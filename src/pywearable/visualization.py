@@ -12,9 +12,14 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
 from matplotlib.dates import DateFormatter, DayLocator, MonthLocator, WeekdayLocator
 from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter
 from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.projections.polar import PolarAxes
+from matplotlib.projections import register_projection
+
+import warnings
 
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
@@ -1033,7 +1038,7 @@ def get_sleep_summary_graph(
 
     time_period = pd.date_range(
         start_date,
-        periods=(end_date - start_date).days + 1,
+        periods=(end_date - start_date).days,
         freq="D",
     )
 
@@ -1654,8 +1659,194 @@ def plot_trend_analysis(
     return ax
 
 
-def hrv_radar_chart():
-    pass
+class RadarAxes(PolarAxes):
+    name = 'radar'
+
+    def __init__(self, *args, **kwargs):
+        super(RadarAxes, self).__init__(*args, **kwargs)
+        self.set_theta_zero_location('N')
+        self.theta = []
+
+    def plot(self, *args, **kwargs):
+        lines = super(RadarAxes, self).plot(*args, **kwargs)
+        for line in lines:
+            self._close_line(line)
+
+    def _close_line(self, line):
+        x, y = line.get_data()
+        if x[0] != x[-1]:
+            x = np.concatenate((x, [x[0]]))
+            y = np.concatenate((y, [y[0]]))
+            line.set_data(x, y)
+
+    def set_varlabels(self, labels):
+        self.set_thetagrids(np.degrees(self.theta), labels)
+
+    def _gen_axes_patch(self):
+        return plt.Circle((0.5, 0.5), 0.5)
+
+    def _gen_axes_spines(self):
+        return PolarAxes._gen_axes_spines(self)
+
+
+def radar_chart(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    comparison_start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    comparison_end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = "mean",
+    metrics: Union[list, None] = None,
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    title: Union[str, None] = None,
+    reference_label: str = 'Reference',
+    comparison_label: str = 'Comparison',
+    legend: bool = True,
+    colors: list = ['lightskyblue', 'salmon'],
+    kwargs_metric_fns = {}
+):
+    """Plots a radar chart of the desired pywearable metrics.
+
+    Plots a radar chart comparing the values between two periods for the desired pywearable metrics. 
+    The radar chart is not limited by the number of the metrics to be included in the chart; 
+    it dynamically adjusts itself to the number of compared metrics.
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id(s) for which the sleep statistic must be computed.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    comparison_start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval of the comparison period, by default None
+    comparison_end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval of the comparison period, by default None
+    kind : :class:`str`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    metrics : :class:`list` or None, optional
+        List of pywearable function for metrics calculation. The list must contain more than 1 metric, by default None
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    show : :class:`str`, optional
+        Whether to show the plot, by default True
+    title : :class:`str`, optional
+        Title of the plot, by default None
+    reference_label : :class:`str`, optional
+        Plot label of the reference data, by default "Reference"
+    comparison_label : :class:`str`, optional
+        Plot label of the comparison data, by default "Comparison"
+    legend: :class:`bool`, optional
+        If true, add a legend with the computed results of the comparison to the plot, by default True
+    colors: :class:`list`, optional
+        Color for the radar chart areas, by default ['lightskyblue', 'salmon']
+    kwargs_metric_fns : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}
+    Raises
+    -------
+    TypeError
+        If an error occurred during the computation of the metrics.
+    TypeError
+        if no selection of pywearable function metrics is provided.
+    ValueError
+        if less than 2 pywearable metric functions are provided.
+    """
+    
+    unknown_metrics, ref_metrics, comp_metrics = [], {}, {}
+    
+    # check that the list of metrics is appropriate for radar chart plotting
+    if metrics is None:
+        raise TypeError("No input list of metrics provided for 'metrics'. Please specify a list of the metric functions"
+                        "to be computed and compared.")
+    elif len(metrics) <= 2:
+        raise ValueError("Not enough metrics selected for a radar chart. Please specify at least 3 pywearable metric functions.")
+    
+    # Register projection of custom RadarAxes class
+    register_projection(RadarAxes)
+    
+    # Compute available metrics
+    for metric_fn in metrics:
+        try:
+            ref_result = metric_fn(loader=loader,
+                                user_id=user_id,
+                                start_date=start_date,
+                                end_date=end_date,
+                                kind=kind,
+                                return_df=True,
+                                **kwargs_metric_fns)
+            ref_metrics[ref_result.loc[user_id].index.values[0]] = ref_result.loc[user_id].values[0]
+            comp_result = metric_fn(loader=loader,
+                                    user_id=user_id,
+                                    start_date=comparison_start_date,
+                                    end_date=comparison_end_date,
+                                    kind=kind,
+                                    return_df=True,
+                                    **kwargs_metric_fns)
+            comp_metrics[comp_result.loc[user_id].index.values[0]] = comp_result.loc[user_id].values[0]
+        except:
+            unknown_metrics.append(metric_fn)
+    
+    # Raise warning pointing out unknown parameters
+    if unknown_metrics != []:
+        warnings.warn("Unknown parameters '%s' will not be computed." % unknown_metrics, stacklevel=2)
+    
+    print(ref_metrics)
+    print(comp_metrics)
+    # Prepare plot
+    if legend:
+        fig, (ax_l, ax) = plt.subplots(1, 2, figsize=(12, 6), subplot_kw=dict(projection='radar'))
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8), subplot_kw={'projection': 'radar'})
+    theta = np.linspace(0, 2 * np.pi, len(ref_metrics.keys()), endpoint=False)
+    ax.theta = theta
+
+    # Prepare plot data
+    ax.set_varlabels([metric for metric in ref_metrics.keys()])
+    max_vals = {metric: max(ref_metrics[metric], comp_metrics[metric]) for metric in ref_metrics.keys()}
+    ref_vals = [(ref_metrics[metric] / max_vals[metric]) * 100 for metric in ref_metrics.keys()]
+    com_vals = [(comp_metrics[metric] / max_vals[metric]) * 100 for metric in ref_metrics.keys()]
+    
+    # Plot data
+    for i, vals in enumerate([ref_vals, com_vals]):
+        ax.plot(theta, vals, color=colors[i])
+        ax.fill(theta, vals, color=colors[i], alpha=0.3)
+    title = "Radar Chart\nReference (%s) vs. Comparison (%s)\n" % (colors[0], colors[1])
+    
+    # Add legend to second empty plot
+    if legend:
+        ax_l.set_title(title, horizontalalignment='center')
+        legend = []
+        # Helper function
+        def _add_legend(label, fc="white"):
+            return legend.append(mpl.patches.Patch(fc=fc, label="\n" + label))
+        # Add list of computed parameters
+        _add_legend(reference_label, colors[0])
+        for metric in ref_metrics.keys():
+            _add_legend("%s:" % metric)
+        # Add list of comparison parameters
+        _add_legend(comparison_label, colors[1])
+        for metric in ref_metrics.keys():
+            _add_legend("%.2f vs. %.2f" % (ref_metrics[metric], comp_metrics[metric]))
+        # Add relative differences
+        _add_legend("")
+        for i, _ in enumerate(ref_metrics.keys()):
+            rel_diff = (com_vals[i] - ref_vals[i])/(ref_vals[i]) * 100
+            _add_legend("+%.2f%s" % (rel_diff, r"$\%$") if rel_diff > 0 else "%.2f%s" % (rel_diff, r"$\%$"))
+        ax_l.legend(handles=legend, ncol=3, frameon=False, loc=7)
+        ax_l.axis('off')
+    else:
+        ax.set_title(title, horizontalalignment='center')
+    if save_to:
+        plt.savefig(save_to, bbox_inches="tight")
+    if show:
+        plt.show()
+    else:
+        plt.close()
+	
 
 
 def intensity_chart():
