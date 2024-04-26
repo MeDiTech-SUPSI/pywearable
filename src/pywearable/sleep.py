@@ -14,6 +14,8 @@ import warnings
 from . import constants, utils
 from .loader.base import BaseLoader
 
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 _SLEEP_METRIC_TIB = "TIB"
 _SLEEP_METRIC_TST = "TST"
 _SLEEP_METRIC_WASO = "WASO"
