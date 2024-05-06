@@ -14,6 +14,8 @@ import warnings
 from . import constants, utils
 from .loader.base import BaseLoader
 
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 _SLEEP_METRIC_TIB = "TIB"
 _SLEEP_METRIC_TST = "TST"
 _SLEEP_METRIC_WASO = "WASO"
@@ -2152,7 +2154,7 @@ def get_cpd_midpoint(
     loader : `pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default "all"
+        The id(s) for which CPD must be retrieved, by default 'all'
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -2202,7 +2204,7 @@ def get_cpd_duration(
     loader : `pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default "all"
+        The id(s) for which CPD must be retrieved, by default 'all'
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -3669,6 +3671,8 @@ def get_sleep_statistic(
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`
         The id(s) for which the sleep statistic must be computed.
+    metric : :class:`str`
+        The name of the sleep statistic which must be computed.
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional

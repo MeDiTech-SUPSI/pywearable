@@ -9,14 +9,11 @@ from math import degrees, floor, radians
 from typing import Union
 
 import dateutil.parser
-
-# import hrvanalysis
 import numpy as np
 import pandas as pd
 import scipy.stats
 
 from . import constants
-from .loader.base import BaseLoader
 
 _LABFRONT_LAST_SAMPLE_UNIX_TIMESTAMP_IN_MS_KEY = "lastSampleUnixTimestampInMs"
 _LABFRONT_QUESTIONNAIRE_STRING = "questionnaire"
@@ -93,15 +90,15 @@ def check_is_df(input, raise_name="input"):
     return input
 
 
-def get_user_ids(loader: "BaseLoader", user_id: Union[str, list]):
+def get_user_ids(loader: "BaseLoader", user_id: Union[str, list] = "all"):
     """Returns user ids in the appropriate format required by pywearable functions
 
     Parameters
     ----------
     loader : :class:`loader.base.BaseLoader`
-        An instance of a data loader
-    user_id : :class:`str` or :class:`list`
-        The id(s) of the user(s) of interest
+        An instance of a data loader.
+    user_id : :class:`str` or :class:`list`, optional
+        The id(s) of the user(s) of interest, by default "all".
 
     Returns
     -------
@@ -118,6 +115,83 @@ def get_user_ids(loader: "BaseLoader", user_id: Union[str, list]):
         raise TypeError("user_id has to be a list.")
 
     return user_id
+
+
+def return_multiindex_df(
+    df: pd.DataFrame, return_df: bool, return_multi_index: bool
+) -> dict:
+    # Check if df is pd.DataFrame
+    if not (type(df) == pd.DataFrame):
+        raise ValueError(f"df must be of type pd.DataFrame, not of {type(df)}")
+    # Check if we have multilevel index
+    if not (type(df.index) == pd.MultiIndex):
+        raise ValueError(
+            f"df.index must be of type pd.MultiIndex, not of {type(df.index)}"
+        )
+    if not return_df:
+        # We need to perform some changes to return dictionary with dates
+        # and not pd.Timestamp as keys
+        if len(df.columns) > 1:
+            """
+            More than one column, dictionary will be:
+            {
+                user_id1: {
+                    datetime.date1: {
+                        metric1: value1,
+                        metric2: value2,
+                        ...
+                    },
+                    datetime.date2: {
+                        metric1: value1,
+                        metric2: value2,
+                    }
+                },
+                user_id2: {
+                    datetime.date1: {
+                        ...
+                    }
+                }
+            }
+
+            """
+            return {
+                user: {
+                    date.to_pydatetime().date(): df.xs((user, date)).to_dict()
+                    for date in df.index.levels[1]
+                }
+                for user in df.index.levels[0]
+            }
+        else:
+            """
+            Single metric, dictionary will be:
+            {
+                user_id1: {
+                    datetime.date1: value1,
+                    datetime.date2: value2
+                },
+                user_id2: {
+                    datetime.date1: value1,
+                    datetime.date2: value2
+                }
+            }
+            """
+            return {
+                level: {
+                    k.to_pydatetime().date(): v
+                    for k, v in df.xs(level).loc[:, df.columns[0]].to_dict().items()
+                }
+                for level in df.index.levels[0]
+            }
+    else:
+        # We return a dataframe
+        if return_multi_index:
+            # Standard multi-index dataframe
+            return df
+        else:
+            # Single index dataframe
+            return df.reset_index(
+                level=[constants._USER_COL, constants._CALENDAR_DATE_COL]
+            )
 
 
 def get_summary(loader: "BaseLoader", comparison_date=time.time()):
@@ -486,76 +560,32 @@ def std_time(times):
     return "%02i:%02i" % (h_std, m_std)
 
 
-def filter_bbi(
-    bbi,
-    remove_outliers=True,
-    remove_ectopic=True,
-    verbose=False,
-    low_rri=300,
-    high_rri=2000,
-    ectopic_method="malik",
-    interpolation_method="linear",
+def filter_out_awake(
+    loader: "BaseLoader",
+    user: str,
+    df: pd.DataFrame,
+    date: datetime.date,
+    resolution: int = 1,
 ):
-    """Get filtered bbi data.
-
-    This function returns bbi data filtered out from outliers and/or ectopic beats.
+    """Filters out night data relative to periods where the user was awake
 
     Parameters
     ----------
-    bbi : list
-        series of beat to beat interval
-    remove_outliers : bool, optional
-        determines if outliers below ``low_rri`` and above ``high_rri`` should be filtered out, by default True
-    remove_ectopic : bool, optional
-        determines if ectopic beats should be removed from the bbi series, by default True
-    verbose : bool, optional
-        whether the function should print out data about the amount of outliers/ectopic beats removed, by default False
-    low_rri : int, optional
-        lower threshold for outlier detection, by default 300
-    high_rri : int, optional
-        upper threshold for outlier detection, by default 2000
-    ectopic_method : str, optional
-        method used to determine and filter out ectopic beats, by default "malik"
-    interpolation_method : str, optional
-        method used to interpolate missing values after the removal of outliers/ectopic beats, by default "linear"
-    """
-    if remove_outliers:
-        bbi = hrvanalysis.remove_outliers(
-            bbi, low_rri=low_rri, high_rri=high_rri, verbose=verbose
-        )
-        bbi = hrvanalysis.interpolate_nan_values(
-            bbi, interpolation_method=interpolation_method
-        )
-    if remove_ectopic:
-        bbi = hrvanalysis.remove_ectopic_beats(
-            bbi, method=ectopic_method, verbose=verbose
-        )
-        bbi = hrvanalysis.interpolate_nan_values(
-            bbi, interpolation_method=interpolation_method
-        )
-    return bbi
-
-
-def filter_out_awake_bbi(loader, user, bbi_df, date, resolution=1):
-    """Filters out night bbi data relative to periods where the user was awake
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
+    loader : :class:`pywearable.loader.base.BaseLoader`
         Initialized instance of data loader.
     user : class:`str`
-        ID of the user for which bbi data has to be filtered.
-    bbi_df : class:`pandas.DataFrame`
-        DataFrame of bbi data
-    date : class:`pandas.Timestamp`
-        Timestamp of the date relative to the night in consideration.
-    resolution : class:`int`
-        Resolution of the hypnogram used to find awakening periods
+        ID of the user for which data has to be filtered.
+    df : class:`pandas.DataFrame`
+        DataFrame of the data to filter, must contain an isoDate column
+    date : class:`datetime.date`
+        Date relative to the night in consideration.
+    resolution : class:`int`, optional
+        Resolution of the hypnogram used to find awake periods, by default 1
 
     Returns
     -------
-    pandas.DataFrame
-    DataFrame in the same format of `bbi_df`, including only bbi data of periods when the participant is asleep.
+    :class:`pandas.DataFrame`
+        Filtered version of the original `df`, including only data of periods when the participant is asleep.
     """
     # we get the hypnogram for that day
     hypnogram = loader.load_hypnogram(
@@ -587,9 +617,8 @@ def filter_out_awake_bbi(loader, user, bbi_df, date, resolution=1):
     ]
 
     for start, end in zip(datetime_starts, datetime_ends):
-        bbi_df = bbi_df.loc[
-            (bbi_df[constants._ISODATE_COL] < start)
-            | (bbi_df[constants._ISODATE_COL] > end)
+        df = df.loc[
+            (df[constants._ISODATE_COL] < start) | (df[constants._ISODATE_COL] > end)
         ]
 
-    return bbi_df
+    return df
