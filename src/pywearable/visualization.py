@@ -5,15 +5,21 @@ This module contains all the functions related to the visualization of data
 
 import datetime
 from pathlib import Path
-from typing import Union
+from typing import Union, Callable
 
 import july
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from matplotlib.dates import DateFormatter
+
+from matplotlib.dates import DateFormatter, DayLocator, MonthLocator, WeekdayLocator
 from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter
+from matplotlib.colors import ListedColormap, LinearSegmentedColormap
+from matplotlib.projections.polar import PolarAxes
+from matplotlib.projections import register_projection
+
+import warnings
 
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
@@ -27,6 +33,39 @@ from .loader.base import BaseLoader
 
 date_form = DateFormatter("%m-%d")
 
+def _define_custom_colormap(
+        base_colormap : Union[str, ListedColormap, LinearSegmentedColormap],
+        missing_data_index : int = 0,
+        missing_data_color : tuple = (0.8, 0.8, 0.8, 1.0),
+        cmap_name : str = 'custom_colormap'
+        ):
+    """Defines a custom colormap
+
+    Parameters
+    ----------
+    base_colormap : :class:`str`, :class:`ListedColormap`, :class:`LinearSegmentedColormap`
+        Colormap object from which to start the customization
+    missing_data_index : int, optional
+        The index within the colormap to associate with the missing_data_color, by default 0
+    missing_data_color : tuple, optional
+        The color for missing data, if not specified it's light grey, by default (0.8, 0.8, 0.8, 1.0)
+    cmap_name : str, optional
+        The name of the customized colormap, by default 'custom_colormap'
+            
+    Returns
+    -------
+    :class:`ListedColorMap`
+        the customized colormap
+    """
+
+    if type(base_colormap) == str:
+        cmap = plt.cm.get_cmap(base_colormap)
+    
+    # ListedColormap with the same colors but extended to include a specific color for missing data
+    cmap_list = [cmap(i) for i in range(cmap.N)]
+    cmap_list[missing_data_index] = missing_data_color 
+    return ListedColormap(cmap_list, name=cmap_name)
+
 
 def get_steps_line_graph_and_stats(
     loader: BaseLoader,
@@ -39,9 +78,14 @@ def get_steps_line_graph_and_stats(
     steps_line_label: str = "steps",
     goal_line_label: str = "daily goal",
     ylabel: str = "Steps",
-    plot_title: Union[str, None] = "Daily steps",
+    title: Union[str, None] = None,
     figsize: tuple = (10, 6),
     fontsize: int = 15,
+    locator_interval: int = 2,
+    plot_guideline_zones : bool = False,
+    zones_labels: list = ["Sedentary", "Low active", "Somewhat active", "Active", "Highly active"],
+    zones_colors: list = ["tomato", "orange", "yellow", "aquamarine", "forestgreen"],
+    zones_alpha: float = 0.25
 ) -> dict:
     """Generate line-plot of daily steps and goals.
 
@@ -52,7 +96,7 @@ def get_steps_line_graph_and_stats(
 
     Parameters
     ----------
-    loader : :class:`pylabfront.loader.LabfrontLoader`
+    loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader
     user_id : :class:`str`
         The id of the user of interest
@@ -78,6 +122,16 @@ def get_steps_line_graph_and_stats(
         Size of the figure, by default (10,6)
     fontsize : :class:`int`, optional
         Font size of the graph, by default 15
+    locator_interval : :class:`int`, optional
+        Interval for the x-axis dates, by default 2
+    plot_guideline_zones : :class:`bool`, optional
+        Whether to plot shaded regions corresponding to general guidelines for steps, by default False
+    zones_labels : :class:`str`, optional
+        labels of the guideline ranges, by default ["Sedentary", "Low active", "Somewhat active", "Active", "Highly active"]
+    zones_colors : :class:`list`, optional
+        Colors of the guideline ranges, by default ["tomato", "orange", "yellow", "aquamarine", "forestgreen"]
+    zones_alpha : :class:`float`, optional
+        Alphas for the guideline ranges, by default 0.25
 
     Returns
     -------
@@ -118,14 +172,20 @@ def get_steps_line_graph_and_stats(
 
     with plt.style.context("ggplot"):
         fig, ax = plt.subplots(figsize=figsize)
-        ax.xaxis.set_major_formatter(date_form)
+
         ax.plot(dates, steps, label=steps_line_label, c="k")
         ax.plot(dates, goals, linestyle="--", c="g", label=goal_line_label)
         ax.scatter(dates, steps, c=col, s=100)
+
+        ax.xaxis.set_major_formatter(date_form)
+        locator = DayLocator(interval=locator_interval)
+        ax.xaxis.set_major_locator(locator)
+
         plt.xticks(rotation=45, fontsize=fontsize)
         plt.yticks(fontsize=fontsize)
-        plt.legend(fontsize=fontsize - 1, loc="best")
+        
         plt.grid("on")
+
         plt.ylim([max(min(steps) - 500, 0), max(steps) + 2000])
         plt.xlim(
             [
@@ -133,11 +193,70 @@ def get_steps_line_graph_and_stats(
                 max(dates) + datetime.timedelta(hours=6),
             ]
         )
+
         plt.ylabel(ylabel, fontsize=fontsize)
-        if plot_title:
-            plt.title(plot_title, fontsize=fontsize + 2)
-        if save_to:
-            plt.savefig(save_to, bbox_inches="tight")
+
+        if title:
+            plt.title(title, fontsize=fontsize + 2)
+
+        if plot_guideline_zones:
+            min_date = dates[0]
+            max_date = dates[-1]
+            # plot coloring by fill_between different y-ranges
+            # highly active
+            ax.fill_between(
+                [min_date, max_date],
+                [12500 for i in range(2)],
+                [max(12500, max(steps)+2000) for i in range(2)],
+                color=zones_colors[4],
+                alpha=zones_alpha,
+                label=zones_labels[4],
+            )
+            # active
+            ax.fill_between(
+                [min_date, max_date],
+                [10000 for i in range(2)],
+                [12499 for i in range(2)],
+                color=zones_colors[3],
+                alpha=zones_alpha,
+                label=zones_labels[3],
+            )
+            # somewhat active
+            ax.fill_between(
+                [min_date, max_date],
+                [7500 for i in range(2)],
+                [9999 for i in range(2)],
+                color=zones_colors[2],
+                alpha=zones_alpha,
+                label=zones_labels[2],
+            )
+            # low active
+            ax.fill_between(
+                [min_date, max_date],
+                [5000 for i in range(2)],
+                [7499 for i in range(2)],
+                color=zones_colors[1],
+                alpha=zones_alpha,
+                label=zones_labels[1],
+            )
+            # sedentary
+            ax.fill_between(
+                [min_date, max_date],
+                [0 for i in range(2)],
+                [4999 for i in range(2)],
+                color=zones_colors[0],
+                alpha=zones_alpha,
+                label=zones_labels[0],
+            )
+        
+        plt.legend(fontsize=fontsize - 1,
+                    loc="center left",
+                    bbox_to_anchor=(1, 0.5)
+                    )
+
+    if save_to:
+        plt.savefig(save_to, 
+                    bbox_inches="tight")
 
     if show:
         plt.show()
@@ -158,7 +277,6 @@ def get_cardiac_line_graph_and_stats(
     user_id: str,
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    verbose: bool = False,
     save_to: Union[str, None] = None,
     show: bool = True,
     resting_hr_label: str = "resting heart rate",
@@ -170,13 +288,12 @@ def get_cardiac_line_graph_and_stats(
 ) -> dict:
     """Generate graph of cardiac activity
 
-    This function generate (and possibly save) a graph of cardiac data of `user_id`
+    This function generate a graph of cardiac data of `user_id`
     for a period of interest between `start_date` and `end_date`.
-    Cardiac statistics are computed and returned.
 
     Parameters
     ----------
-    loader : :class:`pylabfront.loader.LabfrontLoader`
+    loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str`
         The id of the user of interest
@@ -184,8 +301,6 @@ def get_cardiac_line_graph_and_stats(
         Start date for data retrieval, by default None
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         End date for data retrieval, by default None
-    verbose : :class:`bool`, optional
-        Whether to print out information about cardiac statistics, by default False
     save_to : :class:`str` or None, optional
         Path where to save the plot, by default None
     show : :class:`bool`, optional
@@ -202,35 +317,24 @@ def get_cardiac_line_graph_and_stats(
         Size of the figure, by default (10,6)
     fontsize : :class:`int`, optional
         Font size of the plot, by default 15
-
-    Returns
-    -------
-    :class:`dict`
-        dictionary of cardiac statistics for the period of interest
-        (Average resting heart rate, Maximum heart rate overall)
     """
     
-    # get stats
-    avg_resting_hr = round(
-        cardiac.get_rest_heart_rate(
-            loader, user_id, start_date, end_date, kind="mean"
-        )[user_id]["RHR"]
-    )
-    max_hr_recorded = cardiac.get_max_heart_rate(
-        loader, user_id, start_date, end_date, kind="max"
-            )[user_id]["MHR"]
-    stats_dict = {
-        "Mean resting HR": avg_resting_hr,
-        "Maximum HR overall": max_hr_recorded,
-    }
     # get time series
     dates, rest_hr = zip(
-        *cardiac.get_rest_heart_rate(loader, user_id, start_date, end_date)[
+        *cardiac.get_rest_heart_rate(loader=loader, 
+                                     user_id=user_id, 
+                                     start_date=start_date, 
+                                     end_date=end_date, 
+                                     return_df=False)[
             user_id
         ].items()
     )
     max_hr = list(
-        cardiac.get_max_heart_rate(loader, user_id, start_date, end_date)[
+        cardiac.get_max_heart_rate(loader=loader, 
+                                   user_id=user_id, 
+                                   start_date=start_date, 
+                                   end_date=end_date, 
+                                   return_df=False)[
             user_id
         ].values()
     )
@@ -264,7 +368,7 @@ def get_cardiac_line_graph_and_stats(
         plt.yticks(fontsize=fontsize)
         plt.legend(loc="upper right", fontsize=fontsize - 1)
         plt.grid("both")
-        plt.ylim([min(30, min(rest_hr)), max(200, max_hr_recorded + 30)])
+        plt.ylim([min(30, min(rest_hr)), max(200, max(max_hr) + 30)])
         if title:
             plt.title(title, fontsize=fontsize + 2)
         if save_to:
@@ -273,12 +377,6 @@ def get_cardiac_line_graph_and_stats(
         plt.show()
     else:
         plt.close()
-
-    if verbose:
-        print(f"Resting HR: {avg_resting_hr}")
-        print(f"Maximum HR: {max_hr_recorded}")
-
-    return stats_dict
 
 
 def get_rest_spo2_graph(
@@ -304,7 +402,7 @@ def get_rest_spo2_graph(
 
     Parameters
     ----------
-    loader : :class:`pylabfront.loader.LabfrontLoader`
+    loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str`
         _The id of the user
@@ -335,10 +433,10 @@ def get_rest_spo2_graph(
     timedelta = datetime.timedelta(
         hours=12
     )  # this assumes that at the last day a person wakes up before midday...
-    spo2_df = loader.load_garmin_connect_pulse_ox(
+    spo2_df = loader.load_pulse_ox(
         user_id, start_date, end_date + timedelta
     )
-    sleep_spo2_df = spo2_df[spo2_df.sleep == 1].loc[:, ["isoDate", "spo2"]]
+    sleep_spo2_df = spo2_df[spo2_df.isSleeping == 1].loc[:, ["isoDate", "spo2"]]
     unique_dates = pd.to_datetime(sleep_spo2_df.isoDate.dt.date.unique())
     # in order to avoid plotting lines between nights, we need to plot separately each sleep occurrence
     # unfortunately this takes some time (~6-7s/month), to find appropriate night for every row, maybe try to improve? #TODO
@@ -414,97 +512,6 @@ def get_rest_spo2_graph(
         plt.close()
 
 
-def get_stress_grid_and_stats(
-    loader: BaseLoader,
-    user_id: str,
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    verbose: bool = False,
-    save_to: Union[str, None] = None,
-    show: bool = True,
-    title: str = "Average daily stress",
-) -> dict:
-    """Generate a github-like plot of daily stress scores
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.LabfrontLoader`
-        An instance of a data loader
-    user_id : :class:`str`
-        The id of the user
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    verbose : :class:`bool`, optional
-        Whether to print out average daily stress score, by default False
-    save_to : :class:`str` or None, optional
-        Path where to save the plot, by default None
-    show : :class:`bool`, optional
-        Whether to show the plot, by default True
-    title : :class:`str`, optional
-        Title of the plot, by default "Average daily stress"
-
-    Returns
-    -------
-    :class:`int`
-        Average stress score for the period of interest
-    """
-    
-    # get stats
-    dates, metrics = zip(
-        *stress.get_daily_stress_statistics(loader, user_id, start_date, end_date)[
-            user_id
-        ].items()
-    )
-    daily_avg_stress, daily_max_stress = list(zip(*metrics))
-    avg_stress = round(np.mean(daily_avg_stress))
-
-    # Plot yearly stress
-    # We need to create a DataFrame with dates going from one year before to the latest datetime
-    # Get start and end days from calendar date
-    start_date = dates[-1] - datetime.timedelta(days=364)
-    # we want to make it inclusive wrt end_date
-    end_date = dates[-1] + datetime.timedelta(days=1)
-    intervals = int(divmod((end_date - start_date).total_seconds(), 60 * 60 * 24)[0])
-    time_delta_intervals = [
-        start_date + i * datetime.timedelta(days=1) for i in range(intervals)
-    ]
-
-    stress_reduced_df = pd.DataFrame({"date": dates, "stress": daily_avg_stress})
-
-    stress_df = pd.DataFrame(
-        {
-            "date": time_delta_intervals,
-        }
-    )
-
-    stress_df = pd.merge(left=stress_df, right=stress_reduced_df, on="date", how="left")
-
-    stress_df.loc[stress_df.stress.isna(), "stress"] = 0
-
-    july.heatmap(
-        stress_df.date,
-        stress_df.stress,
-        cmap="golden",
-        title=title,
-        colorbar=True,
-        month_grid=True,
-    )
-
-    if save_to:
-        plt.savefig(save_to, bbox_inches="tight")
-    if show:
-        plt.show()
-    else:
-        plt.close()
-
-    if verbose:
-        print(f"Average daily stress: {avg_stress}")
-
-    return avg_stress
-
-
 def get_respiration_line_graph_and_stats(
     loader: BaseLoader,
     user_id: str,
@@ -562,20 +569,22 @@ def get_respiration_line_graph_and_stats(
     
     # get series, note that we're inclusive wrt the whole last day
     rest_dates, rest_resp = zip(
-        *respiration.get_rest_breaths_per_minute(
+        *respiration.get_mean_rest_breaths_per_minute(
             loader,
             user_id,
             start_date,
-            end_date + datetime.timedelta(hours=23, minutes=59),
-            remove_zero=True,
+            end_date,
+            return_df=False,
+            remove_zero=True
         )[user_id].items()
     )
     waking_dates, waking_resp = zip(
-        *respiration.get_waking_breaths_per_minute(
+        *respiration.get_mean_awake_breaths_per_minute(
             loader,
             user_id,
             start_date,
-            end_date + datetime.timedelta(hours=23, minutes=59),
+            end_date,
+            return_df=False,
             remove_zero=True,
         )[user_id].items()
     )
@@ -623,111 +632,255 @@ def get_respiration_line_graph_and_stats(
     return stats_dict
 
 
-def get_sleep_grid_and_stats(
+def get_metric_heatmap(
     loader: BaseLoader,
     user_id: str,
+    metric_fn : Callable,
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    verbose: bool = False,
+    period_length : Union[int, None] = None,
     save_to: Union[str, None] = None,
     show: bool = True,
-    title: str = "Sleep performance",
-) -> dict:
+    kwargs_heatmap : dict = {}
+):
     """
     Generate a github-like grid plot of the sleep scores over that years for `user_id`
 
     Parameters
     ----------
-    loader : :class:`pylabfront.loader.LabfrontLoader`
-        An instance of a data loader
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
     user_id : :class:`str`
-        The id of the user
+        The id(s) for which the sleep statistic must be computed.
+    metric_fn : :class:`callable`
+        A pywearable function to calculate the metric of interest for which the heatmap must be generated.
+        The function is expected to return a dictionary for the user, such that the primary key
+        is the user's id, the secondary keys are the dates and the values are the metric observations.
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         End date for data retrieval, by default None
-    verbose : :class:`bool`, optional
-        Whether to print out sleep stats, by default False
+    period_length : :class:`int` or None, optional
+        Duration of the period to be shown (in days) in the heatmap.
+        If not specified the period coincides with the dates where data is available, by default None
     save_to : :class:`str` or None, optional
         Path where to save the grid plot, by default None
     show : :class:`str`, optional
         _Whether to show the plot, by default True
-    title : :class:`str`, optional
-        Title of the plot, by default "Sleep performance"
-
-    Returns
-    -------
-    :class:`dict`
-        Dictionary of sleep stats (averages of sleep stages durations, awakenings, and sleep score)
+    kwargs_heatmap : :class:`dict`, optional
+        Additional keyword arguments for the july's heatmap function, by default {}
     """
 
+    assert(type(period_length) == int or period_length is None)
+
     dates, scores = zip(
-        *sleep.get_sleep_score(loader, user_id, start_date, end_date)[user_id].items()
+        *metric_fn(loader, user_id, start_date, end_date)[user_id].items()
     )
-    # Get start and end days from calendar date
-    start_date = dates[-1] - datetime.timedelta(days=364)
-    end_date = dates[-1] + datetime.timedelta(days=1)
-    intervals = int(divmod((end_date - start_date).total_seconds(), 60 * 60 * 24)[0])
+    # Get start and end days for the heatmap, based on data and desired backward extension
+    start_date = dates[0] if period_length is None else dates[-1] - datetime.timedelta(days=period_length - 1) 
+    end_date = dates[-1]
     time_delta_intervals = [
-        start_date + i * datetime.timedelta(days=1) for i in range(intervals)
+        start_date + i * datetime.timedelta(days=1) for i in range((end_date - start_date).days + 1)
     ]
 
-    sleep_reduced_df = pd.DataFrame({"date": dates, "sleep": scores})
+    data_df = pd.DataFrame({"date": dates, "metric": scores})
 
-    sleep_df = pd.DataFrame({"date": time_delta_intervals})
+    extended_df = pd.DataFrame({"date": time_delta_intervals})
 
-    sleep_df = pd.merge(left=sleep_df, right=sleep_reduced_df, on="date", how="left")
-    sleep_df.loc[sleep_df.sleep.isna(), "sleep"] = 0
+    extended_df = pd.merge(left=extended_df, right=data_df, on="date", how="left")
+    extended_df.loc[extended_df.metric.isna(), "metric"] = 0
 
     july.heatmap(
-        sleep_df.date,
-        sleep_df.sleep,
-        cmap="BuGn",
-        title=title,
-        colorbar=True,
-        month_grid=True,
-    )
+            extended_df.date,
+            extended_df.metric,
+            **kwargs_heatmap
+        )
+    
+    if show:
+        plt.show()
 
     if save_to:
         plt.savefig(save_to, bbox_inches="tight")
 
-    if show:
-        plt.show()
 
-    # stats
-    avg_deep = sleep.get_n3_duration(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["N3"]
-    avg_light = sleep.get_n1_duration(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["N1"]
-    avg_rem = sleep.get_rem_duration(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["REM"]
-    avg_awake = sleep.get_awake_duration(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["AWAKE"]
-    avg_awakenings = sleep.get_awake_count(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["countAwake"]
-    avg_score = sleep.get_sleep_score(
-        loader, user_id, start_date, end_date, kind="mean"
-    )[user_id]["SCORE"]
+def get_sleep_performance_heatmap(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    period_length : int = 365,
+    cmin : Union[int, None] = None,
+    cmax : Union[int, None] = None,
+    title : Union[str, None] = "Sleep Performance"
+):
+    """Generate a github-like heatmap plot of daily sleep scores
 
-    stats_dict = {
-        "Average light sleep": f"{avg_light}",
-        "Average deep sleep": f"{avg_deep}",
-        "Average REM sleep": f"{avg_rem}",
-        "Average awake time": f"{avg_awake}",
-        "Average awakenings": round(avg_awakenings, 1),
-        "Average sleep score": round(avg_score),
-    }
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader
+    user_id : :class:`str`
+        The id of the user for which the sleep performance heatmap must be generated.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    save_to : :class:`str` or None, optional
+        Path where to save the plot, by default None
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    period_length : :class:`int`, optional
+        Period length (in days) to show, a year is shown is shown if not chosen otherwise, by default 365
+    cmin : :class:`int` or None, optional
+        Minimum value for the colorbar. If not specified the minimum value of the data is used, by default None
+    cmax : :class:`int` or None, optional
+        Maximum value for the colorbar. If not specified the maximum value of the data is used, by default None
+    """
 
-    if verbose:
-        for k, v in stats_dict.items():
-            print(f"{k} : {v}")
+    custom_cmap = _define_custom_colormap(base_colormap="BuGn",
+                                          missing_data_index=0,
+                                          missing_data_color=(0.9, 0.9, 0.9, 1.0))
 
-    return stats_dict
+    get_metric_heatmap(loader=loader,
+                       user_id=user_id,
+                       metric_fn=sleep.get_sleep_score,
+                       start_date=start_date,
+                       end_date=end_date,
+                       period_length=period_length,
+                       save_to=save_to,
+                       show=show,
+                       kwargs_heatmap={"cmap":custom_cmap,
+                                       "title":title,
+                                       "fontsize":14,
+                                       "frame_on":True,
+                                       "month_grid":True,
+                                       "colorbar":True,
+                                       "year_label":period_length>=365,
+                                       "cmin":cmin,
+                                       "cmax":cmax
+                                       })
+
+
+def get_stress_heatmap(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    period_length : int = 365,
+    cmin : Union[int, None] = None,
+    cmax : Union[int, None] = None,
+    title : Union[str, None] = "Stress scores"
+):
+    """Generate a github-like heatmap plot of daily stress scores
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader
+    user_id : :class:`str`
+        The id of the user for which the stress scores heatmap must be generated.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    save_to : :class:`str` or None, optional
+        Path where to save the plot, by default None
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    period_length : :class:`int`, optional
+        Period length (in days) to show, a year is shown is shown if not chosen otherwise, by default 365
+    cmin : :class:`int` or None, optional
+        Minimum value for the colorbar. If not specified the minimum value of the data is used, by default None
+    cmax : :class:`int` or None, optional
+        Maximum value for the colorbar. If not specified the maximum value of the data is used, by default None
+    """
+
+    custom_cmap = _define_custom_colormap(base_colormap="YlOrBr",
+                                          missing_data_index=0,
+                                          missing_data_color=(0.9, 0.9, 0.9, 1.0))
+    
+    get_metric_heatmap(loader=loader,
+                       user_id=user_id,
+                       metric_fn=stress.get_daily_stress_score,
+                       start_date=start_date,
+                       end_date=end_date,
+                       period_length=period_length,
+                       save_to=save_to,
+                       show=show,
+                       kwargs_heatmap={"cmap":custom_cmap,
+                                       "title":title,
+                                       "fontsize":14,
+                                       "frame_on":True,
+                                       "month_grid":True,
+                                       "colorbar":True,
+                                       "year_label":period_length>=365,
+                                       "cmin":cmin,
+                                       "cmax":cmax
+                                       })
+
+
+def get_recovery_heatmap(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    period_length : int = 365,
+    cmin : Union[int, None] = None,
+    cmax : Union[int, None] = None,
+    title : Union[str, None] = "Recovery"
+):
+    """Generate a github-like heatmap plot of night recovery
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader
+    user_id : :class:`str`
+        The id of the user for which the night recovery heatmap must be generated.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    save_to : :class:`str` or None, optional
+        Path where to save the plot, by default None
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    period_length : :class:`int`, optional
+        Period length (in days) to show, a year is shown is shown if not chosen otherwise, by default 365
+    cmin : :class:`int` or None, optional
+        Minimum value for the colorbar. If not specified the minimum value of the data is used, by default None
+    cmax : :class:`int` or None, optional
+        Maximum value for the colorbar. If not specified the maximum value of the data is used, by default None
+    """
+
+    custom_cmap = _define_custom_colormap(base_colormap="RdYlGn",
+                                          missing_data_index=0,
+                                          missing_data_color=(0.9, 0.9, 0.9, 1.0))
+    
+    get_metric_heatmap(loader=loader,
+                       user_id=user_id,
+                       metric_fn=stress.get_recovery_percentage,
+                       start_date=start_date,
+                       end_date=end_date,
+                       period_length=period_length,
+                       save_to=save_to,
+                       show=show,
+                       kwargs_heatmap={"cmap":custom_cmap,
+                                       "title":title,
+                                       "fontsize":14,
+                                       "frame_on":True,
+                                       "month_grid":True,
+                                       "colorbar":True,
+                                       "year_label":period_length>=365,
+                                       "cmin":cmin,
+                                       "cmax":cmax
+                                       })
 
 
 def get_sleep_summary_graph(
@@ -751,11 +904,12 @@ def get_sleep_summary_graph(
     show_chronotype: bool = False,
     chronotype_sleep_start: Union[str, None] = None,
     chronotype_sleep_end: Union[str, None] = None,
-    sleep_metric: Union[str, None] = None,
+    consistency_metric: Union[str, None] = None,
     legend_fontsize : int = 14,
     axis_fontsize : int = 14,
     title_fontsize : int = 20,
-    score_fontsize : int = 15
+    score_fontsize : int = 15,
+    kwargs_trend_analysis : dict = {}
 ):
     """
     Generates a graph of all hypnograms of main sleeps of `user_id` for the period of interest
@@ -802,7 +956,7 @@ def get_sleep_summary_graph(
         usual sleeping time for `user_id` in format HH:MM, by default None
     chronotype_sleep_end : :class:`str` or None, optional
         usual waking time for `user_id` in format HH:MM, by default None
-    sleep_metric : :class:`str` or None, optional
+    consistency_metric : :class:`str` or None, optional
         metric used for circadian variability ("midpoint" or "duration"), by default None
     legend_fontsize: :class:`int`, optional
         fontsize of the sleep stages legend, by default 14
@@ -812,6 +966,8 @@ def get_sleep_summary_graph(
         fontsize of the title, by default 20
     score_fontsize: :class:`int`, optional
         fontsize of the score on the hypnograms, by default 
+    kwargs_trend_analysis : :class:`dict`, optional
+        kwargs for the trend analysis of consistency metrics, by default {}
     """
 
 
@@ -826,24 +982,30 @@ def get_sleep_summary_graph(
     POSITION = 1.3
 
     # Get sleep summaries so that it is easier to get info
-    sleep_summaries = loader.load_sleep_summary(user_id, start_date, end_date)
+    sleep_summaries = loader.load_sleep_summary(
+        user_id, start_date, end_date
+    )
+    # no data
     if len(sleep_summaries) == 0:
-        return
+        raise ValueError(f"No sleep data available between {start_date} and {end_date}")
     sleep_min_time = datetime.time(15, 0)
     # Check for start and end dates and convert them appropriately
     start_date = utils.check_date(start_date)
     end_date = utils.check_date(end_date)
 
     # check chronotype and infer it from data if missing
-    if sleep_metric is not None or show_chronotype is not None:
+    if consistency_metric is not None or show_chronotype is not None:
         if chronotype_sleep_start is None or chronotype_sleep_end is None:
-            infer_chronotype = sleep.get_sleep_timestamps(loader=loader,
-                                                            user_id=user_id,
-                                                            start_date=start_date,
-                                                            end_date=end_date,
-                                                            kind="mean")
-            chronotype_sleep_start = infer_chronotype[user_id][0]
-            chronotype_sleep_end = infer_chronotype[user_id][1]
+            chronotype_sleep_start = sleep.get_bedtime(loader=loader,
+                                                           user_id=user_id,
+                                                           start_date=start_date,
+                                                           end_date=end_date,
+                                                           kind="mean")[user_id]["bedTime"]
+            chronotype_sleep_end = sleep.get_wakeup_time(loader=loader,
+                                                           user_id=user_id,
+                                                           start_date=start_date,
+                                                           end_date=end_date,
+                                                           kind="mean")[user_id]["wakeupTime"]
         else:
             assertion_msg = "Must specify chronotype in format 'HH:MM' when plotting circadian measures"
             assert (
@@ -925,13 +1087,13 @@ def get_sleep_summary_graph(
                 return "firebrick"
 
     hypnograms = loader.load_hypnogram(user_id, start_date, end_date, resolution=1)
-    if sleep_metric is None:
+    if consistency_metric is None:
         fig, ax = plt.subplots(figsize=figsize)
-    elif sleep_metric == "midpoint" or sleep_metric == "duration":
+    elif consistency_metric == "midpoint" or consistency_metric == "duration":
         fig, (ax, ax2) = plt.subplots(
             1, 2, gridspec_kw={"width_ratios": [8, 2]}, figsize=figsize
         )
-    elif sleep_metric == "both":
+    elif consistency_metric == "both":
         fig, (ax, ax2, ax3) = plt.subplots(
             1, 3, gridspec_kw={"width_ratios": [8, 1, 1]}, figsize=figsize
         )
@@ -1075,11 +1237,11 @@ def get_sleep_summary_graph(
     ax.yaxis.grid(False)
     ax.set_ylabel(ylabel, labelpad=15, color="#333333", fontsize=axis_fontsize+2)
     ax.set_xlabel(xlabel, labelpad=15, color="#333333", fontsize=axis_fontsize+2)
-    ax.set_yticks(
-        [i * POSITION for i in range(len(time_period))],
-        [date.strftime("%d/%m") for date in time_period],
-        rotation=0,
-        fontsize=axis_fontsize,
+    ax.set_yticks([i * POSITION for i in range(len(time_period))])
+    ax.set_yticklabels(labels=[date.strftime("%d/%m") for date in time_period])
+    ax.tick_params(
+        labelrotation=0,
+        labelsize=axis_fontsize
     )
     ax.set_title(title, pad=25, color="#333333", weight="bold", fontsize=title_fontsize)
     # ordinarly the yaxis starts from below, but it's better to visualize earlier dates on top instead
@@ -1120,22 +1282,24 @@ def get_sleep_summary_graph(
         ax.axvline(converted_wake_time, linestyle="--", zorder=11)
 
     # CONSISTENCY SUBPLOTS
-    if sleep_metric is not None:
+    if consistency_metric is not None:
         # determine which metrics are needed in the subplot(s)
-        if sleep_metric == "duration":
+        if consistency_metric == "duration":
             consistency_fns = [sleep.get_cpd_duration]
             axes = [ax2]
-        elif sleep_metric == "midpoint":
+            axes_titles = [consistency_metric]
+        elif consistency_metric == "midpoint":
             consistency_fns = [sleep.get_cpd_midpoint]
             axes = [ax2]
-        elif sleep_metric == "both":
+            axes_titles = [consistency_metric]
+        elif consistency_metric == "both":
             consistency_fns = [sleep.get_cpd_midpoint, sleep.get_cpd_duration]
             axes = [ax2, ax3]
+            axes_titles = ["midpoint", "duration"]
         else:
             raise ValueError(
                 f"Warning: consistency sleep metric {sleep_metric} isn't valid."
             )
-
         # and populate a subplot which each one
         for k in range(len(consistency_fns)):
             current_ax = axes[k]
@@ -1152,7 +1316,10 @@ def get_sleep_summary_graph(
                 },
             )[user_id]
             cpd_trend = utils.trend_analysis(
-                cpd_dict, start_date - datetime.timedelta(days=30), end_date
+                cpd_dict, 
+                start_date - datetime.timedelta(days=30), 
+                end_date,
+                **kwargs_trend_analysis
             )
             # filter out to keep appropriate period
             cpd_trend = cpd_trend[cpd_trend.index.isin(time_period)]
@@ -1169,7 +1336,7 @@ def get_sleep_summary_graph(
             current_ax.plot(baseline, dates, linestyle="-", linewidth=1, color="red")
             current_ax.fill_betweenx(dates, LB, UB, alpha=0.25, color="green")
             current_ax.grid("on")
-            current_ax.set_title(f"CPD ({sleep_metric})", fontsize=10)
+            current_ax.set_title(f"CPD ({axes_titles[k]})", fontsize=10)
             current_ax.set_yticks([])
 
             # subplot params
@@ -1318,25 +1485,6 @@ def get_errorbar_graph(
         plt.show()
     else:
         plt.close()
-
-
-def plot_bbi_distribution(bbi: np.array, bin_length: int = 20):
-    """
-    Plots distribution of BBI data
-
-    Parameters
-    ----------
-    bbi : :class:`numpy.ndarray`
-        Array of Beat-to-beat intraval (BBI) data
-    bin_length : :class:`int`, optional
-        length of bins in the histogram, by default 20
-    """
-
-    pass
-
-
-def plot_comparison_radar_chart():
-    pass  # TODO
 
 
 def compare_against_group(
@@ -1517,3 +1665,306 @@ def plot_trend_analysis(
     if show:
         plt.show()
     return ax
+
+
+class RadarAxes(PolarAxes):
+    name = 'radar'
+
+    def __init__(self, *args, **kwargs):
+        super(RadarAxes, self).__init__(*args, **kwargs)
+        self.set_theta_zero_location('N')
+        self.theta = []
+
+    def plot(self, *args, **kwargs):
+        lines = super(RadarAxes, self).plot(*args, **kwargs)
+        for line in lines:
+            self._close_line(line)
+
+    def _close_line(self, line):
+        x, y = line.get_data()
+        if x[0] != x[-1]:
+            x = np.concatenate((x, [x[0]]))
+            y = np.concatenate((y, [y[0]]))
+            line.set_data(x, y)
+
+    def set_varlabels(self, labels):
+        self.set_thetagrids(np.degrees(self.theta), labels)
+
+    def _gen_axes_patch(self):
+        return plt.Circle((0.5, 0.5), 0.5)
+
+    def _gen_axes_spines(self):
+        return PolarAxes._gen_axes_spines(self)
+
+
+def radar_chart(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    comparison_start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    comparison_end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = "mean",
+    metrics: Union[list, None] = None,
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    title: Union[str, None] = None,
+    reference_label: str = 'Reference',
+    comparison_label: str = 'Comparison',
+    legend: bool = True,
+    colors: list = ['lightskyblue', 'salmon'],
+    kwargs_metric_fns = {}
+):
+    """Plots a radar chart of the desired pywearable metrics.
+
+    Plots a radar chart comparing the values between two periods for the desired pywearable metrics. 
+    The radar chart is not limited by the number of the metrics to be included in the chart; 
+    it dynamically adjusts itself to the number of compared metrics.
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id(s) for which the sleep statistic must be computed.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    comparison_start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval of the comparison period, by default None
+    comparison_end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval of the comparison period, by default None
+    kind : :class:`str`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    metrics : :class:`list` or None, optional
+        List of pywearable function for metrics calculation. The list must contain more than 1 metric, by default None
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    show : :class:`str`, optional
+        Whether to show the plot, by default True
+    title : :class:`str`, optional
+        Title of the plot, by default None
+    reference_label : :class:`str`, optional
+        Plot label of the reference data, by default "Reference"
+    comparison_label : :class:`str`, optional
+        Plot label of the comparison data, by default "Comparison"
+    legend: :class:`bool`, optional
+        If true, add a legend with the computed results of the comparison to the plot, by default True
+    colors: :class:`list`, optional
+        Color for the radar chart areas, by default ['lightskyblue', 'salmon']
+    kwargs_metric_fns : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}
+    Raises
+    -------
+    TypeError
+        If an error occurred during the computation of the metrics.
+    TypeError
+        if no selection of pywearable function metrics is provided.
+    ValueError
+        if less than 2 pywearable metric functions are provided.
+    """
+    
+    unknown_metrics, ref_metrics, comp_metrics = [], {}, {}
+    
+    # check that the list of metrics is appropriate for radar chart plotting
+    if metrics is None:
+        raise TypeError("No input list of metrics provided for 'metrics'. Please specify a list of the metric functions"
+                        "to be computed and compared.")
+    elif len(metrics) <= 2:
+        raise ValueError("Not enough metrics selected for a radar chart. Please specify at least 3 pywearable metric functions.")
+    
+    # Register projection of custom RadarAxes class
+    register_projection(RadarAxes)
+    
+    # Compute available metrics
+    for metric_fn in metrics:
+        try:
+            ref_result = metric_fn(loader=loader,
+                                user_id=user_id,
+                                start_date=start_date,
+                                end_date=end_date,
+                                kind=kind,
+                                return_df=True,
+                                **kwargs_metric_fns)
+            ref_metrics[ref_result.loc[user_id].index.values[0]] = ref_result.loc[user_id].values[0]
+            comp_result = metric_fn(loader=loader,
+                                    user_id=user_id,
+                                    start_date=comparison_start_date,
+                                    end_date=comparison_end_date,
+                                    kind=kind,
+                                    return_df=True,
+                                    **kwargs_metric_fns)
+            comp_metrics[comp_result.loc[user_id].index.values[0]] = comp_result.loc[user_id].values[0]
+        except:
+            unknown_metrics.append(metric_fn)
+    
+    # Raise warning pointing out unknown parameters
+    if unknown_metrics != []:
+        warnings.warn("Unknown parameters '%s' will not be computed." % unknown_metrics, stacklevel=2)
+    
+    print(ref_metrics)
+    print(comp_metrics)
+    # Prepare plot
+    if legend:
+        fig, (ax_l, ax) = plt.subplots(1, 2, figsize=(12, 6), subplot_kw=dict(projection='radar'))
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8), subplot_kw={'projection': 'radar'})
+    theta = np.linspace(0, 2 * np.pi, len(ref_metrics.keys()), endpoint=False)
+    ax.theta = theta
+
+    # Prepare plot data
+    ax.set_varlabels([metric for metric in ref_metrics.keys()])
+    max_vals = {metric: max(ref_metrics[metric], comp_metrics[metric]) for metric in ref_metrics.keys()}
+    ref_vals = [(ref_metrics[metric] / max_vals[metric]) * 100 for metric in ref_metrics.keys()]
+    com_vals = [(comp_metrics[metric] / max_vals[metric]) * 100 for metric in ref_metrics.keys()]
+    
+    # Plot data
+    for i, vals in enumerate([ref_vals, com_vals]):
+        ax.plot(theta, vals, color=colors[i])
+        ax.fill(theta, vals, color=colors[i], alpha=0.3)
+    title = "Radar Chart\nReference (%s) vs. Comparison (%s)\n" % (colors[0], colors[1])
+    
+    # Add legend to second empty plot
+    if legend:
+        ax_l.set_title(title, horizontalalignment='center')
+        legend = []
+        # Helper function
+        def _add_legend(label, fc="white"):
+            return legend.append(mpl.patches.Patch(fc=fc, label="\n" + label))
+        # Add list of computed parameters
+        _add_legend(reference_label, colors[0])
+        for metric in ref_metrics.keys():
+            _add_legend("%s:" % metric)
+        # Add list of comparison parameters
+        _add_legend(comparison_label, colors[1])
+        for metric in ref_metrics.keys():
+            _add_legend("%.2f vs. %.2f" % (ref_metrics[metric], comp_metrics[metric]))
+        # Add relative differences
+        _add_legend("")
+        for i, _ in enumerate(ref_metrics.keys()):
+            rel_diff = (com_vals[i] - ref_vals[i])/(ref_vals[i]) * 100
+            _add_legend("+%.2f%s" % (rel_diff, r"$\%$") if rel_diff > 0 else "%.2f%s" % (rel_diff, r"$\%$"))
+        ax_l.legend(handles=legend, ncol=3, frameon=False, loc=7)
+        ax_l.axis('off')
+    else:
+        ax.set_title(title, horizontalalignment='center')
+    if save_to:
+        plt.savefig(save_to, bbox_inches="tight")
+    if show:
+        plt.show()
+    else:
+        plt.close()
+	
+
+
+def intensity_chart():
+    pass
+
+
+def period_to_period_comparison_chart(
+    loader: BaseLoader,
+    user_id: str,
+    metric_fn : Callable,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: str = "mean",
+    period_interval: str = "month",
+    show: bool = True,
+    save_to: Union[str, None] = None,
+    figsize: tuple = (12,8),
+    xlabel: Union[str, None] = None,
+    ylabel: Union[str, None] = None,
+    locator_interval: int = 1,
+    title: str = "",
+    fontsize: int = 14
+):
+    if period_interval not in ["month", "week"]:
+        raise ValueError(f"period interval {period_interval} is not a valid interval.")
+
+    fig, ax = plt.subplots(figsize=figsize)
+    if period_interval == "month":
+        month_loc = MonthLocator(interval=locator_interval)
+        ax.xaxis.set_major_locator(month_loc)
+        ax.xaxis.set_major_formatter(DateFormatter("%b"))
+        date_aggr_fn = lambda x: x.month
+    elif period_interval == "week":
+        week_loc = DayLocator(interval=locator_interval)
+        ax.xaxis.set_major_locator(week_loc)
+        ax.xaxis.set_major_formatter(DateFormatter("%m-%d"))
+        date_aggr_fn = lambda x: x.week
+
+    metric_data = metric_fn(loader, 
+                            user_id, 
+                            start_date, 
+                            end_date)[user_id]
+    metric_dates = list(metric_data.keys())
+    metric_values = list(metric_data.values())
+
+    # compute metric aggregate transformation (kind) during each period and its changes
+    metric_df = pd.DataFrame({"Date":metric_dates, 
+                            "metric":metric_values})
+    metric_df['Date'] = pd.to_datetime(metric_df['Date'])
+    metric_df["aggregate_over"] = metric_df["Date"].apply(date_aggr_fn)
+
+    changes = pd.DataFrame(metric_df.groupby("aggregate_over")["metric"].apply(kind))
+    abs_change = changes.diff()
+    pct_change = changes.pct_change() * 100
+    changes["abs_change"] = abs_change
+    changes["pct_change"] = pct_change
+
+    metric_df["aggr_metric"] = metric_df.groupby("aggregate_over")["metric"].transform(kind)
+
+    ax.plot(
+        metric_dates,
+        metric_values,
+        color="#25BCCA",
+        alpha=0.2,
+    )
+
+    for period in metric_df["aggregate_over"].unique():
+        relative_change = changes[changes.index == period]["pct_change"].values[0]
+        ax.plot(
+            np.array(metric_df[metric_df["aggregate_over"] == period]["Date"]),
+            np.array(metric_df[metric_df["aggregate_over"] == period]["aggr_metric"]),
+            "#06B478"
+            if relative_change >= 0
+            else ("tab:orange" if not np.isnan(relative_change) else "#25BCCA"),
+            alpha=0.8,
+        )
+        ax.text(
+            metric_df[metric_df["aggregate_over"] == period]["Date"].mean(),
+            metric_df[metric_df["aggregate_over"] == period]["aggr_metric"].unique(),
+            metric_df[metric_df["aggregate_over"] == period]["aggr_metric"].unique().round(1)[0],
+            ha="center",
+            va="bottom",
+        )
+        if not np.isnan(relative_change):
+            # the following offset is an heuristic which seems to work well always, possibly to improve
+            vertical_offset = (max(metric_values) - min(metric_values)) / 20
+            ax.text(
+                metric_df[metric_df["aggregate_over"] == period]["Date"].mean(),
+                metric_df[metric_df["aggregate_over"] == period]["aggr_metric"].unique()
+                - vertical_offset,
+                f"{'+' if relative_change >= 0 else ''}{round(relative_change,1)}%",
+                ha="center",
+                va="bottom",
+                color="#06B478" if relative_change >= 0 else "tab:orange",
+            )
+
+    ax.set_xlim([start_date, end_date])    
+    for label in ax.get_xticklabels(which="major"):
+        label.set(rotation=30, horizontalalignment="right")
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_title(title, fontsize=fontsize+2)
+
+    if save_to:
+        plt.savefig(save_to,bbox_inches="tight")
+    if show:
+        plt.show()
+    else:
+        plt.close()
+
+
+def weekday_barplot():
+    pass
