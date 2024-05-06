@@ -9,7 +9,8 @@ from math import degrees, floor, radians
 from typing import Union
 
 import dateutil.parser
-import hrvanalysis
+
+# import hrvanalysis
 import numpy as np
 import pandas as pd
 import scipy.stats
@@ -357,9 +358,11 @@ def get_earliest_bedtime(times: list) -> str:
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time + datetime.timedelta(days=1)
-        if (dt_time.hour >= 0 and dt_time.hour < 12)
-        else dt_time
+        (
+            dt_time + datetime.timedelta(days=1)
+            if (dt_time.hour >= 0 and dt_time.hour < 12)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -384,9 +387,11 @@ def get_earliest_wakeup_time(times: list) -> str:
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time - datetime.timedelta(days=1)
-        if (dt_time.hour >= 12 and dt_time.hour <= 23)
-        else dt_time
+        (
+            dt_time - datetime.timedelta(days=1)
+            if (dt_time.hour >= 12 and dt_time.hour <= 23)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -411,9 +416,11 @@ def get_latest_bedtime(times: list) -> str:
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time + datetime.timedelta(days=1)
-        if (dt_time.hour >= 0 and dt_time.hour < 12)
-        else dt_time
+        (
+            dt_time + datetime.timedelta(days=1)
+            if (dt_time.hour >= 0 and dt_time.hour < 12)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -438,9 +445,11 @@ def get_latest_wakeup_time(times: list) -> str:
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time - datetime.timedelta(days=1)
-        if (dt_time.hour >= 12 and dt_time.hour <= 23)
-        else dt_time
+        (
+            dt_time - datetime.timedelta(days=1)
+            if (dt_time.hour >= 12 and dt_time.hour <= 23)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 

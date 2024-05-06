@@ -3,7 +3,6 @@ This module contains all the functions related to the analysis
 of Labfront adherence.
 """
 
-
 import datetime
 from typing import Union
 
