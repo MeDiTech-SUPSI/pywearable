@@ -706,10 +706,10 @@ def _compute_hr_statistic(
     if statistic == _CARDIAC_STATISTIC_RESTING_HEART_RATE:
         # Set iso date as index
         heart_rate = heart_rate.set_index(constants._ISODATE_COL)
-        mean_hr = heart_rate.resample("30Min", label="left")[
-            constants._HR_COLUMN
-        ].mean()
-        return mean_hr.resample("1d").min().apply(lambda x: np.nan if pd.isna(x) else round(x))
+        # Perform 30 minute average
+        mean_hr = heart_rate.rolling(window="30Min")[constants._HR_COLUMN].mean()
+        # Return minimum 30 minute average
+        return mean_hr.resample("1d", label="left").min()
     else:
         if statistic == _CARDIAC_STATISTIC_MAXIMUM_HEART_RATE:
             fn = "max"
