@@ -724,7 +724,7 @@ def _compute_hr_statistic(
         return (
             heart_rate.groupby(constants._CALENDAR_DATE_COL)[constants._HR_COLUMN]
             .agg(fn)
-            .apply(lambda x: np.nan if pd.isna(x) else round(x))
+            .astype("float")
         )
 
 
