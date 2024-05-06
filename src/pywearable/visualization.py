@@ -18,7 +18,6 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
 import pywearable.constants
-from .loader.base import BaseLoader
 import pywearable.respiration as respiration
 import pywearable.sleep as sleep
 import pywearable.stress as stress
@@ -815,14 +814,19 @@ def get_sleep_summary_graph(
         fontsize of the score on the hypnograms, by default 
     """
 
+
+    if sleep_metric is not None:
+        assertion_msg = "Must specify chronotype when plotting circadian measures"
+        assert (
+            chronotype_sleep_start is not None and chronotype_sleep_end is not None
+        ), assertion_msg
+
     # Define parameters for plotting
     ALPHA = alpha
     POSITION = 1.3
 
     # Get sleep summaries so that it is easier to get info
-    sleep_summaries = loader.load_sleep_summary(
-        user_id, start_date, end_date
-    )
+    sleep_summaries = loader.load_sleep_summary(user_id, start_date, end_date)
     if len(sleep_summaries) == 0:
         return
     sleep_min_time = datetime.time(15, 0)
@@ -857,9 +861,7 @@ def get_sleep_summary_graph(
     sleep_summaries["endIsoDate"] = pd.to_datetime(
         (
             sleep_summaries[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-            + sleep_summaries[
-                pywearable.constants._TIMEZONEOFFSET_IN_MS_COL
-            ]
+            + sleep_summaries[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL]
             + sleep_summaries[pywearable.constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
             + sleep_summaries[
                 pywearable.constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
@@ -878,7 +880,7 @@ def get_sleep_summary_graph(
     ).dt.total_seconds()
 
     time_period = pd.date_range(
-        start_date + datetime.timedelta(days=1),
+        start_date,
         periods=(end_date - start_date).days,
         freq="D",
     )
@@ -1130,8 +1132,10 @@ def get_sleep_summary_graph(
             consistency_fns = [sleep.get_cpd_midpoint, sleep.get_cpd_duration]
             axes = [ax2, ax3]
         else:
-            raise ValueError(f"Warning: consistency sleep metric {sleep_metric} isn't valid.")
-            
+            raise ValueError(
+                f"Warning: consistency sleep metric {sleep_metric} isn't valid."
+            )
+
         # and populate a subplot which each one
         for k in range(len(consistency_fns)):
             current_ax = axes[k]
@@ -1142,8 +1146,10 @@ def get_sleep_summary_graph(
                 user_id,
                 start_date - datetime.timedelta(days=30),
                 end_date,
-                kind = None,
-                chronotype_dict = {user_id:(chronotype_sleep_start, chronotype_sleep_end)}
+                kind=None,
+                chronotype_dict={
+                    user_id: (chronotype_sleep_start, chronotype_sleep_end)
+                },
             )[user_id]
             cpd_trend = utils.trend_analysis(
                 cpd_dict, start_date - datetime.timedelta(days=30), end_date

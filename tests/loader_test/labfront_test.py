@@ -4,15 +4,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from pywearable.loader.labfront.loader import LabfrontLoader
+import pywearable.loader
 
 
 @pytest.fixture
 def loader(scope="session"):
-    return LabfrontLoader(Path("sample_data"))
+    return pywearable.loader.LabfrontLoader(Path("sample_data"))
 
 
-def test_get_user_ids(loader: LabfrontLoader):
+def test_get_user_ids(loader):
     user_ids = loader.get_user_ids()
     assert type(user_ids) == list
     assert user_ids == ["user-01"]
@@ -36,24 +36,24 @@ def test_get_user_id(loader):
     assert user_id == "user-01"
 
 
-def test_get_labfront_ids(loader: LabfrontLoader):
+def test_get_labfront_ids(loader: pywearable.loader.LabfrontLoader):
     labfront_id = loader.get_labfront_ids()
     assert type(labfront_id) == list
     assert labfront_id == ["6732ab82-077a-4bfd-8f89-246aba683253"]
 
 
-def test_load_heart_rate_invalid_user_id(loader: LabfrontLoader):
+def test_load_heart_rate_invalid_user_id(loader: pywearable.loader.LabfrontLoader):
     with pytest.raises(ValueError):
         loader.load_garmin_connect_heart_rate("user-02")
 
 
 @pytest.mark.parametrize("start_date", [None])
-def test_load_heart_rate_is_df(loader: LabfrontLoader, start_date):
+def test_load_heart_rate_is_df(loader: pywearable.loader.LabfrontLoader, start_date):
     df = loader.load_garmin_connect_heart_rate("user-01")
     assert isinstance(df, pd.DataFrame)
 
 
-def test_load_heart_rate_is_empty(loader: LabfrontLoader):
+def test_load_heart_rate_is_empty(loader: pywearable.loader.LabfrontLoader):
     df = loader.load_garmin_connect_heart_rate(
         "user-01", end_date=datetime.datetime(1970, 1, 1)
     )

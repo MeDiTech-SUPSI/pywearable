@@ -133,11 +133,6 @@ _QUESTIONNAIRE_QUESTION_TYPE_MULTI_SELECT_VALUE = "multi_select"
 _QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE = "text"
 
 #################################################
-#                    REGEX                      #
-#################################################
-_QUESTIONNAIRE_QUESTION_NAME_REGEX = "option\dName"
-
-#################################################
 #              CSV FILES - ROWS                 #
 #################################################
 _CSV_STATS_SKIP_ROWS = 3
