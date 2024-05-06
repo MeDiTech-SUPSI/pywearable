@@ -2,6 +2,7 @@
 This module contains all the functions related to the loading of data from Labfront.
 
 """
+
 import datetime
 import os
 import re
@@ -59,10 +60,10 @@ class LabfrontLoader(BaseLoader):
             data_path = Path(data_path)
         self.data_path = data_path
         self.ids, self.labfront_ids = self.retrieve_ids()
-        self.ids_dict = self.retrieve_ids(return_dict=True)
-        self.full_ids = self.retrieve_full_ids()
+        self.ids_dict = self._retrieve_ids(return_dict=True)
+        self.full_ids = self._retrieve_full_ids()
 
-        self.data_dictionary, self.metrics_data_dictionary = self.get_time_dictionary()
+        self.data_dictionary, self.metrics_data_dictionary = self._get_time_dictionary()
         self.tasks_dict = self.get_available_questionnaires(
             return_dict=True
         ) | self.get_available_todos(return_dict=True)
@@ -121,7 +122,9 @@ class LabfrontLoader(BaseLoader):
         """
         return self.full_ids
 
-    def retrieve_ids(self, return_dict: bool = False) -> Union[Tuple[list, list], dict]:
+    def _retrieve_ids(
+        self, return_dict: bool = False
+    ) -> Union[Tuple[list, list], dict]:
         """Get IDs of users from folder with data.
 
         This function returns both user IDs (set in the Labfront dashboard
@@ -140,6 +143,7 @@ class LabfrontLoader(BaseLoader):
             User IDs and Labfront IDs, as a tuple with two lists if `return_dict` was `False`,
             otherwise as a dictionary.
         """
+        # TODO get the ids from file_index
         # Get the names of the folder in root_folder
         ids = []
         labfront_ids = []
@@ -156,7 +160,7 @@ class LabfrontLoader(BaseLoader):
             return dict(zip(ids, labfront_ids))
         return ids, labfront_ids
 
-    def retrieve_full_ids(self) -> list:
+    def _retrieve_full_ids(self) -> list:
         """Get list of users in "[user_id]_[labfront_id]" format.
 
         Returns
@@ -164,6 +168,7 @@ class LabfrontLoader(BaseLoader):
         list
             List of user IDs.
         """
+        # TODO get the full_ids from file_index
         participant_ids = [
             k + "_" + v for k, v in self.retrieve_ids(return_dict=True).items()
         ]
@@ -227,6 +232,7 @@ class LabfrontLoader(BaseLoader):
             list
                 alphabetically sorted names of the questionnaires for the user(s).
         """
+        # TODO get the name of the questionnaires from file_index
         if not self.data_path.exists():
             raise FileNotFoundError
 
@@ -270,6 +276,7 @@ class LabfrontLoader(BaseLoader):
     def get_available_todos(
         self, user_id: Union[str, list] = "all", return_dict: bool = False
     ) -> list:
+        # TODO get the name of the todos from file_index
         """Get available todos for given users.
 
         Parameters
@@ -328,8 +335,22 @@ class LabfrontLoader(BaseLoader):
         else:
             return sorted(list(todos))
 
-    def get_time_dictionary(self) -> Tuple[list, list]:
-        """_summary_
+    def _get_time_dictionary(self) -> Tuple[list, list]:
+        """Create internal file index to speed up finding file.
+
+        This function creates an internal file index with
+        information about the metrics and the timerange for
+        which data are available for each user. The
+        resulting :class:`pd.DataFrame` has the following
+        structure::
+
+                                             startDateTime endDateTime
+            fullId labfrontId userId metric
+
+        This function also saves the file index information into
+        the data folder. If reindex is True, then the files are
+        all indexed again. If instead it is False, then the information
+        already available in the file is used.
 
         Returns
         -------
@@ -343,57 +364,43 @@ class LabfrontLoader(BaseLoader):
         """
         if not self.data_path.exists():
             raise FileNotFoundError
+        file_index = pd.DataFrame()
         participant_dict = {}
-        metrics_time_dict = {}
         for participant_folder in self.data_path.iterdir():
             # For each participant
             if participant_folder.is_dir():
                 participant_dict[participant_folder.name] = {}
-                metrics_time_dict[participant_folder.name] = {}
                 for participant_metric_folder in participant_folder.iterdir():
                     # For each metric
                     if participant_metric_folder.is_dir():
                         participant_dict[participant_folder.name][
                             participant_metric_folder.name
                         ] = {}
-                        metrics_time_dict[participant_folder.name][
-                            participant_metric_folder.name
-                        ] = {}
-                        metrics_first_ts = None
-                        metrics_last_ts = None
-                        # If it is a folder, then we need to read the csv files and get first and last unix times, and min sample rate
+                        n_files = len(os.listdir(participant_metric_folder))
+                        # If it is a folder, then we need to read the csv files
+                        # and get first and last unix times, and min sample rate
                         for metric_data in participant_metric_folder.iterdir():
                             # For each csv folder/file
                             if metric_data.is_file() and str(metric_data).endswith(
                                 "csv"
                             ):
-                                # If it is a file
-                                (first_ts, last_ts) = self.get_labfront_file_time_stats(
-                                    metric_data
+                                # If we have a single file, start is from file, end is today
+                                first_date = datetime.datetime.strptime(
+                                    metric_data.name[:6], "%y%m%d"
                                 )
-                                # Update first time stamp of the metric
-                                if metrics_first_ts is None:
-                                    metrics_first_ts = first_ts
+                                if n_files == 1:
+                                    last_date = None
                                 else:
-                                    if first_ts < metrics_first_ts:
-                                        metrics_first_ts = first_ts
-                                # Update last time stamp of the metric
-                                if metrics_last_ts is None:
-                                    metrics_last_ts = last_ts
-                                else:
-                                    if last_ts < metrics_last_ts:
-                                        metrics_last_ts = last_ts
+                                    last_date = first_date + datetime.timedelta(days=1)
+                                # If it is a file
+                                first_ts = first_date
+                                last_ts = last_date
+                                print(participant_metric_folder.name, first_ts, last_ts)
                                 participant_dict[participant_folder.name][
                                     participant_metric_folder.name
                                 ][metric_data.name] = {
                                     labfront_constants._FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: first_ts,
                                     labfront_constants._LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: last_ts,
-                                }
-                                metrics_time_dict[participant_folder.name][
-                                    participant_metric_folder.name
-                                ] = {
-                                    labfront_constants._FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: metrics_first_ts,
-                                    labfront_constants._LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: metrics_last_ts,
                                 }
                             else:
                                 if not metric_data.is_dir():
@@ -421,70 +428,14 @@ class LabfrontLoader(BaseLoader):
                                             csv_file,
                                             is_questionnaire_or_to_do=is_questionnaire_or_to_do,
                                         )
-                                        # Update first time stamp of the metric
-                                        if metrics_first_ts is None:
-                                            metrics_first_ts = first_ts
-                                        else:
-                                            if first_ts < metrics_first_ts:
-                                                metrics_first_ts = first_ts
-                                        # Update last time stamp of the metric
-                                        if metrics_last_ts is None:
-                                            metrics_last_ts = last_ts
-                                        else:
-                                            if last_ts < metrics_last_ts:
-                                                metrics_last_ts = last_ts
                                         participant_dict[participant_folder.name][
                                             participant_metric_folder.name
                                         ][metric_data.name][csv_file.name] = {
                                             labfront_constants._FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: first_ts,
                                             labfront_constants._LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: last_ts,
                                         }
-                        metrics_time_dict[participant_folder.name][
-                            participant_metric_folder.name
-                        ] = {
-                            labfront_constants._FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: metrics_first_ts,
-                            labfront_constants._LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL: metrics_last_ts,
-                        }
 
-        return participant_dict, metrics_time_dict
-
-    def get_first_unix_timestamp(self, user_id: str, metric: str) -> int:
-        """Get first available unix timestamp for a given user and metric.
-
-        Parameters
-        ----------
-        user_id : str
-            ID of the user.
-        metric : str
-            Metric of interest.
-
-        Returns
-        -------
-        int
-            First available unix timestamp.
-        """
-        return self.metrics_data_dictionary[self.get_full_id(user_id)][metric][
-            labfront_constants._FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL
-        ]
-
-    def get_last_unix_timestamp(self, user_id, metric):
-        """Get last available unix timestamp for a given user and metric.
-
-        Parameters
-        ----------
-        user_id : str
-            ID of the user.
-        metric : _type_
-            Metric of interest.
-
-        Returns
-        -------
-        int
-            Last available unix timestamp.
-        """
-        return self.metrics_data_dictionary[self.get_full_id(user_id)][metric][
-            labfront_constants._LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL
-        ]
+        return participant_dict
 
     def get_labfront_file_time_stats(
         self, path_to_file: Union[str, Path], is_questionnaire_or_to_do: bool = False
@@ -2040,6 +1991,11 @@ class LabfrontLoader(BaseLoader):
             end_date=end_date,
             source=source,
         )
+
+    def load_step(
+        source="health_api",
+    ):
+        pass
 
     def load_stress(
         self,
