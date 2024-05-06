@@ -970,6 +970,13 @@ def get_sleep_summary_graph(
         kwargs for the trend analysis of consistency metrics, by default {}
     """
 
+
+    if sleep_metric is not None:
+        assertion_msg = "Must specify chronotype when plotting circadian measures"
+        assert (
+            chronotype_sleep_start is not None and chronotype_sleep_end is not None
+        ), assertion_msg
+
     # Define parameters for plotting
     ALPHA = alpha
     POSITION = 1.3
@@ -1016,9 +1023,7 @@ def get_sleep_summary_graph(
     sleep_summaries["endIsoDate"] = pd.to_datetime(
         (
             sleep_summaries[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-            + sleep_summaries[
-                pywearable.constants._TIMEZONEOFFSET_IN_MS_COL
-            ]
+            + sleep_summaries[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL]
             + sleep_summaries[pywearable.constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
             + sleep_summaries[
                 pywearable.constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
@@ -1292,8 +1297,9 @@ def get_sleep_summary_graph(
             axes = [ax2, ax3]
             axes_titles = ["midpoint", "duration"]
         else:
-            raise ValueError(f"Warning: consistency sleep metric {consistency_metric} isn't valid.")
-            
+            raise ValueError(
+                f"Warning: consistency sleep metric {sleep_metric} isn't valid."
+            )
         # and populate a subplot which each one
         for k in range(len(consistency_fns)):
             current_ax = axes[k]
@@ -1304,8 +1310,10 @@ def get_sleep_summary_graph(
                 user_id,
                 start_date - datetime.timedelta(days=30),
                 end_date,
-                kind = None,
-                chronotype_dict = {user_id:(chronotype_sleep_start, chronotype_sleep_end)}
+                kind=None,
+                chronotype_dict={
+                    user_id: (chronotype_sleep_start, chronotype_sleep_end)
+                },
             )[user_id]
             cpd_trend = utils.trend_analysis(
                 cpd_dict, 
