@@ -95,6 +95,7 @@ def base_loader(session_mocker):
         "pywearable.loader.BaseLoader.load_bbi",
         return_value=bbi,
     )
+
     # load_sleep_summary
     sleep_summary = pd.read_csv(
         MOCK_FILES_DICT[pywearable.constants._METRIC_SLEEP_SUMMARY],
@@ -115,5 +116,9 @@ def base_loader(session_mocker):
     session_mocker.patch(
         "pywearable.loader.BaseLoader.load_sleep_stage", return_value=load_sleep_stage()
     )
-
+    # get_user_ids
+    session_mocker.patch(
+        "pywearable.loader.BaseLoader.get_user_ids",
+        return_value=["user-01"],
+    )
     return loader
