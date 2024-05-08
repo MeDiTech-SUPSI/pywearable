@@ -26,17 +26,17 @@ _METRIC_DATE_FORMAT_KEY = "date_format"
 
 _METRIC_DICT = {
     lifesnaps_constants._METRIC_COMP_TEMP: {
-        "metric_key": lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
-        "start_date_key": lifesnaps_constants._DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
-        "end_date_key": lifesnaps_constants._DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
+        _METRIC_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
+        _METRIC_START_DATE_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
+        _METRIC_END_DATE_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
     },
     lifesnaps_constants._METRIC_SPO2: {
-        "metric_key": lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
-        "start_date_key": lifesnaps_constants._DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
+        _METRIC_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
+        _METRIC_START_DATE_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
     },
     lifesnaps_constants._METRIC_STEPS: {
-        "metric_key": lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
-        "start_date_key": lifesnaps_constants._DB_FITBIT_COLLECTION_STEPS_DATETIME_COL,
+        _METRIC_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants._DB_FITBIT_COLLECTION_STEPS_DATETIME_COL,
         _METRIC_DATE_FORMAT_KEY: "%Y-%m-%dT%H:%M:%S",
     },
     # Questionnaires
@@ -726,6 +726,11 @@ class LifeSnapsLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        
+        user_id = self._check_user_id(user_id)
+        start_date = utils.check_date(start_date)
+        end_date = utils.check_date(end_date)
+
         steps = self.load_metric(
             metric=lifesnaps_constants._METRIC_STEPS,
             user_id=user_id,
