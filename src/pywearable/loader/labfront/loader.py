@@ -59,7 +59,7 @@ class LabfrontLoader(BaseLoader):
         if not isinstance(data_path, Path):
             data_path = Path(data_path)
         self.data_path = data_path
-        self.ids, self.labfront_ids = self.retrieve_ids()
+        self.ids, self.labfront_ids = self._retrieve_ids()
         self.ids_dict = self._retrieve_ids(return_dict=True)
         self.full_ids = self._retrieve_full_ids()
 
