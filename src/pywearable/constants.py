@@ -1,7 +1,13 @@
+_METRIC_BBI = "bbi"
+_METRIC_DAILY_SUMMARY = "daily-summary"
 _METRIC_HEART_RATE = "heart-rate"
 _METRIC_STRESS = "stress"
 _METRIC_SLEEP_SUMMARY = "sleep-summary"
 _METRIC_SLEEP_STAGE = "sleep-stage"
+_METRIC_PULSE_OX = "pulse-ox"
+_METRIC_RESPIRATION = "respiration"
+_METRIC_SLEEP_RESPIRATION = "sleep-respiration"
+_METRIC_SLEEP_PULSE_OX = "sleep-pulse-ox"
 
 #################################################
 #          CSV FILES - COLUMN NAMES             #
@@ -16,9 +22,19 @@ _UNIXTIMESTAMP_IN_MS_COL = "unixTimestampInMs"
 
 #: Column for timezone offset in milliseconds
 _TIMEZONEOFFSET_IN_MS_COL = "timezoneOffsetInMs"
+
+#: Column for calendar date
 _CALENDAR_DATE_COL = "calendarDate"
 _SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
+
+#: Column duration expressed in milliseconds
 _DURATION_IN_MS_COL = "durationInMs"
+
+#: Column for entries in which sleep is detected
+_IS_SLEEPING_COL = "isSleeping"
+
+# spo2 columns #
+_SPO2_SPO2_COL = "spo2"
 
 # Sleep summary columns #
 _SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL = "overallSleepScore"
@@ -62,6 +78,14 @@ _RESPIRATION_BREATHS_PER_MINUTE_COL = "breathsPerMinute"
 _RESPIRATION_SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
 _RESPIRATION_CALENDAR_DATE_COL = "calendarDate"
 
+# Cardiac data columns #
+_SPO2_COLUMN = "spo2"
+_HR_COLUMN = "beatsPerMinute"
+_RESTING_HR_COLUMN = "restingHeartRateInBeatsPerMinute"
+_AVG_HR_COLUMN = "averageHeartRateInBeatsPerMinute"
+_MAX_HR_COLUMN = "maxHeartRateInBeatsPerMinute"
+_MIN_HR_COLUMN = "minHeartRateInBeatsPerMinute"
+
 # Epochs #
 _EPOCH_INTENSITY_COL = "intensity"
 _EPOCH_ACTIVE_TIME_MS_COL = "activeTimeInMs"
@@ -74,6 +98,9 @@ _QUESTIONNAIRE_QUESTION_TYPE_COL = "questionType"
 _QUESTIONNAIRE_SECTION_INDEX_COL = "sectionIndex"
 _QUESTIONNAIRE_QUESTION_INDEX_COL = "questionIndex"
 _TASK_SCHEDULE_COL = "taskScheduleRepeat"
+
+# User column (for index and related)
+_USER_COL = "user"
 
 #################################################
 #           CSV FILES - COLUMN VALUES          #
