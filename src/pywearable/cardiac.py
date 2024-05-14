@@ -881,11 +881,13 @@ def get_heart_rate_statistics(
     both_dates_valid = False
     if (not (start_date is None)) and (not (end_date is None)):
         # Let's set up a dataframe in which we will store all the data
-        start_date_in_date = start_date.replace(
-            hour=0, minute=0, second=0, microsecond=0
+        date_periods = pd.date_range(
+            start_date,
+            end_date,
+            freq="D",
+            normalize=True,
+            inclusive="left",
         )
-        end_date_in_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        date_periods = pd.date_range(start_date_in_date, end_date_in_date, freq="D")
         multi_index = pd.MultiIndex.from_product(
             [user_id, date_periods],
             names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
@@ -1591,12 +1593,9 @@ def get_hrv_statistics(
     both_dates_valid = False
     if (not (start_date is None)) and (not (end_date is None)):
         # Let's set up a dataframe in which we will store all the data
-        # Let's set up a dataframe in which we will store all the data
-        start_date_in_date = start_date.replace(
-            hour=0, minute=0, second=0, microsecond=0
+        date_periods = pd.date_range(
+            start_date, end_date, inclusive="left", normalize=True, freq="D"
         )
-        end_date_in_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
-        date_periods = pd.date_range(start_date_in_date, end_date_in_date, freq="D")
         multi_index = pd.MultiIndex.from_product(
             [user_id, date_periods],
             names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
