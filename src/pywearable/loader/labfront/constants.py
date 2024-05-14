@@ -1,4 +1,23 @@
 ##################################################
+#               FILE INDEX KEYS                  #
+##################################################
+FILE_INDEX_METRIC_KEY = "metric"
+FILE_INDEX_FILENAME_KEY = "fileName"
+FILE_INDEX_PARTICIPANT_ID_KEY = "participantId"
+FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY = "participantLabfrontId"
+FILE_INDEX_PARTICIPANT_FULL_ID_KEY = "participantFullId"
+FILE_INDEX_FIRST_TIMESTAMP_KEY = "firstTimestamp"
+FILE_INDEX_LAST_TIMESTAMP_KEY = "lastTimestamp"
+FILE_INDEX_IS_QUESTIONNAIRE_KEY = "isQuestionnaire"
+FILE_INDEX_IS_TASK_KEY = "isTask"
+
+##################################################
+#                 DATA SOURCES                   #
+##################################################
+DATA_SOURCE_GARMIN_HEALTH_API = "garmin_health_api"
+DATA_SOURCE_GARMIN_SDK = "garmin_sdk"
+
+##################################################
 #               FOLDER NAMES                     #
 ##################################################
 
@@ -30,8 +49,8 @@ _GARMIN_DEVICE_STEP_FOLDER = _GARMIN_DEVICE_FOLDER + "-step"
 _GARMIN_DEVICE_STRESS_FOLDER = _GARMIN_DEVICE_FOLDER + "-stress"
 
 # Questionnaire and Todo - Folder names #
-_QUESTIONNAIRE_FOLDER = "questionnaire"
-_TODO_FOLDER = "todo"
+QUESTIONNAIRE_FOLDER = "questionnaire"
+TASK_FOLDER = "todo"
 
 # Labfront-specific CSV columns
 _GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL = "timezoneOffsetInMs"
