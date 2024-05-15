@@ -544,9 +544,15 @@ class LifeSnapsLoader(BaseLoader):
         )
         # Convert to dataframe
         sleep_stage_df = pd.DataFrame()
+        sleep_summary_ids = []
         for sleep_entry in filtered_coll:
+            log_id = sleep_entry[lifesnaps_constants._DB_DATA_KEY][lifesnaps_constants._DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY]
+            if log_id in sleep_summary_ids:
+                continue
+            else:
+                sleep_summary_ids.append(log_id)
             # Get shortData if they are there
-            if include_short_data:
+            if lifesnaps_constants._DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_SHORT_DATA_KEY in sleep_entry[lifesnaps_constants._DB_DATA_KEY].keys() and include_short_data:
                 sleep_data_df = self._merge_sleep_data_and_sleep_short_data(sleep_entry)
             else:
                 # Get data

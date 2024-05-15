@@ -905,11 +905,12 @@ def get_sleep_summary_graph(
     chronotype_sleep_start: Union[str, None] = None,
     chronotype_sleep_end: Union[str, None] = None,
     consistency_metric: Union[str, None] = None,
-    legend_fontsize : int = 14,
-    axis_fontsize : int = 14,
-    title_fontsize : int = 20,
-    score_fontsize : int = 15,
-    kwargs_trend_analysis : dict = {}
+    legend_fontsize: int = 14,
+    axis_fontsize: int = 14,
+    title_fontsize: int = 20,
+    score_fontsize: int = 15,
+    kwargs_trend_analysis: dict = {},
+    resolution: int = 1
 ):
     """
     Generates a graph of all hypnograms of main sleeps of `user_id` for the period of interest
@@ -1082,7 +1083,7 @@ def get_sleep_summary_graph(
             else:
                 return "firebrick"
 
-    hypnograms = loader.load_hypnogram(user_id, start_date, end_date, resolution=1)
+    hypnograms = loader.load_hypnogram(user_id, start_date, end_date, resolution=resolution)
     if consistency_metric is None:
         fig, ax = plt.subplots(figsize=figsize)
     elif consistency_metric == "midpoint" or consistency_metric == "duration":
@@ -1106,13 +1107,13 @@ def get_sleep_summary_graph(
                 {
                     "stage": hypnogram["values"],
                     "isoDate": [
-                        hypnogram["start_time"] + i * datetime.timedelta(minutes=1)
+                        hypnogram["start_time"] + i * datetime.timedelta(minutes=resolution)
                         for i in range(
                             int(
                                 (
                                     hypnogram["end_time"] - hypnogram["start_time"]
                                 ).total_seconds()
-                                / 60
+                                / (60 * resolution)
                             )
                         )
                     ],
