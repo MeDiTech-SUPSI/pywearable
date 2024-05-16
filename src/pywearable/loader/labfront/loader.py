@@ -224,16 +224,21 @@ class LabfrontLoader(BaseLoader):
                 alphabetically sorted names of the questionnaires for the user(s).
         """
         if lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY in self.file_index:
-            return self.file_index[
-                lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY
-            ].unique()
+            return (
+                self.file_index.loc[
+                    self.file_index[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY]
+                    == True,
+                    lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY,
+                ]
+                .unique()
+                .tolist()
+            )
         else:
             return []
 
     def get_available_todos(
         self, user_id: Union[str, list] = "all", return_dict: bool = False
     ) -> list:
-        # TODO get the name of the todos from file_index
         """Get available todos for given users.
 
         Parameters
@@ -255,9 +260,30 @@ class LabfrontLoader(BaseLoader):
             if data path does not exist
         """
         if lf_constants.FILE_INDEX_TODO_NAME_KEY in self.file_index:
-            return self.file_index[lf_constants.FILE_INDEX_TODO_NAME_KEY].unique()
+            return (
+                self.file_index.loc[
+                    self.file_index[lf_constants.FILE_INDEX_IS_TODO_KEY] == True,
+                    lf_constants.FILE_INDEX_TODO_NAME_KEY,
+                ]
+                .unique()
+                .tolist()
+            )
         else:
             return []
+
+    def _get_stored_file_index(self) -> pd.DataFrame:
+        if (self.data_path / ".pywearable_file_index.csv").exists():
+            # load it
+            file_index = pd.read_csv(
+                self.data_path / ".pywearable_file_index.csv",
+                parse_dates=[
+                    lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
+                    lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY,
+                ],
+            )
+            return file_index
+        else:
+            return None
 
     def get_file_index(self, force_reload: bool = False) -> pd.DataFrame:
         """Create internal file index to speed up finding file.
@@ -288,140 +314,161 @@ class LabfrontLoader(BaseLoader):
         """
         if not self.data_path.exists():
             raise FileNotFoundError
-        file_index = pd.DataFrame()
-        for participant_folder in self.data_path.iterdir():
-            # For each participant
-            if participant_folder.is_dir():
-                participant_dict = {}
-                for participant_metric_folder in participant_folder.iterdir():
-                    # For each metric
-                    if participant_metric_folder.is_dir():
-                        # Get the number of files inside folder
-                        n_files = len(os.listdir(participant_metric_folder))
-                        for metric_csv_file in participant_metric_folder.iterdir():
-                            # If it is a folder, then we need to read the csv files
-                            # and get first and last unix times for each CSV file
-                            if metric_csv_file.is_file() and str(
-                                metric_csv_file
-                            ).endswith("csv"):
-                                first_date = datetime.datetime.strptime(
-                                    metric_csv_file.name[:6], "%y%m%d"
-                                )
-                                # If we have a single file, start is from file name, end is today
-                                if n_files == 1:
-                                    last_date = np.nan
-                                else:
-                                    last_date = first_date + datetime.timedelta(days=1)
-                                participant_dict[metric_csv_file.name] = {
-                                    lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
-                                    lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
-                                    lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
-                                    lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
-                                    lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: False,
-                                    lf_constants.FILE_INDEX_IS_TODO_KEY: False,
-                                }
-                            else:
-                                # We don't have a file, we expect a questionnaire/task folder
-                                if not metric_csv_file.is_dir():
-                                    continue
-                                # For each questionnaire/task folder
-                                for csv_file in metric_csv_file.iterdir():
-                                    if lf_constants.TODO_FOLDER == metric_csv_file.name:
-                                        # We have a task
-                                        is_todo = True
-                                        is_questionnaire = False
-                                    elif (
-                                        lf_constants.QUESTIONNAIRE_FOLDER
-                                        == metric_csv_file.name
-                                    ):
-                                        # We have a questionnaire
-                                        is_todo = False
-                                        is_questionnaire = True
+        # Get stored file index
+        file_index = self._get_stored_file_index()
+        if (file_index is None) or force_reload:
+
+            file_index = pd.DataFrame()
+            for participant_folder in self.data_path.iterdir():
+                # For each participant
+                if participant_folder.is_dir():
+                    participant_dict = {}
+                    for participant_metric_folder in participant_folder.iterdir():
+                        # For each metric
+                        if participant_metric_folder.is_dir():
+                            # Get the number of files inside folder
+                            n_files = len(os.listdir(participant_metric_folder))
+                            for metric_csv_file in participant_metric_folder.iterdir():
+                                # If it is a folder, then we need to read the csv files
+                                # and get first and last unix times for each CSV file
+                                if metric_csv_file.is_file() and str(
+                                    metric_csv_file
+                                ).endswith("csv"):
+                                    first_date = datetime.datetime.strptime(
+                                        metric_csv_file.name[:6], "%y%m%d"
+                                    )
+                                    # If we have a single file, start is from file name, end is today
+                                    if n_files == 1:
+                                        last_date = np.nan
                                     else:
-                                        continue
-                                    if csv_file.is_file() and str(csv_file).endswith(
-                                        "csv"
-                                    ):
-                                        # We need to get the name of the questionnaire/task and its id
-                                        # Get first date from filename
-                                        first_date = datetime.datetime.strptime(
-                                            csv_file.name[:6], "%y%m%d"
+                                        last_date = first_date + datetime.timedelta(
+                                            days=1
                                         )
-                                        # If we have a single file, start is from file name, end is today
-                                        if n_files == 1:
-                                            last_date = np.nan
+                                    participant_dict[metric_csv_file.name] = {
+                                        lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
+                                        lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
+                                        lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
+                                        lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
+                                        lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: False,
+                                        lf_constants.FILE_INDEX_IS_TODO_KEY: False,
+                                    }
+                                else:
+                                    # We don't have a file, we expect a questionnaire/task folder
+                                    if not metric_csv_file.is_dir():
+                                        continue
+                                    # For each questionnaire/task folder
+                                    for task_csv_file in metric_csv_file.iterdir():
+                                        if (
+                                            lf_constants.TODO_FOLDER
+                                            == participant_metric_folder.name
+                                        ):
+                                            # We have a task
+                                            is_todo = True
+                                            is_questionnaire = False
+                                        elif (
+                                            lf_constants.QUESTIONNAIRE_FOLDER
+                                            == participant_metric_folder.name
+                                        ):
+                                            # We have a questionnaire
+                                            is_todo = False
+                                            is_questionnaire = True
                                         else:
-                                            last_date = first_date + datetime.timedelta(
-                                                days=1
-                                            )
+                                            continue
 
-                                        participant_dict[metric_csv_file.name] = {
-                                            lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
-                                            lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
-                                            lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
-                                            lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
-                                            lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: is_questionnaire,
-                                            lf_constants.FILE_INDEX_IS_TODO_KEY: is_todo,
-                                        }
-
-                                        if is_questionnaire:
-                                            (
-                                                questionnaire_name,
-                                                questionnaire_id,
-                                                task_id,
-                                            ) = self._get_questionnaire_info(csv_file)
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY
-                                            ] = questionnaire_name
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.FILE_INDEX_QUESTIONNAIRE_ID_KEY
-                                            ] = questionnaire_id
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.FILE_INDEX_TASK_ID_KEY
-                                            ] = task_id
-                                        elif is_todo:
-                                            todo_name, todo_id, task_id = (
-                                                self._get_todo_info(csv_file)
+                                        if task_csv_file.is_file() and str(
+                                            task_csv_file
+                                        ).endswith("csv"):
+                                            # We need to get the name of the questionnaire/task and its id
+                                            # Get first date from filename
+                                            first_date = datetime.datetime.strptime(
+                                                task_csv_file.name[:6], "%y%m%d"
                                             )
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.TODO_NAME_COL
-                                            ] = todo_name
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.TODO_ID_COL
-                                            ] = todo_id
-                                            participant_dict[metric_csv_file.name][
-                                                lf_constants.TASK_ID_COL
-                                            ] = task_id
-                if len(participant_dict) > 0:
-                    if len(file_index) > 0:
-                        file_index = pd.concat(
-                            (
-                                file_index,
-                                pd.DataFrame.from_dict(
-                                    participant_dict, orient="index"
+                                            # If we have a single file, start is from file name, end is today
+                                            if n_files == 1:
+                                                last_date = np.nan
+                                            else:
+                                                last_date = (
+                                                    first_date
+                                                    + datetime.timedelta(days=1)
+                                                )
+
+                                            participant_dict[task_csv_file.name] = {
+                                                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
+                                                lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
+                                                lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
+                                                lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
+                                                lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: is_questionnaire,
+                                                lf_constants.FILE_INDEX_IS_TODO_KEY: is_todo,
+                                            }
+
+                                            if is_questionnaire:
+                                                (
+                                                    questionnaire_name,
+                                                    questionnaire_id,
+                                                    task_id,
+                                                ) = self._get_questionnaire_info(
+                                                    task_csv_file
+                                                )
+                                                print(questionnaire_name)
+                                                print(questionnaire_id)
+                                                print(task_id)
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.QUESTIONNAIRE_NAME_COL
+                                                ] = questionnaire_name
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.QUESTIONNAIRE_ID_COL
+                                                ] = questionnaire_id
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.TASK_ID_COL
+                                                ] = task_id
+                                            elif is_todo:
+                                                todo_name, todo_id, task_id = (
+                                                    self._get_todo_info(task_csv_file)
+                                                )
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.TODO_NAME_COL
+                                                ] = todo_name
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.TODO_ID_COL
+                                                ] = todo_id
+                                                participant_dict[task_csv_file.name][
+                                                    lf_constants.TASK_ID_COL
+                                                ] = task_id
+
+                    if len(participant_dict) > 0:
+                        if len(file_index) > 0:
+                            file_index = pd.concat(
+                                (
+                                    file_index,
+                                    pd.DataFrame.from_dict(
+                                        participant_dict, orient="index"
+                                    ),
                                 ),
-                            ),
-                            axis=0,
-                            ignore_index=True,
-                        )
-                    else:
-                        file_index = pd.DataFrame.from_dict(
-                            participant_dict, orient="index"
-                        )
-        if lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY in file_index.columns:
-            # Create two separate columns for IDs
-            file_index[
-                [
-                    lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
-                    lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
-                ]
-            ] = file_index[lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY].str.split(
-                "_", expand=True
+                                axis=0,
+                            )
+                        else:
+                            file_index = pd.DataFrame.from_dict(
+                                participant_dict, orient="index"
+                            )
+            if lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY in file_index.columns:
+                # Create two separate columns for IDs
+                file_index[
+                    [
+                        lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
+                        lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
+                    ]
+                ] = file_index[
+                    lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY
+                ].str.split(
+                    "_", expand=True
+                )
+            # Reset index
+            file_index = file_index.reset_index(
+                names=lf_constants.FILE_INDEX_FILENAME_KEY
             )
-        # Reset index
-        file_index = file_index.reset_index(
-            names=lf_constants.FILE_INDEX_FILENAME_KEY
-        ).set_index(
+            # Store it into CSV
+            file_index.to_csv(self.data_path / ".pywearable_file_index.csv")
+        file_index = file_index.set_index(
             [
                 lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY,
                 lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
@@ -429,10 +476,9 @@ class LabfrontLoader(BaseLoader):
                 lf_constants.FILE_INDEX_METRIC_KEY,
             ]
         )
-
         return file_index
 
-    def _get_questionnaire_info(path_to_file) -> Tuple[str, str]:
+    def _get_questionnaire_info(self, path_to_file) -> Tuple[str, str]:
         questionnaire_info_df = pd.read_csv(
             path_to_file, nrows=1, skiprows=lf_constants.CSV_STATS_SKIP_ROWS
         )
@@ -445,7 +491,7 @@ class LabfrontLoader(BaseLoader):
         task_id = questionnaire_info_df.loc[0, lf_constants.TASK_ID_COL]
         return (questionnaire_name, questionnaire_id, task_id)
 
-    def _get_todo_info(path_to_file) -> Tuple[str, str]:
+    def _get_todo_info(self, path_to_file) -> Tuple[str, str]:
         todo_info_df = pd.read_csv(
             path_to_file, nrows=1, skiprows=lf_constants.CSV_STATS_SKIP_ROWS
         )
@@ -515,12 +561,15 @@ class LabfrontLoader(BaseLoader):
         ):
             # Participant does not have files for this metric, return empty list
             return []
-        # Reset index and fill last timestamps with end date
-        participant_files = (
-            self.file_index.loc[(participant_id, slice(None), slice(None), metric), :]
-            .reset_index(drop=True)
-            .fillna(end_date)
-        )
+        participant_files = self.file_index.loc[
+            (participant_id, slice(None), slice(None), metric), :
+        ].reset_index(drop=True)
+        if start_date is None:
+            start_date = participant_files[
+                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+            ].min()
+        if end_date is None:
+            end_date = pd.Timestamp.now()
         # We need to floor start_date to the previous day
         # since Labfront files contain the midnight in the
         # file belonging to the previous day
@@ -530,6 +579,9 @@ class LabfrontLoader(BaseLoader):
         # We need to ceil end_date to the next date to
         # handle end-date non inclusiveness with dates
         end_date = pd.Timestamp(end_date).ceil("1d")
+        # Reset index and fill last timestamps with end date
+
+        participant_files = participant_files.fillna(end_date)
         if len(participant_files) == 1:
             # We only have one file
             if (
@@ -566,6 +618,7 @@ class LabfrontLoader(BaseLoader):
         is_questionnaire: bool = False,
         is_todo: bool = False,
         task_name: str = None,
+        filter_on_calendar_date: bool = False,
     ) -> pd.DataFrame:
         """Load data from a given user in a given time frame.
 
@@ -644,7 +697,6 @@ class LabfrontLoader(BaseLoader):
             is_todo=is_todo,
             task_name=task_name,
         )
-
         if len(files) == 0:
             return pd.DataFrame()
         if is_questionnaire:
@@ -681,23 +733,49 @@ class LabfrontLoader(BaseLoader):
             return pd.DataFrame()
 
         # Convert to datetime according to isoformat
-        data[constants.ISODATE_COL] = pd.to_datetime(
-            data[constants.ISODATE_COL]
-        ).dt.tz_localize(None)
-        # Get data only from given start and end dates
-        if (start_date is None) and (not end_date is None):
-            return data[(data[constants.ISODATE_COL] < end_date)].reset_index(drop=True)
-        elif (not start_date is None) and (end_date is None):
-            return data[(data[constants.ISODATE_COL] >= start_date)].reset_index(
-                drop=True
+        cols_to_sort = []
+        if constants.ISODATE_COL in data.columns:
+            data[constants.ISODATE_COL] = pd.to_datetime(
+                data[constants.ISODATE_COL]
+            ).dt.tz_localize(None)
+        if constants.CALENDAR_DATE_COL in data.columns:
+            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
             )
-        elif (not start_date is None) and (not end_date is None):
-            return data[
-                (data[constants.ISODATE_COL] >= start_date)
-                & (data[constants.ISODATE_COL] < end_date)
-            ].reset_index(drop=True)
+            cols_to_sort.append(constants.CALENDAR_DATE_COL)
+        data = data.sort_values(by=cols_to_sort, ignore_index=True)
+        # Get data only from given start and end dates
+        if (start_date is None) and (end_date is None):
+            return data
+        elif not (
+            constants.ISODATE_COL in data.columns
+            or constants.CALENDAR_DATE_COL in data.columns
+        ):
+            return data
         else:
-            return data.reset_index(drop=True)
+            date_filter_col = constants.ISODATE_COL
+            if filter_on_calendar_date:
+                start_date = (
+                    None
+                    if (start_date is None)
+                    else pd.Timestamp(start_date).normalize()
+                )
+                end_date = (
+                    None if (end_date is None) else pd.Timestamp(end_date).normalize()
+                )
+                date_filter_col = constants.CALENDAR_DATE_COL
+            if (start_date is None) and (not (end_date is None)):
+                return data[(data[date_filter_col] < end_date)]
+            elif (not (start_date is None)) and (end_date is None):
+                return data[(data[date_filter_col] >= start_date)]
+            else:
+                if start_date == end_date:
+                    return data[data[date_filter_col] == start_date]
+                else:
+                    return data[
+                        (data[date_filter_col] >= start_date)
+                        & (data[date_filter_col] < end_date)
+                    ]
 
     def get_header_length(self, file_path: Union[str, Path]) -> int:
         """Get header length of Labfront csv file.
@@ -772,7 +850,7 @@ class LabfrontLoader(BaseLoader):
         str
             Full ID of the task.
         """
-
+        # TODO get the name of the folder
         return self.tasks_dict[task_id.lower()]
 
     def get_questionnaire_questions(self, questionnaire_name: str) -> dict:
@@ -886,6 +964,109 @@ class LabfrontLoader(BaseLoader):
             questions_dict[question_id]["options"] = question_options
         return questions_dict
 
+    def load_garmin_connect_activity_details_lap(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_ACTIVITY_DETAILS_LAP_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_activity_details_sample(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_ACTIVITY_DETAILS_SAMPLE_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_activity_details_summary(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_ACTIVITY_DETAILS_SUMMARY_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_activity_moveiq_summary(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_ACTIVITY_MOVEIQ_SUMMARY_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_activity_summary(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_ACTIVITY_SUMMARY_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_body_composition(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        """Load Garmin Connect body composition data.
+
+        This function loads Garmin Connect body composition data from a given
+        participant and within a specified date and time range.
+
+        Parameters
+        ----------
+        user_id : str
+            ID of the user.
+        start_date : str or datetime.date or datetime.date, optional
+            Start date from which data should be retrieved, by default None
+        end_date : str or datetime.date or datetime.date, optional
+            End date from which data should be retrieved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe containing Garmin Connect body composition data.
+        """
+        data = self.get_data_from_datetime(
+            user_id,
+            lf_constants.GARMIN_CONNECT_BODY_COMPOSITION_FOLDER,
+            start_date,
+            end_date,
+        )
+        return data
+
     def load_garmin_connect_heart_rate(
         self,
         user_id: str,
@@ -911,51 +1092,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing heart rate data.
         """
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
-            start_date,
-            end_date,
-        )
-        return data
-
-    def load_garmin_connect_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.datetime] = None,
-        end_date: Union[str, datetime.date, datetime.datetime] = None,
-    ) -> pd.DataFrame:
-        sleep_data = self.get_data_from_datetime(
+        return self.get_data_from_datetime(
             user_id=user_id,
-            metric=lf_constants.GARMIN_CONNECT_SLEEP_PULSE_OX_FOLDER,
+            metric=lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
             start_date=start_date,
             end_date=end_date,
-        ).reset_index(drop=True)
-        if len(sleep_data) > 0:
-            # We need to add calendarDate from sleep summaries
-            sleep_summary = self.load_sleep_summary(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-                same_day_filter=False,
-            )
-            sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
-            ]
-
-            sleep_data = sleep_data.merge(
-                right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
-                how="left",
-            )
-
-            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
-            # Convert calendar date to pd.Timestamp
-            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                sleep_data[constants.CALENDAR_DATE_COL]
-            )
-        return sleep_data
+            filter_on_calendar_date=False,
+        )
 
     def load_garmin_connect_pulse_ox(
         self,
@@ -987,6 +1130,7 @@ class LabfrontLoader(BaseLoader):
             metric=lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
             start_date=start_date,
             end_date=end_date,
+            filter_on_calendar_date=False,
         ).reset_index(drop=True)
         # Load sleep pulse ox data
         sleep_data = self.get_data_from_datetime(
@@ -994,6 +1138,7 @@ class LabfrontLoader(BaseLoader):
             metric=lf_constants.GARMIN_CONNECT_SLEEP_PULSE_OX_FOLDER,
             start_date=start_date,
             end_date=end_date,
+            filter_on_calendar_date=False,
         ).reset_index(drop=True)
 
         if len(sleep_data) > 0:
@@ -1083,18 +1228,20 @@ class LabfrontLoader(BaseLoader):
         """
         # We need to load both sleep and daily respiration
         daily_data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         ).reset_index(drop=True)
 
         # Get sleep data
         sleep_data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_SLEEP_RESPIRATION_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_SLEEP_RESPIRATION_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         ).reset_index(drop=True)
 
         # Add calendar date from sleep summary
@@ -1161,6 +1308,46 @@ class LabfrontLoader(BaseLoader):
             daily_data[constants.IS_SLEEPING_COL] = False
             return daily_data
 
+    def load_garmin_connect_sleep_pulse_ox(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.datetime] = None,
+        end_date: Union[str, datetime.date, datetime.datetime] = None,
+    ) -> pd.DataFrame:
+        sleep_data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_SLEEP_PULSE_OX_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
+        ).reset_index(drop=True)
+        if len(sleep_data) > 0:
+            # We need to add calendarDate from sleep summaries
+            sleep_summary = self.load_sleep_summary(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+                same_day_filter=False,
+            )
+            sleep_summary = sleep_summary.loc[
+                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+            ]
+
+            sleep_data = sleep_data.merge(
+                right=sleep_summary,
+                left_on=constants.SLEEP_SUMMARY_ID_COL,
+                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                how="left",
+            )
+
+            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
+            # Convert calendar date to pd.Timestamp
+            # TODO remove since sleep_summary already has Timestamp on calendarDate
+            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_data[constants.CALENDAR_DATE_COL]
+            )
+        return sleep_data
+
     def load_garmin_connect_sleep_respiration(
         self,
         user_id: str,
@@ -1172,6 +1359,7 @@ class LabfrontLoader(BaseLoader):
             metric=lf_constants.GARMIN_CONNECT_SLEEP_RESPIRATION_FOLDER,
             start_date=start_date,
             end_date=end_date,
+            filter_on_calendar_date=False,
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
@@ -1199,167 +1387,6 @@ class LabfrontLoader(BaseLoader):
             )
         return sleep_data
 
-    def load_sleep_stage(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date, None] = None,
-        end_date: Union[str, datetime.date, datetime.date, None] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Connect sleep stage data.
-
-        This function loads sleep stage data from a given
-        user and within a specified date and time range.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            Unique identifier for the user.
-        start_date : :class:`str` or :class:`datetime.datetime` or :class:`datetime.date` or None, optional
-            Start date from which data should be retrieved, by default None
-        end_date : :class:`str` or :class:`datetime.datetime` or :class:`datetime.date` or None, optional
-            End date from which data should be retrieved, by default None
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe with sleep stages data.
-        """
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_SLEEP_STAGE_FOLDER,
-            start_date,
-            end_date,
-        )
-
-        if len(data) > 0:
-            # Change sleep stage values
-            data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
-            ].map(
-                {
-                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_N1_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_N3_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-                }
-            )
-
-        return data
-
-    def load_sleep_summary(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-        same_day_filter: bool = True,
-    ) -> pd.DataFrame:
-        """Load Garmin Connect sleep summary data.
-
-        This function loads sleep summary data from a given
-        user and within a specified date and time range.
-
-        Parameters
-        ----------
-        user_id : str
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing sleep summary data.
-        """
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_FOLDER,
-            start_date,
-            end_date,
-        )
-
-        if len(data) > 0:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL],
-                format="%Y-%m-%d",
-            ).dt.date
-
-            if same_day_filter:
-                data["validationMap"] = data["validation"].map(
-                    {
-                        "AUTO_TENTATIVE": 1,
-                        "AUTO_FINAL": 2,
-                        "ENHANCED_TENTATIVE": 3,
-                        "ENHANCED_FINAL": 4,
-                    }
-                )
-                data = (
-                    data.sort_values(
-                        by=(
-                            [
-                                constants.CALENDAR_DATE_COL,
-                                "validationMap",
-                                constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
-                            ]
-                        ),
-                        ascending=True,
-                    )
-                    .groupby(constants.CALENDAR_DATE_COL)
-                    .tail(1)
-                )
-                data = data.drop(["validationMap"], axis=1)
-
-            # Rename columns based on pywearable specs
-            data = data.rename(
-                columns={
-                    lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                }
-            )
-
-            data[constants.SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL] = np.nan
-
-            data = data.loc[
-                :,
-                [
-                    constants.SLEEP_SUMMARY_ID_COL,
-                    constants.TIMEZONEOFFSET_IN_MS_COL,
-                    constants.UNIXTIMESTAMP_IN_MS_COL,
-                    constants.ISODATE_COL,
-                    constants.CALENDAR_DATE_COL,
-                    constants.DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL,
-                ],
-            ]
-
-            if (start_date is None) and (end_date is None):
-                return data
-            else:
-                start_date = None if (start_date is None) else start_date.date()
-                end_date = None if (end_date is None) else end_date.date()
-                if (start_date is None) and (not (end_date is None)):
-                    return data[(data[constants.CALENDAR_DATE_COL] <= end_date)]
-                elif (not (start_date is None)) and (end_date is None):
-                    return data[(data[constants.CALENDAR_DATE_COL] >= start_date)]
-                else:
-                    return data[
-                        (data[constants.CALENDAR_DATE_COL] >= start_date)
-                        & (data[constants.CALENDAR_DATE_COL] <= end_date)
-                    ]
-        else:
-            return pd.DataFrame()
-
     def load_garmin_connect_stress(
         self,
         user_id: str,
@@ -1386,10 +1413,44 @@ class LabfrontLoader(BaseLoader):
             Dataframe containing stress data.
         """
         data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_STRESS_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_STRESS_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return data
+
+    def load_garmin_connect_user_metrics(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        """Load Garmin Connect stress data.
+
+        This function loads stress data from a given
+        user and within a specified date and time range.
+
+        Parameters
+        ----------
+        user_id : str
+            ID of the user.
+        start_date : str or datetime.date or datetime.date, optional
+            Start date from which data should be retrieved, by default None
+        end_date : str or datetime.date or datetime.date, optional
+            End date from which data should be retrieved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe containing stress data.
+        """
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_USER_METRICS_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=True,
         )
         return data
 
@@ -1419,10 +1480,10 @@ class LabfrontLoader(BaseLoader):
             Dataframe containing heart rate data.
         """
         data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
         )
         return data
 
@@ -1433,13 +1494,15 @@ class LabfrontLoader(BaseLoader):
         end_date: Union[str, datetime.date, datetime.date] = None,
     ) -> pd.DataFrame:
         data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         )
         if len(data) > 0:
             # We need to add calendarDate from sleep summaries
+            # TODO probably better not to depend on sleep module here
             sleep_timestamps = sleep.get_sleep_timestamps(
                 self,
                 user_id=user_id,
@@ -1762,39 +1825,6 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def load_garmin_connect_body_composition(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Connect body composition data.
-
-        This function loads Garmin Connect body composition data from a given
-        participant and within a specified date and time range.
-
-        Parameters
-        ----------
-        user_id : str
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing Garmin Connect body composition data.
-        """
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_BODY_COMPOSITION_FOLDER,
-            start_date,
-            end_date,
-        )
-        return data
-
     def load_daily_summary(
         self,
         user_id: str,
@@ -1820,44 +1850,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing Garmin Connect daily summary data.
         """
-        start_date = utils.check_date(start_date)
-        end_date = utils.check_date(end_date)
-        if not start_date is None:
-            new_start_date = start_date - datetime.timedelta(days=1)
-            start_date_date = datetime.datetime.combine(
-                start_date.date(), datetime.time(0, 0, 0)
-            )
-        else:
-            new_start_date = None
-        if not end_date is None:
-            new_end_date = end_date + datetime.timedelta(days=1)
-            end_date_date = datetime.datetime.combine(
-                end_date.date(), datetime.time(0, 0, 0)
-            )
-        else:
-            new_end_date = None
         data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_DAILY_SUMMARY_FOLDER,
-            new_start_date,
-            new_end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_DAILY_SUMMARY_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=True,
         )
-        if len(data) > 0:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL],
-                format="%Y-%m-%d",
-            )
-            if (start_date is None) and (not (end_date is None)):
-                return data[data[constants.CALENDAR_DATE_COL] <= end_date_date]
-            elif (not (start_date is None)) and (end_date is None):
-                return data[data[constants.CALENDAR_DATE_COL] >= start_date_date]
-            elif (not (start_date is None)) and (not (end_date is None)):
-                return data[
-                    (data[constants.CALENDAR_DATE_COL] >= start_date_date)
-                    & (data[constants.CALENDAR_DATE_COL] <= end_date_date)
-                ]
-            else:
-                return data
         return data
 
     def load_garmin_connect_epoch(
@@ -1886,53 +1885,72 @@ class LabfrontLoader(BaseLoader):
             Dataframe containing Garmin Connect epoch data.
         """
         data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_CONNECT_EPOCH_FOLDER,
-            start_date,
-            end_date,
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_EPOCH_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         )
         return data
 
-    def load_todo(
+    def load_garmin_metric(
+        self,
+        metric: str,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+        filter_on_calendar_date: bool = False,
+    ):
+        try:
+            labfront_metric = _LABFRONT_METRICS_DICT[metric][source]
+        except KeyError:
+            raise (f"Could not find available metric {metric} with source {source}")
+        return self.get_data_from_datetime(
+            user_id=user_id,
+            metric=labfront_metric,
+            start_date=start_date,
+            end_date=end_date,
+            is_questionnaire=False,
+            is_todo=False,
+            filter_on_calendar_date=filter_on_calendar_date,
+        )
+
+    def load_heart_rate(
         self,
         user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-        todo_name: str = None,
-    ):
-        """Load todo data.
-
-        This function loads todo data from a given
-        participant and within a specified date and time range.
-
-        Parameters
-        ----------
-        user_id : str
-            ID of the user for which todo data have to be loaded.
-            This can be the user ID, Labfront ID, or
-            the full ID. If multiple users exist with the same user ID, then
-            it is necessary to pass either the Labfront ID or the full ID.
-        start_date : str or datetime.date or datetime.date, optional
-            Start data for data loading, by default None
-        end_date : str or datetime.date or datetime.date, optional
-            End data for data loading, by default None
-        todo_name : str, optional
-            Name of the todo to be loaded, by default None
-
-        Returns
-        -------
-        pd.DataFrame
-            Todo data.
-        """
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.TODO_FOLDER,
-            start_date,
-            end_date,
-            is_todo=True,
-            task_name=todo_name,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+    ) -> pd.DataFrame:
+        return self.load_garmin_metric(
+            metric=constants.METRIC_HEART_RATE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            source=source,
+            filter_on_calendar_date=False,
         )
-        return data
+
+    def load_pulse_ox(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+    ) -> pd.DataFrame:
+        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
+            return self.load_garmin_connect_pulse_ox(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            return self.load_garmin_device_pulse_ox(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
 
     def load_questionnaire(
         self,
@@ -1966,70 +1984,15 @@ class LabfrontLoader(BaseLoader):
             Questionnaire data.
         """
         data = self.get_data_from_datetime(
-            user_id,
+            user_id=user_id,
             metric=lf_constants.QUESTIONNAIRE_FOLDER,
             start_date=start_date,
             end_date=end_date,
             is_questionnaire=True,
             task_name=questionnaire_name,
+            filter_on_calendar_date=False,
         )
         return data
-
-    def load_metric(
-        self,
-        metric: str,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ):
-        try:
-            labfront_metric = _LABFRONT_METRICS_DICT[metric][source]
-        except KeyError:
-            raise (f"Could not find available metric {metric} with source {source}")
-        return self.get_data_from_datetime(
-            user_id=user_id,
-            metric=labfront_metric,
-            start_date=start_date,
-            end_date=end_date,
-            is_questionnaire=False,
-            is_todo=False,
-        )
-
-    def load_heart_rate(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        return self.load_metric(
-            metric=constants.METRIC_HEART_RATE,
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-            source=source,
-        )
-
-    def load_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            return self.load_garmin_device_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
 
     def load_respiration(
         self,
@@ -2091,6 +2054,136 @@ class LabfrontLoader(BaseLoader):
                 end_date=end_date,
             )
 
+    def load_sleep_stage(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date, None] = None,
+        end_date: Union[str, datetime.date, datetime.date, None] = None,
+    ) -> pd.DataFrame:
+        """Load Garmin Connect sleep stage data.
+
+        This function loads sleep stage data from a given
+        user and within a specified date and time range.
+
+        Parameters
+        ----------
+        user_id : :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`str` or :class:`datetime.datetime` or :class:`datetime.date` or None, optional
+            Start date from which data should be retrieved, by default None
+        end_date : :class:`str` or :class:`datetime.datetime` or :class:`datetime.date` or None, optional
+            End date from which data should be retrieved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe with sleep stages data.
+        """
+        data = self.get_data_from_datetime(
+            user_id,
+            lf_constants.GARMIN_CONNECT_SLEEP_STAGE_FOLDER,
+            start_date,
+            end_date,
+            filter_on_calendar_date=False,
+        )
+
+        if len(data) > 0:
+            # Change sleep stage values
+            data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
+                constants.SLEEP_STAGE_SLEEP_TYPE_COL
+            ].map(
+                {
+                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_N1_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_N3_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                }
+            )
+
+        return data
+
+    def load_sleep_summary(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+        same_day_filter: bool = True,
+    ) -> pd.DataFrame:
+        """Load Garmin Connect sleep summary data.
+
+        This function loads sleep summary data from a given
+        user and within a specified date and time range.
+
+        Parameters
+        ----------
+        user_id : str
+            ID of the user.
+        start_date : str or datetime.date or datetime.date, optional
+            Start date from which data should be retrieved, by default None
+        end_date : str or datetime.date or datetime.date, optional
+            End date from which data should be retrieved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe containing sleep summary data.
+        """
+        data = self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=True,
+        )
+
+        if len(data) > 0:
+            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[constants.CALENDAR_DATE_COL],
+                format="%Y-%m-%d",
+            ).dt.date
+
+            if same_day_filter:
+                data["validationMap"] = data["validation"].map(
+                    {
+                        "AUTO_TENTATIVE": 1,
+                        "AUTO_FINAL": 2,
+                        "ENHANCED_TENTATIVE": 3,
+                        "ENHANCED_FINAL": 4,
+                    }
+                )
+                data = (
+                    data.sort_values(
+                        by=(
+                            [
+                                constants.CALENDAR_DATE_COL,
+                                "validationMap",
+                                constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                            ]
+                        ),
+                        ascending=True,
+                    )
+                    .groupby(constants.CALENDAR_DATE_COL)
+                    .tail(1)
+                )
+                data = data.drop(["validationMap"], axis=1)
+
+            # Rename columns based on pywearable specs
+            data = data.rename(
+                columns={
+                    lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+                    lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+                }
+            )
+
+            data[constants.SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL] = np.nan
+            return data
+        else:
+            return pd.DataFrame()
+
     def load_stress(
         self,
         user_id: str,
@@ -2098,10 +2191,52 @@ class LabfrontLoader(BaseLoader):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
-        return self.load_metric(
+        return self.load_garmin_metric(
             metric=constants.METRIC_STRESS,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             source=source,
+            filter_on_calendar_date=False,
+        )
+
+    def load_todo(
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
+        todo_name: str = None,
+    ):
+        """Load todo data.
+
+        This function loads todo data from a given
+        participant and within a specified date and time range.
+
+        Parameters
+        ----------
+        user_id : str
+            ID of the user for which todo data have to be loaded.
+            This can be the user ID, Labfront ID, or
+            the full ID. If multiple users exist with the same user ID, then
+            it is necessary to pass either the Labfront ID or the full ID.
+        start_date : str or datetime.date or datetime.date, optional
+            Start data for data loading, by default None
+        end_date : str or datetime.date or datetime.date, optional
+            End data for data loading, by default None
+        todo_name : str, optional
+            Name of the todo to be loaded, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Todo data.
+        """
+        return self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.TODO_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            is_todo=True,
+            task_name=todo_name,
+            filter_on_calendar_date=False,
         )
