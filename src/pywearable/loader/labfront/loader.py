@@ -814,7 +814,7 @@ class LabfrontLoader(BaseLoader):
 
         # Get data only from given start and end dates
         if (start_date is None) and (not end_date is None):
-            return data[(data[constants._ISODATE_COL] <= end_date)].reset_index(
+            return data[(data[constants._ISODATE_COL] < end_date)].reset_index(
                 drop=True
             )
         elif (not start_date is None) and (end_date is None):
@@ -824,7 +824,7 @@ class LabfrontLoader(BaseLoader):
         elif (not start_date is None) and (not end_date is None):
             return data[
                 (data[constants._ISODATE_COL] >= start_date)
-                & (data[constants._ISODATE_COL] <= end_date)
+                & (data[constants._ISODATE_COL] < end_date)
             ].reset_index(drop=True)
         else:
             return data.reset_index(drop=True)
@@ -1160,21 +1160,21 @@ class LabfrontLoader(BaseLoader):
             # We need to merge the dataframes because the daily_data already contain sleep_data
             if len(daily_data) > 0:
                 sleep_data = sleep_data.drop(
-                [
-                    x
-                    for x in sleep_data.columns
-                    if (
-                        not x
-                        in (
-                            [
-                                constants._ISODATE_COL,
-                                constants._CALENDAR_DATE_COL,
-                                constants._IS_SLEEPING_COL,
-                            ]
+                    [
+                        x
+                        for x in sleep_data.columns
+                        if (
+                            not x
+                            in (
+                                [
+                                    constants._ISODATE_COL,
+                                    constants._CALENDAR_DATE_COL,
+                                    constants._IS_SLEEPING_COL,
+                                ]
+                            )
                         )
-                    )
-                ],
-                axis=1,
+                    ],
+                    axis=1,
                 )
                 merged_data = daily_data.merge(
                     sleep_data, on=constants._ISODATE_COL, how="left"
