@@ -734,10 +734,32 @@ class LabfrontLoader(BaseLoader):
 
         # Convert to datetime according to isoformat
         cols_to_sort = []
+        print(data.head())
         if constants.ISODATE_COL in data.columns:
-            data[constants.ISODATE_COL] = pd.to_datetime(
-                data[constants.ISODATE_COL]
-            ).dt.tz_localize(None)
+            if lf_constants.GARMIN_CONNECT_BASE_FOLDER in metric:
+                # Convert to datetime according to isoformat
+                data[constants.ISODATE_COL] = (
+                    data[constants.UNIXTIMESTAMP_IN_MS_COL]
+                    + data[lf_constants.GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL]
+                )
+                data[constants.ISODATE_COL] = pd.to_datetime(
+                    data[constants.ISODATE_COL], unit="ms", utc=True
+                )
+                data[constants.ISODATE_COL] = data[
+                    constants.ISODATE_COL
+                ].dt.tz_localize(None)
+            else:
+                # Convert unix time stamp
+                data[constants.ISODATE_COL] = pd.to_datetime(
+                    data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+                )
+                data[constants.ISODATE_COL] = data.groupby(
+                    lf_constants.GARMIN_DEVICE_TIMEZONE_COL,
+                    group_keys=False,
+                )[constants.ISODATE_COL].apply(
+                    lambda x: x.dt.tz_convert(x.name).dt.tz_localize(tz=None)
+                )
+
         if constants.CALENDAR_DATE_COL in data.columns:
             data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
                 data[constants.CALENDAR_DATE_COL], format="%Y-%m-%d"

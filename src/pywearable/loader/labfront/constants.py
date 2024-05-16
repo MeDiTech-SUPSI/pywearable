@@ -80,7 +80,7 @@ TODO_FOLDER = "todo"
 
 # Labfront-specific CSV columns
 GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL = "timezoneOffsetInMs"
-GARMIN_DEVICE_TIMEZONEOFFSET_IN_MS_COL = "timezone"
+GARMIN_DEVICE_TIMEZONE_COL = "timezone"
 FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL = "firstSampleUnixTimestampInMs"
 LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL = "lastSampleUnixTimestampInMs"
 
