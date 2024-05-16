@@ -979,12 +979,6 @@ def get_sleep_summary_graph(
         kwargs for the trend analysis of consistency metrics, by default {}
     """
 
-    if not (consistency_metric is None):
-        assertion_msg = "Must specify chronotype when plotting circadian measures"
-        assert (
-            chronotype_sleep_start is not None and chronotype_sleep_end is not None
-        ), assertion_msg
-
     # Define parameters for plotting
     ALPHA = alpha
     POSITION = 1.3
