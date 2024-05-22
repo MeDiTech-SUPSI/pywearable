@@ -624,32 +624,13 @@ def get_recovery_percentage(loader: BaseLoader,
     user_id = utils.get_user_ids(loader, user_id)
 
     for user in user_id:
-        data_dict[user] = {}
-        sleep_timestamps = sleep.get_sleep_timestamps(
-            loader=loader, user_id=user, start_date=start_date, end_date=end_date
-        )[user]
-        if not (sleep_timestamps is None):
-            for k, v in sleep_timestamps.items():
-                sleep_onset, awake_time = v[0], v[1]
-
-                df = loader.load_stress(user, sleep_onset, awake_time)
-                if len(df) == 0:
-                    continue
-
-                df = df[~df[constants._STRESS_BODY_BATTERY_COL].isna()]
-                df = df.reset_index(drop=True)
-                if len(df) == 0:
-                    continue
-                df = (
-                    df.groupby(constants._ISODATE_COL)[
-                        constants._STRESS_BODY_BATTERY_COL
-                    ]
-                    .mean()
-                    .sort_index()
-                )
-                available_recovery = 100 - df.iloc[0]
-                pct_recovery = round((df.iloc[-1] - df.iloc[0])/available_recovery * 100, 1)
-                data_dict[user][k] = pct_recovery
+        recovery_df = loader.load_recovery(user, start_date, end_date)
+        if len(recovery_df)>0:
+            data_dict[user] = (recovery_df.set_index(constants._CALENDAR_DATE_COL).loc[
+                :,constants._RECOVERY_RECOVERY_COL
+            ]*100).to_dict()
+        else:
+            data_dict[user] = {}
     
         if kind == "mean":
             recovery_df = pd.DataFrame.from_dict(

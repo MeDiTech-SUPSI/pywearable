@@ -2432,3 +2432,110 @@ class LabfrontLoader(BaseLoader):
             end_date=end_date,
             source=source,
         )
+    
+    def load_recovery(  
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source="health_api"
+    ):
+        """Load recovery data.
+
+        This function returns Garmin Body Battery Recovery data from the
+        given ``user_id`` with the time window defined by ``start_date``
+        and ``end_date``. Recovery is computed considering body battery
+        values at wake up and bedtime, and by comparing the total charge
+        with respect to the available charge.
+
+        Parameters
+        ----------
+        user_id : :class:`str`
+            Unique user identifier for recovery data retrieval.
+        start_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
+            Start date for recovery data retrieval.
+        end_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
+            End date for recovery data retrieval.
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            Formatted :class:`pd.DataFrame` with recovery data.
+        """
+        sleep_summary = self.load_sleep_summary(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            same_day_filter=True,
+        )
+        if len(sleep_summary) > 0:
+            # We need to get body battery data for each sleep
+            # Let's retrieve sleep timestamps
+            sleep_summary["wakeup"] = pd.to_datetime(
+                sleep_summary[constants._UNIXTIMESTAMP_IN_MS_COL]
+                + sleep_summary[constants._TIMEZONEOFFSET_IN_MS_COL]
+                + sleep_summary[constants._DURATION_IN_MS_COL]
+                + sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+                utc=True,
+                unit="ms",
+            ).dt.tz_localize(None)
+            sleep_timestamps = sleep_summary.loc[
+                :, [constants._CALENDAR_DATE_COL, constants._ISODATE_COL, "wakeup"]
+            ]
+            # Load body battery for all sleep sessions with 5 minute tolerance
+            min_time = sleep_timestamps[constants._ISODATE_COL].min() - pd.Timedelta(
+                minutes=5
+            )
+            max_time = sleep_timestamps["wakeup"].max() + pd.Timedelta(minutes=5)
+            body_battery = self.load_stress(
+                user_id=user_id,
+                start_date=min_time.to_pydatetime(),
+                end_date=max_time.to_pydatetime(),
+                source=source
+            )
+            if len(body_battery) > 0:
+                if labfront_constants._STRESS_BODY_BATTERY_COL in body_battery.columns:
+                    body_battery = body_battery.loc[
+                        :, [constants._ISODATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]
+                    ]
+                    # Labfront has several duplicates, we take the mean by isoDate and make sure isoDate is monotonic increasing
+                    body_battery = body_battery.groupby(constants._ISODATE_COL)[
+                        labfront_constants._STRESS_BODY_BATTERY_COL].mean().sort_index().reset_index()
+                    body_battery_bedtime = pd.merge_asof(
+                        sleep_timestamps,
+                        body_battery,
+                        on=constants._ISODATE_COL,
+                        direction="backward",
+                        tolerance=pd.Timedelta(minutes=5),
+                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    body_battery_wakeup = pd.merge_asof(
+                        sleep_timestamps,
+                        body_battery,
+                        left_on="wakeup",
+                        right_on=constants._ISODATE_COL,
+                        direction="forward",
+                        tolerance=pd.Timedelta(minutes=5),
+                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    sleep_timestamps = pd.merge(
+                        left=body_battery_bedtime,
+                        right=body_battery_wakeup,
+                        how="inner",
+                        on=constants._CALENDAR_DATE_COL,
+                        suffixes=["Bedtime", "Wakeup"],
+                    )
+                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = (
+                        sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_WAKING_COL]
+                        - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL]
+                    ) / (100 - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL])
+                    # make sure recovery isn't negative, set it to zero if it is
+                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = np.maximum(sleep_timestamps[constants._RECOVERY_RECOVERY_COL],0)
+                    sleep_timestamps = sleep_timestamps.reset_index(drop=True)
+                    return sleep_timestamps.loc[
+                        :,
+                        [
+                            constants._CALENDAR_DATE_COL,
+                            constants._RECOVERY_RECOVERY_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_WAKING_COL,
+                        ],
+                    ]
+        return pd.DataFrame()

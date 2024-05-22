@@ -57,6 +57,9 @@ _SLEEP_STAGE_SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
 _STRESS_STRESS_LEVEL_COL = "stressLevel"
 _STRESS_BODY_BATTERY_COL = "bodyBattery"
 
+# Recovery columns #
+_RECOVERY_RECOVERY_COL = "recovery"
+
 # Daily summary columns #
 _DAILY_SUMMARY_CALENDAR_DATE_COL = "calendarDate"
 _DAILY_SUMMARY_STEPS_COL = "steps"
