@@ -49,11 +49,11 @@ class LabfrontLoader(BaseLoader):
             Path to folder containing Labfront data.
     """
 
-    def __init__(self, data_path: Union[str, Path], force_reload: bool = False):
+    def __init__(self, data_path: Union[str, Path], reindex_files: bool = False):
         """Constructor method"""
-        self.set_path(data_path, force_reload=force_reload)
+        self.set_path(data_path, reindex_files=reindex_files)
 
-    def set_path(self, data_path: Union[str, Path], force_reload: bool = False):
+    def set_path(self, data_path: Union[str, Path], reindex_files: bool = False):
         """Set path to folder containing Labfront data.
 
         This function allows to change the path of Labfront data
@@ -67,7 +67,7 @@ class LabfrontLoader(BaseLoader):
         if not isinstance(data_path, Path):
             data_path = Path(data_path)
         self.data_path = data_path
-        self.file_index = self.get_file_index(force_reload=force_reload)
+        self.file_index = self.get_file_index(reindex_files=reindex_files)
         # self.tasks_dict = self.get_available_questionnaires(
         #    return_dict=True
         # ) | self.get_available_todos(return_dict=True)
@@ -285,7 +285,7 @@ class LabfrontLoader(BaseLoader):
         else:
             return None
 
-    def get_file_index(self, force_reload: bool = False) -> pd.DataFrame:
+    def get_file_index(self, reindex_files: bool = False) -> pd.DataFrame:
         """Create internal file index to speed up finding file.
 
         This function creates an internal file index with
@@ -316,7 +316,7 @@ class LabfrontLoader(BaseLoader):
             raise FileNotFoundError
         # Get stored file index
         file_index = self._get_stored_file_index()
-        if (file_index is None) or force_reload:
+        if (file_index is None) or reindex_files:
 
             file_index = pd.DataFrame()
             for participant_folder in self.data_path.iterdir():
@@ -409,9 +409,6 @@ class LabfrontLoader(BaseLoader):
                                                 ) = self._get_questionnaire_info(
                                                     task_csv_file
                                                 )
-                                                print(questionnaire_name)
-                                                print(questionnaire_id)
-                                                print(task_id)
                                                 participant_dict[task_csv_file.name][
                                                     lf_constants.QUESTIONNAIRE_NAME_COL
                                                 ] = questionnaire_name
@@ -734,31 +731,10 @@ class LabfrontLoader(BaseLoader):
 
         # Convert to datetime according to isoformat
         cols_to_sort = []
-        print(data.head())
         if constants.ISODATE_COL in data.columns:
-            if lf_constants.GARMIN_CONNECT_BASE_FOLDER in metric:
-                # Convert to datetime according to isoformat
-                data[constants.ISODATE_COL] = (
-                    data[constants.UNIXTIMESTAMP_IN_MS_COL]
-                    + data[lf_constants.GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL]
-                )
-                data[constants.ISODATE_COL] = pd.to_datetime(
-                    data[constants.ISODATE_COL], unit="ms", utc=True
-                )
-                data[constants.ISODATE_COL] = data[
-                    constants.ISODATE_COL
-                ].dt.tz_localize(None)
-            else:
-                # Convert unix time stamp
-                data[constants.ISODATE_COL] = pd.to_datetime(
-                    data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
-                )
-                data[constants.ISODATE_COL] = data.groupby(
-                    lf_constants.GARMIN_DEVICE_TIMEZONE_COL,
-                    group_keys=False,
-                )[constants.ISODATE_COL].apply(
-                    lambda x: x.dt.tz_convert(x.name).dt.tz_localize(tz=None)
-                )
+            data[constants.ISODATE_COL] = pd.to_datetime(
+                data[constants.ISODATE_COL].str.rsplit("+", expand=True)[0], utc=True
+            ).dt.tz_localize(tz=None)
 
         if constants.CALENDAR_DATE_COL in data.columns:
             data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
