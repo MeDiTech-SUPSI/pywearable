@@ -36,6 +36,8 @@ _LABFRONT_METRICS_DICT = {
     },
 }
 
+LABFRONT_FILE_INDEX_NAME = ".pywearable_labfront_file_index.csv"
+
 
 class LabfrontLoader(BaseLoader):
     """Loader for Labfront data.
@@ -68,6 +70,7 @@ class LabfrontLoader(BaseLoader):
             data_path = Path(data_path)
         self.data_path = data_path
         self.file_index = self.get_file_index(reindex_files=reindex_files)
+
         # self.tasks_dict = self.get_available_questionnaires(
         #    return_dict=True
         # ) | self.get_available_todos(return_dict=True)
@@ -272,10 +275,10 @@ class LabfrontLoader(BaseLoader):
             return []
 
     def _get_stored_file_index(self) -> pd.DataFrame:
-        if (self.data_path / ".pywearable_file_index.csv").exists():
+        if (self.data_path / LABFRONT_FILE_INDEX_NAME).exists():
             # load it
             file_index = pd.read_csv(
-                self.data_path / ".pywearable_file_index.csv",
+                self.data_path / LABFRONT_FILE_INDEX_NAME,
                 parse_dates=[
                     lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
                     lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY,
@@ -729,7 +732,7 @@ class LabfrontLoader(BaseLoader):
         else:
             return pd.DataFrame()
 
-        # Convert to datetime according to isoformat
+        # Convert columns to datetime
         cols_to_sort = []
         if constants.ISODATE_COL in data.columns:
             data[constants.ISODATE_COL] = pd.to_datetime(
