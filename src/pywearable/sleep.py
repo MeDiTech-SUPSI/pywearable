@@ -1693,12 +1693,15 @@ def get_sleep_timestamps(
     user_id = utils.get_user_ids(loader, user_id)
 
     for user in user_id:
-        bedtime_dict = get_bedtime(loader, user, start_date, end_date)[user]
-        wakeup_time_dict = get_wakeup_time(loader, user, start_date, end_date)[user]
-        data_dict[user] = {
-            k: (bedtime_dict.get(k, None), wakeup_time_dict.get(k, None))
-            for k in bedtime_dict.keys()
-        }
+        try:
+            bedtime_dict = get_bedtime(loader, user, start_date, end_date)[user]
+            wakeup_time_dict = get_wakeup_time(loader, user, start_date, end_date)[user]
+            data_dict[user] = {
+                k: (bedtime_dict.get(k, None), wakeup_time_dict.get(k, None))
+                for k in bedtime_dict.keys()
+            }
+        except:
+            data_dict[user] = {}
     return data_dict
 
 
