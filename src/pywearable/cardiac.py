@@ -21,36 +21,36 @@ from .loader.base import BaseLoader
 
 # TODO change get_sleep_timestamps
 
-_CARDIAC_STATISTIC_RESTING_HEART_RATE = "restHR"
-_CARDIAC_STATISTIC_MAXIMUM_HEART_RATE = "maxHR"
-_CARDIAC_STATISTIC_MINIMUM_HEART_RATE = "minHR"
-_CARDIAC_STATISTIC_AVERAGE_HEART_RATE = "avgHR"
-_CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES = "RMSSD"
-_CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL = "SDNN"
-_CARDIAC_STATISTIC_LOW_FREQUENCY = "LF"
-_CARDIAC_STATISTIC_HIGH_FREQUENCY = "HF"
-_CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO = "LFHF"
+CARDIAC_STATISTIC_RESTING_HEART_RATE = "restHR"
+CARDIAC_STATISTIC_MAXIMUM_HEART_RATE = "maxHR"
+CARDIAC_STATISTIC_MINIMUM_HEART_RATE = "minHR"
+CARDIAC_STATISTIC_AVERAGE_HEART_RATE = "avgHR"
+CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES = "RMSSD"
+CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL = "SDNN"
+CARDIAC_STATISTIC_LOW_FREQUENCY = "LF"
+CARDIAC_STATISTIC_HIGH_FREQUENCY = "HF"
+CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO = "LFHF"
 
-_CARDIAC_HR_STATISTICS = [
-    _CARDIAC_STATISTIC_RESTING_HEART_RATE,
-    _CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
-    _CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
-    _CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
+CARDIAC_HR_STATISTICS = [
+    CARDIAC_STATISTIC_RESTING_HEART_RATE,
+    CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
+    CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
+    CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
 ]
 
-_CARDIAC_HRV_TIME_DOMAIN_STATISTICS = [
-    _CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
-    _CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
+CARDIAC_HRV_TIME_DOMAIN_STATISTICS = [
+    CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
+    CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
 ]
 
-_CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS = [
-    _CARDIAC_STATISTIC_LOW_FREQUENCY,
-    _CARDIAC_STATISTIC_HIGH_FREQUENCY,
-    _CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
+CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS = [
+    CARDIAC_STATISTIC_LOW_FREQUENCY,
+    CARDIAC_STATISTIC_HIGH_FREQUENCY,
+    CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
 ]
 
-_CARDIAC_HRV_STATISTICS = (
-    _CARDIAC_HRV_TIME_DOMAIN_STATISTICS + _CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS
+CARDIAC_HRV_STATISTICS = (
+    CARDIAC_HRV_TIME_DOMAIN_STATISTICS + CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS
 )
 
 
@@ -176,7 +176,7 @@ def get_rest_heart_rate(
     return get_heart_rate_statistics(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_RESTING_HEART_RATE,
+        statistic=CARDIAC_STATISTIC_RESTING_HEART_RATE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -309,7 +309,7 @@ def get_max_heart_rate(
     return get_heart_rate_statistics(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
+        statistic=CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -441,7 +441,7 @@ def get_min_heart_rate(
     return get_heart_rate_statistics(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
+        statistic=CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -573,7 +573,7 @@ def get_avg_heart_rate(
     return get_heart_rate_statistics(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
+        statistic=CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -599,7 +599,7 @@ def _compute_resting_heart_rate(heart_rate: pd.DataFrame, **kwargs) -> pd.Series
         A dictionary with daily rest heart as values, and calendar dates as index.
     """
     return _compute_hr_statistic(
-        heart_rate=heart_rate, statistic=_CARDIAC_STATISTIC_RESTING_HEART_RATE
+        heart_rate=heart_rate, statistic=CARDIAC_STATISTIC_RESTING_HEART_RATE
     )
 
 
@@ -617,7 +617,7 @@ def _compute_maximum_heart_rate(heart_rate: pd.DataFrame, **kwargs) -> pd.Series
         A :class:`pd.Series` with daily maximum heart rate as values, and calendar dates as index.
     """
     return _compute_hr_statistic(
-        heart_rate=heart_rate, statistic=_CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
+        heart_rate=heart_rate, statistic=CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
     )
 
 
@@ -635,7 +635,7 @@ def _compute_minimum_heart_rate(heart_rate: pd.DataFrame, **kwargs) -> pd.Series
         A :class:`pd.Series` with daily minimum heart rate as values, and calendar dates as index.
     """
     return _compute_hr_statistic(
-        heart_rate=heart_rate, statistic=_CARDIAC_STATISTIC_MINIMUM_HEART_RATE
+        heart_rate=heart_rate, statistic=CARDIAC_STATISTIC_MINIMUM_HEART_RATE
     )
 
 
@@ -653,7 +653,7 @@ def _compute_average_heart_rate(heart_rate: pd.DataFrame, **kwargs) -> pd.Series
         A :class:`pd.Series` with daily average heart rate as values, and calendar dates as index.
     """
     return _compute_hr_statistic(
-        heart_rate=heart_rate, statistic=_CARDIAC_STATISTIC_AVERAGE_HEART_RATE
+        heart_rate=heart_rate, statistic=CARDIAC_STATISTIC_AVERAGE_HEART_RATE
     )
 
 
@@ -693,46 +693,46 @@ def _compute_hr_statistic(
 
     if len(heart_rate) == 0:
         return {}
-    if constants._ISODATE_COL in heart_rate.columns:
-        heart_rate[constants._CALENDAR_DATE_COL] = pd.to_datetime(
-            heart_rate[constants._ISODATE_COL].dt.date
+    if constants.ISODATE_COL in heart_rate.columns:
+        heart_rate[constants.CALENDAR_DATE_COL] = pd.to_datetime(
+            heart_rate[constants.ISODATE_COL].dt.date
         )
         heart_rate = heart_rate.sort_values(
-            by=[constants._ISODATE_COL], ignore_index=True
+            by=[constants.ISODATE_COL], ignore_index=True
         )
         heart_rate = heart_rate.drop_duplicates(
-            subset=[constants._ISODATE_COL], ignore_index=True
+            subset=[constants.ISODATE_COL], ignore_index=True
         )
-    if statistic == _CARDIAC_STATISTIC_RESTING_HEART_RATE:
+    if statistic == CARDIAC_STATISTIC_RESTING_HEART_RATE:
         # Set iso date as index
-        heart_rate = heart_rate.set_index(constants._ISODATE_COL)
+        heart_rate = heart_rate.set_index(constants.ISODATE_COL)
         # Perform 30 minute average
-        mean_hr = heart_rate.rolling(window="30Min")[constants._HR_COLUMN].mean()
+        mean_hr = heart_rate.rolling(window="30Min")[constants.HR_COLUMN].mean()
         # Return minimum 30 minute average
         return mean_hr.resample("1d", label="left").min()
     else:
-        if statistic == _CARDIAC_STATISTIC_MAXIMUM_HEART_RATE:
+        if statistic == CARDIAC_STATISTIC_MAXIMUM_HEART_RATE:
             fn = "max"
-        elif statistic == _CARDIAC_STATISTIC_MINIMUM_HEART_RATE:
+        elif statistic == CARDIAC_STATISTIC_MINIMUM_HEART_RATE:
             fn = "min"
-        elif statistic == _CARDIAC_STATISTIC_AVERAGE_HEART_RATE:
+        elif statistic == CARDIAC_STATISTIC_AVERAGE_HEART_RATE:
             fn = "mean"
         else:
             raise ValueError(
-                f"{statistic} is not a valid value. Select among {_CARDIAC_HR_STATISTICS}"
+                f"{statistic} is not a valid value. Select among {CARDIAC_HR_STATISTICS}"
             )
         return (
-            heart_rate.groupby(constants._CALENDAR_DATE_COL)[constants._HR_COLUMN]
+            heart_rate.groupby(constants.CALENDAR_DATE_COL)[constants.HR_COLUMN]
             .agg(fn)
             .astype("float")
         )
 
 
 _HEART_RATE_STATISTICS_DICT = {
-    _CARDIAC_STATISTIC_RESTING_HEART_RATE: _compute_resting_heart_rate,
-    _CARDIAC_STATISTIC_MAXIMUM_HEART_RATE: _compute_maximum_heart_rate,
-    _CARDIAC_STATISTIC_MINIMUM_HEART_RATE: _compute_minimum_heart_rate,
-    _CARDIAC_STATISTIC_AVERAGE_HEART_RATE: _compute_average_heart_rate,
+    CARDIAC_STATISTIC_RESTING_HEART_RATE: _compute_resting_heart_rate,
+    CARDIAC_STATISTIC_MAXIMUM_HEART_RATE: _compute_maximum_heart_rate,
+    CARDIAC_STATISTIC_MINIMUM_HEART_RATE: _compute_minimum_heart_rate,
+    CARDIAC_STATISTIC_AVERAGE_HEART_RATE: _compute_average_heart_rate,
 }
 
 
@@ -890,7 +890,7 @@ def get_heart_rate_statistics(
         )
         multi_index = pd.MultiIndex.from_product(
             [user_id, date_periods],
-            names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
+            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
         )
         heart_rate_stats_df = pd.DataFrame(
             index=multi_index, columns=statistics, dtype=float
@@ -926,8 +926,8 @@ def get_heart_rate_statistics(
                             pd.MultiIndex.from_product(
                                 [[user], user_date_range],
                                 names=[
-                                    constants._USER_COL,
-                                    constants._CALENDAR_DATE_COL,
+                                    constants.USER_COL,
+                                    constants.CALENDAR_DATE_COL,
                                 ],
                             )
                         ).rename(statistic)
@@ -948,9 +948,9 @@ def get_heart_rate_statistics(
                 )
     # Perform kind operation by user
     if not (kind is None):
-        heart_rate_stats_df = heart_rate_stats_df.groupby(
-            level=constants._USER_COL
-        ).agg(kind, *kind_args, **kind_kwargs)
+        heart_rate_stats_df = heart_rate_stats_df.groupby(level=constants.USER_COL).agg(
+            kind, *kind_args, **kind_kwargs
+        )
         if return_df:
             return heart_rate_stats_df
         else:
@@ -1018,7 +1018,7 @@ def get_night_rmssd(
     return get_hrv_statistic(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
+        statistic=CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
         start_date=start_date,
         end_date=end_date,
         coverage=coverage,
@@ -1081,7 +1081,7 @@ def get_night_sdnn(
     return get_hrv_statistic(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
+        statistic=CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
         start_date=start_date,
         end_date=end_date,
         coverage=coverage,
@@ -1143,7 +1143,7 @@ def get_night_lf(
     return get_hrv_statistic(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_LOW_FREQUENCY,
+        statistic=CARDIAC_STATISTIC_LOW_FREQUENCY,
         start_date=start_date,
         end_date=end_date,
         coverage=coverage,
@@ -1206,7 +1206,7 @@ def get_night_hf(
     return get_hrv_statistic(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_HIGH_FREQUENCY,
+        statistic=CARDIAC_STATISTIC_HIGH_FREQUENCY,
         start_date=start_date,
         end_date=end_date,
         coverage=coverage,
@@ -1269,7 +1269,7 @@ def get_night_lfhf(
     return get_hrv_statistic(
         loader=loader,
         user_id=user_id,
-        statistic=_CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
+        statistic=CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
         start_date=start_date,
         end_date=end_date,
         coverage=coverage,
@@ -1314,23 +1314,23 @@ def _compute_hrv_statistic(
     daily_means = {}
 
     for date, bbi_df in bbi_dict.items():
-        bbi_df = bbi_df.set_index(constants._ISODATE_COL)
+        bbi_df = bbi_df.set_index(constants.ISODATE_COL)
         # we consider the coverage against the mean bbi in that window
         counts = bbi_df.resample("5min").bbi.count()
         means = bbi_df.resample("5min").bbi.mean()
         coverage_filter = (counts > ((300 / (means / 1000)) * coverage)).values
 
         # time-domain
-        if metric == _CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES:
+        if metric == CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES:
             ST_analysis = bbi_df.resample("5min").bbi.apply(
                 lambda x: np.sqrt(np.mean(np.diff(x) ** 2)) if x.count() > 5 else 0
             )
-        elif metric == _CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL:
+        elif metric == CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL:
             ST_analysis = bbi_df.resample("5min").bbi.apply(
                 lambda x: np.std(x, ddof=1) if x.count() > 5 else 0
             )
         # frequency domain
-        elif metric in _CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS:
+        elif metric in CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS:
             LF_range = (0.04, 0.15)
             HF_range = (0.15, 0.40)
 
@@ -1374,11 +1374,11 @@ def _compute_hrv_statistic(
 
                 return pow
 
-            if metric == _CARDIAC_STATISTIC_HIGH_FREQUENCY:
+            if metric == CARDIAC_STATISTIC_HIGH_FREQUENCY:
                 ST_analysis = bbi_df.resample("5min").bbi.apply(
                     lambda x: calculate_power(x, HF_range) if x.count() > 5 else 0
                 )
-            elif metric == _CARDIAC_STATISTIC_LOW_FREQUENCY:
+            elif metric == CARDIAC_STATISTIC_LOW_FREQUENCY:
                 ST_analysis = bbi_df.resample("5min").bbi.apply(
                     lambda x: calculate_power(x, LF_range) if x.count() > 5 else 0
                 )
@@ -1395,7 +1395,7 @@ def _compute_hrv_statistic(
                 )
         else:
             raise ValueError(
-                f"{metric} is not a valid value. Select among {_CARDIAC_HRV_STATISTICS}"
+                f"{metric} is not a valid value. Select among {CARDIAC_HRV_STATISTICS}"
             )
         # check coverage
         ST_analysis = ST_analysis.iloc[coverage_filter & (ST_analysis != 0).values]
@@ -1426,7 +1426,7 @@ def _compute_rmssd(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
     """
     return _compute_hrv_statistic(
         bbi_dict=bbi_dict,
-        metric=_CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
+        metric=CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
         coverage=coverage,
     )
 
@@ -1448,7 +1448,7 @@ def _compute_sdnn(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
     """
     return _compute_hrv_statistic(
         bbi_dict=bbi_dict,
-        metric=_CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
+        metric=CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
         coverage=coverage,
     )
 
@@ -1469,7 +1469,7 @@ def _compute_lf(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
         A dictionary with night LF power as values, and calendar dates as keys.
     """
     return _compute_hrv_statistic(
-        bbi_dict=bbi_dict, metric=_CARDIAC_STATISTIC_LOW_FREQUENCY, coverage=coverage
+        bbi_dict=bbi_dict, metric=CARDIAC_STATISTIC_LOW_FREQUENCY, coverage=coverage
     )
 
 
@@ -1489,7 +1489,7 @@ def _compute_hf(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
         A dictionary with night HF power as values, and calendar dates as keys.
     """
     return _compute_hrv_statistic(
-        bbi_dict=bbi_dict, metric=_CARDIAC_STATISTIC_HIGH_FREQUENCY, coverage=coverage
+        bbi_dict=bbi_dict, metric=CARDIAC_STATISTIC_HIGH_FREQUENCY, coverage=coverage
     )
 
 
@@ -1510,17 +1510,17 @@ def _compute_lfhf(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
     """
     return _compute_hrv_statistic(
         bbi_dict=bbi_dict,
-        metric=_CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
+        metric=CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
         coverage=coverage,
     )
 
 
 _HRV_STATISTICS_DICT = {
-    _CARDIAC_STATISTIC_LOW_FREQUENCY: _compute_lf,
-    _CARDIAC_STATISTIC_HIGH_FREQUENCY: _compute_hf,
-    _CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO: _compute_lfhf,
-    _CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: _compute_rmssd,
-    _CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: _compute_sdnn,
+    CARDIAC_STATISTIC_LOW_FREQUENCY: _compute_lf,
+    CARDIAC_STATISTIC_HIGH_FREQUENCY: _compute_hf,
+    CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO: _compute_lfhf,
+    CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: _compute_rmssd,
+    CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: _compute_sdnn,
 }
 
 
@@ -1598,7 +1598,7 @@ def get_hrv_statistics(
         )
         multi_index = pd.MultiIndex.from_product(
             [user_id, date_periods],
-            names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
+            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
         )
         hrv_stats_df = pd.DataFrame(index=multi_index, columns=statistics)
         both_dates_valid = True
@@ -1625,8 +1625,8 @@ def get_hrv_statistics(
         if len(bbi_df) > 0:
             for date, (start_hour, end_hour) in sleep_timestamps.items():
                 night_bbi = bbi_df.loc[
-                    (bbi_df[constants._ISODATE_COL] > start_hour)
-                    & (bbi_df[constants._ISODATE_COL] < end_hour)
+                    (bbi_df[constants.ISODATE_COL] > start_hour)
+                    & (bbi_df[constants.ISODATE_COL] < end_hour)
                 ]
                 filtered_night_bbi = utils.filter_out_awake(
                     loader, user, night_bbi, date, resolution=1
@@ -1651,8 +1651,8 @@ def get_hrv_statistics(
                             pd.MultiIndex.from_product(
                                 [[user], user_date_range],
                                 names=[
-                                    constants._USER_COL,
-                                    constants._CALENDAR_DATE_COL,
+                                    constants.USER_COL,
+                                    constants.CALENDAR_DATE_COL,
                                 ],
                             )
                         ).rename(statistic)
@@ -1671,7 +1671,7 @@ def get_hrv_statistics(
                 hrv_stats_df = pd.concat((hrv_stats_df, user_hrv_stats_df))
     # Perform kind operation by user
     if not (kind is None):
-        hrv_stats_df = hrv_stats_df.groupby(level=constants._USER_COL).agg(
+        hrv_stats_df = hrv_stats_df.groupby(level=constants.USER_COL).agg(
             kind, *kind_args, **kind_kwargs
         )
         if return_df:
@@ -1689,7 +1689,7 @@ def get_hrv_statistics(
         return mi_df
 
 
-def get_cardiac_statistics(
+def getCARDIAC_statistics(
     loader: BaseLoader,
     user_id: Union[str, list],
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -1706,7 +1706,7 @@ def get_cardiac_statistics(
 
     This function is used to get all the
     statistics from cardiac data. It is more efficient than
-    :func:`get_cardiac_statistic` when multiple
+    :func:`getCARDIAC_statistic` when multiple
     statistics are needed as it retrieves cardiac data
     only once to compute all the statistics.
 
