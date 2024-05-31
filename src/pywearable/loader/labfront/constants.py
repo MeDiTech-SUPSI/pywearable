@@ -10,11 +10,12 @@ FILE_INDEX_FIRST_TIMESTAMP_KEY = "firstTimestamp"
 FILE_INDEX_LAST_TIMESTAMP_KEY = "lastTimestamp"
 FILE_INDEX_IS_QUESTIONNAIRE_KEY = "isQuestionnaire"
 FILE_INDEX_IS_TODO_KEY = "isTodo"
-FILE_INDEX_QUESTIONNAIRE_NAME_KEY = "questionnaireName"
-FILE_INDEX_QUESTIONNAIRE_ID_KEY = "questionnaireName"
-FILE_INDEX_TODO_NAME_KEY = "todoName"
-FILE_INDEX_TODO_ID_KEY = "todoId"
+FILE_INDEX_TASK_NAME_KEY = "taskName"
 FILE_INDEX_TASK_ID_KEY = "taskId"
+FILE_INDEX_TASK_FULL_ID_KEY = "taskFullId"
+FILE_INDEX_TASK_FOLDER = "taskFolder"
+FILE_INDEX_LAST_EDIT_TIMESTAMP_KEY = "lastEditTimestamp"
+FILE_INDEX_BASE_FOLDER_KEY = "baseFolder"
 
 ##################################################
 #                 DATA SOURCES                   #

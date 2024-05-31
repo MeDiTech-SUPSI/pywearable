@@ -17,6 +17,8 @@ from ... import constants, sleep, utils
 from ..base import BaseLoader
 from . import constants as lf_constants
 
+# TODO some Labfront folders have midnigt in end-date, other in start-date...
+
 _LABFRONT_METRICS_DICT = {
     constants.METRIC_HEART_RATE: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
@@ -51,11 +53,11 @@ class LabfrontLoader(BaseLoader):
             Path to folder containing Labfront data.
     """
 
-    def __init__(self, data_path: Union[str, Path], reindex_files: bool = False):
+    def __init__(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
         """Constructor method"""
-        self.set_path(data_path, reindex_files=reindex_files)
+        self.set_path(data_paths, reindex_files=reindex_files)
 
-    def set_path(self, data_path: Union[str, Path], reindex_files: bool = False):
+    def set_path(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
         """Set path to folder containing Labfront data.
 
         This function allows to change the path of Labfront data
@@ -66,9 +68,16 @@ class LabfrontLoader(BaseLoader):
         data_path : str or Path
             Path to folder containing Labfront data.
         """
-        if not isinstance(data_path, Path):
-            data_path = Path(data_path)
-        self.data_path = data_path
+        if isinstance(data_paths, str):
+            self.data_paths = [Path(data_paths)]
+        elif isinstance(data_paths, Path):
+            self.data_paths = [data_paths]
+        elif isinstance(data_paths, list):
+            self.data_paths = [Path(x) for x in data_paths]
+        else:
+            raise ValueError(
+                f"data_paths must be either Path, str, or list, not {type(data_paths)}"
+            )
         self.file_index = self.get_file_index(reindex_files=reindex_files)
 
         # self.tasks_dict = self.get_available_questionnaires(
@@ -171,16 +180,21 @@ class LabfrontLoader(BaseLoader):
         if "_" in id:
             # This is already a full ID
             return id
-        elif id in self.file_index[lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY].unique():
+        elif (
+            id
+            in self.file_index.index.get_level_values(
+                lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY
+            ).unique()
+        ):
             # This is a user ID
             # Check if we have more than one participant with the same user id
             if (
                 len(
-                    self.file_index.loc[
-                        (slice(None), id, slice(None), slice(None)), :
-                    ].index.get_level_values(
+                    self.file_index.loc[(slice(None), id, slice(None), slice(None)), :]
+                    .index.get_level_values(
                         lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY
                     )
+                    .unique()
                 )
                 > 1
             ):
@@ -195,9 +209,9 @@ class LabfrontLoader(BaseLoader):
             )
         elif (
             id
-            in self.file_index[
+            in self.file_index.index.get_level_values(
                 lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY
-            ].unique()
+            ).unique()
         ):
             # This is a Labfront ID
             return (
@@ -226,12 +240,12 @@ class LabfrontLoader(BaseLoader):
             list
                 alphabetically sorted names of the questionnaires for the user(s).
         """
-        if lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY in self.file_index:
+        if lf_constants.FILE_INDEX_TASK_NAME_KEY in self.file_index.columns:
             return (
                 self.file_index.loc[
                     self.file_index[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY]
                     == True,
-                    lf_constants.FILE_INDEX_QUESTIONNAIRE_NAME_KEY,
+                    lf_constants.FILE_INDEX_TASK_NAME_KEY,
                 ]
                 .unique()
                 .tolist()
@@ -262,11 +276,11 @@ class LabfrontLoader(BaseLoader):
         FileNotFoundError
             if data path does not exist
         """
-        if lf_constants.FILE_INDEX_TODO_NAME_KEY in self.file_index:
+        if lf_constants.FILE_INDEX_TASK_NAME_KEY in self.file_index:
             return (
                 self.file_index.loc[
                     self.file_index[lf_constants.FILE_INDEX_IS_TODO_KEY] == True,
-                    lf_constants.FILE_INDEX_TODO_NAME_KEY,
+                    lf_constants.FILE_INDEX_TASK_NAME_KEY,
                 ]
                 .unique()
                 .tolist()
@@ -274,11 +288,11 @@ class LabfrontLoader(BaseLoader):
         else:
             return []
 
-    def _get_stored_file_index(self) -> pd.DataFrame:
-        if (self.data_path / LABFRONT_FILE_INDEX_NAME).exists():
+    def get_stored_file_index(self, data_folder: Union[str, Path]) -> pd.DataFrame:
+        if Path(data_folder / LABFRONT_FILE_INDEX_NAME).exists():
             # load it
             file_index = pd.read_csv(
-                self.data_path / LABFRONT_FILE_INDEX_NAME,
+                data_folder / LABFRONT_FILE_INDEX_NAME,
                 parse_dates=[
                     lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
                     lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY,
@@ -315,168 +329,192 @@ class LabfrontLoader(BaseLoader):
         FileNotFoundError
             _description_
         """
-        if not self.data_path.exists():
-            raise FileNotFoundError
-        # Get stored file index
-        file_index = self._get_stored_file_index()
-        if (file_index is None) or reindex_files:
+        global_file_index_list = []
+        for data_folder in self.data_paths:
+            data_folder = Path(data_folder)
+            if not data_folder.exists():
+                raise FileNotFoundError(f"Folder {data_folder} does not exist.")
+            # Get stored file index
+            file_index = self.get_stored_file_index(data_folder)
+            if (file_index is None) or reindex_files:
 
-            file_index = pd.DataFrame()
-            for participant_folder in self.data_path.iterdir():
-                # For each participant
-                if participant_folder.is_dir():
-                    participant_dict = {}
-                    for participant_metric_folder in participant_folder.iterdir():
-                        # For each metric
-                        if participant_metric_folder.is_dir():
-                            # Get the number of files inside folder
-                            n_files = len(os.listdir(participant_metric_folder))
-                            for metric_csv_file in participant_metric_folder.iterdir():
-                                # If it is a folder, then we need to read the csv files
-                                # and get first and last unix times for each CSV file
-                                if metric_csv_file.is_file() and str(
-                                    metric_csv_file
-                                ).endswith("csv"):
-                                    first_date = datetime.datetime.strptime(
-                                        metric_csv_file.name[:6], "%y%m%d"
-                                    )
-                                    # If we have a single file, start is from file name, end is today
-                                    if n_files == 1:
-                                        last_date = np.nan
-                                    else:
-                                        last_date = first_date + datetime.timedelta(
-                                            days=1
-                                        )
-                                    participant_dict[metric_csv_file.name] = {
-                                        lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
-                                        lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
-                                        lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
-                                        lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
-                                        lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: False,
-                                        lf_constants.FILE_INDEX_IS_TODO_KEY: False,
-                                    }
-                                else:
-                                    # We don't have a file, we expect a questionnaire/task folder
-                                    if not metric_csv_file.is_dir():
-                                        continue
-                                    # For each questionnaire/task folder
-                                    for task_csv_file in metric_csv_file.iterdir():
-                                        if (
-                                            lf_constants.TODO_FOLDER
-                                            == participant_metric_folder.name
-                                        ):
-                                            # We have a task
-                                            is_todo = True
-                                            is_questionnaire = False
-                                        elif (
-                                            lf_constants.QUESTIONNAIRE_FOLDER
-                                            == participant_metric_folder.name
-                                        ):
-                                            # We have a questionnaire
-                                            is_todo = False
-                                            is_questionnaire = True
-                                        else:
-                                            continue
-
-                                        if task_csv_file.is_file() and str(
-                                            task_csv_file
-                                        ).endswith("csv"):
-                                            # We need to get the name of the questionnaire/task and its id
-                                            # Get first date from filename
-                                            first_date = datetime.datetime.strptime(
-                                                task_csv_file.name[:6], "%y%m%d"
-                                            )
-                                            # If we have a single file, start is from file name, end is today
-                                            if n_files == 1:
-                                                last_date = np.nan
-                                            else:
-                                                last_date = (
-                                                    first_date
-                                                    + datetime.timedelta(days=1)
-                                                )
-
-                                            participant_dict[task_csv_file.name] = {
-                                                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_date,
-                                                lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_date,
-                                                lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
-                                                lf_constants.FILE_INDEX_METRIC_KEY: participant_metric_folder.name,
-                                                lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: is_questionnaire,
-                                                lf_constants.FILE_INDEX_IS_TODO_KEY: is_todo,
-                                            }
-
-                                            if is_questionnaire:
-                                                (
-                                                    questionnaire_name,
-                                                    questionnaire_id,
-                                                    task_id,
-                                                ) = self._get_questionnaire_info(
-                                                    task_csv_file
-                                                )
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.QUESTIONNAIRE_NAME_COL
-                                                ] = questionnaire_name
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.QUESTIONNAIRE_ID_COL
-                                                ] = questionnaire_id
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.TASK_ID_COL
-                                                ] = task_id
-                                            elif is_todo:
-                                                todo_name, todo_id, task_id = (
-                                                    self._get_todo_info(task_csv_file)
-                                                )
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.TODO_NAME_COL
-                                                ] = todo_name
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.TODO_ID_COL
-                                                ] = todo_id
-                                                participant_dict[task_csv_file.name][
-                                                    lf_constants.TASK_ID_COL
-                                                ] = task_id
-
-                    if len(participant_dict) > 0:
-                        if len(file_index) > 0:
-                            file_index = pd.concat(
-                                (
-                                    file_index,
-                                    pd.DataFrame.from_dict(
-                                        participant_dict, orient="index"
-                                    ),
-                                ),
-                                axis=0,
-                            )
-                        else:
-                            file_index = pd.DataFrame.from_dict(
-                                participant_dict, orient="index"
-                            )
-            if lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY in file_index.columns:
-                # Create two separate columns for IDs
-                file_index[
-                    [
-                        lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
-                        lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
+                file_index = pd.DataFrame()
+                participants_folders = [x for x in data_folder.iterdir() if x.is_dir()]
+                file_index_list = []
+                for participant_folder in participants_folders:
+                    # For each participant
+                    metrics_folders = [
+                        x for x in participant_folder.iterdir() if x.is_dir()
                     ]
-                ] = file_index[
+                    for metric_folder in metrics_folders:
+                        if metric_folder.name == "movesense-stream":
+                            continue
+                        # Set is_questionnaire/is_todo
+                        is_questionnaire = False
+                        is_todo = False
+                        if lf_constants.QUESTIONNAIRE_FOLDER in metric_folder.name:
+                            is_questionnaire = True
+                        elif lf_constants.TODO_FOLDER in metric_folder.name:
+                            is_todo = True
+                        # Get the number of files inside folder
+                        n_files = len(os.listdir(metric_folder))
+                        # Get subfolders (questionnaires/todos)
+                        subfolders = [x for x in metric_folder.iterdir() if x.is_dir()]
+                        if len(subfolders) == 0:
+                            # Get csv files in metric folder
+                            csv_files = [
+                                x
+                                for x in metric_folder.iterdir()
+                                if x.is_file() and x.name.endswith("csv")
+                            ]
+                            subfolders = []
+                        else:
+                            # Get csv files from nested metric folder
+                            items = [
+                                (subfolder.name, x)
+                                for subfolder in subfolders
+                                for x in subfolder.iterdir()
+                                if x.is_file() and x.name.endswith("csv")
+                            ]
+                            subfolders = [x[0] for x in items]
+                            csv_files = [x[1] for x in items]
+                        # Get first dates in the csv files
+                        dates = [
+                            self._get_first_and_last_date_in_csv_file(
+                                csv_file, n_files=n_files
+                            )
+                            for csv_file in csv_files
+                        ]
+                        first_dates = [date[0] for date in dates]
+                        # Get last dates in the csv files
+                        last_dates = [date[1] for date in dates]
+
+                        # Get last edit times
+                        last_edit_times = [
+                            os.path.getmtime(csv_file) for csv_file in csv_files
+                        ]
+
+                        # Save everything into a DataFrame
+                        metric_file_index = pd.DataFrame(
+                            {
+                                lf_constants.FILE_INDEX_FILENAME_KEY: [
+                                    csv_file.name for csv_file in csv_files
+                                ],
+                                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY: first_dates,
+                                lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY: last_dates,
+                                lf_constants.FILE_INDEX_LAST_EDIT_TIMESTAMP_KEY: last_edit_times,
+                                lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY: is_questionnaire,
+                                lf_constants.FILE_INDEX_IS_TODO_KEY: is_todo,
+                                lf_constants.FILE_INDEX_METRIC_KEY: metric_folder.name,
+                                lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY: participant_folder.name,
+                            }
+                        )
+                        # Get task info
+                        if is_questionnaire or is_todo:
+                            task_info = [
+                                self._get_task_info(
+                                    csv_file, is_questionnaire=is_questionnaire
+                                )
+                                for csv_file in csv_files
+                            ]
+                            metric_file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY] = [
+                                x[0] for x in task_info
+                            ]
+                            metric_file_index[lf_constants.FILE_INDEX_TASK_ID_KEY] = [
+                                x[1] for x in task_info
+                            ]
+                            metric_file_index[
+                                lf_constants.FILE_INDEX_TASK_FULL_ID_KEY
+                            ] = [x[2] for x in task_info]
+                            metric_file_index[lf_constants.FILE_INDEX_TASK_FOLDER] = (
+                                subfolders
+                            )
+
+                        # Reindex based on first and last dates
+                        def reindex_by_dates_on_groupby(groupby: pd.DataFrame):
+
+                            dates = pd.date_range(
+                                groupby.index.min(),
+                                groupby[
+                                    lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
+                                ].max(),
+                                freq="D",
+                            )
+                            return groupby.reindex(dates).ffill()
+
+                        metric_file_index = (
+                            metric_file_index.set_index(
+                                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+                            )
+                            .groupby(lf_constants.FILE_INDEX_FILENAME_KEY)
+                            .apply(reindex_by_dates_on_groupby, include_groups=False)
+                            .reset_index(
+                                names=[
+                                    lf_constants.FILE_INDEX_FILENAME_KEY,
+                                    lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
+                                ]
+                            )
+                        )
+                        metric_file_index[
+                            lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
+                        ] = metric_file_index[
+                            lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+                        ] + pd.Timedelta(
+                            days=1
+                        )
+
+                        # print(metric_file_index)
+                        file_index_list.append(metric_file_index)
+                file_index = pd.concat(file_index_list, axis=0, ignore_index=True)
+                if (
                     lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY
-                ].str.split(
-                    "_", expand=True
-                )
-            # Reset index
-            file_index = file_index.reset_index(
-                names=lf_constants.FILE_INDEX_FILENAME_KEY
+                    in file_index.columns
+                ):
+                    # Create two separate columns for IDs
+                    file_index[
+                        [
+                            lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
+                            lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
+                        ]
+                    ] = file_index[
+                        lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY
+                    ].str.split(
+                        "_", expand=True
+                    )
+                # Store it into CSV
+                file_index.to_csv(data_folder / ".pywearable_file_index.csv")
+            file_index[lf_constants.FILE_INDEX_BASE_FOLDER_KEY] = data_folder
+            file_index = file_index.set_index(
+                [
+                    lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY,
+                    lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
+                    lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
+                    lf_constants.FILE_INDEX_METRIC_KEY,
+                ]
             )
-            # Store it into CSV
-            file_index.to_csv(self.data_path / ".pywearable_file_index.csv")
-        file_index = file_index.set_index(
-            [
-                lf_constants.FILE_INDEX_PARTICIPANT_FULL_ID_KEY,
-                lf_constants.FILE_INDEX_PARTICIPANT_ID_KEY,
-                lf_constants.FILE_INDEX_PARTICIPANT_LABFRONT_ID_KEY,
-                lf_constants.FILE_INDEX_METRIC_KEY,
-            ]
+            global_file_index_list.append(file_index)
+        file_index = pd.concat(global_file_index_list, axis=0)
+        # Sort by first timestamp and last edit timestamp
+        file_index = file_index.sort_values(
+            by=[
+                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
+                lf_constants.FILE_INDEX_LAST_EDIT_TIMESTAMP_KEY,
+            ],
+            ascending=True,
         )
+        # Drop duplicate filenames and keep the latest edited ones
+        # file_index = file_index.drop_duplicates(
+        #    subset=[lf_constants.FILE_INDEX_FILENAME_KEY], keep="last"
+        # )
         return file_index
+
+    def _get_task_info(
+        self, path_to_file, is_questionnaire: bool
+    ) -> Tuple[str, str, str]:
+        if is_questionnaire:
+            return self._get_questionnaire_info(path_to_file=path_to_file)
+        else:
+            return self._get_todo_info(path_to_file=path_to_file)
 
     def _get_questionnaire_info(self, path_to_file) -> Tuple[str, str]:
         questionnaire_info_df = pd.read_csv(
@@ -499,6 +537,124 @@ class LabfrontLoader(BaseLoader):
         todo_id = todo_info_df.loc[0, lf_constants.TODO_ID_COL]
         task_id = todo_info_df.loc[0, lf_constants.TASK_ID_COL]
         return (todo_name, todo_id, task_id)
+
+    def _get_first_and_last_date_in_csv_file(
+        self, path_to_file: Union[str, Path], n_files: int
+    ) -> datetime.date:
+        # Get first date of the data in CSV file
+        # Either we have it in the file Name (e.g. 240313) or we
+        # need to get this information from the CSV file itself
+        # -> Let's read the header and see if we have first an last unixTimestamp
+        head = self.read_csv_file_header_info(path_to_csv_file=path_to_file)
+        if lf_constants.FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL in head.columns:
+            first_sample_unixtimestamp = (
+                head[lf_constants.FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL].iloc[0] / 1000
+            )
+            last_sample_unixtimestamp = (
+                head[lf_constants.LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL].iloc[0] / 1000
+            )
+            # We have unix timestamps
+            # We don't know the timezone, so we add a clearance of 14 hours to keep it safe
+            # considering that the maximum tz diff from utc is 14
+            if not (np.isnan(first_sample_unixtimestamp)):
+                first_date = (
+                    datetime.datetime.fromtimestamp(
+                        first_sample_unixtimestamp,
+                        tz=datetime.timezone.utc,
+                    )
+                    - datetime.timedelta(hours=14)
+                ).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+                if not (np.isnan(last_sample_unixtimestamp)):
+                    last_date = (
+                        datetime.datetime.fromtimestamp(
+                            last_sample_unixtimestamp,
+                            tz=datetime.timezone.utc,
+                        )
+                        + datetime.timedelta(hours=14)
+                    ).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+            else:
+                # Let's read the entire CSV file
+                try:
+                    temp_df = pd.read_csv(
+                        path_to_file,
+                        skiprows=self.get_header_length(file_path=path_to_file) + 1,
+                    )
+                    if constants.ISODATE_COL in temp_df:
+                        column = constants.ISODATE_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column].str.rsplit("+", expand=True)[0], utc=True
+                        ).dt.tz_localize(None)
+                        first_date = temp_df[column].min().normalize()
+                        last_date = temp_df[column].max().normalize()
+                    elif constants.CALENDAR_DATE_COL in temp_df:
+                        column = constants.CALENDAR_DATE_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column], format="%Y-%m-%d"
+                        ).dt.tz_localize(None)
+                        first_date = temp_df[column].min()
+                        last_date = temp_df[column].max()
+                    elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
+                        column = constants.UNIXTIMESTAMP_IN_MS_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column], unit="ms", utc=True
+                        ).dt.tz_localize(None)
+                        first_date = temp_df[column].min() - pd.Timedelta(hours=14)
+                        last_date = temp_df[column].max() + pd.Timedelta(hours=14)
+                    else:
+                        raise ValueError(
+                            f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
+                        )
+                except pd.errors.EmptyDataError:
+                    first_date = pd.NaT
+                    last_date = pd.NaT
+
+        else:
+            # -> If not, date must be retrieved from the name
+            first_date = datetime.datetime.strptime(path_to_file.name[:6], "%y%m%d")
+            if n_files == 1:
+                # Read full CSV file and get last date
+                try:
+                    temp_df = pd.read_csv(
+                        path_to_file,
+                        skiprows=self.get_header_length(file_path=path_to_file) + 1,
+                    )
+                    if constants.ISODATE_COL in temp_df:
+                        column = constants.ISODATE_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column].str.rsplit("+", expand=True)[0], utc=True
+                        ).dt.tz_localize(None)
+                        last_date = temp_df[column].max().normalize()
+                    elif constants.CALENDAR_DATE_COL in temp_df:
+                        column = constants.CALENDAR_DATE_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column], format="%Y-%m-%d"
+                        ).dt.tz_localize(None)
+                        last_date = temp_df[column].max()
+                    elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
+                        column = constants.UNIXTIMESTAMP_IN_MS_COL
+                        temp_df[column] = pd.to_datetime(
+                            temp_df[column], unit="ms", utc=True
+                        ).dt.tz_localize(None)
+                        first_date = temp_df[column].min() - pd.Timedelta(hours=14)
+                        last_date = temp_df[column].max() + pd.Timedelta(hours=14)
+                    else:
+                        raise ValueError(
+                            f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
+                        )
+                except pd.errors.EmptyDataError:
+                    first_date = pd.NaT
+                    last_date = pd.NaT
+            else:
+                last_date = first_date + datetime.timedelta(days=1)
+        return first_date, last_date
+
+    def read_csv_file_header_info(
+        self, path_to_csv_file: Union[str, Path]
+    ) -> pd.DataFrame:
+        head = pd.read_csv(
+            path_to_csv_file, skiprows=lf_constants.CSV_STATS_SKIP_ROWS, nrows=1
+        )
+        return head
 
     def get_files_from_timerange(
         self,
@@ -553,6 +709,10 @@ class LabfrontLoader(BaseLoader):
 
         # Get full participant_id
         participant_id = self.get_full_id(user_id)
+
+        # Get full task id
+        if task_name != "":
+            task_name = self.get_task_full_id(task_name)
         if not (
             metric
             in self.file_index.loc[(participant_id)].index.get_level_values(
@@ -561,15 +721,31 @@ class LabfrontLoader(BaseLoader):
         ):
             # Participant does not have files for this metric, return empty list
             return []
+
+        # Get files for this participant and this metric
         participant_files = self.file_index.loc[
             (participant_id, slice(None), slice(None), metric), :
         ].reset_index(drop=True)
+        # Return empty list if no files are available for this metric
+        if len(participant_files) == 0:
+            return []
+
+        if task_name != "":
+            participant_files = participant_files.loc[
+                participant_files[lf_constants.FILE_INDEX_TASK_FULL_ID_KEY] == task_name
+            ]
+            # Return empty list if no files are available for this task
+            if len(participant_files) == 0:
+                return []
         if start_date is None:
             start_date = participant_files[
                 lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
             ].min()
         if end_date is None:
-            end_date = pd.Timestamp.now()
+            end_date = participant_files[
+                lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
+            ].max()
+        # TODO midnight is present in the previous file for some files
         # We need to floor start_date to the previous day
         # since Labfront files contain the midnight in the
         # file belonging to the previous day
@@ -578,36 +754,58 @@ class LabfrontLoader(BaseLoader):
         ).floor("1d")
         # We need to ceil end_date to the next date to
         # handle end-date non inclusiveness with dates
-        end_date = pd.Timestamp(end_date).ceil("1d")
+        end_date = pd.Timestamp(end_date + datetime.timedelta(microseconds=1)).ceil(
+            "1d"
+        )
         # Reset index and fill last timestamps with end date
-
-        participant_files = participant_files.fillna(end_date)
+        # TODO it may happen that end_date is lower than the firstTimestamp in file_index
         if len(participant_files) == 1:
             # We only have one file
-            if (
-                start_date
-                >= participant_files.iloc[0].loc[
-                    lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
-                ]
-            ) or (
-                end_date
-                <= participant_files.iloc[0].loc[
-                    lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
-                ]
+            if not (
+                (
+                    start_date
+                    >= participant_files.iloc[0].loc[
+                        lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+                    ]
+                )
+                or (
+                    end_date
+                    <= participant_files.iloc[0].loc[
+                        lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
+                    ]
+                )
             ):
-                # The file contains either start date or end date
-                return participant_files[lf_constants.FILE_INDEX_FILENAME_KEY].values
-            else:
                 return []
         else:
             # Return only files that contain start and end dates
-            participant_files = (
-                participant_files.set_index(lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY)
-                .truncate(before=start_date, after=end_date)
-                .loc[:, lf_constants.FILE_INDEX_FILENAME_KEY]
-                .values
+            # TODO truncate does not work if we have a start date that
+            # is greater than the minimum start date with only one file
+            participant_files = participant_files.set_index(
+                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+            ).truncate(before=start_date, after=end_date)
+        participant_files = participant_files.drop_duplicates(
+            subset=[lf_constants.FILE_INDEX_FILENAME_KEY]
+        )
+
+        file_names = (
+            participant_files[lf_constants.FILE_INDEX_BASE_FOLDER_KEY].astype(str)
+            + os.path.sep
+            + participant_id
+            + os.path.sep
+            + metric
+            + os.path.sep
+        )
+        if is_questionnaire or is_todo:
+            file_names += participant_files[lf_constants.FILE_INDEX_TASK_FOLDER].astype(
+                str
             )
-            return participant_files
+            file_names += os.path.sep
+        file_names += participant_files[lf_constants.FILE_INDEX_FILENAME_KEY].astype(
+            str
+        )
+        file_names = file_names.drop_duplicates()
+
+        return file_names.values
 
     def get_data_from_datetime(
         self,
@@ -617,7 +815,7 @@ class LabfrontLoader(BaseLoader):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         is_questionnaire: bool = False,
         is_todo: bool = False,
-        task_name: str = None,
+        task_name: str = "",
         filter_on_calendar_date: bool = False,
     ) -> pd.DataFrame:
         """Load data from a given user in a given time frame.
@@ -668,26 +866,15 @@ class LabfrontLoader(BaseLoader):
             task_name = self.get_task_full_id(task_name)
 
         # Check dates and times
-        if not (
-            (type(start_date) == datetime.datetime)
-            or (type(start_date) == datetime.date)
-            or (start_date is None)
-        ):
+        if type(start_date) is str:
             start_date = dateutil.parser.parse(start_date)
-        elif type(start_date) == datetime.date:
-            start_date = datetime.datetime.combine(start_date, datetime.time())
+        # elif type(start_date) == datetime.date:
+        #    start_date = datetime.datetime.combine(start_date, datetime.time())
 
-        if not (
-            (type(end_date) == datetime.datetime)
-            or (type(end_date) == datetime.date or (end_date is None))
-        ):
+        if type(end_date) is str:
             end_date = dateutil.parser.parse(end_date)
-        elif type(end_date) == datetime.date:
-            end_date = datetime.datetime.combine(end_date, datetime.time())
-
         # Get full participant_id (user + labfront)
         participant_id = self.get_full_id(user_id)
-
         files = self.get_files_from_timerange(
             user_id=participant_id,
             metric=metric,
@@ -699,44 +886,30 @@ class LabfrontLoader(BaseLoader):
         )
         if len(files) == 0:
             return pd.DataFrame()
-        if is_questionnaire:
-            path_to_folder = (
-                self.data_path
-                / participant_id
-                / lf_constants.QUESTIONNAIRE_FOLDER
-                / task_name
-            )
-        elif is_todo:
-            path_to_folder = (
-                self.data_path
-                / participant_id
-                / lf_constants.QUESTIONNAIRE_FOLDER
-                / task_name
-            )
-        else:
-            path_to_folder = self.data_path / participant_id / metric
 
-        n_rows_to_skip = self.get_header_length(path_to_folder / files[0])
+        n_rows_to_skip = self.get_header_length(Path(files[0]))
         if is_questionnaire:
-            n_rows_to_skip += self.get_key_length(path_to_folder / files[0]) + 1
+            n_rows_to_skip += self.get_key_length(Path(files[0])) + 1
         # Load data from first file
         df_list = []
         for f in files:
             try:
-                df_list.append(pd.read_csv(path_to_folder / f, skiprows=n_rows_to_skip))
+                df_list.append(pd.read_csv(Path(f), skiprows=n_rows_to_skip))
             except pd.errors.EmptyDataError:
                 # We may have empty CSV files
                 continue
         if len(df_list) > 0:
-            data = pd.concat(df_list, ignore_index=True)
+            data = pd.concat(df_list, ignore_index=True, axis=0)
         else:
             return pd.DataFrame()
 
         # Convert columns to datetime
         cols_to_sort = []
         if constants.ISODATE_COL in data.columns:
+            # TODO fix this as it does not work with negative timezone
             data[constants.ISODATE_COL] = pd.to_datetime(
-                data[constants.ISODATE_COL].str.rsplit("+", expand=True)[0], utc=True
+                data[constants.ISODATE_COL].str[:-6],
+                utc=True,
             ).dt.tz_localize(tz=None)
 
         if constants.CALENDAR_DATE_COL in data.columns:
@@ -766,17 +939,21 @@ class LabfrontLoader(BaseLoader):
                 )
                 date_filter_col = constants.CALENDAR_DATE_COL
             if (start_date is None) and (not (end_date is None)):
-                return data[(data[date_filter_col] < end_date)]
+                return data[(data[date_filter_col] < end_date)].reset_index(drop=True)
             elif (not (start_date is None)) and (end_date is None):
-                return data[(data[date_filter_col] >= start_date)]
+                return data[(data[date_filter_col] >= start_date)].reset_index(
+                    drop=True
+                )
             else:
                 if start_date == end_date:
-                    return data[data[date_filter_col] == start_date]
+                    return data[data[date_filter_col] == start_date].reset_index(
+                        drop=True
+                    )
                 else:
                     return data[
                         (data[date_filter_col] >= start_date)
                         & (data[date_filter_col] < end_date)
-                    ]
+                    ].reset_index(drop=True)
 
     def get_header_length(self, file_path: Union[str, Path]) -> int:
         """Get header length of Labfront csv file.
@@ -851,8 +1028,44 @@ class LabfrontLoader(BaseLoader):
         str
             Full ID of the task.
         """
-        # TODO get the name of the folder
-        return self.tasks_dict[task_id.lower()]
+        if "_" in task_id:
+            # This is already a full ID
+            return task_id
+        elif task_id in self.file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY].unique():
+            # This is a task name
+            # Check if we have more than one task with the same name
+            if (
+                len(
+                    self.file_index.loc[
+                        self.file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY]
+                        == task_id,
+                        lf_constants.FILE_INDEX_TASK_FULL_ID_KEY,
+                    ].unique()
+                )
+                > 1
+            ):
+                raise ValueError(
+                    f"Multiple tasks exist with the same name {task_id}. Specify either Task ID or Task Full ID."
+                )
+            # Return full id corresponding to this task name
+            return self.file_index.loc[
+                self.file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY] == task_id,
+                lf_constants.FILE_INDEX_TASK_FULL_ID_KEY,
+            ].unique()[0]
+        elif task_id in self.file_index[lf_constants.FILE_INDEX_TASK_ID_KEY].unique():
+            # This is a Task ID
+            self.file_index[
+                self.file_index.loc[lf_constants.FILE_INDEX_TASK_ID_KEY] == task_id,
+                lf_constants.FILE_INDEX_TASK_FULL_ID_KEY,
+            ].unique()[0]
+        elif (
+            task_id
+            in self.file_index[lf_constants.FILE_INDEX_TASK_FULL_ID_KEY].unique()
+        ):
+            # This is a task full id
+            return task_id
+        else:
+            raise ValueError(f"Could not get task full id from {task_id}")
 
     def get_questionnaire_questions(self, questionnaire_name: str) -> dict:
         # TODO change implementation with new file_index
@@ -2181,7 +2394,7 @@ class LabfrontLoader(BaseLoader):
             )
 
             data[constants.SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL] = np.nan
-            return data
+            return data.reset_index(drop=True)
         else:
             return pd.DataFrame()
 
