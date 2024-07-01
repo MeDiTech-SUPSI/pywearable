@@ -14,69 +14,69 @@ import pandas as pd
 from . import constants, utils
 from .loader.base import BaseLoader
 
-_SLEEP_METRIC_TIB = "TIB"
-_SLEEP_METRIC_TST = "TST"
-_SLEEP_METRIC_WASO = "WASO"
-_SLEEP_METRIC_SPT = "SPT"
-_SLEEP_METRIC_N1_DURATION = "N1"
-_SLEEP_METRIC_N2_DURATION = "N2"
-_SLEEP_METRIC_N3_DURATION = "N3"
-_SLEEP_METRIC_NREM_DURATION = "NREM"
-_SLEEP_METRIC_REM_DURATION = "REM"
-_SLEEP_METRIC_AWAKE_DURATION = "AWAKE"
-_SLEEP_METRIC_UNMEASURABLE_DURATION = "UNMEASURABLE"
-_SLEEP_METRIC_SOL = "SOL"
-_SLEEP_METRIC_N1_LATENCY = "Lat_N1"
-_SLEEP_METRIC_N2_LATENCY = "Lat_N2"
-_SLEEP_METRIC_N3_LATENCY = "Lat_N3"
-_SLEEP_METRIC_REM_LATENCY = "Lat_REM"
-_SLEEP_METRIC_N1_PERCENTAGE = "%N1"
-_SLEEP_METRIC_N2_PERCENTAGE = "%N2"
-_SLEEP_METRIC_N3_PERCENTAGE = "%N3"
-_SLEEP_METRIC_NREM_PERCENTAGE = "%NREM"
-_SLEEP_METRIC_REM_PERCENTAGE = "%REM"
-_SLEEP_METRIC_SE = "SE"
-_SLEEP_METRIC_SME = "SME"
-_SLEEP_METRIC_SLEEP_SCORE = "SCORE"
-_SLEEP_METRIC_AWAKE_COUNT = "countAwake"
-_SLEEP_METRIC_N1_COUNT = "countN1"
-_SLEEP_METRIC_N2_COUNT = "countN2"
-_SLEEP_METRIC_N3_COUNT = "countN3"
-_SLEEP_METRIC_REM_COUNT = "countREM"
-_SLEEP_METRIC_BEDTIME = "bedTime"
-_SLEEP_METRIC_WAKEUP_TIME = "wakeupTime"
-_SLEEP_METRIC_MIDPOINT = "midpoint"
-_SLEEP_METRIC_CPD_MIDPOINT = "CPD_midpoint"
-_SLEEP_METRIC_CPD_DURATION = "CPD_duration"
-_SLEEP_DATETIME_METRICS = [
-    _SLEEP_METRIC_BEDTIME,
-    _SLEEP_METRIC_MIDPOINT,
-    _SLEEP_METRIC_WAKEUP_TIME,
+SLEEP_METRIC_TIB = "TIB"
+SLEEP_METRIC_TST = "TST"
+SLEEP_METRIC_WASO = "WASO"
+SLEEP_METRIC_SPT = "SPT"
+SLEEP_METRIC_N1_DURATION = "N1"
+SLEEP_METRIC_N2_DURATION = "N2"
+SLEEP_METRIC_N3_DURATION = "N3"
+SLEEP_METRIC_NREM_DURATION = "NREM"
+SLEEP_METRIC_REM_DURATION = "REM"
+SLEEP_METRIC_AWAKE_DURATION = "AWAKE"
+SLEEP_METRIC_UNMEASURABLE_DURATION = "UNMEASURABLE"
+SLEEP_METRIC_SOL = "SOL"
+SLEEP_METRIC_N1_LATENCY = "Lat_N1"
+SLEEP_METRIC_N2_LATENCY = "Lat_N2"
+SLEEP_METRIC_N3_LATENCY = "Lat_N3"
+SLEEP_METRIC_REM_LATENCY = "Lat_REM"
+SLEEP_METRIC_N1_PERCENTAGE = "%N1"
+SLEEP_METRIC_N2_PERCENTAGE = "%N2"
+SLEEP_METRIC_N3_PERCENTAGE = "%N3"
+SLEEP_METRIC_NREM_PERCENTAGE = "%NREM"
+SLEEP_METRIC_REM_PERCENTAGE = "%REM"
+SLEEP_METRIC_SE = "SE"
+SLEEP_METRIC_SME = "SME"
+SLEEP_METRIC_SLEEP_SCORE = "SCORE"
+SLEEP_METRIC_AWAKE_COUNT = "countAwake"
+SLEEP_METRIC_N1_COUNT = "countN1"
+SLEEP_METRIC_N2_COUNT = "countN2"
+SLEEP_METRIC_N3_COUNT = "countN3"
+SLEEP_METRIC_REM_COUNT = "countREM"
+SLEEP_METRIC_BEDTIME = "bedTime"
+SLEEP_METRIC_WAKEUP_TIME = "wakeupTime"
+SLEEP_METRIC_MIDPOINT = "midpoint"
+SLEEP_METRIC_CPD_MIDPOINT = "CPD_midpoint"
+SLEEP_METRIC_CPD_DURATION = "CPD_duration"
+SLEEP_DATETIME_METRICS = [
+    SLEEP_METRIC_BEDTIME,
+    SLEEP_METRIC_MIDPOINT,
+    SLEEP_METRIC_WAKEUP_TIME,
 ]
 
 _SLEEP_KIND_MAPPING = {
     "mean": {
-        _SLEEP_METRIC_BEDTIME: utils.mean_time,
-        _SLEEP_METRIC_WAKEUP_TIME: utils.mean_time,
-        _SLEEP_METRIC_MIDPOINT: utils.mean_time,
+        SLEEP_METRIC_BEDTIME: utils.mean_time,
+        SLEEP_METRIC_WAKEUP_TIME: utils.mean_time,
+        SLEEP_METRIC_MIDPOINT: utils.mean_time,
         "default": np.nanmean,
     },
     "std": {
-        _SLEEP_METRIC_BEDTIME: utils.std_time,
-        _SLEEP_METRIC_WAKEUP_TIME: utils.std_time,
-        _SLEEP_METRIC_MIDPOINT: utils.std_time,
+        SLEEP_METRIC_BEDTIME: utils.std_time,
+        SLEEP_METRIC_WAKEUP_TIME: utils.std_time,
+        SLEEP_METRIC_MIDPOINT: utils.std_time,
         "default": np.nanstd,
     },
     "min": {
-        _SLEEP_METRIC_BEDTIME: utils.get_earliest_bedtime,
-        _SLEEP_METRIC_WAKEUP_TIME: utils.get_earliest_wakeup_time,
-        _SLEEP_METRIC_MIDPOINT: utils.get_earliest_wakeup_time,
+        SLEEP_METRIC_BEDTIME: utils.get_earliest_bedtime,
+        SLEEP_METRIC_WAKEUP_TIME: utils.get_earliest_wakeup_time,
+        SLEEP_METRIC_MIDPOINT: utils.get_earliest_wakeup_time,
         "default": np.nanmin,
     },
     "max": {
-        _SLEEP_METRIC_BEDTIME: utils.get_latest_bedtime,
-        _SLEEP_METRIC_WAKEUP_TIME: utils.get_latest_wakeup_time,
-        _SLEEP_METRIC_MIDPOINT: utils.get_latest_wakeup_time,
+        SLEEP_METRIC_BEDTIME: utils.get_latest_bedtime,
+        SLEEP_METRIC_WAKEUP_TIME: utils.get_latest_wakeup_time,
+        SLEEP_METRIC_MIDPOINT: utils.get_latest_wakeup_time,
         "default": np.nanmax,
     },
 }
@@ -165,7 +165,7 @@ def get_time_in_bed(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_TIB,
+        metric=SLEEP_METRIC_TIB,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -252,7 +252,7 @@ def get_sleep_period_time(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_SPT,
+        metric=SLEEP_METRIC_SPT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -340,7 +340,7 @@ def get_total_sleep_time(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_TST,
+        metric=SLEEP_METRIC_TST,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -429,7 +429,7 @@ def get_sleep_efficiency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_SE,
+        metric=SLEEP_METRIC_SE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -520,7 +520,7 @@ def get_sleep_maintenance_efficiency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_SME,
+        metric=SLEEP_METRIC_SME,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -607,7 +607,7 @@ def get_n1_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N1_LATENCY,
+        metric=SLEEP_METRIC_N1_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -694,7 +694,7 @@ def get_n2_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N2_LATENCY,
+        metric=SLEEP_METRIC_N2_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -781,7 +781,7 @@ def get_n3_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N3_LATENCY,
+        metric=SLEEP_METRIC_N3_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -868,7 +868,7 @@ def get_rem_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_REM_LATENCY,
+        metric=SLEEP_METRIC_REM_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -960,7 +960,7 @@ def get_n1_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N1_DURATION,
+        metric=SLEEP_METRIC_N1_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1052,7 +1052,7 @@ def get_n2_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N2_DURATION,
+        metric=SLEEP_METRIC_N2_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1143,7 +1143,7 @@ def get_n3_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N3_DURATION,
+        metric=SLEEP_METRIC_N3_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1236,7 +1236,7 @@ def get_rem_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_REM_DURATION,
+        metric=SLEEP_METRIC_REM_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1329,7 +1329,7 @@ def get_nrem_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_NREM_DURATION,
+        metric=SLEEP_METRIC_NREM_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1422,7 +1422,7 @@ def get_awake_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_AWAKE_DURATION,
+        metric=SLEEP_METRIC_AWAKE_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1515,7 +1515,7 @@ def get_unmeasurable_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_UNMEASURABLE_DURATION,
+        metric=SLEEP_METRIC_UNMEASURABLE_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1532,7 +1532,7 @@ def get_n1_percentage(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N1_PERCENTAGE,
+        metric=SLEEP_METRIC_N1_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1549,7 +1549,7 @@ def get_n2_percentage(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N2_PERCENTAGE,
+        metric=SLEEP_METRIC_N2_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1566,7 +1566,7 @@ def get_n3_percentage(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N3_PERCENTAGE,
+        metric=SLEEP_METRIC_N3_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1583,7 +1583,7 @@ def get_rem_percentage(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_REM_PERCENTAGE,
+        metric=SLEEP_METRIC_REM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1600,7 +1600,7 @@ def get_nrem_percentage(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_NREM_PERCENTAGE,
+        metric=SLEEP_METRIC_NREM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1617,7 +1617,7 @@ def get_wake_after_sleep_onset(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_WASO,
+        metric=SLEEP_METRIC_WASO,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1634,7 +1634,7 @@ def get_sleep_onset_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_SOL,
+        metric=SLEEP_METRIC_SOL,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1651,7 +1651,7 @@ def get_sleep_score(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_SLEEP_SCORE,
+        metric=SLEEP_METRIC_SLEEP_SCORE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1752,7 +1752,7 @@ def get_bedtime(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_BEDTIME,
+        metric=SLEEP_METRIC_BEDTIME,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1801,7 +1801,7 @@ def get_wakeup_time(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_WAKEUP_TIME,
+        metric=SLEEP_METRIC_WAKEUP_TIME,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1851,7 +1851,7 @@ def get_sleep_midpoint(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_MIDPOINT,
+        metric=SLEEP_METRIC_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1910,7 +1910,7 @@ def get_awake_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_AWAKE_COUNT,
+        metric=SLEEP_METRIC_AWAKE_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -1953,7 +1953,7 @@ def get_n1_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N1_COUNT,
+        metric=SLEEP_METRIC_N1_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -2012,7 +2012,7 @@ def get_n2_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N2_COUNT,
+        metric=SLEEP_METRIC_N2_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -2071,7 +2071,7 @@ def get_n3_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_N3_COUNT,
+        metric=SLEEP_METRIC_N3_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -2130,7 +2130,7 @@ def get_rem_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_REM_COUNT,
+        metric=SLEEP_METRIC_REM_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -2179,7 +2179,7 @@ def get_cpd_midpoint(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_CPD_MIDPOINT,
+        metric=SLEEP_METRIC_CPD_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -2229,7 +2229,7 @@ def get_cpd_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=_SLEEP_METRIC_CPD_DURATION,
+        metric=SLEEP_METRIC_CPD_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
@@ -3595,40 +3595,40 @@ def _compute_cpd_duration(
 
 
 _SLEEP_STATISTICS_DICT = {
-    _SLEEP_METRIC_TIB: _compute_time_in_bed,
-    _SLEEP_METRIC_TST: _compute_total_sleep_time,
-    _SLEEP_METRIC_SE: _compute_sleep_efficiency,
-    _SLEEP_METRIC_SME: _compute_sleep_maintenance_efficiency,
-    _SLEEP_METRIC_SPT: _compute_sleep_period_time,
-    _SLEEP_METRIC_WASO: _compute_wake_after_sleep_onset,
-    _SLEEP_METRIC_SOL: _compute_sleep_onset_latency,
-    _SLEEP_METRIC_N1_DURATION: _compute_n1_duration,
-    _SLEEP_METRIC_N2_DURATION: _compute_n2_duration,
-    _SLEEP_METRIC_N3_DURATION: _compute_n3_duration,
-    _SLEEP_METRIC_REM_DURATION: _compute_rem_duration,
-    _SLEEP_METRIC_NREM_DURATION: _compute_nrem_duration,
-    _SLEEP_METRIC_AWAKE_DURATION: _compute_awake_duration,
-    _SLEEP_METRIC_UNMEASURABLE_DURATION: _compute_unmeasurable_duration,
-    _SLEEP_METRIC_N1_PERCENTAGE: _compute_n1_percentage,
-    _SLEEP_METRIC_N2_PERCENTAGE: _compute_n2_percentage,
-    _SLEEP_METRIC_N3_PERCENTAGE: _compute_n3_percentage,
-    _SLEEP_METRIC_REM_PERCENTAGE: _compute_rem_percentage,
-    _SLEEP_METRIC_NREM_PERCENTAGE: _compute_nrem_percentage,
-    _SLEEP_METRIC_N1_LATENCY: _compute_n1_latency,
-    _SLEEP_METRIC_N2_LATENCY: _compute_n2_latency,
-    _SLEEP_METRIC_N3_LATENCY: _compute_n3_latency,
-    _SLEEP_METRIC_REM_LATENCY: _compute_rem_latency,
-    _SLEEP_METRIC_SLEEP_SCORE: _compute_sleep_score,
-    _SLEEP_METRIC_AWAKE_COUNT: _compute_awake_count,
-    _SLEEP_METRIC_N1_COUNT: _compute_n1_count,
-    _SLEEP_METRIC_N2_COUNT: _compute_n2_count,
-    _SLEEP_METRIC_N3_COUNT: _compute_n3_count,
-    _SLEEP_METRIC_REM_COUNT: _compute_rem_count,
-    _SLEEP_METRIC_BEDTIME: _compute_bedtime,
-    _SLEEP_METRIC_WAKEUP_TIME: _compute_wakeup_time,
-    _SLEEP_METRIC_MIDPOINT: _compute_sleep_midpoint,
-    _SLEEP_METRIC_CPD_MIDPOINT: _compute_cpd_midpoint,
-    _SLEEP_METRIC_CPD_DURATION: _compute_cpd_duration,
+    SLEEP_METRIC_TIB: _compute_time_in_bed,
+    SLEEP_METRIC_TST: _compute_total_sleep_time,
+    SLEEP_METRIC_SE: _compute_sleep_efficiency,
+    SLEEP_METRIC_SME: _compute_sleep_maintenance_efficiency,
+    SLEEP_METRIC_SPT: _compute_sleep_period_time,
+    SLEEP_METRIC_WASO: _compute_wake_after_sleep_onset,
+    SLEEP_METRIC_SOL: _compute_sleep_onset_latency,
+    SLEEP_METRIC_N1_DURATION: _compute_n1_duration,
+    SLEEP_METRIC_N2_DURATION: _compute_n2_duration,
+    SLEEP_METRIC_N3_DURATION: _compute_n3_duration,
+    SLEEP_METRIC_REM_DURATION: _compute_rem_duration,
+    SLEEP_METRIC_NREM_DURATION: _compute_nrem_duration,
+    SLEEP_METRIC_AWAKE_DURATION: _compute_awake_duration,
+    SLEEP_METRIC_UNMEASURABLE_DURATION: _compute_unmeasurable_duration,
+    SLEEP_METRIC_N1_PERCENTAGE: _compute_n1_percentage,
+    SLEEP_METRIC_N2_PERCENTAGE: _compute_n2_percentage,
+    SLEEP_METRIC_N3_PERCENTAGE: _compute_n3_percentage,
+    SLEEP_METRIC_REM_PERCENTAGE: _compute_rem_percentage,
+    SLEEP_METRIC_NREM_PERCENTAGE: _compute_nrem_percentage,
+    SLEEP_METRIC_N1_LATENCY: _compute_n1_latency,
+    SLEEP_METRIC_N2_LATENCY: _compute_n2_latency,
+    SLEEP_METRIC_N3_LATENCY: _compute_n3_latency,
+    SLEEP_METRIC_REM_LATENCY: _compute_rem_latency,
+    SLEEP_METRIC_SLEEP_SCORE: _compute_sleep_score,
+    SLEEP_METRIC_AWAKE_COUNT: _compute_awake_count,
+    SLEEP_METRIC_N1_COUNT: _compute_n1_count,
+    SLEEP_METRIC_N2_COUNT: _compute_n2_count,
+    SLEEP_METRIC_N3_COUNT: _compute_n3_count,
+    SLEEP_METRIC_REM_COUNT: _compute_rem_count,
+    SLEEP_METRIC_BEDTIME: _compute_bedtime,
+    SLEEP_METRIC_WAKEUP_TIME: _compute_wakeup_time,
+    SLEEP_METRIC_MIDPOINT: _compute_sleep_midpoint,
+    SLEEP_METRIC_CPD_MIDPOINT: _compute_cpd_midpoint,
+    SLEEP_METRIC_CPD_DURATION: _compute_cpd_duration,
 }
 
 
@@ -3770,7 +3770,7 @@ def get_sleep_statistic(
             )
             # Convert it to a pd.Series with calendarDate as index
             # special handling in this step for timestamp metrics
-            if metric in _SLEEP_DATETIME_METRICS:
+            if metric in SLEEP_DATETIME_METRICS:
                 data_dict[user] = dict(
                     zip(
                         metric_data[constants._CALENDAR_DATE_COL],
@@ -3785,7 +3785,7 @@ def get_sleep_statistic(
 
             if not (kind is None):
                 if (
-                    metric in _SLEEP_DATETIME_METRICS
+                    metric in SLEEP_DATETIME_METRICS
                 ):  # circular means are calculated on HH:MM format
                     data_dict[user] = {
                         date: time.strftime("%H:%M")
@@ -3798,7 +3798,7 @@ def get_sleep_statistic(
                     # assume it's something that can be directly applied to metric
                     # otherwise get the specific version for the metric through the kind mapping
                     kind_fn = _SLEEP_KIND_MAPPING.get(kind, {"default": kind}).get(
-                        metric if metric in _SLEEP_DATETIME_METRICS else "default", kind
+                        metric if metric in SLEEP_DATETIME_METRICS else "default", kind
                     )
                     transformed_dict[user][metric] = kind_fn(
                         np.array(list(data_dict[user].values()))
@@ -4013,13 +4013,13 @@ def get_sleep_statistics(
                 # otherwise get the specific version for each metric in the df through kind mapping
                 fn_dict = {
                     metric: _SLEEP_KIND_MAPPING.get(kind, {"default": kind}).get(
-                        metric if metric in _SLEEP_DATETIME_METRICS else "default", kind
+                        metric if metric in SLEEP_DATETIME_METRICS else "default", kind
                     )
                     for metric in user_sleep_metrics_df.columns
                 }
                 # Assume that all transformations require the datetime metrics to be in "HH:MM" format:
                 for metric in user_sleep_metrics_df.columns:
-                    if metric in _SLEEP_DATETIME_METRICS:
+                    if metric in SLEEP_DATETIME_METRICS:
                         user_sleep_metrics_df[metric] = (
                             user_sleep_metrics_df.loc[:, metric]
                             .dt.strftime("%H:%M")
