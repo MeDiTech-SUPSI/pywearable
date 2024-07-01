@@ -3617,7 +3617,7 @@ def _compute_cpd_duration(
     return pd.Series(data=CPDs, index=sleep_summary.index)
 
 
-_SLEEP_STATISTICS_DICT = {
+SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,
     SLEEP_STATISTIC_TST: _compute_total_sleep_time,
     SLEEP_STATISTIC_SE: _compute_sleep_efficiency,
@@ -3962,3 +3962,145 @@ def get_sleep_statistics(
         return transformed_dict
     else:
         return data_dict
+
+
+def get_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind=None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+):
+    # Get user id from the loader
+    user_id = utils.get_user_ids(loader, user_id)
+    # Convert to datetime
+    start_date = utils.check_date(start_date)
+    end_date = utils.check_date(end_date)
+
+    # Check metrics
+    if statistic is None:
+        # Consider all metrics
+        statistics = list(SLEEP_STATISTICS_DICT.keys())
+    elif type(statistic) == str:
+        statistics = [statistic]
+
+    # Check args and kwargs
+    if type(kind_args) != list:
+        raise ValueError(f"kind_args must be an iterable, not {type(kind_args)}")
+    if type(kind_kwargs) != dict:
+        raise ValueError(f"kind_kwargs must be of type dict, not {type(kind_kwargs)}")
+    if type(loader_kwargs) != dict:
+        raise ValueError(
+            f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
+        )
+    both_dates_valid = False
+    if (not (start_date is None)) and (not (end_date is None)):
+        # Let's set up a dataframe in which we will store all the data
+        date_periods = pd.date_range(
+            start_date, end_date, inclusive="left", normalize=True, freq="D"
+        )
+        multi_index = pd.MultiIndex.from_product(
+            [user_id, date_periods],
+            names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
+        )
+        sleep_stats_df = pd.DataFrame(index=multi_index, columns=statistics)
+        both_dates_valid = True
+    else:
+        # Set up a standard df and we will populate it later with indexes
+        sleep_stats_df = pd.DataFrame()
+    for user in user_id:
+        if not (both_dates_valid):
+            user_sleep_stats_df = pd.DataFrame()
+        # Load sleep summary data
+        sleep_summary = loader.load_sleep_summary(
+            user_id=user,
+            start_date=start_date,
+            end_date=end_date,
+            single_day_filter=True,
+            **loader_kwargs,
+        )
+        if len(sleep_summary) > 0:
+            sleep_summary = sleep_summary.set_index(constants._CALENDAR_DATE_COL)
+
+            sleep_summary_start_date = sleep_summary[constants._ISODATE_COL].min()
+            sleep_summary_end_date = (
+                sleep_summary[constants._ISODATE_COL]
+                + pd.Timedelta(
+                    milliseconds=int(
+                        sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
+                        + sleep_summary[constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
+                    )
+                )
+            ).max()
+            sleep_stages = loader.load_sleep_stage(
+                user_id=user,
+                start_date=sleep_summary_start_date,
+                end_date=sleep_summary_end_date,
+            )
+            # Keep only those belonging to sleep summaries
+            sleep_stages = sleep_stages[
+                sleep_stages[constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
+                    sleep_summary[constants._SLEEP_SUMMARY_ID_COL].unique()
+                )
+            ]
+            for statistic in statistics:
+                # Get series with metrics by calendarDate
+                ser = _HRV_STATISTICS_DICT[statistic](
+                    bbi_dict=bbi_dict,
+                    coverage=coverage,
+                )
+                if both_dates_valid:
+                    hrv_stats_df.loc[(user, ser.index), statistic] = ser.values
+                else:
+                    if len(ser) > 0:
+                        min_date = ser.index.min() if start_date is None else start_date
+                        max_date = ser.index.max() if end_date is None else end_date
+                        user_date_range = pd.date_range(min_date, max_date, freq="D")
+                        ser = ser.reindex(user_date_range)
+                        # We have different dates based on user
+                        ser = ser.set_axis(
+                            pd.MultiIndex.from_product(
+                                [[user], user_date_range],
+                                names=[
+                                    constants._USER_COL,
+                                    constants._CALENDAR_DATE_COL,
+                                ],
+                            )
+                        ).rename(statistic)
+                        if len(user_hrv_stats_df) == 0:
+                            # Empty df, first metric
+                            user_hrv_stats_df = ser.to_frame()
+                        else:
+                            user_hrv_stats_df = pd.merge(
+                                user_hrv_stats_df,
+                                ser,
+                                left_index=True,
+                                right_index=True,
+                                how="outer",
+                            )
+            if not both_dates_valid:
+                hrv_stats_df = pd.concat((hrv_stats_df, user_hrv_stats_df))
+    # Perform kind operation by user
+    if not (kind is None):
+        hrv_stats_df = hrv_stats_df.groupby(level=constants._USER_COL).agg(
+            kind, *kind_args, **kind_kwargs
+        )
+        if return_df:
+            return hrv_stats_df
+        else:
+            return hrv_stats_df.to_dict(orient="index")
+    # Return based on settings
+    mi_df = utils.return_multiindex_df(hrv_stats_df, return_df, return_multi_index)
+    # Return series if only statistic
+    if (
+        (type(statistic) is str) or ((type(statistic) is list) and len(statistic) == 1)
+    ) and return_df:
+        return mi_df.squeeze(axis=1)
+    else:
+        return mi_df
