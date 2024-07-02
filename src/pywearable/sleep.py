@@ -22,6 +22,7 @@ SLEEP_STATISTIC_DEEP_DURATION = "deep"
 SLEEP_STATISTIC_LIGHT_DURATION = "light"
 SLEEP_STATISTIC_REM_DURATION = "REM"
 
+# To deprecate
 SLEEP_STATISTIC_N1_DURATION = "N1"
 SLEEP_STATISTIC_N2_DURATION = "N2"
 SLEEP_STATISTIC_N3_DURATION = "N3"
@@ -34,6 +35,7 @@ SLEEP_STATISTIC_SOL = "SOL"
 SLEEP_STATISTIC_DEEP_LATENCY = "Lat_Deep"
 SLEEP_STATISTIC_LIGHT_LATENCY = "Lat_Light"
 
+# To deprecate
 SLEEP_STATISTIC_N1_LATENCY = "Lat_N1"
 SLEEP_STATISTIC_N2_LATENCY = "Lat_N2"
 SLEEP_STATISTIC_N3_LATENCY = "Lat_N3"
@@ -42,6 +44,7 @@ SLEEP_STATISTIC_REM_LATENCY = "Lat_REM"
 SLEEP_STATISTIC_DEEP_PERCENTAGE = "%Deep"
 SLEEP_STATISTIC_LIGHT_PERCENTAGE = "%Light"
 
+# To deprecate
 SLEEP_STATISTIC_N1_PERCENTAGE = "%N1"
 SLEEP_STATISTIC_N2_PERCENTAGE = "%N2"
 SLEEP_STATISTIC_N3_PERCENTAGE = "%N3"
@@ -55,6 +58,7 @@ SLEEP_STATISTIC_AWAKE_COUNT = "countAwake"
 SLEEP_STATISTIC_DEEP_COUNT = "countDeep"
 SLEEP_STATISTIC_LIGHT_COUNT = "countLight"
 
+# To deprecate
 SLEEP_STATISTIC_N1_COUNT = "countN1"
 SLEEP_STATISTIC_N2_COUNT = "countN2"
 SLEEP_STATISTIC_N3_COUNT = "countN3"
@@ -191,6 +195,11 @@ def get_time_in_bed(
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
