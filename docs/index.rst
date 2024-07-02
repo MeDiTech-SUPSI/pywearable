@@ -11,8 +11,11 @@ Welcome to pywearable's documentation!
    :caption: Contents:
 
    _pages/getting_started
+   _pages/data_sources
    _pages/metrics
    _pages/tutorials
+   _pages/metrics
+   _pages/statistics
    _pages/api
 
 Indices and tables

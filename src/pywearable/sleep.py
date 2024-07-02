@@ -14,6 +14,8 @@ import pandas as pd
 from . import constants, utils
 from .loader.base import BaseLoader
 
+warnings.simplefilter(action="ignore", category=FutureWarning)
+
 SLEEP_STATISTIC_TIB = "TIB"
 SLEEP_STATISTIC_TST = "TST"
 SLEEP_STATISTIC_WASO = "WASO"
@@ -101,6 +103,7 @@ _SLEEP_KIND_MAPPING = {
         "default": np.nanmax,
     },
 }
+
 
 
 def get_time_in_bed(
@@ -1752,6 +1755,7 @@ def get_bedtime(
     """Get bedtime sleep metric.
 
     This function computes the bedtime metric.
+    This function computes the bedtime metric.
     The value is reported in a datetime.datetime format.
 
     Depending on the value of the ``kind`` parameter, this function
@@ -2188,7 +2192,7 @@ def get_cpd_midpoint(
     loader : `pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default "all"
+        The id(s) for which CPD must be retrieved, by default 'all'
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -2238,7 +2242,7 @@ def get_cpd_duration(
     loader : `pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default "all"
+        The id(s) for which CPD must be retrieved, by default 'all'
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -3376,7 +3380,7 @@ def _compute_bedtime(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
         If `sleep_summary` is not a :class:`pandas.DataFrame` .
     """
     sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    if constants._SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL in sleep_summary.columns:
+    if constants._ISODATE_COL in sleep_summary.columns:
         bedtime = sleep_summary[constants._ISODATE_COL]
     else:
         bedtime = pd.Series()
@@ -3715,6 +3719,8 @@ def get_sleep_statistic(
         An instance of a data loader.
     user_id : :class:`str` or :class:`list`
         The id(s) for which the sleep statistic must be computed.
+    metric : :class:`str`
+        The name of the sleep statistic which must be computed.
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None.
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -3930,6 +3936,11 @@ def get_sleep_statistics(
                         if "chronotype_dict" not in kwargs
                         else kwargs["chronotype_dict"].get(user, None)
                     ),
+                    chronotype=(
+                        None
+                        if "chronotype_dict" not in kwargs
+                        else kwargs["chronotype_dict"].get(user, None)
+                    ),
                 )
             user_sleep_metrics_df = sleep_summary.set_index(
                 sleep_summary[constants._CALENDAR_DATE_COL]
@@ -3950,6 +3961,7 @@ def get_sleep_statistics(
                         kind,
                     )
                     for metric in user_sleep_metrics_df.columns
+                }
                 }
                 # Assume that all transformations require the datetime metrics to be in "HH:MM" format:
                 for metric in user_sleep_metrics_df.columns:
