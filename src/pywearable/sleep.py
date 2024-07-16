@@ -105,7 +105,6 @@ _SLEEP_KIND_MAPPING = {
 }
 
 
-
 def get_time_in_bed(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -561,7 +560,58 @@ def get_sleep_maintenance_efficiency(
     )
 
 
-# @deprecated
+def get_deep_latency(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+) -> pd.Series:
+    return get_sleep_statistics(
+        loader=loader,
+        user_id=user_id,
+        metric=SLEEP_STATISTIC_DEEP_LATENCY,
+        start_date=start_date,
+        end_date=end_date,
+        kind=kind,
+        kind_args=kind_args,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
+    )
+
+
+def get_light_latency(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+) -> pd.Series:
+    return get_sleep_statistics(
+        loader=loader,
+        user_id=user_id,
+        metric=SLEEP_STATISTIC_LIGHT_LATENCY,
+        start_date=start_date,
+        end_date=end_date,
+        kind=kind,
+        kind_args=kind_args,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
+    )
+
+
 def get_n1_latency(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -2891,9 +2941,10 @@ def _compute_sleep_period_time(
     # Get only sleep stages of interest
     filtered_sleep_stages = sleep_stages[
         sleep_stages[constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-            sleep_summary.index
+            sleep_summary[constants._SLEEP_SUMMARY_ID_COL].unique()
         )
     ].reset_index(drop=True)
+    print(filtered_sleep_stages)
     spt = pd.Series(
         filtered_sleep_stages[
             filtered_sleep_stages[constants._SLEEP_STAGE_SLEEP_TYPE_COL]
@@ -2935,6 +2986,7 @@ def _compute_sleep_onset_latency(
     if len(sleep_stages) == 0:
         return pd.Series(index=sleep_summary.index)
     latencies = _compute_latencies(sleep_summary, sleep_stages)
+    print(latencies)
     # Remove awake latency
     if constants._SLEEP_STAGE_AWAKE_STAGE_VALUE in latencies.columns:
         latencies = latencies.drop([constants._SLEEP_STAGE_AWAKE_STAGE_VALUE], axis=1)
@@ -2978,7 +3030,7 @@ def _compute_wake_after_sleep_onset(
     # Get only sleep stages belonging to the sleep summaries of interest
     filtered_sleep_stages = sleep_stages[
         sleep_stages[constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-            sleep_summary.index
+            sleep_summary[constants._SLEEP_SUMMARY_ID_COL].unique()
         )
     ].reset_index(drop=True)
     # Get first sleep stages that are awake and remove them
@@ -3168,7 +3220,7 @@ def _compute_latencies(
     # Get only sleep stages with valid sleepSummaryId
     filtered_sleep_stages = sleep_stages[
         sleep_stages[constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-            sleep_summary.index
+            sleep_summary[constants._SLEEP_SUMMARY_ID_COL].unique()
         )
     ].reset_index(drop=True)
     # Compute latencies by groupby operation
@@ -3179,7 +3231,9 @@ def _compute_latencies(
                 constants._SLEEP_STAGE_SLEEP_TYPE_COL,
             ]
         )[constants._ISODATE_COL].first()
-        - sleep_summary[constants._ISODATE_COL]
+        - sleep_summary.set_index(constants._SLEEP_SUMMARY_ID_COL)[
+            constants._ISODATE_COL
+        ]
     ).dt.total_seconds() / (60)
 
     # Pivot
@@ -3203,12 +3257,13 @@ def _compute_latencies(
     latencies = latencies.rename_axis(None, axis=1)
     # Add missing sleepSummary from sleep_summary index
     latencies = pd.merge(
-        left=sleep_summary.loc[:, []],
+        left=sleep_summary.loc[:, [constants._SLEEP_SUMMARY_ID_COL]],
         right=latencies,
-        left_index=True,
+        left_on=constants._SLEEP_SUMMARY_ID_COL,
         right_index=True,
         how="outer",
     )
+    latencies = latencies.drop(constants._SLEEP_SUMMARY_ID_COL, axis=1)
     return latencies
 
 
@@ -3318,7 +3373,9 @@ def _compute_stage_count(
 
     # Get only sleep_stages with sleepSummaryId contained in sleep_summary
     filtered_sleep_stages = sleep_stages[
-        sleep_stages[constants._SLEEP_SUMMARY_ID_COL].isin(sleep_summary.index)
+        sleep_stages[constants._SLEEP_SUMMARY_ID_COL].isin(
+            sleep_summary[constants._SLEEP_SUMMARY_ID_COL].unique()
+        )
     ].reset_index(drop=True)
 
     # Check that we have sleep stages
@@ -3638,6 +3695,8 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_SPT: _compute_sleep_period_time,
     SLEEP_STATISTIC_WASO: _compute_wake_after_sleep_onset,
     SLEEP_STATISTIC_SOL: _compute_sleep_onset_latency,
+    SLEEP_STATISTIC_DEEP_DURATION: _compute_n3_duration,
+    SLEEP_STATISTIC_LIGHT_DURATION: _compute_n1_duration,
     SLEEP_STATISTIC_N1_DURATION: _compute_n1_duration,
     SLEEP_STATISTIC_N2_DURATION: _compute_n2_duration,
     SLEEP_STATISTIC_N3_DURATION: _compute_n3_duration,
@@ -3645,17 +3704,23 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_NREM_DURATION: _compute_nrem_duration,
     SLEEP_STATISTIC_AWAKE_DURATION: _compute_awake_duration,
     SLEEP_STATISTIC_UNMEASURABLE_DURATION: _compute_unmeasurable_duration,
+    SLEEP_STATISTIC_DEEP_PERCENTAGE: _compute_n3_percentage,
+    SLEEP_STATISTIC_LIGHT_PERCENTAGE: _compute_n1_percentage,
     SLEEP_STATISTIC_N1_PERCENTAGE: _compute_n1_percentage,
     SLEEP_STATISTIC_N2_PERCENTAGE: _compute_n2_percentage,
     SLEEP_STATISTIC_N3_PERCENTAGE: _compute_n3_percentage,
     SLEEP_STATISTIC_REM_PERCENTAGE: _compute_rem_percentage,
     SLEEP_STATISTIC_NREM_PERCENTAGE: _compute_nrem_percentage,
+    SLEEP_STATISTIC_DEEP_LATENCY: _compute_n3_latency,
+    SLEEP_STATISTIC_LIGHT_LATENCY: _compute_n1_latency,
     SLEEP_STATISTIC_N1_LATENCY: _compute_n1_latency,
     SLEEP_STATISTIC_N2_LATENCY: _compute_n2_latency,
     SLEEP_STATISTIC_N3_LATENCY: _compute_n3_latency,
     SLEEP_STATISTIC_REM_LATENCY: _compute_rem_latency,
     SLEEP_STATISTIC_SLEEP_SCORE: _compute_sleep_score,
     SLEEP_STATISTIC_AWAKE_COUNT: _compute_awake_count,
+    SLEEP_STATISTIC_DEEP_COUNT: _compute_n3_count,
+    SLEEP_STATISTIC_LIGHT_COUNT: _compute_n1_count,
     SLEEP_STATISTIC_N1_COUNT: _compute_n1_count,
     SLEEP_STATISTIC_N2_COUNT: _compute_n2_count,
     SLEEP_STATISTIC_N3_COUNT: _compute_n3_count,
@@ -3758,13 +3823,62 @@ def get_sleep_statistic(
 
 def get_sleep_statistics(
     loader: BaseLoader,
-    user_id: Union[str, list],
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    **kwargs,
-) -> dict:
-    """Get sleep statistics from sleep data.
+    kind=None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+) -> Union[pd.DataFrame, dict]:
+    """_summary_
+
+    _extended_summary_
+
+    Parameters
+    ----------
+    loader : BaseLoader
+        _description_
+    statistic : Union[str, list, tuple, None], optional
+        _description_, by default None
+    user_id : Union[str, list], optional
+        _description_, by default "all"
+    start_date : Union[datetime.datetime, datetime.date, str, None], optional
+        _description_, by default None
+    end_date : Union[datetime.datetime, datetime.date, str, None], optional
+        _description_, by default None
+    kind : _type_, optional
+        _description_, by default None
+    kind_args : list, optional
+        _description_, by default []
+    kind_kwargs : dict, optional
+        _description_, by default {}
+    loader_kwargs : dict, optional
+        _description_, by default {}
+    return_df : bool, optional
+        _description_, by default True
+    return_multi_index : bool, optional
+        _description_, by default True
+
+    Returns
+    -------
+    Union[pd.DataFrame, dict]
+        _description_
+
+    Raises
+    ------
+    ValueError
+        _description_
+    ValueError
+        _description_
+    ValueError
+        _description_
+
+    # OLD DOCUMENTATION
+    Get sleep statistics from sleep data.
 
     This function is used by all the functions to get all the
     statistics from sleep data. It is more efficient than
@@ -3877,127 +3991,8 @@ def get_sleep_statistics(
         If ``kind`` is not ``None``, dictionary with ``user_id`` as key, and a nested dictionary with
         ``values`` as key of another nested dictionary with key:value pairs for each sleep statistic,
         and a ``days`` key that contains an array of all calendar days over which the transformation was computed.
+
     """
-    data_dict = {}
-    if not (kind is None):
-        transformed_dict = {}
-    user_id = utils.get_user_ids(loader, user_id)
-
-    for user in user_id:
-        # Load sleep summary data
-        sleep_summary = loader.load_sleep_summary(user, start_date, end_date)
-        if len(sleep_summary) > 0:
-            sleep_summary = sleep_summary.set_index(
-                constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
-            )
-
-            # Drop duplicates of calendar date and keep longest ones
-            sleep_summary = sleep_summary.sort_values(
-                by=[
-                    constants._CALENDAR_DATE_COL,
-                    constants._SLEEP_SUMMARY_DURATION_IN_MS_COL,
-                ]
-            )
-
-            sleep_summary = sleep_summary.drop_duplicates(
-                constants._CALENDAR_DATE_COL, keep="last"
-            )
-            sleep_summary_start_date = sleep_summary.iloc[0][
-                constants._ISODATE_COL
-            ].to_pydatetime()
-            sleep_summary_end_date = (
-                sleep_summary.iloc[-1]["isoDate"]
-                + datetime.timedelta(
-                    milliseconds=int(
-                        sleep_summary.iloc[-1][
-                            constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
-                        ]
-                        + sleep_summary.iloc[-1][
-                            constants._SLEEP_SUMMARY_DURATION_IN_MS_COL
-                        ]
-                    )
-                )
-            ).to_pydatetime()
-            sleep_stages = loader.load_sleep_stage(
-                user, sleep_summary_start_date, sleep_summary_end_date
-            )
-            # Keep only those belonging to sleep summaries
-            sleep_stages = sleep_stages[
-                sleep_stages[constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summary.index
-                )
-            ]
-            for sleep_metric in _SLEEP_STATISTICS_DICT.keys():
-                sleep_summary[sleep_metric] = _SLEEP_STATISTICS_DICT[sleep_metric](
-                    sleep_summary=sleep_summary,
-                    sleep_stages=sleep_stages,
-                    chronotype=(
-                        None
-                        if "chronotype_dict" not in kwargs
-                        else kwargs["chronotype_dict"].get(user, None)
-                    ),
-                    chronotype=(
-                        None
-                        if "chronotype_dict" not in kwargs
-                        else kwargs["chronotype_dict"].get(user, None)
-                    ),
-                )
-            user_sleep_metrics_df = sleep_summary.set_index(
-                sleep_summary[constants._CALENDAR_DATE_COL]
-            ).loc[
-                :,
-                [k for k in _SLEEP_STATISTICS_DICT.keys()],
-            ]
-            data_dict[user] = user_sleep_metrics_df.to_dict("index")
-
-            if not (kind is None):
-                transformed_dict[user] = {}
-                # if the kind function is not among the common ones
-                # assume it's something that can be directly applied to metric
-                # otherwise get the specific version for each metric in the df through kind mapping
-                fn_dict = {
-                    metric: _SLEEP_KIND_MAPPING.get(kind, {"default": kind}).get(
-                        metric if metric in SLEEP_DATETIME_STATISTICS else "default",
-                        kind,
-                    )
-                    for metric in user_sleep_metrics_df.columns
-                }
-                }
-                # Assume that all transformations require the datetime metrics to be in "HH:MM" format:
-                for metric in user_sleep_metrics_df.columns:
-                    if metric in SLEEP_DATETIME_STATISTICS:
-                        user_sleep_metrics_df[metric] = (
-                            user_sleep_metrics_df.loc[:, metric]
-                            .dt.strftime("%H:%M")
-                            .values
-                        )
-                transformed_dict[user]["values"] = {
-                    metric: fn_dict[metric](user_sleep_metrics_df[metric])
-                    for metric in user_sleep_metrics_df.columns
-                }
-                transformed_dict[user]["days"] = [
-                    x for x in user_sleep_metrics_df.index
-                ]
-
-    if not (kind is None):
-        return transformed_dict
-    else:
-        return data_dict
-
-
-def get_sleep_statistics(
-    loader: BaseLoader,
-    statistic: Union[str, list, tuple, None] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
     # Get user id from the loader
     user_id = utils.get_user_ids(loader, user_id)
     # Convert to datetime
@@ -4021,6 +4016,9 @@ def get_sleep_statistics(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
     both_dates_valid = False
+    # TODO probably better to create a series for every user
+    # and then reindex each series and concatenate at the end
+    # then set the index with user and date columns
     if (not (start_date is None)) and (not (end_date is None)):
         # Let's set up a dataframe in which we will store all the data
         date_periods = pd.date_range(
@@ -4039,24 +4037,29 @@ def get_sleep_statistics(
         if not (both_dates_valid):
             user_sleep_stats_df = pd.DataFrame()
         # Load sleep summary data
-        sleep_summary = loader.load_sleep_summary(
+        sleep_summary: pd.DataFrame = loader.load_sleep_summary(
             user_id=user,
             start_date=start_date,
             end_date=end_date,
-            single_day_filter=True,
+            same_day_filter=True,
             **loader_kwargs,
         )
+        print(sleep_summary)
         if len(sleep_summary) > 0:
+            sleep_summary[constants._CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_summary[constants._CALENDAR_DATE_COL]
+            )
             sleep_summary = sleep_summary.set_index(constants._CALENDAR_DATE_COL)
 
             sleep_summary_start_date = sleep_summary[constants._ISODATE_COL].min()
             sleep_summary_end_date = (
                 sleep_summary[constants._ISODATE_COL]
-                + pd.Timedelta(
-                    milliseconds=int(
+                + pd.to_timedelta(
+                    (
                         sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
                         + sleep_summary[constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                    )
+                    ),
+                    unit="ms",
                 )
             ).max()
             sleep_stages = loader.load_sleep_stage(
@@ -4072,12 +4075,13 @@ def get_sleep_statistics(
             ]
             for statistic in statistics:
                 # Get series with metrics by calendarDate
-                ser = _HRV_STATISTICS_DICT[statistic](
-                    bbi_dict=bbi_dict,
-                    coverage=coverage,
+                ser: pd.Series = SLEEP_STATISTICS_DICT[statistic](
+                    sleep_summary=sleep_summary,
+                    sleep_stages=sleep_stages,
                 )
+                print(ser.index)
                 if both_dates_valid:
-                    hrv_stats_df.loc[(user, ser.index), statistic] = ser.values
+                    sleep_stats_df.loc[(user, ser.index), statistic] = ser.values
                 else:
                     if len(ser) > 0:
                         min_date = ser.index.min() if start_date is None else start_date
@@ -4094,30 +4098,28 @@ def get_sleep_statistics(
                                 ],
                             )
                         ).rename(statistic)
-                        if len(user_hrv_stats_df) == 0:
+                        if len(user_sleep_stats_df) == 0:
                             # Empty df, first metric
-                            user_hrv_stats_df = ser.to_frame()
+                            user_sleep_stats_df = ser.to_frame()
                         else:
-                            user_hrv_stats_df = pd.merge(
-                                user_hrv_stats_df,
-                                ser,
-                                left_index=True,
-                                right_index=True,
-                                how="outer",
+                            user_sleep_stats_df = pd.concat(
+                                (user_sleep_stats_df, ser),
+                                axis=1,
                             )
             if not both_dates_valid:
-                hrv_stats_df = pd.concat((hrv_stats_df, user_hrv_stats_df))
+                sleep_stats_df = pd.concat((sleep_stats_df, user_sleep_stats_df))
     # Perform kind operation by user
     if not (kind is None):
-        hrv_stats_df = hrv_stats_df.groupby(level=constants._USER_COL).agg(
+        sleep_stats_df = sleep_stats_df.groupby(level=constants._USER_COL).agg(
             kind, *kind_args, **kind_kwargs
         )
         if return_df:
-            return hrv_stats_df
+            return sleep_stats_df
         else:
-            return hrv_stats_df.to_dict(orient="index")
+            return sleep_stats_df.to_dict(orient="index")
     # Return based on settings
-    mi_df = utils.return_multiindex_df(hrv_stats_df, return_df, return_multi_index)
+    print(sleep_stats_df)
+    mi_df = utils.return_multiindex_df(sleep_stats_df, return_df, return_multi_index)
     # Return series if only statistic
     if (
         (type(statistic) is str) or ((type(statistic) is list) and len(statistic) == 1)

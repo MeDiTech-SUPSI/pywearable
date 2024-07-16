@@ -119,7 +119,7 @@ def get_user_ids(loader: "BaseLoader", user_id: Union[str, list] = "all"):
 
 def return_multiindex_df(
     df: pd.DataFrame, return_df: bool, return_multi_index: bool
-) -> dict:
+) -> Union[dict, pd.DataFrame]:
     # Check if df is pd.DataFrame
     if not (type(df) == pd.DataFrame):
         raise ValueError(f"df must be of type pd.DataFrame, not of {type(df)}")

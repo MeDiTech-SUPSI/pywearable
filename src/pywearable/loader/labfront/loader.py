@@ -731,22 +731,11 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"User with ID {user_id} was not found.")
 
         # Check dates and times
-        if not (
-            (type(start_date) == datetime.datetime)
-            or (type(start_date) == datetime.date)
-            or (start_date is None)
-        ):
-            start_date = dateutil.parser.parse(start_date)
-        elif type(start_date) == datetime.date:
-            start_date = datetime.datetime.combine(start_date, datetime.time())
+        if not (start_date is None):
+            start_date = pd.Timestamp(start_date)
 
-        if not (
-            (type(end_date) == datetime.datetime)
-            or (type(end_date) == datetime.date or (end_date is None))
-        ):
-            end_date = dateutil.parser.parse(end_date)
-        elif type(end_date) == datetime.date:
-            end_date = datetime.datetime.combine(end_date, datetime.time())
+        if (end_date is None):
+            end_date = pd.Timestamp(end_date)
 
         files = self.get_files_from_timerange(
             user_id,
