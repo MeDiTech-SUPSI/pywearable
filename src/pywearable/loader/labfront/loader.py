@@ -734,7 +734,7 @@ class LabfrontLoader(BaseLoader):
         if not (start_date is None):
             start_date = pd.Timestamp(start_date)
 
-        if (end_date is None):
+        if end_date is None:
             end_date = pd.Timestamp(end_date)
 
         files = self.get_files_from_timerange(
@@ -1498,13 +1498,13 @@ class LabfrontLoader(BaseLoader):
                 start_date = None if (start_date is None) else start_date.date()
                 end_date = None if (end_date is None) else end_date.date()
                 if (start_date is None) and (not (end_date is None)):
-                    return data[(data[constants._CALENDAR_DATE_COL] <= end_date)]
+                    return data[(data[constants._CALENDAR_DATE_COL] < end_date)]
                 elif (not (start_date is None)) and (end_date is None):
                     return data[(data[constants._CALENDAR_DATE_COL] >= start_date)]
                 else:
                     return data[
                         (data[constants._CALENDAR_DATE_COL] >= start_date)
-                        & (data[constants._CALENDAR_DATE_COL] <= end_date)
+                        & (data[constants._CALENDAR_DATE_COL] < end_date)
                     ]
         else:
             return pd.DataFrame()
@@ -1997,13 +1997,13 @@ class LabfrontLoader(BaseLoader):
                 format="%Y-%m-%d",
             )
             if (start_date is None) and (not (end_date is None)):
-                return data[data[constants._CALENDAR_DATE_COL] <= end_date_date]
+                return data[data[constants._CALENDAR_DATE_COL] < end_date_date]
             elif (not (start_date is None)) and (end_date is None):
                 return data[data[constants._CALENDAR_DATE_COL] >= start_date_date]
             elif (not (start_date is None)) and (not (end_date is None)):
                 return data[
                     (data[constants._CALENDAR_DATE_COL] >= start_date_date)
-                    & (data[constants._CALENDAR_DATE_COL] <= end_date_date)
+                    & (data[constants._CALENDAR_DATE_COL] < end_date_date)
                 ]
             else:
                 return data
