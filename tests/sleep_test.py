@@ -28,6 +28,7 @@ def sleep_summary():
                 x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+02:00,23700000,0,0,23700000,0,600000,,70
             """
         ),
+        parse_dates=[pywearable.constants._CALENDAR_DATE_COL],
     )
     sleep_summary[pywearable.constants._ISODATE_COL] = pd.to_datetime(
         sleep_summary[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
@@ -35,9 +36,6 @@ def sleep_summary():
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    sleep_summary[pywearable.constants._CALENDAR_DATE_COL] = pd.to_datetime(
-        sleep_summary[pywearable.constants._CALENDAR_DATE_COL], format="%Y-%m-%d"
-    ).dt.date
     return sleep_summary
 
 
@@ -221,22 +219,73 @@ def test_get_bedtime(base_loader):
     raise AssertionError
 
 
-def test_compute_sleep_score(sleep_summary_id_as_idx):
-    sleep_score = pywearable.sleep._compute_sleep_score(sleep_summary_id_as_idx)
+def test_compute_bedtime(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    bedtime = pywearable.sleep._compute_bedtime(sleep_summary)
+    assert type(bedtime) == pd.Series
+    pandas.testing.assert_series_equal(
+        bedtime,
+        pd.Series(
+            [
+                pd.Timestamp(2023, 5, 8, 22, 2),
+                pd.Timestamp(2023, 5, 9, 23, 23),
+                pd.Timestamp(2023, 5, 10, 21, 56),
+                pd.Timestamp(2023, 5, 11, 23, 54),
+            ],
+            index=[
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
+            ],
+        ),
+        check_names=False,
+        check_dtype=True,
+    )
+
+
+def test_compute_wakeup_time(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary)
+    assert type(wakeup_time) == pd.Series
+    pandas.testing.assert_series_equal(
+        wakeup_time,
+        pd.Series(
+            [
+                pd.Timestamp(2023, 5, 9, 5, 31),
+                pd.Timestamp(2023, 5, 10, 5, 29),
+                pd.Timestamp(2023, 5, 11, 5, 22),
+                pd.Timestamp(2023, 5, 12, 6, 39),
+            ],
+            index=[
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
+            ],
+        ),
+        check_names=False,
+        check_dtype=True,
+    )
+
+
+def test_compute_sleep_score(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    sleep_score = pywearable.sleep._compute_sleep_score(sleep_summary)
     assert type(sleep_score) == pd.Series
     pandas.testing.assert_series_equal(
         sleep_score,
         pd.Series(
             [88.0, np.nan, 40.0, 70.0],
             index=[
-                "x4c64722-64595538-6630",
-                "x4c64722-645ab9b4-55c8",
-                "x4c64722-645bf6d0-6888",
-                "x4c64722-645d63f8-5c94",
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
             ],
         ),
         check_names=False,
-        check_dtype=False,
+        check_dtype=True,
     )
 
 

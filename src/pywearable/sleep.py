@@ -3575,7 +3575,9 @@ def _compute_wakeup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     ):
         wakeup_time = sleep_summary[constants._ISODATE_COL] + pd.to_timedelta(
             sleep_summary[constants._DURATION_IN_MS_COL]
-            + sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+            + sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(
+                0
+            ),
             unit="ms",
         )
     else:
