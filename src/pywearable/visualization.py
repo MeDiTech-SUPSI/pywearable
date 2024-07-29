@@ -589,8 +589,12 @@ def get_respiration_line_graph_and_stats(
         list(set(rest_dates + waking_dates))
     )  # not always we have waking/rest data, but need consistent x labeling
     # get stats
-    avg_sleeping_breaths = round(np.mean(rest_resp), 2)
-    avg_waking_breaths = round(np.mean(waking_resp), 2)
+    avg_sleeping_breaths = np.nanmean(rest_resp)
+    avg_waking_breaths = np.nanmean(waking_resp)
+
+    avg_sleeping_breaths = float(round(avg_sleeping_breaths, 2)) if not np.isnan(avg_sleeping_breaths) else None
+    avg_waking_breaths = float(round(avg_waking_breaths, 2)) if not np.isnan(avg_waking_breaths) else None
+
     stats_dict = {
         "Average sleep breaths": avg_sleeping_breaths,
         "Average waking breaths": avg_waking_breaths,
@@ -1264,7 +1268,7 @@ def get_sleep_summary_graph(
         fontsize=legend_fontsize,
     )
     # take care of opacity of of the colors selected
-    for i, lh in enumerate(lgd.legendHandles):
+    for i, lh in enumerate(lgd.legend_handles):
         lh.set_color(colors[i])
         lh.set_alpha(alphas[i])
     lgd.get_frame().set_alpha(0.0)
@@ -1823,8 +1827,6 @@ def radar_chart(
             stacklevel=2,
         )
 
-    print(ref_metrics)
-    print(comp_metrics)
     # Prepare plot
     if legend:
         fig, (ax_l, ax) = plt.subplots(
@@ -1892,10 +1894,6 @@ def radar_chart(
         plt.close()
 
 
-def intensity_chart():
-    pass
-
-
 def period_to_period_comparison_chart(
     loader: BaseLoader,
     user_id: str,
@@ -1913,6 +1911,11 @@ def period_to_period_comparison_chart(
     title: str = "",
     fontsize: int = 14,
 ):
+    """Generates a period-to-period comparison chart for a user and a metric of interest.
+    
+    This function is used to visualize period to period comparison of a metric. It can be used
+    to show weekly variations or monthly variations over extended periods.
+    """
     if period_interval not in ["month", "week"]:
         raise ValueError(f"period interval {period_interval} is not a valid interval.")
 
@@ -2004,4 +2007,21 @@ def period_to_period_comparison_chart(
 
 
 def weekday_barplot():
+    """Generates a barplot showing how a metric changes over the week.
+    
+    For a metric of interest, aggregate statistics, determined by the `kind` parameter,
+    are showed as averages throughout the days of the week.
+    """
+    pass
+
+
+def general_longitudinal_chart():
+    """
+    Generates a longitudinal chart for a user and period of interest
+    
+    The idea of this function is to show for a period of interest cardiac data,
+    in terms of heart rate, activity data, in terms of steps, and sleep data, in
+    terms of hypnograms. The data is showing on daily subplots, starting from the chosen
+    start_time. 
+    """
     pass
