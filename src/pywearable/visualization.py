@@ -1730,6 +1730,7 @@ def radar_chart(
     Plots a radar chart comparing the values between two periods for the desired pywearable metrics.
     The radar chart is not limited by the number of the metrics to be included in the chart;
     it dynamically adjusts itself to the number of compared metrics.
+    
     Parameters
     ----------
     loader : :class:`pywearable.loader.base.BaseLoader`
@@ -1910,6 +1911,7 @@ def period_to_period_comparison_chart(
     locator_interval: int = 1,
     title: str = "",
     fontsize: int = 14,
+    metric_fn_kwargs : dict = {},
 ):
     """Generates a period-to-period comparison chart for a user and a metric of interest.
     
@@ -1931,7 +1933,11 @@ def period_to_period_comparison_chart(
         ax.xaxis.set_major_formatter(DateFormatter("%m-%d"))
         date_aggr_fn = lambda x: x.week
 
-    metric_data = metric_fn(loader, user_id, start_date, end_date)[user_id]
+    metric_data = metric_fn(loader, 
+                            user_id, 
+                            start_date, 
+                            end_date,
+                            **metric_fn_kwargs)[user_id]
     metric_dates = list(metric_data.keys())
     metric_values = list(metric_data.values())
 
@@ -2006,13 +2012,154 @@ def period_to_period_comparison_chart(
         plt.close()
 
 
-def weekday_barplot():
+def weekday_barplot(
+    loader: BaseLoader,
+    user_id: str,
+    metric_fn: Callable,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    aggr_fn: Union[str, callable] = "mean",
+    figsize: tuple = (12, 8),
+    title: str = "",
+    xlabel: str = "",
+    ylabel: str = "",
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    horizontal: bool = False,
+    fontsize: int = 12,
+    alpha: float = 0.7,
+    color: Union[str, list] = "blue",
+    errorbar: bool = False,
+    error_range: str = "std",
+    metric_lim: Union[list, None] = None,
+    metric_fn_kwargs : dict = {},
+    bar_kwargs: dict = {},
+):
     """Generates a barplot showing how a metric changes over the week.
     
     For a metric of interest, aggregate statistics, determined by the `kind` parameter,
     are showed as averages throughout the days of the week.
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id for which the weekday barplot must be generated.
+    metric_fn : :class:`callable`
+        A pywearable function that computes the metric of interest.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    aggr_fn : :class:`str` or class:`callable`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default (12, 8)
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    xlabel : :class:`str`, optional
+        Label of the x-axis, by default ""
+    ylabel : :class:`str`, optional
+        Label of the y-axis, by default ""
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    show : :class:`str`, optional
+        Whether to show the plot, by default True
+    horizontal : :class:`bool`, optional
+        Whether to show the barplot horizontally, by default False
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 12
+    alpha : :class:`float`, optional
+        Alpha of the bars, by default 0.7
+    color : :class:`str` or :class:`list`, optional
+        Color(s) of the bars, by default "blue"
+    errorbar : :class:`bool`, optional
+        Whether to show error bars, by default False
+    error_range : :class:`str`, optional
+        Range of the error bars, can be either "std", "IQR" or "minmax", by default "std"
+    metric_lim : :class:`list`, optional
+        Limits of the metric in the plot, by default None
+    metric_fn_kwargs : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}
+    bar_kwargs : :class:`dict`, optional
+        Additional keyword arguments for the bar plot, by default {}
+        
+    Raises
+    -------
+    ValueError
+        If the error range is not a valid range.
     """
-    pass
+    metric_data = metric_fn(loader=loader, 
+                            user_id=user_id, 
+                            start_date=start_date, 
+                            end_date=end_date, 
+                            **metric_fn_kwargs)[user_id]
+
+    if isinstance(aggr_fn, str) and aggr_fn.lower() == "mean":
+        aggr_fn = np.nanmean
+    elif isinstance(aggr_fn, str) and aggr_fn.lower() == "median":
+        aggr_fn = np.nanmedian
+    
+    if errorbar:
+        if isinstance(error_range, str) and error_range.lower() == "std":
+            error_fn = np.nanstd
+        # note that the following assumes that aggr_fn computes a central statistic of the metric
+        elif isinstance(error_range, str) and error_range.lower() == "iqr":
+            error_fn = lambda x: (abs(aggr_fn(x) - np.nanpercentile(x, 25)),
+                                  abs(aggr_fn(x) - np.nanpercentile(x, 75)))
+        elif isinstance(error_range, str) and error_range.lower() == "minmax":
+            error_fn = lambda x: (abs(aggr_fn(x) - np.nanmin(x)), 
+                                  abs(aggr_fn(x) - np.nanmax(x)))
+        else:
+            raise ValueError(f"Error range {error_range} is not a valid range.")
+
+    weekday_metrics = [[] for _ in range(7)]
+
+    for date, value in metric_data.items():
+        weekday = date.weekday()
+        weekday_metrics[weekday].append(value)
+
+    mean_weekday_metrics = [aggr_fn(weekday) for weekday in weekday_metrics]
+    if errorbar:
+        error_weekday_metrics = np.array([error_fn(weekday) for weekday in weekday_metrics]).T
+
+    weekdays_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize)
+
+    if not horizontal:
+        ax.bar(weekdays_labels, 
+               mean_weekday_metrics,
+               color=color,
+               alpha=alpha,
+               yerr=error_weekday_metrics if errorbar else None,
+               **bar_kwargs)
+        if metric_lim:
+            ax.set_ylim(metric_lim)
+    else:
+        ax.barh(weekdays_labels, 
+                mean_weekday_metrics,
+                color=color,
+                alpha=alpha,
+                xerr=error_weekday_metrics if errorbar else None,
+                **bar_kwargs)
+        if metric_lim:
+            ax.set_xlim(metric_lim)
+        ax.invert_yaxis()
+
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.set_title(title, fontsize=fontsize + 2)
+
+    plt.tight_layout()
+
+    if save_to:
+        plt.savefig(save_to, bbox_inches="tight")
+
+    if show:
+        plt.show()
 
 
 def general_longitudinal_chart():
