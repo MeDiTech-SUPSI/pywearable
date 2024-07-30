@@ -5,18 +5,21 @@ This module contains all the functions related to the visualization of data
 import datetime
 import warnings
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Union, Optional, List, Any
 
-import july
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import calendar
+from datetime import date
+
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.dates import DateFormatter, DayLocator, MonthLocator, WeekdayLocator
 from matplotlib.projections import register_projection
 from matplotlib.projections.polar import PolarAxes
-from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter
+from matplotlib.pyplot import Axes
+from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter, ScalarFormatter
 
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
@@ -29,6 +32,8 @@ import pywearable.utils as utils
 from .loader.base import BaseLoader
 
 date_form = DateFormatter("%m-%d")
+cmaps_list = plt.colormaps()
+cmaps_dict = dict(zip(cmaps_list, cmaps_list))
 
 
 def _define_custom_colormap(
@@ -57,7 +62,7 @@ def _define_custom_colormap(
     """
 
     if type(base_colormap) == str:
-        cmap = plt.cm.get_cmap(base_colormap)
+        cmap = plt.get_cmap(base_colormap)
 
     # ListedColormap with the same colors but extended to include a specific color for missing data
     cmap_list = [cmap(i) for i in range(cmap.N)]
@@ -632,6 +637,289 @@ def get_respiration_line_graph_and_stats(
 
     return stats_dict
 
+class CalendarHeatmap:
+
+    def __init__(
+        self,
+        dates: List[Union[str, datetime.date, datetime.datetime]],
+        data: List[float],
+        cmap: Union[str, LinearSegmentedColormap, ListedColormap] = "Greens",
+        value_label: bool = False,
+        weekday_label: bool = True,
+        month_label: bool = True,
+        year_label: bool = True,
+        month_grid: bool = False,
+        month_grid_color: str = "black",
+        colorbar: bool = False,
+        frame_on: bool = False,
+        value_format: str = "int",
+        title: Optional[str] = None,
+        cmin: Optional[int] = None,
+        cmax: Optional[int] = None,
+        cbar_label_format: Optional[str] = None,
+        figsize: tuple = (12, 5),
+        fontsize: int = 14,
+    ):
+        self.dates = dates
+        self.data = data
+        self.cmap = cmap
+        self.value_label = value_label
+        self.weekday_label = weekday_label
+        self.month_label = month_label
+        self.year_label = year_label
+        self.month_grid = month_grid
+        self.month_grid_color = month_grid_color
+        self.colorbar = colorbar
+        self.frame_on = frame_on
+        self.value_format = value_format
+        self.title = title
+        self.cmin = cmin
+        self.cmax = cmax
+        self.cbar_label_format = cbar_label_format
+        self.figsize = figsize
+        self.fontsize = fontsize
+
+    def generate(self):
+        cal = self._date_grid(self.dates, self.data)
+        ax = self._cal_heatmap(
+            cal=cal,
+            dates=self.dates,
+            cmap=self.cmap,
+            value_label=self.value_label,
+            weekday_label=self.weekday_label,
+            month_label=self.month_label,
+            year_label=self.year_label,
+            month_grid=self.month_grid,
+            month_grid_color=self.month_grid_color,
+            colorbar=self.colorbar,
+            frame_on=self.frame_on,
+            value_format=self.value_format,
+            title=self.title,
+            cmin=self.cmin,
+            cmax=self.cmax,
+            cbar_label_format=self.cbar_label_format,
+        )
+        self.ax = ax
+        
+
+    def plot(self):
+        self.ax.plot()
+        
+    def save(self, path: str):
+        self.ax.get_figure().savefig(path, bbox_inches="tight")
+
+    def _date_grid(self, dates: List[date], data: List[Any],  dtype: str = "float64"):
+        iso_dates = np.array([day.isocalendar() for day in dates])
+        unique_weeks = sorted(list(set([tuple(row) for row in iso_dates[:, :2]])))
+
+        weeknum2idx = {week: i for i, week in enumerate(unique_weeks)}
+        week_coords = np.array([weeknum2idx[tuple(week)] for week in iso_dates[:, :2]])
+        day_coords = iso_dates[:, 2] - 1
+
+        n_weeks = len(unique_weeks)
+        n_days = 7
+
+        grid = np.empty((n_weeks, n_days), dtype=dtype)
+        grid = np.nan * grid if dtype == "float64" else grid
+        grid[week_coords, day_coords] = data
+
+        return grid.T
+    
+    def _cal_heatmap(
+        self,
+        cal: np.ndarray,
+        dates: List[date],
+        cmap: Union[str, LinearSegmentedColormap, ListedColormap] = "Greens",
+        value_label: bool = False,
+        weekday_label: bool = True,
+        month_label: bool = True,
+        year_label: bool = True,
+        month_grid: bool = False,
+        month_grid_color: str = "black",
+        colorbar: bool = False,
+        frame_on: bool = False,
+        value_format: str = "int",
+        title: Optional[str] = None,
+        cmin: Optional[int] = None,
+        cmax: Optional[int] = None,
+        cbar_label_format: Optional[str] = None,
+        ax: Optional[plt.axes] = None,
+    ):
+        if not ax:
+            fig, ax = plt.subplots(figsize=self.figsize, dpi=100)
+        else:
+            fig = ax.get_figure()
+
+        if isinstance(cmap, str):
+            cmap = cmaps_dict[cmap]
+
+        pc = ax.pcolormesh(cal, 
+                            edgecolors=ax.get_facecolor(), 
+                            linewidth=0.25, 
+                            cmap=cmap)
+        pc.set_clim(cmin or np.nanmin(cal), cmax or np.nanmax(cal))
+        ax.invert_yaxis()
+        ax.set_aspect("equal")
+        bbox = ax.get_position()
+
+        if value_label:
+            self._add_value_label(ax, cal, value_format)
+        else:
+            ax.set_xticklabels("")
+        if weekday_label:
+            self._add_weekday_label(ax)
+        if month_label:
+            self._add_month_label(ax, dates)
+        if year_label:
+            self._add_year_label(ax, dates)
+        if month_grid:
+            self._add_month_grid(ax, dates, cal, month_grid_color)
+        if colorbar:
+            self._add_colorbar(pc, fig, ax, bbox, cbar_label_format)
+        if title:
+            ax.set_title(title)
+
+        ax.set_frame_on(frame_on)
+        return ax
+    
+    def _get_month_outline(self, dates, month_grid, month):
+        day_grid = self._date_grid(dates, dates, dtype="object").T
+        month_grid = month_grid.T
+
+        nrows, ncols = month_grid.shape
+        coords_list = []
+
+        for y in range(nrows):
+            for x in range(ncols):
+                if np.isfinite(month_grid[y, x]) and day_grid[y, x] is not None:
+                    if day_grid[y, x].month == month:
+                        coords_list.append((x, y))
+
+        sorted_coords = np.array(coords_list)
+        min_y = sorted_coords[:, 1].min()
+        max_y = sorted_coords[:, 1].max()
+        upper_left = sorted_coords[0]
+        upper_right = np.array([7, min_y])
+        lower_right = np.array([7, max_y])
+        lower_right2 = sorted_coords[-1] + np.array([1, 1])
+
+        lower_right1 = (
+            lower_right2
+            if np.array_equal(lower_right, lower_right2)
+            else lower_right2 - np.array([0, 1])
+        )
+        lower_left = np.array([0, sorted_coords[:, 1].max() + 1])
+        corner_last = upper_left + np.array([0, 1])
+        second_last = np.copy(corner_last)
+        second_last[0] = 0
+
+        coords = np.array(
+            [
+                upper_left,
+                upper_right,
+                lower_right,
+                lower_right1,
+                lower_right2,
+                lower_left,
+                second_last,
+                corner_last,
+                upper_left,
+            ]
+        )
+
+        return coords[:, [1, 0]]
+    
+    def _add_value_label(self, ax, cal, value_format):
+        if value_format == "int":
+            val_format = "{:0.0f}"
+        elif value_format == "decimal":
+            val_format = "{:0.1f}"
+        else:
+            raise ValueError(
+                "Argument 'value_format' must be equal to either "
+                f"'int' or 'float'. Got: {value_format}."
+            )
+
+        for (i, j), z in np.ndenumerate(cal):
+            if np.isfinite(z):
+                ax.text(j + 0.5, i + 0.5, val_format.format(z), ha="center", va="center")
+
+    def _add_weekday_label(self, ax):
+        ax.tick_params(axis="y", which="major", pad=8)
+        ax.set_yticks([x + 0.5 for x in range(0, 7)])
+        ax.set_yticklabels(
+            calendar.weekheader(width=1).split(" "),
+        )
+
+    def _add_month_label(self, ax, dates):
+        month_years = [(day.year, day.month) for day in dates]
+        month_years_str = list(map(str, month_years))
+        month_year_grid = self._date_grid(dates, month_years_str, dtype="object")
+        unique_month_years = sorted(set(month_years))
+
+        month_locs = {}
+        for month in unique_month_years:
+            yy, xx = np.nonzero(month_year_grid == str(month))
+            month_locs[month] = (xx.max() + 1 + xx.min()) / 2
+
+        month_labels = [calendar.month_abbr[x[1]] for x in month_locs.keys()]
+
+        ax.set_xticks([*month_locs.values()])
+        ax.set_xticklabels(month_labels, ha="center")
+
+    def _add_year_label(self, ax, dates):
+        years = [day.year for day in dates]
+        year_grid = self._date_grid(dates, years)
+        unique_years = sorted(set(years))
+
+        year_locs = {}
+        for year in unique_years:
+            yy, xx = np.nonzero(year_grid == year)
+            year_locs[year] = (
+                xx.max() + 1 + xx.min()) / 2
+
+        for year, loc in year_locs.items():
+            ax.annotate(
+                year,
+                (loc / year_grid.shape[1], 1),
+                (0, 12),
+                xycoords="axes fraction",
+                textcoords="offset points",
+                fontsize="large",
+                va="center",
+                ha="center",
+            )
+
+    def _add_colorbar(self, pc, fig, ax, bbox, cbar_label_format):
+        adj_bbox = ax.get_position()
+        height_diff = adj_bbox.height - bbox.height
+        cax = fig.add_axes(
+            [
+                bbox.x1 + 0.015,
+                adj_bbox.y0 + height_diff / 2,
+                0.015,
+                bbox.height,
+            ]
+        )
+        cbar_label_format = cbar_label_format or ScalarFormatter()
+        plt.colorbar(pc, cax=cax, format=cbar_label_format)
+
+    def _add_month_grid(self, ax, dates, month_grid, color):
+        months = set([d.month for d in dates])
+        for month in months:
+            coords = self._get_month_outline(
+                dates, month_grid, month=month
+            )
+            ax.plot(coords[:, 0], coords[:, 1], color=color, linewidth=1)
+
+        ax.set_xlim(ax.get_xlim()[0] - 0.1, ax.get_xlim()[1] + 0.1)
+        ax.set_ylim(ax.get_ylim()[0] + 0.1, ax.get_ylim()[1] - 0.1)
+
+        fig = ax.get_figure()
+
+        for pos in ["top", "bottom", "right", "left"]:
+            ax.spines[pos].set_edgecolor(fig.get_facecolor())
+            return ax
 
 def get_metric_heatmap(
     loader: BaseLoader,
@@ -645,14 +933,14 @@ def get_metric_heatmap(
     kwargs_heatmap: dict = {},
 ):
     """
-    Generate a github-like grid plot of the sleep scores over that years for `user_id`
+    Generate a github-like grid plot of a metric, user, and period of interest
 
     Parameters
     ----------
     loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str`
-        The id(s) for which the sleep statistic must be computed.
+        The id of the user for which the heatmap must be generated.
     metric_fn : :class:`callable`
         A pywearable function to calculate the metric of interest for which the heatmap must be generated.
         The function is expected to return a dictionary for the user, such that the primary key
@@ -667,7 +955,7 @@ def get_metric_heatmap(
     save_to : :class:`str` or None, optional
         Path where to save the grid plot, by default None
     show : :class:`str`, optional
-        _Whether to show the plot, by default True
+        Whether to show the plot, by default True
     kwargs_heatmap : :class:`dict`, optional
         Additional keyword arguments for the july's heatmap function, by default {}
     """
@@ -677,6 +965,7 @@ def get_metric_heatmap(
     dates, scores = zip(
         *metric_fn(loader, user_id, start_date, end_date)[user_id].items()
     )
+    
     # Get start and end days for the heatmap, based on data and desired backward extension
     start_date = (
         dates[0]
@@ -695,14 +984,19 @@ def get_metric_heatmap(
 
     extended_df = pd.merge(left=extended_df, right=data_df, on="date", how="left")
     extended_df.loc[extended_df.metric.isna(), "metric"] = 0
-
-    july.heatmap(extended_df.date, extended_df.metric, **kwargs_heatmap)
-
+    
+    heatmap = CalendarHeatmap(
+        dates=extended_df.date,
+        data=extended_df.metric,
+        **kwargs_heatmap,
+    )
+    heatmap.generate()
+    
     if show:
-        plt.show()
+        heatmap.plot()
 
     if save_to:
-        plt.savefig(save_to, bbox_inches="tight")
+        heatmap.save(save_to)
 
 
 def get_sleep_performance_heatmap(
