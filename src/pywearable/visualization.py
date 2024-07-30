@@ -1599,55 +1599,142 @@ def compare_against_group(
 
 
 def plot_trend_analysis(
-    df: pd.DataFrame,
-    ax: Union[plt.axes, None] = None,
+    loader: BaseLoader,
+    user_id: str,
+    metric_fn: Callable,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ax: Union[None, plt.axes] = None,
+    ma_type: str = "MA",
+    baseline_periods: int = 7,
+    min_periods_baseline: int = 3,
+    normal_range_periods: int = 30,
+    min_periods_normal_range: int = 20,
+    std_multiplier: float = 1.0,
     save_to: Union[str, None] = None,
     show: bool = True,
     xlabel: str = "",
     ylabel: str = "",
     title: str = "",
-    fontsize: int = 16,
+    fontsize: int = 12,
     alpha: float = 0.3,
     xticks_frequency: int = 3,
     xticks_rotation: int = 45,
+    ylim: Union[tuple, None] = None,
     figsize: tuple = (10, 6),
     show_legend: bool = False,
-    normal_range: tuple = None,
+    fixed_normal_range: tuple = None,
+    metric_fn_kwargs: dict = {},
+    barplot_kwargs: dict = {},
+    baseline_kwargs: dict = {},
+    normal_range_kwargs: dict = {},
 ):
-    """Plots a trend analysis graph including short-term, mid-term, and long-term metrics
+    """Plots a trend analysis graph
+
+    This function plots a trend analysis graph for a given metric, a given user, and a period of interest,
+    showing the short term variations (daily values), mid-term variations (the baseline), 
+    and long term variations (the normal range).
 
     Parameters
     ----------
-    df : :class:`pandas.DataFrame`
-        DataFrame of the processed metric data returned by the `pylabfront.utils.trend_analysis` function
+    loader : :class:`pylabfront.loader.BaseLoader`
+        Loader object to load the data
+    user_id : :class:`str`
+        ID of the user for which to plot the trend analysis
+    metric_fn : :class:`Callable`
+        Pywearable function to calculate the metric of interest
+    start_date : :class:`datetime.datetime`, :class:`datetime.date`, :class:`str`, optional
+        Start date of the period of interest, by default None
+    end_date : :class:`datetime.datetime`, :class:`datetime.date`, :class:`str`, optional
+        End date of the period of interest, by default None
     ax : None or class:`matplotlib.axes`, optional
         Axes where to build the figure, by default None
+    ma_type : :class:`str`, optional
+        Type of moving average to use, can be either "MA" or "EMA", by default "MA"
+    baseline_periods : :class:`int`, optional
+        Number of periods to consider for the baseline, by default 7
+    min_periods_baseline : :class:`int`, optional
+        Minimum number of periods to consider for the baseline, by default 3
+    normal_range_periods : :class:`int`, optional
+        Number of periods to consider for the normal range, by default 30
+    min_periods_normal_range : :class:`int`, optional
+        Minimum number of periods to consider for the normal range, by default 20
+    std_multiplier : :class:`float`, optional
+        Multiplier for the standard deviation to consider for the normal range, by default 1.0
     save_to : :class:`str`, optional
-        path where to save the plot, by default None
+        Path where to save the plot, by default None
     show : :class:`bool`, optional
-        whether to show the plot
+        Whether to show the plot, by default True
     xlabel : :class:`str`, optional
-        label of the x-axis, by default ""
+        Label of the x-axis, by default ""
     ylabel : :class:`str`, optional
-        label of the y-axis, by default ""
+        Label of the y-axis, by default ""
     title : :class:`str`, optional
-        title of the plot, by default ""
+        Title of the plot, by default ""
     fontsize : :class:`int`, optional
-        fonti size for the plot, by default 16
+        Font size for the plot, by default 12
     alpha : :class:`float`, optional
         Alpha of the shaded regions, by default 0.3
     xticks_frequency : :class:`int`, optional
-        frequency of visualization of x-axis ticks, by default 3
-    xticksrotaton : :class:`int`, optional
-        rotation of ticks on the x-axis, by default 45
+        Frequency of visualization of x-axis ticks, by default 3
+    xticks_rotation : :class:`int`, optional
+        Rotation of ticks on the x-axis, by default 45
+    ylim : :class:`tuple`, optional
+        Limits of the y-axis, by default None
     figsize : :class:`tuple`, optional
-        size of the figure, by default (10,6)
+        Size of the figure, by default (10,6)
     show_legend : :class:`bool`, optional
-        whether to show the legend of the plot, by default False
-    normal_range : :class:`tuple`, optional
-        start and end of a fixed range (based on norm values) instead of a trend NR, by default None
+        Whether to show the legend of the plot, by default False
+    fixed_normal_range : :class:`tuple`, optional
+        Start and end of a fixed range (based on norm values) instead of a trend NR, by default None
+    metric_fn_kwargs : :class:`dict`, optional
+        Additional kwargs for the metric function, by default {}
+    barplot_kwargs : :class:`dict`, optional
+        Additional kwargs for the barplot, by default {}
+    baseline_kwargs : :class:`dict`, optional
+        Additional kwargs for the baseline plot, by default {}
+    normal_range_kwargs : :class:`dict`, optional
+        Additional kwargs for the normal range plot, by default {}
+    
+    Returns
+    -------
+    :class:`matplotlib.axes._subplots.AxesSubplot`
+        Axes object of the plot
     """
-    df = df.dropna(how="all")  # restrict viz to period with available data
+    data_dict = metric_fn(
+        loader=loader,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        **metric_fn_kwargs,
+    )[user_id]
+
+    df = utils.trend_analysis(
+        data_dict=data_dict,
+        ma_type=ma_type,
+        baseline_periods=baseline_periods,
+        min_periods_baseline=min_periods_baseline,
+        normal_range_periods=normal_range_periods,
+        min_periods_normal_range=min_periods_normal_range,
+        std_multiplier=std_multiplier
+    )
+
+    # default kwargs for normal range in case they're not provided
+    if "alpha" not in normal_range_kwargs:
+        normal_range_kwargs["alpha"] = 0.5
+    if "color" not in normal_range_kwargs:
+        normal_range_kwargs["color"] = "green"
+
+    # default kwargs for baseline in case they're not provided
+    if "color" not in baseline_kwargs:
+        baseline_kwargs["color"] = "red"
+    if "linestyle" not in baseline_kwargs:
+        baseline_kwargs["linestyle"] = "-"
+    if "linewidth" not in baseline_kwargs:
+        baseline_kwargs["linewidth"] = 2
+
+    # restrict viz to period with available data
+    df = df.dropna(how="all")  
     dates = df.index
     metric = df.metric
     baseline = df.BASELINE
@@ -1655,21 +1742,27 @@ def plot_trend_analysis(
     UB = df.NR_UPPER_BOUND
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
-    ax.bar(dates, metric, label="Daily metric")
-    ax.plot(baseline, linestyle="-", linewidth=3, color="red", label="Baseline")
-    if normal_range is not None:
-        assert type(normal_range) == tuple and len(normal_range) == 2
-        LB = normal_range[0]
-        UB = normal_range[1]
-    ax.fill_between(dates, LB, UB, alpha=alpha, color="green", label="Normal range")
+    ax.bar(dates, metric, label="Daily metric", **barplot_kwargs)
+    ax.plot(baseline, label="Baseline", **baseline_kwargs)
+    if fixed_normal_range is not None:
+        assert type(fixed_normal_range) == tuple and len(fixed_normal_range) == 2
+        LB = fixed_normal_range[0]
+        UB = fixed_normal_range[1]
+    ax.fill_between(dates, LB, UB, label="Normal range", **normal_range_kwargs, zorder=-1)
     ax.grid("on")
     ax.set_xticks(dates[::xticks_frequency])
     ax.tick_params(axis="x", labelrotation=xticks_rotation)
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
     ax.set_title(title, fontsize=fontsize + 2)
+
+    if ylim:
+        ax.set_ylim(ylim)
     if show_legend:
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    
+    plt.tight_layout()
+        
     if save_to:
         plt.savefig(save_to, bbox_inches="tight")
     if show:
@@ -2081,13 +2174,13 @@ def weekday_barplot(
         An instance of a data loader.
     user_id : :class:`str`
         The id for which the weekday barplot must be generated.
-    metric_fn : :class:`callable`
+    metric_fn : :class:`Callable`
         A pywearable function that computes the metric of interest.
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         End date for data retrieval, by default None
-    aggr_fn : :class:`str` or class:`callable`, optional
+    aggr_fn : :class:`str` or class:`Callable`, optional
         Summary statistic to calculate for the metrics to be displayed, by default "mean"
     figsize : :class:`tuple`, optional
         Size of the figure, by default (12, 8)
