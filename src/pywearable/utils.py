@@ -320,64 +320,78 @@ def find_nearest_timestamp(timestamp, timestamp_array):
 
 def trend_analysis(
     data_dict: dict,
-    start_date: datetime.datetime,
-    end_date: datetime.datetime,
-    ma_kind: str = "normal",
+    ma_type: str = "MA",
     baseline_periods: int = 7,
     min_periods_baseline: int = 3,
     normal_range_periods: int = 30,
     min_periods_normal_range: int = 20,
     std_multiplier: float = 1.0,
 ):
-    """Performs trend analysis on daily data for a pre-loaded metric.
+    """Perform trend analysis for a pre-loaded metric of interest.
 
+    This function performs trend analysis, i.e. it comptues medium, and long-term trends
+    in a metric of interest for a user. The function computes the moving average of the metric
+    and the normal range of the metric. 
+    
     Parameters
     ----------
-    data_dict : class: dict
-        Dictionary with dates as keys and daily metric data as values.
-    start_date : :class:`datetime.datetime`
-        Start date of the period of interest
-    end_date : :class:`datetime.datetime`
-        End date of the period of interest (inclusive)
-    ma_kind : :class: str, optional
-        type of moving average to compute, can be either normal or exponential, by default "normal"
-    baseline_periods : int, optional
-        number of period values to be used for the computation of the rolling baseline, by default 7 (MA7)
-    min_periods_baseline : int, optional
-        minimum number of period values needed for the baseline to be considered valid, by default 3
-    normal_range_periods : int, optional
-        number of period values to be used for the computation of the rolling normal range, by default 30
-    min_periods_normal_range : int, optional
-        minimum number of period values needed for the normal range to be considered valid, by default 20
-    std_multiplier : int, optional
-        multiplier of the standard deviation for the computation of lower and upper bounds of the normal range, by default 1
-
+    data_dict : :class:`dict`
+        Dictionary containing the pre-loaded metric values for the user.
+    ma_type : :class:`str`, optional
+        Type of moving average to compute, can be either "MA" or "EMA", by default "MA"
+    baseline_periods : :class:`int`, optional
+        Number of period values to be used for the computation of the rolling baseline, by default 7
+    min_periods_baseline : :class:`int`, optional
+        Minimum number of period values needed for the baseline to be considered valid, by default 3
+    normal_range_periods : :class:`int`, optional
+        Number of period values to be used for the computation of the rolling normal range, by default 30
+    min_periods_normal_range : :class:`int`, optional
+        Minimum number of period values needed for the normal range to be considered valid, by default 20
+    std_multiplier : :class:`float`, optional
+        Multiplier of the standard deviation for the computation of lower and upper bounds of the normal range, by default 1.0
+        
     Returns
     -------
-    pandas.DataFrame
-    including daily metric, baseline, and normal range params.
+    :class:`pandas.DataFrame`
+        DataFrame containing daily metric, baseline, and normal range params.
+
+    Raises
+    ------
+    ValueError
+        If the moving average type is not "MA" or "EMA".
     """
+
+    start_date = min(data_dict.keys())
+    end_date = max(data_dict.keys())
+
     idx = pd.date_range(start_date, end_date)
     s = pd.Series(data_dict)
     s.index = pd.DatetimeIndex(s.index)
     s = s.reindex(idx, fill_value=None)
     df = pd.DataFrame(s, columns=["metric"])
-    if ma_kind == "normal":
+    if ma_type == "MA":
         df["BASELINE"] = df.metric.rolling(
             window=baseline_periods, min_periods=min_periods_baseline
         ).mean()
-    elif ma_kind == "exponential":
+        df["NR_MEAN"] = df.metric.rolling(
+        window=normal_range_periods, min_periods=min_periods_normal_range
+        ).mean()
+        df["NR_STD"] = df.metric.rolling(
+        window=normal_range_periods, min_periods=min_periods_normal_range
+        ).std()
+    elif ma_type == "EMA":
         df["BASELINE"] = df.metric.ewm(
             span=baseline_periods, min_periods=min_periods_baseline
         ).mean()
+        df["NR_MEAN"] = df.metric.ewm(
+            span=normal_range_periods, min_periods=min_periods_normal_range
+        ).mean()
+        df["NR_STD"] = df.metric.ewm(
+            span=normal_range_periods, min_periods=min_periods_normal_range
+        ).std()
     else:
         raise ValueError('Moving average kind can only be "normal" or "exponential"')
-    df["NR_MEAN"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
-    ).mean()
-    df["NR_STD"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
-    ).std()
+    
     df["NR_LOWER_BOUND"] = df["NR_MEAN"] - std_multiplier * df["NR_STD"]
     df["NR_UPPER_BOUND"] = df["NR_MEAN"] + std_multiplier * df["NR_STD"]
     return df
