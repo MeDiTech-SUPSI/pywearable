@@ -1327,8 +1327,6 @@ def get_sleep_summary_graph(
             )[user_id]
             cpd_trend = utils.trend_analysis(
                 cpd_dict,
-                start_date - datetime.timedelta(days=30),
-                end_date,
                 **kwargs_trend_analysis,
             )
             # filter out to keep appropriate period
