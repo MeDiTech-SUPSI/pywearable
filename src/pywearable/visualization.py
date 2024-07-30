@@ -1917,6 +1917,41 @@ def period_to_period_comparison_chart(
     
     This function is used to visualize period to period comparison of a metric. It can be used
     to show weekly variations or monthly variations over extended periods.
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id(s) for which the sleep statistic must be computed.
+    metric_fn : :class:`callable`
+        A pywearable function that computes the metric of interest.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    kind : :class:`str`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    period_interval : :class:`str`, optional
+        Interval of the period (month or week) to be considered for the comparison, by default "month"
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default (12, 8)
+    xlabel : :class:`str` or None, optional
+        Label of the x-axis, by default None
+    ylabel : :class:`str` or None, optional
+        Label of the y-axis, by default None
+    locator_interval : :class:`int`, optional
+        Interval of the locator, by default 1
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 14
+    metric_fn_kwargs : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}    
     """
     if period_interval not in ["month", "week"]:
         raise ValueError(f"period interval {period_interval} is not a valid interval.")
