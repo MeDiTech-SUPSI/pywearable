@@ -1615,7 +1615,6 @@ def plot_trend_analysis(
     ylabel: str = "",
     title: str = "",
     fontsize: int = 12,
-    alpha: float = 0.3,
     xticks_frequency: int = 3,
     xticks_rotation: int = 45,
     ylim: Union[tuple, None] = None,
@@ -1671,8 +1670,6 @@ def plot_trend_analysis(
         Title of the plot, by default ""
     fontsize : :class:`int`, optional
         Font size for the plot, by default 12
-    alpha : :class:`float`, optional
-        Alpha of the shaded regions, by default 0.3
     xticks_frequency : :class:`int`, optional
         Frequency of visualization of x-axis ticks, by default 3
     xticks_rotation : :class:`int`, optional
