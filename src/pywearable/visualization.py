@@ -2579,7 +2579,26 @@ def weekday_barplot(
         plt.show()
 
 
-def general_longitudinal_chart():
+def summary_longitudinal_chart(
+        loader : BaseLoader,
+        user_id : str,
+        start_date : Union[datetime.datetime, datetime.date, str],
+        end_date : Union[datetime.datetime, datetime.date, str],
+        start_hour : int = 0,
+        figsize : Union[tuple,None] = None,
+        hypnogram_fn : Union[Callable, None] = None,
+        cardiac_fn : Union[Callable, None] = None,
+        activity_fn : Union[Callable, None] = None,
+        show_missing : bool = True,
+        resolution_sleep : Union[float, int] = 1.,
+        resolution_cardiac : Union[float, int] = 1.,
+        resolution_activity : Union[float, int] = 15.,
+        fontsize : int = 10,
+        show : bool = True,
+        save_to : str = None,
+        title : str = "",
+        show_dates : bool = False,
+        ):
     """
     Generates a longitudinal chart for a user and period of interest
     
@@ -2587,5 +2606,219 @@ def general_longitudinal_chart():
     in terms of heart rate, activity data, in terms of steps, and sleep data, in
     terms of hypnograms. The data is showing on daily subplots, starting from the chosen
     start_time. 
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id for which the longitudinal chart must be generated.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str`
+        Start date for data retrieval.
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str`
+        End date for data retrieval.
+    start_hour : :class:`int`, optional
+        Start hour for the daily subplots, by default 0
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default None
+    hypnogram_fn : :class:`Callable`, optional
+        Function to load the hypnogram data, by default None
+    cardiac_fn : :class:`Callable`, optional
+        Function to load the cardiac data, by default None
+    activity_fn : :class:`Callable`, optional
+        Function to load the activity data, by default None
+    show_missing : :class:`bool`, optional
+        Whether to show missing data, by default True
+    resolution_sleep : :class:`float` or :class:`int`, optional
+        Resolution of the sleep data in minutes, by default 1.
+    resolution_cardiac : :class:`float` or :class:`int`, optional
+        Resolution of the cardiac data in minutes, by default 1.
+    resolution_activity : :class:`float` or :class:`int`, optional
+        Resolution of the activity data in minutes, by default 15.
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 10
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    save_to : :class:`str`, optional
+        Path where to save the grid plot, by default None
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    show_dates : :class:`bool`, optional
+        Whether to show the dates on the x-axis, by default False
+
+    Returns
+    -------
+    :class:`list[matplotlib.axes._subplots.AxesSubplot]`
+        Axes objects of the plot
     """
-    pass
+    
+    if figsize is None:
+        figsize = (10, (end_date-start_date).days*2)
+    if hypnogram_fn is None:
+        hypnogram_fn = loader.load_hypnogram
+    if cardiac_fn is None:
+        cardiac_fn = loader.load_heart_rate
+    if activity_fn is None:
+        activity_fn = activity.get_steps_series # TODO: implement this function for every loader instead
+
+    # load all the data with some room for the next day due to start_hour
+    hypnograms = hypnogram_fn(user_id=user_id, 
+                          start_date=start_date, 
+                            end_date=end_date+datetime.timedelta(days=1))
+    cardiac_data = cardiac_fn(user_id=user_id, 
+                              start_date=start_date, 
+                              end_date=end_date+datetime.timedelta(days=1))
+    activity_data = activity_fn(loader=loader, # TODO change this when above is implemented
+                                user_id=user_id, 
+                                start_date=start_date, 
+                                end_date=end_date+datetime.timedelta(days=1))[user_id]
+
+    plt.figure(figsize=figsize)
+    axes = []
+
+    for i in range((end_date - start_date).days):
+        date = start_date + datetime.timedelta(days=i)
+        start_date_hour = datetime.datetime.combine(date, datetime.time(start_hour))
+        
+        # get the hypnogram for the given date
+        hypnogram = hypnograms.get(date, None)
+        if hypnogram is not None:
+            hypnogram_stages = hypnogram["values"]
+            hypnogram_length = len(hypnogram_stages)
+            hypnogram_start = hypnogram["start_time"]
+            hypnogram_end = hypnogram["end_time"]
+            hypnogram_time = pd.date_range(start=hypnogram_start, 
+                                        periods=hypnogram_length+1, 
+                                        freq=f"{resolution_sleep}T")
+            
+        # and for the next date
+        next_hypnogram = hypnograms.get(date + datetime.timedelta(days=1), None)
+        if next_hypnogram is not None:
+            next_hypnogram_stages = next_hypnogram["values"]
+            next_hypnogram_length = len(next_hypnogram_stages)
+            next_hypnogram_start = next_hypnogram["start_time"]
+            next_hypnogram_end = next_hypnogram["end_time"]
+            next_hypnogram_time = pd.date_range(start=next_hypnogram_start, 
+                                                periods=next_hypnogram_length+1, 
+                                                freq=f"{resolution_sleep}T")
+
+
+        full_day_range = pd.date_range(start=start_date_hour, 
+                                       periods=24*((60)/ resolution_sleep)+1, 
+                                       freq=f"{resolution_sleep}T")
+        full_day_hypnogram = np.full(len(full_day_range) - 1, 5) # 5 (wake) is assumed as default value
+
+        if hypnogram is not None or next_hypnogram is not None:
+            if hypnogram is not None:
+                diff_init = hypnogram_start - start_date_hour
+                # in case the hypnogram starts before the start of the subplot 
+                # we need to see only the last part of the hypnogram
+                if diff_init.days < 0:
+                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep*60)))
+                    hypnogram_time = hypnogram_time[diff_steps:]
+                    hypnogram_values = hypnogram_stages[diff_steps:]
+                    full_day_hypnogram[:len(hypnogram_values)] = hypnogram_values
+                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep * 60)))
+                    full_day_hypnogram[diff_steps:hypnogram_length+diff_steps] = hypnogram_stages
+            if next_hypnogram is not None:
+                diff_end = next_hypnogram_end - (start_date_hour + datetime.timedelta(days=1))
+                # in case the hypnogram ends after the end of the subplot
+                if diff_end.days >= 0:
+                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
+                    next_hypnogram_time = next_hypnogram_time[:-diff_steps]
+                    next_hypnogram_values = next_hypnogram_stages[:-diff_steps]
+                    # Note that if the hypnogram is completely in the next subplot, we must avoid the next part
+                    # If it is not, we need to see only the first part of the hypnogram
+                    if len(next_hypnogram_values) > 0:
+                        full_day_hypnogram[-len(next_hypnogram_values):] = next_hypnogram_values
+                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
+                    full_day_hypnogram[-next_hypnogram_length-diff_steps:-diff_steps] = next_hypnogram_stages
+        # map 0 (previous encoding of wake) to 5 in full_day_hypnogram for visualization purposes
+        full_day_hypnogram[full_day_hypnogram == 0] = 5 
+
+        # get cardiac data
+        full_day_range_cardiac = pd.date_range(start=start_date_hour, 
+                                               periods=24*((60)/ resolution_cardiac)+1, 
+                                               freq=f"{resolution_cardiac}T")
+        date_cardiac_expanded = pd.merge(left=full_day_range_cardiac.to_series(name="isoDate"),
+                                          right=cardiac_data, 
+                                          how="left")
+        # get activity data
+        full_day_range_activity = pd.date_range(start=start_date_hour, 
+                                                periods=24*((60)/ resolution_activity)+1, 
+                                                freq=f"{resolution_activity}T")
+        date_activity_expanded = pd.merge(full_day_range_activity.to_series(name="isoDate"), 
+                                          activity_data.reset_index(), # TODO : change this when activity_fn is implemented
+                                          how="left")
+
+        ax = plt.subplot((end_date - start_date).days, 1, i+1)
+        date_times = pd.date_range(start=start_date_hour, periods=9, freq='3H')
+        ax.set_xlim([date_times[0], date_times[-1]])
+
+        # show times on x-axis top only in the first subplot
+        if i == 0:
+            ax.set_title(title, fontsize=fontsize + 4)
+            ax.xaxis.tick_top()
+            ax.set_xticks(date_times)
+            ax.set_xticklabels(date_times.strftime("%H:%M"))
+            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+        else:
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+
+        #plot activity data
+        ax.bar(date_activity_expanded["isoDate"], 
+                date_activity_expanded["steps"] / resolution_activity, 
+                color="green",
+                alpha=0.5,
+                width=0.01,
+                edgecolor="black")
+        max_yaxis_activity = max(1000 / resolution_activity, 
+                                max(date_activity_expanded["steps"]/resolution_activity) + 100/resolution_activity)
+        ax.set_ylim([0, max_yaxis_activity])
+        ax.tick_params(axis='y', colors='green')
+        ax.set_ylabel("Steps per minute", color='green', fontsize=fontsize)
+        if show_dates:
+            ax.set_xlabel(date, fontsize=fontsize+2)
+
+        # plot cardiac data
+        ax2 = ax.twinx()
+        ax2.plot(date_cardiac_expanded["isoDate"], 
+                 date_cardiac_expanded["beatsPerMinute"], 
+                 color="red")
+        max_yaxis = max(175, max(date_cardiac_expanded["beatsPerMinute"]))
+        if show_missing:
+            ax2.fill_between(date_cardiac_expanded["isoDate"], 
+                            max_yaxis - 10, 
+                            where=date_cardiac_expanded.beatsPerMinute.isna(),
+                            facecolor="darkgrey", 
+                            alpha=0.5)
+        ax2.set_ylim([35, max_yaxis])
+        ax2.tick_params(axis='y', colors='red')
+        ax2.set_ylabel("Heart rate (bpm)", color='red', fontsize=fontsize)
+        
+        # plot hypnogram(s)
+        ax3 = ax.twinx()
+        ax3.set_ylim([0, 5.5])
+        ax3.stairs(full_day_hypnogram, 
+                   full_day_range, 
+                   baseline=4, 
+                   color="darkblue")
+        # Offset the third y-axis to the right
+        ax3.spines['right'].set_position(('outward', 50)) 
+        ax3.set_yticks(ticks=[1, 2, 3, 4, 5],labels=["Light", "", "Deep", "REM", "Wake"])
+        ax3.tick_params(axis='y', colors='darkblue')
+
+        axes.append([ax, ax2, ax3])
+    
+    plt.tight_layout()
+
+    if save_to:
+        plt.savefig(save_to)
+    if show:
+        plt.show()
+    
+    return axes
