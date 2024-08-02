@@ -134,7 +134,7 @@ def get_steps_line_graph_and_stats(
     locator_interval : :class:`int`, optional
         Interval for the x-axis dates, by default 2
     plot_guideline_zones : :class:`bool`, optional
-        Whether to plot shaded regions corresponding to general guidelines for steps, by default False
+        Whether to plot shaded regions corresponding to general guidelines for daily steps as reported in [1], by default False
     zones_labels : :class:`str`, optional
         labels of the guideline ranges, by default ["Sedentary", "Low active", "Somewhat active", "Active", "Highly active"]
     zones_colors : :class:`list`, optional
@@ -147,6 +147,10 @@ def get_steps_line_graph_and_stats(
     :class:`dict`
         dictionary of daily activity statistics
         (Mean daily steps, Mean daily distance, Percentage goal completion)
+
+    References
+    ----------
+    [1] Tudor-Locke, Catrine, Yoshiro Hatano, Robert Pangrazi, and Minsoo Kang. “Revisiting How Many Steps Are Enough?” Medicine and Science in Sports and Exercise 40 (July 1, 2008): S537-43. https://doi.org/10.1249/MSS.0b013e31817c7133.
     """
 
     # get dates,steps,goals,compare steps to goal to get goal completion
