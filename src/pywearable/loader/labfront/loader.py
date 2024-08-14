@@ -734,7 +734,7 @@ class LabfrontLoader(BaseLoader):
         if not (start_date is None):
             start_date = pd.Timestamp(start_date)
 
-        if end_date is None:
+        if not (end_date is None):
             end_date = pd.Timestamp(end_date)
 
         files = self.get_files_from_timerange(
@@ -2383,13 +2383,13 @@ class LabfrontLoader(BaseLoader):
             end_date=end_date,
             source=source,
         )
-    
-    def load_recovery(  
+
+    def load_recovery(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source="health_api"
+        source="health_api",
     ):
         """Load recovery data.
 
@@ -2441,23 +2441,39 @@ class LabfrontLoader(BaseLoader):
                 user_id=user_id,
                 start_date=min_time.to_pydatetime(),
                 end_date=max_time.to_pydatetime(),
-                source=source
+                source=source,
             )
             if len(body_battery) > 0:
                 if labfront_constants._STRESS_BODY_BATTERY_COL in body_battery.columns:
                     body_battery = body_battery.loc[
-                        :, [constants._ISODATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]
+                        :,
+                        [
+                            constants._ISODATE_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_COL,
+                        ],
                     ]
                     # Labfront has several duplicates, we take the mean by isoDate and make sure isoDate is monotonic increasing
-                    body_battery = body_battery.groupby(constants._ISODATE_COL)[
-                        labfront_constants._STRESS_BODY_BATTERY_COL].mean().sort_index().reset_index()
+                    body_battery = (
+                        body_battery.groupby(constants._ISODATE_COL)[
+                            labfront_constants._STRESS_BODY_BATTERY_COL
+                        ]
+                        .mean()
+                        .sort_index()
+                        .reset_index()
+                    )
                     body_battery_bedtime = pd.merge_asof(
                         sleep_timestamps,
                         body_battery,
                         on=constants._ISODATE_COL,
                         direction="backward",
                         tolerance=pd.Timedelta(minutes=5),
-                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    ).loc[
+                        :,
+                        [
+                            constants._CALENDAR_DATE_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_COL,
+                        ],
+                    ]
                     body_battery_wakeup = pd.merge_asof(
                         sleep_timestamps,
                         body_battery,
@@ -2465,7 +2481,13 @@ class LabfrontLoader(BaseLoader):
                         right_on=constants._ISODATE_COL,
                         direction="forward",
                         tolerance=pd.Timedelta(minutes=5),
-                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    ).loc[
+                        :,
+                        [
+                            constants._CALENDAR_DATE_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_COL,
+                        ],
+                    ]
                     sleep_timestamps = pd.merge(
                         left=body_battery_bedtime,
                         right=body_battery_wakeup,
@@ -2474,11 +2496,22 @@ class LabfrontLoader(BaseLoader):
                         suffixes=["Bedtime", "Wakeup"],
                     )
                     sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = (
-                        sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_WAKING_COL]
-                        - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL]
-                    ) / (100 - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL])
+                        sleep_timestamps[
+                            labfront_constants._STRESS_BODY_BATTERY_WAKING_COL
+                        ]
+                        - sleep_timestamps[
+                            labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL
+                        ]
+                    ) / (
+                        100
+                        - sleep_timestamps[
+                            labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL
+                        ]
+                    )
                     # make sure recovery isn't negative, set it to zero if it is
-                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = np.maximum(sleep_timestamps[constants._RECOVERY_RECOVERY_COL],0)
+                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = np.maximum(
+                        sleep_timestamps[constants._RECOVERY_RECOVERY_COL], 0
+                    )
                     sleep_timestamps = sleep_timestamps.reset_index(drop=True)
                     return sleep_timestamps.loc[
                         :,
