@@ -391,6 +391,7 @@ def mean_time(times: Union[str, list]) -> str:
     t = [
         time.split(":") if type(time) is str else (time.hour, time.minute)
         for time in times
+        if not (pd.isnull(time))
     ]
     # t = (time.split(":") for time in times)
     seconds = ((int(m) * 60 + int(h) * 3600) for h, m in t)
@@ -432,11 +433,12 @@ def get_earliest_bedtime(times: list) -> str:
     """
     dt_times = []
     for time in times:
-        if type(time) is str:
-            hour, minute = [int(x) for x in time.split(":")]
-        else:
-            hour, minute = time.hour, time.minute
-        dt_times.append(datetime.time(hour, minute))
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
 
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
@@ -469,11 +471,12 @@ def get_earliest_bedtime(times: list) -> str:
 def get_earliest_wakeup_time(times: list) -> str:
     dt_times = []
     for time in times:
-        if type(time) is str:
-            hour, minute = [int(x) for x in time.split(":")]
-        else:
-            hour, minute = time.hour, time.minute
-        dt_times.append(datetime.time(hour, minute))
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
 
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
@@ -506,11 +509,12 @@ def get_earliest_wakeup_time(times: list) -> str:
 def get_latest_bedtime(times: list) -> str:
     dt_times = []
     for time in times:
-        if type(time) is str:
-            hour, minute = [int(x) for x in time.split(":")]
-        else:
-            hour, minute = time.hour, time.minute
-        dt_times.append(datetime.time(hour, minute))
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -542,11 +546,12 @@ def get_latest_bedtime(times: list) -> str:
 def get_latest_wakeup_time(times: list) -> str:
     dt_times = []
     for time in times:
-        if type(time) is str:
-            hour, minute = [int(x) for x in time.split(":")]
-        else:
-            hour, minute = time.hour, time.minute
-        dt_times.append(datetime.time(hour, minute))
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -581,6 +586,7 @@ def std_time(times):
     t = [
         time.split(":") if type(time) is str else (time.hour, time.minute)
         for time in times
+        if not pd.isnull(time)
     ]
 
     # Get seconds
