@@ -614,7 +614,7 @@ def get_rest_pulse_ox_statistics(
                 ].reset_index(drop=True)
             if not (end_date is None):
                 rest_pulse_ox = rest_pulse_ox[
-                    rest_pulse_ox[constants._CALENDAR_DATE_COL] <= end_date
+                    rest_pulse_ox[constants._CALENDAR_DATE_COL] < end_date
                 ].reset_index(drop=True)
             for metric in metrics:
                 # Get series with metrics by calendarDate
@@ -944,7 +944,7 @@ def get_breaths_per_minute_statistics(
                 ].reset_index(drop=True)
             if not (end_date is None):
                 rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[constants._CALENDAR_DATE_COL] <= end_date
+                    rest_breaths_per_minute[constants._CALENDAR_DATE_COL] < end_date
                 ].reset_index(drop=True)
             if remove_zero:
                 rest_breaths_per_minute = rest_breaths_per_minute[

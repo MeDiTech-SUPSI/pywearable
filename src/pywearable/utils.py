@@ -119,7 +119,7 @@ def get_user_ids(loader: "BaseLoader", user_id: Union[str, list] = "all"):
 
 def return_multiindex_df(
     df: pd.DataFrame, return_df: bool, return_multi_index: bool
-) -> dict:
+) -> Union[dict, pd.DataFrame]:
     # Check if df is pd.DataFrame
     if not (type(df) == pd.DataFrame):
         raise ValueError(f"df must be of type pd.DataFrame, not of {type(df)}")
@@ -387,8 +387,12 @@ def mean_angle(deg):
     return degrees(phase(sum(rect(1, radians(d)) for d in deg) / len(deg)))
 
 
-def mean_time(times):
-    t = (time.split(":") for time in times)
+def mean_time(times: Union[str, list]) -> str:
+    t = [
+        time.split(":") if type(time) is str else (time.hour, time.minute)
+        for time in times
+    ]
+    # t = (time.split(":") for time in times)
     seconds = ((int(m) * 60 + int(h) * 3600) for h, m in t)
     day = 24 * 60 * 60
     to_angles = [s * 360.0 / day for s in seconds]
@@ -418,15 +422,22 @@ def get_earliest_bedtime(times: list) -> str:
     ----------
     times : :class:`list`
         List of times from which the earliest bedtime must be determined.
+        The times can be either of class :class:`str` or :class:`datetime.datetime`
+        or :class:`pandas.Timestamp`
 
     Returns
     -------
     :class:`str`
         Earliest bedtime in HH:MM format.
     """
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if type(time) is str:
+            hour, minute = [int(x) for x in time.split(":")]
+        else:
+            hour, minute = time.hour, time.minute
+        dt_times.append(datetime.time(hour, minute))
+
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -449,13 +460,21 @@ def get_earliest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmin()]
+    if type(times) is pd.Series:
+        return times.iloc[dt_diff.argmin()].strftime("%H:%M")
+    else:
+        return times[dt_diff.argmin()]
 
 
 def get_earliest_wakeup_time(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if type(time) is str:
+            hour, minute = [int(x) for x in time.split(":")]
+        else:
+            hour, minute = time.hour, time.minute
+        dt_times.append(datetime.time(hour, minute))
+
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -478,13 +497,20 @@ def get_earliest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmax()]
+    if type(times) is pd.Series:
+        return times.iloc[dt_diff.argmax()].strftime("%H:%M")
+    else:
+        return times[dt_diff.argmax()]
 
 
 def get_latest_bedtime(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if type(time) is str:
+            hour, minute = [int(x) for x in time.split(":")]
+        else:
+            hour, minute = time.hour, time.minute
+        dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -507,13 +533,20 @@ def get_latest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmax()]
+    if type(times) is pd.Series:
+        return times.iloc[dt_diff.argmax()].strftime("%H:%M")
+    else:
+        return times[dt_diff.argmax()]
 
 
 def get_latest_wakeup_time(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if type(time) is str:
+            hour, minute = [int(x) for x in time.split(":")]
+        else:
+            hour, minute = time.hour, time.minute
+        dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
@@ -536,12 +569,21 @@ def get_latest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmin()]
+    if type(times) is pd.Series:
+        return times.iloc[dt_diff.argmin()].strftime("%H:%M")
+    else:
+        return times[dt_diff.argmin()]
 
 
 def std_time(times):
+    if type(times) is str:
+        times = [times]
+    t = [
+        time.split(":") if type(time) is str else (time.hour, time.minute)
+        for time in times
+    ]
+
     # Get seconds
-    t = (time.split(":") for time in times)
     seconds = [(int(m) * 60 + int(h) * 3600) for h, m in t]
 
     # Get angle in degrees

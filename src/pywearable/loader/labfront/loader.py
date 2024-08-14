@@ -731,22 +731,11 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"User with ID {user_id} was not found.")
 
         # Check dates and times
-        if not (
-            (type(start_date) == datetime.datetime)
-            or (type(start_date) == datetime.date)
-            or (start_date is None)
-        ):
-            start_date = dateutil.parser.parse(start_date)
-        elif type(start_date) == datetime.date:
-            start_date = datetime.datetime.combine(start_date, datetime.time())
+        if not (start_date is None):
+            start_date = pd.Timestamp(start_date)
 
-        if not (
-            (type(end_date) == datetime.datetime)
-            or (type(end_date) == datetime.date or (end_date is None))
-        ):
-            end_date = dateutil.parser.parse(end_date)
-        elif type(end_date) == datetime.date:
-            end_date = datetime.datetime.combine(end_date, datetime.time())
+        if end_date is None:
+            end_date = pd.Timestamp(end_date)
 
         files = self.get_files_from_timerange(
             user_id,
@@ -1371,20 +1360,6 @@ class LabfrontLoader(BaseLoader):
             end_date,
         )
 
-        if len(data) > 0:
-            # Change sleep stage values
-            data[constants._SLEEP_STAGE_SLEEP_TYPE_COL] = data[
-                constants._SLEEP_STAGE_SLEEP_TYPE_COL
-            ].map(
-                {
-                    labfront_constants._SLEEP_STAGE_LIGHT_STAGE_VALUE: constants._SLEEP_STAGE_N1_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_DEEP_STAGE_VALUE: constants._SLEEP_STAGE_N3_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_REM_STAGE_VALUE: constants._SLEEP_STAGE_REM_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_AWAKE_STAGE_VALUE: constants._SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-                }
-            )
-
         return data
 
     def load_sleep_summary(
@@ -1474,34 +1449,10 @@ class LabfrontLoader(BaseLoader):
             # Rename columns based on pywearable specs
             data = data.rename(
                 columns={
-                    labfront_constants._SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    labfront_constants._SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
                     labfront_constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    labfront_constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
                     labfront_constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
                 }
             )
-
-            data[constants._SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL] = np.nan
-
-            data = data.loc[
-                :,
-                [
-                    constants._SLEEP_SUMMARY_ID_COL,
-                    constants._TIMEZONEOFFSET_IN_MS_COL,
-                    constants._UNIXTIMESTAMP_IN_MS_COL,
-                    constants._ISODATE_COL,
-                    constants._CALENDAR_DATE_COL,
-                    constants._DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL,
-                ],
-            ]
 
             if (start_date is None) and (end_date is None):
                 return data
@@ -1509,13 +1460,13 @@ class LabfrontLoader(BaseLoader):
                 start_date = None if (start_date is None) else start_date.date()
                 end_date = None if (end_date is None) else end_date.date()
                 if (start_date is None) and (not (end_date is None)):
-                    return data[(data[constants._CALENDAR_DATE_COL] <= end_date)]
+                    return data[(data[constants._CALENDAR_DATE_COL] < end_date)]
                 elif (not (start_date is None)) and (end_date is None):
                     return data[(data[constants._CALENDAR_DATE_COL] >= start_date)]
                 else:
                     return data[
                         (data[constants._CALENDAR_DATE_COL] >= start_date)
-                        & (data[constants._CALENDAR_DATE_COL] <= end_date)
+                        & (data[constants._CALENDAR_DATE_COL] < end_date)
                     ]
         else:
             return pd.DataFrame()
@@ -2008,13 +1959,13 @@ class LabfrontLoader(BaseLoader):
                 format="%Y-%m-%d",
             )
             if (start_date is None) and (not (end_date is None)):
-                return data[data[constants._CALENDAR_DATE_COL] <= end_date_date]
+                return data[data[constants._CALENDAR_DATE_COL] < end_date_date]
             elif (not (start_date is None)) and (end_date is None):
                 return data[data[constants._CALENDAR_DATE_COL] >= start_date_date]
             elif (not (start_date is None)) and (not (end_date is None)):
                 return data[
                     (data[constants._CALENDAR_DATE_COL] >= start_date_date)
-                    & (data[constants._CALENDAR_DATE_COL] <= end_date_date)
+                    & (data[constants._CALENDAR_DATE_COL] < end_date_date)
                 ]
             else:
                 return data
@@ -2288,8 +2239,8 @@ class LabfrontLoader(BaseLoader):
                     {
                         constants._SLEEP_STAGE_REM_STAGE_VALUE: constants._SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
                         constants._SLEEP_STAGE_AWAKE_STAGE_VALUE: constants._SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N3_STAGE_VALUE: constants._SLEEP_STAGE_N3_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N1_STAGE_VALUE: constants._SLEEP_STAGE_N1_STAGE_MAPPED_VALUE,
+                        constants._SLEEP_STAGE_DEEP_STAGE_VALUE: constants._SLEEP_STAGE_DEEP_STAGE_MAPPED_VALUE,
+                        constants._SLEEP_STAGE_LIGHT_STAGE_VALUE: constants._SLEEP_STAGE_LIGHT_STAGE_MAPPED_VALUE,
                         constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants._SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
                     }
                 )
