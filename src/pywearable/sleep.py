@@ -1641,7 +1641,6 @@ def get_sleep_timestamps(
             }
         except:
             data_dict[user] = {}
-
     return data_dict
 
 
