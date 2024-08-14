@@ -375,6 +375,11 @@ def get_sleep_efficiency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> pd.DataFrame:
     """Get sleep efficiency (SE) sleep metric.
 
@@ -451,10 +456,15 @@ def get_sleep_efficiency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_SE,
+        statistic=SLEEP_STATISTIC_SE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -464,6 +474,11 @@ def get_sleep_maintenance_efficiency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> pd.DataFrame:
     """Get sleep maintenance efficiency (SME) sleep metric.
 
@@ -542,10 +557,15 @@ def get_sleep_maintenance_efficiency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_SME,
+        statistic=SLEEP_STATISTIC_SME,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -634,11 +654,12 @@ def get_deep_latency(
     return get_sleep_statistics(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_DEEP_LATENCY,
+        statistic=SLEEP_STATISTIC_DEEP_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
         kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
         return_df=return_df,
         return_multi_index=return_multi_index,
@@ -660,11 +681,12 @@ def get_light_latency(
     return get_sleep_statistics(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_LIGHT_LATENCY,
+        statistic=SLEEP_STATISTIC_LIGHT_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
         kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
         return_df=return_df,
         return_multi_index=return_multi_index,
@@ -677,6 +699,11 @@ def get_rem_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get REM sleep latency.
 
@@ -751,10 +778,15 @@ def get_rem_latency(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_REM_LATENCY,
+        statistic=SLEEP_STATISTIC_REM_LATENCY,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -764,6 +796,11 @@ def get_light_sleep_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get light sleep duration.
 
@@ -843,10 +880,15 @@ def get_light_sleep_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_LIGHT_DURATION,
+        statistic=SLEEP_STATISTIC_LIGHT_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -856,6 +898,11 @@ def get_deep_sleep_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get deep sleep duration.
 
@@ -934,10 +981,15 @@ def get_deep_sleep_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_DEEP_DURATION,
+        statistic=SLEEP_STATISTIC_DEEP_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -947,6 +999,11 @@ def get_rem_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get REM sleep duration.
 
@@ -1027,10 +1084,15 @@ def get_rem_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_REM_DURATION,
+        statistic=SLEEP_STATISTIC_REM_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1040,6 +1102,11 @@ def get_nrem_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get NREM sleep duration.
 
@@ -1120,10 +1187,15 @@ def get_nrem_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_NREM_DURATION,
+        statistic=SLEEP_STATISTIC_NREM_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1236,6 +1308,11 @@ def get_unmeasurable_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get unmeasurable sleep duration.
 
@@ -1316,10 +1393,15 @@ def get_unmeasurable_duration(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_UNMEASURABLE_DURATION,
+        statistic=SLEEP_STATISTIC_UNMEASURABLE_DURATION,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1383,14 +1465,24 @@ def get_rem_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_REM_PERCENTAGE,
+        statistic=SLEEP_STATISTIC_REM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1400,14 +1492,24 @@ def get_nrem_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_NREM_PERCENTAGE,
+        statistic=SLEEP_STATISTIC_NREM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1417,6 +1519,9 @@ def get_wake_after_sleep_onset(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
     return_df: bool = True,
     return_multi_index: bool = True,
 ):
@@ -1427,6 +1532,11 @@ def get_wake_after_sleep_onset(
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1463,14 +1573,24 @@ def get_sleep_score(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_SLEEP_SCORE,
+        statistic=SLEEP_STATISTIC_SLEEP_SCORE,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1588,6 +1708,11 @@ def get_wakeup_time(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get wake-up time sleep metric.
 
@@ -1624,10 +1749,15 @@ def get_wakeup_time(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_WAKEUP,
+        statistic=SLEEP_STATISTIC_WAKEUP,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1637,6 +1767,11 @@ def get_sleep_midpoint(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Get midpoint sleep metric.
 
@@ -1674,10 +1809,15 @@ def get_sleep_midpoint(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_MIDPOINT,
+        statistic=SLEEP_STATISTIC_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1756,6 +1896,11 @@ def get_light_sleep_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     """Get the number of light sleep stages.
 
@@ -1786,10 +1931,15 @@ def get_light_sleep_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_LIGHT_COUNT,
+        statistic=SLEEP_STATISTIC_LIGHT_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1799,6 +1949,11 @@ def get_deep_sleep_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     """Get the number of N3 sleep stages.
 
@@ -1845,10 +2000,15 @@ def get_deep_sleep_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_DEEP_COUNT,
+        statistic=SLEEP_STATISTIC_DEEP_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1858,6 +2018,11 @@ def get_rem_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ):
     """Get the number of REM sleep stages.
 
@@ -1904,10 +2069,15 @@ def get_rem_count(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_REM_COUNT,
+        statistic=SLEEP_STATISTIC_REM_COUNT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1916,8 +2086,13 @@ def get_cpd_midpoint(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
     chronotype_dict: dict = {},
+    kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Computes composite phase deviation (CPD) with regard to sleep midpoints
 
@@ -1953,11 +2128,16 @@ def get_cpd_midpoint(
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
-        metric=SLEEP_STATISTIC_CPD_MIDPOINT,
+        statistic=SLEEP_STATISTIC_CPD_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
         kind=kind,
         chronotype_dict=chronotype_dict,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -1966,8 +2146,13 @@ def get_cpd_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
     chronotype_dict: dict = {},
+    kind: Union[str, None] = None,
+    kind_args=[],
+    kind_kwargs={},
+    loader_kwargs={},
+    return_df: bool = True,
+    return_multi_index: bool = True,
 ) -> dict:
     """Computes composite phase deviation (CPD) with regard to sleep duration
 
@@ -2008,6 +2193,11 @@ def get_cpd_duration(
         end_date=end_date,
         kind=kind,
         chronotype_dict=chronotype_dict,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
     )
 
 
@@ -3349,29 +3539,29 @@ def get_sleep_statistic(
     statistics by loading only once sleep data. The following statistics
     can be computed:
 
-        - Time in Bed (``metric="TIB"``)
-        - Total Sleep Time (``metric="TST"``)
-        - Wake After Sleep Onset (``metric="WASO"``)
-        - Sleep Onset Latency (``metric="SOL"``)
-        - Sleep Period Time (``metric="SPT"``)
-        - N1 Sleep Duration (``metric="N1"``)
-        - N2 Sleep Duration (``metric="N2"``)
-        - N3 Sleep Duration (``metric="N3"``)
-        - REM Sleep Duration (``metric="REM"``)
-        - NREM Sleep Duration (``metric="NREM"``)
-        - Awake Duration (``metric="AWAKE"``)
-        - Unmeasurable Sleep Duration (``metric="UNMEASURABLE"``)
-        - N1 Sleep Latency (``metric="Lat_N1"``)
-        - N2 Sleep Latency (``metric="Lat_N2"``)
-        - N3 Sleep Latency (``metric="Lat_N3"``)
-        - REM Sleep Latency (``metric="Lat_REM"``)
-        - N1 Sleep Percentage (``metric="%N1"``)
-        - N2 Sleep Percentage (``metric="%N2"``)
-        - N3 Sleep Percentage (``metric="%N3"``)
-        - Sleep Efficiency (``metric="SE"``)
-        - Sleep Maintenance Efficiency (``metric="SME"``)
-        - Sleep Score (``metric="SCORE"``)
-        - Number of Awakenings (``metric="Awakenings"``)
+        - Time in Bed (``statistic="TIB"``)
+        - Total Sleep Time (``statistic="TST"``)
+        - Wake After Sleep Onset (``statistic="WASO"``)
+        - Sleep Onset Latency (``statistic="SOL"``)
+        - Sleep Period Time (``statistic="SPT"``)
+        - N1 Sleep Duration (``statistic="N1"``)
+        - N2 Sleep Duration (``statistic="N2"``)
+        - N3 Sleep Duration (``statistic="N3"``)
+        - REM Sleep Duration (``statistic="REM"``)
+        - NREM Sleep Duration (``statistic="NREM"``)
+        - Awake Duration (``statistic="AWAKE"``)
+        - Unmeasurable Sleep Duration (``statistic="UNMEASURABLE"``)
+        - N1 Sleep Latency (``statistic="Lat_N1"``)
+        - N2 Sleep Latency (``statistic="Lat_N2"``)
+        - N3 Sleep Latency (``statistic="Lat_N3"``)
+        - REM Sleep Latency (``statistic="Lat_REM"``)
+        - N1 Sleep Percentage (``statistic="%N1"``)
+        - N2 Sleep Percentage (``statistic="%N2"``)
+        - N3 Sleep Percentage (``statistic="%N3"``)
+        - Sleep Efficiency (``statistic="SE"``)
+        - Sleep Maintenance Efficiency (``statistic="SME"``)
+        - Sleep Score (``statistic="SCORE"``)
+        - Number of Awakenings (``statistic="Awakenings"``)
 
     Parameters
     ----------
