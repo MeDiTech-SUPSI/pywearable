@@ -1640,7 +1640,7 @@ def get_sleep_timestamps(
                 for k in bedtime_dict.keys()
             }
         except:
-            pass
+            data_dict[user] = {}
 
     return data_dict
 
