@@ -34,16 +34,12 @@ The required fields for this metric are the following ones:
       - Overall sleep duration in milliseconds, **without** counting awake stages
       - ``pywearable.constants._DURATION_IN_MS_COL``
       - :class:`int`
-    * - n1SleepDurationInMs
-      - Duration of N1 sleep stage in milliseconds
+    * - deepSleepDurationInMs
+      - Duration of deep sleep stage in milliseconds
       - ``pywearable.constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL``
       - :class:`int`
-    * - n2SleepDurationInMs
-      - Duration of N2 sleep stage in milliseconds
-      - ``pywearable.constants._SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL``
-      - :class:`int`
-    * - n3SleepDurationInMs
-      - Duration of N3 sleep stage in milliseconds
+    * - lightSleepDurationInMs
+      - Duration of light sleep stage in milliseconds
       - ``pywearable.constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL``
       - :class:`int`
     * - remSleepDurationInMs
@@ -78,7 +74,7 @@ the most updated night sleep.
 An example of a sleep-summary is shown in the table below.
 
 .. list-table:: Example of sleep summary
-   :widths: 25 25 25 25 25 25 25 25 25 25 25 25 25
+   :widths: 25 25 25 25 25 25 25 25 25 25 25 25
    :header-rows: 1
 
    * - sleepSummaryId
@@ -87,9 +83,8 @@ An example of a sleep-summary is shown in the table below.
      - unixTimestampInMs
      - isoDate
      - durationInMs
-     - n1SleepDurationInMs
-     - n2SleepDurationInMs
-     - n3SleepDurationInMs
+     - lightSleepDurationInMs
+     - deepSleepDurationInMs
      - remSleepDurationInMs
      - unmeasurableSleepDurationInMs
      - awakeDurationInMs
@@ -101,7 +96,6 @@ An example of a sleep-summary is shown in the table below.
      - 2023-09-05T23:25:00.000+02:00
      - 26760000
      - 19740000
-     - 
      - 1620000
      - 4560000
      - 840000
@@ -114,7 +108,6 @@ An example of a sleep-summary is shown in the table below.
      - 2023-09-06T23:11:00.000+02:00
      - 26160000
      - 19980000
-     - 
      - 2280000
      - 3900000
      - 0
@@ -127,7 +120,6 @@ An example of a sleep-summary is shown in the table below.
      - 2023-09-06T23:11:00.000+02:00
      - 26220000
      - 20160000
-     - 
      - 2340000
      - 3720000
      - 0

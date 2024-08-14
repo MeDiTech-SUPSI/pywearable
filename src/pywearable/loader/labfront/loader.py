@@ -731,22 +731,11 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"User with ID {user_id} was not found.")
 
         # Check dates and times
-        if not (
-            (type(start_date) == datetime.datetime)
-            or (type(start_date) == datetime.date)
-            or (start_date is None)
-        ):
-            start_date = dateutil.parser.parse(start_date)
-        elif type(start_date) == datetime.date:
-            start_date = datetime.datetime.combine(start_date, datetime.time())
+        if not (start_date is None):
+            start_date = pd.Timestamp(start_date)
 
-        if not (
-            (type(end_date) == datetime.datetime)
-            or (type(end_date) == datetime.date or (end_date is None))
-        ):
-            end_date = dateutil.parser.parse(end_date)
-        elif type(end_date) == datetime.date:
-            end_date = datetime.datetime.combine(end_date, datetime.time())
+        if end_date is None:
+            end_date = pd.Timestamp(end_date)
 
         files = self.get_files_from_timerange(
             user_id,
@@ -1371,20 +1360,6 @@ class LabfrontLoader(BaseLoader):
             end_date,
         )
 
-        if len(data) > 0:
-            # Change sleep stage values
-            data[constants._SLEEP_STAGE_SLEEP_TYPE_COL] = data[
-                constants._SLEEP_STAGE_SLEEP_TYPE_COL
-            ].map(
-                {
-                    labfront_constants._SLEEP_STAGE_LIGHT_STAGE_VALUE: constants._SLEEP_STAGE_N1_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_DEEP_STAGE_VALUE: constants._SLEEP_STAGE_N3_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_REM_STAGE_VALUE: constants._SLEEP_STAGE_REM_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_AWAKE_STAGE_VALUE: constants._SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    labfront_constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-                }
-            )
-
         return data
 
     def load_sleep_summary(
@@ -1474,34 +1449,10 @@ class LabfrontLoader(BaseLoader):
             # Rename columns based on pywearable specs
             data = data.rename(
                 columns={
-                    labfront_constants._SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    labfront_constants._SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
                     labfront_constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    labfront_constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
                     labfront_constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
                 }
             )
-
-            data[constants._SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL] = np.nan
-
-            data = data.loc[
-                :,
-                [
-                    constants._SLEEP_SUMMARY_ID_COL,
-                    constants._TIMEZONEOFFSET_IN_MS_COL,
-                    constants._UNIXTIMESTAMP_IN_MS_COL,
-                    constants._ISODATE_COL,
-                    constants._CALENDAR_DATE_COL,
-                    constants._DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N2_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                    constants._SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL,
-                ],
-            ]
 
             if (start_date is None) and (end_date is None):
                 return data
@@ -1509,13 +1460,13 @@ class LabfrontLoader(BaseLoader):
                 start_date = None if (start_date is None) else start_date.date()
                 end_date = None if (end_date is None) else end_date.date()
                 if (start_date is None) and (not (end_date is None)):
-                    return data[(data[constants._CALENDAR_DATE_COL] <= end_date)]
+                    return data[(data[constants._CALENDAR_DATE_COL] < end_date)]
                 elif (not (start_date is None)) and (end_date is None):
                     return data[(data[constants._CALENDAR_DATE_COL] >= start_date)]
                 else:
                     return data[
                         (data[constants._CALENDAR_DATE_COL] >= start_date)
-                        & (data[constants._CALENDAR_DATE_COL] <= end_date)
+                        & (data[constants._CALENDAR_DATE_COL] < end_date)
                     ]
         else:
             return pd.DataFrame()
@@ -2008,13 +1959,13 @@ class LabfrontLoader(BaseLoader):
                 format="%Y-%m-%d",
             )
             if (start_date is None) and (not (end_date is None)):
-                return data[data[constants._CALENDAR_DATE_COL] <= end_date_date]
+                return data[data[constants._CALENDAR_DATE_COL] < end_date_date]
             elif (not (start_date is None)) and (end_date is None):
                 return data[data[constants._CALENDAR_DATE_COL] >= start_date_date]
             elif (not (start_date is None)) and (not (end_date is None)):
                 return data[
                     (data[constants._CALENDAR_DATE_COL] >= start_date_date)
-                    & (data[constants._CALENDAR_DATE_COL] <= end_date_date)
+                    & (data[constants._CALENDAR_DATE_COL] < end_date_date)
                 ]
             else:
                 return data
@@ -2288,8 +2239,8 @@ class LabfrontLoader(BaseLoader):
                     {
                         constants._SLEEP_STAGE_REM_STAGE_VALUE: constants._SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
                         constants._SLEEP_STAGE_AWAKE_STAGE_VALUE: constants._SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N3_STAGE_VALUE: constants._SLEEP_STAGE_N3_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N1_STAGE_VALUE: constants._SLEEP_STAGE_N1_STAGE_MAPPED_VALUE,
+                        constants._SLEEP_STAGE_DEEP_STAGE_VALUE: constants._SLEEP_STAGE_DEEP_STAGE_MAPPED_VALUE,
+                        constants._SLEEP_STAGE_LIGHT_STAGE_VALUE: constants._SLEEP_STAGE_LIGHT_STAGE_MAPPED_VALUE,
                         constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants._SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
                     }
                 )
@@ -2432,3 +2383,110 @@ class LabfrontLoader(BaseLoader):
             end_date=end_date,
             source=source,
         )
+    
+    def load_recovery(  
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source="health_api"
+    ):
+        """Load recovery data.
+
+        This function returns Garmin Body Battery Recovery data from the
+        given ``user_id`` with the time window defined by ``start_date``
+        and ``end_date``. Recovery is computed considering body battery
+        values at wake up and bedtime, and by comparing the total charge
+        with respect to the available charge.
+
+        Parameters
+        ----------
+        user_id : :class:`str`
+            Unique user identifier for recovery data retrieval.
+        start_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
+            Start date for recovery data retrieval.
+        end_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
+            End date for recovery data retrieval.
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            Formatted :class:`pd.DataFrame` with recovery data.
+        """
+        sleep_summary = self.load_sleep_summary(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            same_day_filter=True,
+        )
+        if len(sleep_summary) > 0:
+            # We need to get body battery data for each sleep
+            # Let's retrieve sleep timestamps
+            sleep_summary["wakeup"] = pd.to_datetime(
+                sleep_summary[constants._UNIXTIMESTAMP_IN_MS_COL]
+                + sleep_summary[constants._TIMEZONEOFFSET_IN_MS_COL]
+                + sleep_summary[constants._DURATION_IN_MS_COL]
+                + sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+                utc=True,
+                unit="ms",
+            ).dt.tz_localize(None)
+            sleep_timestamps = sleep_summary.loc[
+                :, [constants._CALENDAR_DATE_COL, constants._ISODATE_COL, "wakeup"]
+            ]
+            # Load body battery for all sleep sessions with 5 minute tolerance
+            min_time = sleep_timestamps[constants._ISODATE_COL].min() - pd.Timedelta(
+                minutes=5
+            )
+            max_time = sleep_timestamps["wakeup"].max() + pd.Timedelta(minutes=5)
+            body_battery = self.load_stress(
+                user_id=user_id,
+                start_date=min_time.to_pydatetime(),
+                end_date=max_time.to_pydatetime(),
+                source=source
+            )
+            if len(body_battery) > 0:
+                if labfront_constants._STRESS_BODY_BATTERY_COL in body_battery.columns:
+                    body_battery = body_battery.loc[
+                        :, [constants._ISODATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]
+                    ]
+                    # Labfront has several duplicates, we take the mean by isoDate and make sure isoDate is monotonic increasing
+                    body_battery = body_battery.groupby(constants._ISODATE_COL)[
+                        labfront_constants._STRESS_BODY_BATTERY_COL].mean().sort_index().reset_index()
+                    body_battery_bedtime = pd.merge_asof(
+                        sleep_timestamps,
+                        body_battery,
+                        on=constants._ISODATE_COL,
+                        direction="backward",
+                        tolerance=pd.Timedelta(minutes=5),
+                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    body_battery_wakeup = pd.merge_asof(
+                        sleep_timestamps,
+                        body_battery,
+                        left_on="wakeup",
+                        right_on=constants._ISODATE_COL,
+                        direction="forward",
+                        tolerance=pd.Timedelta(minutes=5),
+                    ).loc[:, [constants._CALENDAR_DATE_COL, labfront_constants._STRESS_BODY_BATTERY_COL]]
+                    sleep_timestamps = pd.merge(
+                        left=body_battery_bedtime,
+                        right=body_battery_wakeup,
+                        how="inner",
+                        on=constants._CALENDAR_DATE_COL,
+                        suffixes=["Bedtime", "Wakeup"],
+                    )
+                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = (
+                        sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_WAKING_COL]
+                        - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL]
+                    ) / (100 - sleep_timestamps[labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL])
+                    # make sure recovery isn't negative, set it to zero if it is
+                    sleep_timestamps[constants._RECOVERY_RECOVERY_COL] = np.maximum(sleep_timestamps[constants._RECOVERY_RECOVERY_COL],0)
+                    sleep_timestamps = sleep_timestamps.reset_index(drop=True)
+                    return sleep_timestamps.loc[
+                        :,
+                        [
+                            constants._CALENDAR_DATE_COL,
+                            constants._RECOVERY_RECOVERY_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_BEDTIME_COL,
+                            labfront_constants._STRESS_BODY_BATTERY_WAKING_COL,
+                        ],
+                    ]
+        return pd.DataFrame()
