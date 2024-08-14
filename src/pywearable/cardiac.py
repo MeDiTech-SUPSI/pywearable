@@ -759,10 +759,10 @@ def get_heart_rate_statistics(
     The type of statistic to be computed can be set using
     the ``statistic`` parameter. Available options are:
 
-        - ``"restHR"```for resting heart rate
-        - ``"minHR"```for minimum heart rate
-        - ``"maxHR"```for maximum heart rate
-        - ``"avgHR"```for average heart rate
+        - ``"restHR"`` for resting heart rate
+        - ``"minHR"`` for minimum heart rate
+        - ``"maxHR"`` for maximum heart rate
+        - ``"avgHR"`` for average heart rate
 
     Both single statistics and multiple statistics can
     be computed. If all the available statistics have

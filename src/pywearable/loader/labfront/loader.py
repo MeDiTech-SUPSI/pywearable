@@ -2407,6 +2407,7 @@ class LabfrontLoader(BaseLoader):
             Start date for recovery data retrieval.
         end_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
             End date for recovery data retrieval.
+
         Returns
         -------
         :class:`pd.DataFrame`
