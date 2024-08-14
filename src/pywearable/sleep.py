@@ -1599,11 +1599,6 @@ def get_sleep_timestamps(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    return_df: bool = False,
-    return_multi_index: bool = False,
 ) -> Union[dict, pd.DataFrame]:
     """Get the timestamps of the beginning and the end of sleep occurrences.
 
@@ -1633,9 +1628,13 @@ def get_sleep_timestamps(
 
     for user in user_id:
         try:
-            bedtime_dict = get_bedtime(loader, user, start_date, end_date)[user]
+            bedtime_dict = get_bedtime(
+                loader, user, start_date, end_date, return_df=False
+            )[user]
 
-            wakeup_time_dict = get_wakeup_time(loader, user, start_date, end_date)[user]
+            wakeup_time_dict = get_wakeup_time(
+                loader, user, start_date, end_date, return_df=False
+            )[user]
             data_dict[user] = {
                 k: (bedtime_dict.get(k, None), wakeup_time_dict.get(k, None))
                 for k in bedtime_dict.keys()
