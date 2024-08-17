@@ -462,10 +462,8 @@ def get_earliest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    if type(times) is pd.Series:
-        return times.iloc[dt_diff.argmin()].strftime("%H:%M")
-    else:
-        return times[dt_diff.argmin()]
+    
+    return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
 def get_earliest_wakeup_time(times: list) -> str:
@@ -500,10 +498,8 @@ def get_earliest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    if type(times) is pd.Series:
-        return times.iloc[dt_diff.argmax()].strftime("%H:%M")
-    else:
-        return times[dt_diff.argmax()]
+
+    return dt_times[dt_diff.argmax()].strftime("%H:%M")
 
 
 def get_latest_bedtime(times: list) -> str:
@@ -537,10 +533,8 @@ def get_latest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    if type(times) is pd.Series:
-        return times.iloc[dt_diff.argmax()].strftime("%H:%M")
-    else:
-        return times[dt_diff.argmax()]
+
+    return dt_times[dt_diff.argmax()].strftime("%H:%M")
 
 
 def get_latest_wakeup_time(times: list) -> str:
@@ -574,10 +568,8 @@ def get_latest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    if type(times) is pd.Series:
-        return times.iloc[dt_diff.argmin()].strftime("%H:%M")
-    else:
-        return times[dt_diff.argmin()]
+
+    return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
 def std_time(times):
