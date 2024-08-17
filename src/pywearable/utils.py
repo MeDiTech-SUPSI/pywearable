@@ -368,7 +368,7 @@ def trend_analysis(
     s = pd.Series(data_dict)
     s.index = pd.DatetimeIndex(s.index)
     s = s.reindex(idx, fill_value=None)
-    df = pd.DataFrame(s, columns=["metric"])
+    df = pd.DataFrame(data=s.values, index=s.index, columns=["metric"])
     if ma_type == "MA":
         df["BASELINE"] = df.metric.rolling(
             window=baseline_periods, min_periods=min_periods_baseline
@@ -651,7 +651,10 @@ def filter_out_awake(
     """
     # we get the hypnogram for that day
     hypnogram = loader.load_hypnogram(
-        user_id=user, start_date=date, end_date=date, resolution=resolution
+        user_id=user, 
+        start_date=date, 
+        end_date=date + datetime.timedelta(days=1), 
+        resolution=resolution
     )[date]
     hypnogram_start = hypnogram["start_time"]
     hypnogram_end = hypnogram["end_time"]

@@ -707,7 +707,7 @@ class CalendarHeatmap:
         
 
     def plot(self):
-        self.ax.plot()
+        plt.show()
         
     def save(self, path: str):
         self.ax.get_figure().savefig(path, bbox_inches="tight")
@@ -1308,14 +1308,14 @@ def get_sleep_summary_graph(
                 start_date=start_date,
                 end_date=end_date,
                 kind="mean",
-            )[user_id]["bedTime"]
+            )["bedtime"].iloc[0]
             chronotype_sleep_end = sleep.get_wakeup_time(
                 loader=loader,
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
                 kind="mean",
-            )[user_id]["wakeupTime"]
+            )["wakeup"].iloc[0]
         else:
             assertion_msg = "Must specify chronotype in format 'HH:MM' when plotting circadian measures"
             assert (
@@ -1373,14 +1373,6 @@ def get_sleep_summary_graph(
     scores_series = sleep.get_sleep_score(
         loader=loader, start_date=start_date, end_date=end_date, user_id=user_id
     )[user_id]
-    # get maximum amount of time spent in bed to know x-axis limit
-    max_bed_time = np.max(
-        list(
-            sleep.get_time_in_bed(
-                loader=loader, start_date=start_date, end_date=end_date, user_id=user_id
-            )[user_id].values()
-        )
-    )
 
     # setup an internal fn to get appropriate sleep score colors:
     def get_color(score):
@@ -2359,8 +2351,7 @@ def period_to_period_comparison_chart(
                             start_date, 
                             end_date,
                             **metric_fn_kwargs)[user_id]
-    metric_dates = list(metric_data.keys())
-    metric_values = list(metric_data.values())
+    metric_dates, metric_values = zip(*metric_data.items())
 
     # compute metric aggregate transformation (kind) during each period and its changes
     metric_df = pd.DataFrame({"Date": metric_dates, "metric": metric_values})
@@ -2693,7 +2684,7 @@ def summary_longitudinal_chart(
             hypnogram_end = hypnogram["end_time"]
             hypnogram_time = pd.date_range(start=hypnogram_start, 
                                         periods=hypnogram_length+1, 
-                                        freq=f"{resolution_sleep}T")
+                                        freq=f"{resolution_sleep}min")
             
         # and for the next date
         next_hypnogram = hypnograms.get(date + datetime.timedelta(days=1), None)
@@ -2704,12 +2695,12 @@ def summary_longitudinal_chart(
             next_hypnogram_end = next_hypnogram["end_time"]
             next_hypnogram_time = pd.date_range(start=next_hypnogram_start, 
                                                 periods=next_hypnogram_length+1, 
-                                                freq=f"{resolution_sleep}T")
+                                                freq=f"{resolution_sleep}min")
 
 
         full_day_range = pd.date_range(start=start_date_hour, 
-                                       periods=24*((60)/ resolution_sleep)+1, 
-                                       freq=f"{resolution_sleep}T")
+                                       periods=int(24*((60)/ resolution_sleep)+1), 
+                                       freq=f"{resolution_sleep}min")
         full_day_hypnogram = np.full(len(full_day_range) - 1, 5) # 5 (wake) is assumed as default value
 
         if hypnogram is not None or next_hypnogram is not None:
@@ -2744,21 +2735,21 @@ def summary_longitudinal_chart(
 
         # get cardiac data
         full_day_range_cardiac = pd.date_range(start=start_date_hour, 
-                                               periods=24*((60)/ resolution_cardiac)+1, 
-                                               freq=f"{resolution_cardiac}T")
+                                               periods=int(24*((60)/ resolution_cardiac)+1), 
+                                               freq=f"{resolution_cardiac}min")
         date_cardiac_expanded = pd.merge(left=full_day_range_cardiac.to_series(name="isoDate"),
                                           right=cardiac_data, 
                                           how="left")
         # get activity data
         full_day_range_activity = pd.date_range(start=start_date_hour, 
-                                                periods=24*((60)/ resolution_activity)+1, 
-                                                freq=f"{resolution_activity}T")
+                                                periods=int(24*((60)/ resolution_activity)+1), 
+                                                freq=f"{resolution_activity}min")
         date_activity_expanded = pd.merge(full_day_range_activity.to_series(name="isoDate"), 
                                           activity_data.reset_index(), # TODO : change this when activity_fn is implemented
                                           how="left")
 
         ax = plt.subplot((end_date - start_date).days, 1, i+1)
-        date_times = pd.date_range(start=start_date_hour, periods=9, freq='3H')
+        date_times = pd.date_range(start=start_date_hour, periods=9, freq='3h')
         ax.set_xlim([date_times[0], date_times[-1]])
 
         # show times on x-axis top only in the first subplot
