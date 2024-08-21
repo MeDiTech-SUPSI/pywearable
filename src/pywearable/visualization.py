@@ -1491,7 +1491,7 @@ def get_sleep_summary_graph(
                 bottom += stage_duration_array[i]
 
             # annotate on top of the daily bar with the daily sleep score, color-coded appropriately
-            score = scores_series.get(night)
+            score = scores_series.get(pd.Timestamp(night))
             appropriate_color = get_color(score)
             # not sure why but with horizontal bars the annotation has to be manually adjusted in position
             ax.annotate(
