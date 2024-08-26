@@ -30,9 +30,9 @@ x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+
         ),
         parse_dates=[pywearable.constants._CALENDAR_DATE_COL],
     )
-    sleep_summary[pywearable.constants._ISODATE_COL] = pd.to_datetime(
-        sleep_summary[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-        + sleep_summary[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL],
+    sleep_summary[pywearable.constants.ISODATE_COL] = pd.to_datetime(
+        sleep_summary[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
+        + sleep_summary[pywearable.constants.TIMEZONEOFFSET_IN_MS_COL],
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
@@ -76,9 +76,9 @@ x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700
         """
         )
     )
-    sleep_stages[pywearable.constants._ISODATE_COL] = pd.to_datetime(
-        sleep_stages[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-        + sleep_stages[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL],
+    sleep_stages[pywearable.constants.ISODATE_COL] = pd.to_datetime(
+        sleep_stages[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
+        + sleep_stages[pywearable.constants.TIMEZONEOFFSET_IN_MS_COL],
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
@@ -106,9 +106,7 @@ def sleep_summary_id_as_idx(sleep_summary):
     the _compute functions of the sleep
     module.
     """
-    return sleep_summary.set_index(
-        pywearable.constants._SLEEP_SUMMARY_ID_COL, drop=True
-    )
+    return sleep_summary.set_index(pywearable.constants.SLEEP_SUMMARY_ID_COL, drop=True)
 
 
 @pytest.fixture()
@@ -359,11 +357,11 @@ def test_compute_latencies(
     assert type(sleep_latencies) == pd.DataFrame
     assert set(
         [
-            pywearable.constants._SLEEP_STAGE_AWAKE_STAGE_VALUE,
-            pywearable.constants._SLEEP_STAGE_N3_STAGE_VALUE,
-            pywearable.constants._SLEEP_STAGE_REM_STAGE_VALUE,
-            pywearable.constants._SLEEP_STAGE_N1_STAGE_VALUE,
-            pywearable.constants._SLEEP_STAGE_N2_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_N3_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_REM_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_N1_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_N2_STAGE_VALUE,
         ]
     ).issubset(sleep_latencies.columns)
     # Check latencies for a given sleep summary
@@ -450,43 +448,43 @@ def test_compute_stage_count(
     assert type(counts) == pd.DataFrame
     assert (
         counts.loc[
-            "x4c64722-64595538-6630", pywearable.constants._SLEEP_STAGE_N1_STAGE_VALUE
+            "x4c64722-64595538-6630", pywearable.constants.SLEEP_STAGE_N1_STAGE_VALUE
         ]
         == 11.0
     )
     assert (
         counts.loc[
-            "x4c64722-64595538-6630", pywearable.constants._SLEEP_STAGE_N3_STAGE_VALUE
+            "x4c64722-64595538-6630", pywearable.constants.SLEEP_STAGE_N3_STAGE_VALUE
         ]
         == 5.0
     )
     assert (
         counts.loc[
             "x4c64722-64595538-6630",
-            pywearable.constants._SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            pywearable.constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
         ]
         == 3.0
     )
     assert np.isnan(
         counts.loc[
-            "x4c64722-645ab9b4-55c8", pywearable.constants._SLEEP_STAGE_N3_STAGE_VALUE
+            "x4c64722-645ab9b4-55c8", pywearable.constants.SLEEP_STAGE_N3_STAGE_VALUE
         ]
     )
     assert (
         counts.loc[
-            "x4c64722-645bf6d0-6888", pywearable.constants._SLEEP_STAGE_N3_STAGE_VALUE
-        ]
-        == 1.0
-    )
-    assert (
-        counts.loc[
-            "x4c64722-645d63f8-5c94", pywearable.constants._SLEEP_STAGE_N1_STAGE_VALUE
+            "x4c64722-645bf6d0-6888", pywearable.constants.SLEEP_STAGE_N3_STAGE_VALUE
         ]
         == 1.0
     )
     assert (
         counts.loc[
-            "x4c64722-645d63f8-5c94", pywearable.constants._SLEEP_STAGE_REM_STAGE_VALUE
+            "x4c64722-645d63f8-5c94", pywearable.constants.SLEEP_STAGE_N1_STAGE_VALUE
+        ]
+        == 1.0
+    )
+    assert (
+        counts.loc[
+            "x4c64722-645d63f8-5c94", pywearable.constants.SLEEP_STAGE_REM_STAGE_VALUE
         ]
         == 0.0
     )
