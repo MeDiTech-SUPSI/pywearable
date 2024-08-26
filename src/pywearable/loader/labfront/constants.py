@@ -116,3 +116,12 @@ SLEEP_STAGE_DEEP_STAGE_VALUE = "deep"
 SLEEP_STAGE_REM_STAGE_VALUE = "rem"
 SLEEP_STAGE_AWAKE_STAGE_VALUE = "awake"
 SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE = "unmeasurable"
+
+##################################################
+#                 Stress columns                 #
+##################################################
+
+_STRESS_STRESS_LEVEL_COL = "stressLevel"
+_STRESS_BODY_BATTERY_COL = "bodyBattery"
+_STRESS_BODY_BATTERY_BEDTIME_COL = "bodyBatteryBedtime"
+_STRESS_BODY_BATTERY_WAKING_COL = "bodyBatteryWakeup"

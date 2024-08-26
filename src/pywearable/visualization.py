@@ -339,6 +339,10 @@ def get_cardiac_line_graph_and_stats(
         )[user_id].values()
     )
 
+    # if there's no data at all raise error
+    if np.isnan(rest_hr).all() or np.isnan(max_hr).all():
+        raise ValueError(f"Cardiac data not available between {start_date} and {end_date}")
+
     # plotting
     with plt.style.context("ggplot"):
         fig, ax = plt.subplots(figsize=figsize)
@@ -979,12 +983,6 @@ def get_sleep_summary_graph(
         kwargs for the trend analysis of consistency metrics, by default {}
     """
 
-    if not (consistency_metric is None):
-        assertion_msg = "Must specify chronotype when plotting circadian measures"
-        assert (
-            chronotype_sleep_start is not None and chronotype_sleep_end is not None
-        ), assertion_msg
-
     # Define parameters for plotting
     ALPHA = alpha
     POSITION = 1.3
@@ -1306,7 +1304,7 @@ def get_sleep_summary_graph(
             axes_titles = ["midpoint", "duration"]
         else:
             raise ValueError(
-                f"Warning: consistency sleep metric {sleep_metric} isn't valid."
+                f"Warning: consistency sleep metric {consistency_metric} isn't valid."
             )
         # and populate a subplot which each one
         for k in range(len(consistency_fns)):

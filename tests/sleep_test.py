@@ -21,13 +21,14 @@ def sleep_summary():
     """
     sleep_summary = pd.read_csv(
         StringIO(
-            """sleepSummaryId,calendarDate,timezoneOffsetInMs,unixTimestampInMs,isoDate,durationInMs,unmeasurableSleepDurationInMs,n3SleepDurationInMs,n1SleepDurationInMs,remSleepDurationInMs,awakeDurationInMs,n2SleepDurationInMs,overallSleepScore
-x4c64722-64595538-6630,2023-05-09,7200000,1683576120000,2023-05-08T22:02:00.000+02:00,26160000,0,3900000,15480000,6780000,780000,,88
-x4c64722-645ab9b4-55c8,2023-05-10,7200000,1683667380000,2023-05-09T23:23:00.000+02:00,21960000,,,,,,,
-x4c64722-645bf6d0-6888,2023-05-11,7200000,1683748560000,2023-05-10T21:56:00.000+02:00,26760000,0,26760000,0,0,0,,40
-x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+02:00,23700000,0,0,23700000,0,600000,,70
+            """sleepSummaryId,calendarDate,timezoneOffsetInMs,unixTimestampInMs,isoDate,durationInMs,unmeasurableSleepDurationInMs,deepSleepDurationInMs,lightSleepDurationInMs,remSleepDurationInMs,awakeDurationInMs,overallSleepScore
+x4c64722-64595538-6630,2023-05-09,7200000,1683576120000,2023-05-08T22:02:00.000+02:00,26160000,0,3900000,15480000,6780000,780000,88
+x4c64722-645ab9b4-55c8,2023-05-10,7200000,1683667380000,2023-05-09T23:23:00.000+02:00,21960000,,,,,,
+x4c64722-645bf6d0-6888,2023-05-11,7200000,1683748560000,2023-05-10T21:56:00.000+02:00,26760000,0,26760000,0,0,0,40
+x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+02:00,23700000,0,0,23700000,0,600000,70
             """
         ),
+        parse_dates=[pywearable.constants._CALENDAR_DATE_COL],
     )
     sleep_summary[pywearable.constants.ISODATE_COL] = pd.to_datetime(
         sleep_summary[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
@@ -35,9 +36,6 @@ x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    sleep_summary[pywearable.constants.CALENDAR_DATE_COL] = pd.to_datetime(
-        sleep_summary[pywearable.constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
-    ).dt.date
     return sleep_summary
 
 
@@ -50,31 +48,31 @@ def sleep_stages():
     sleep_stages = pd.read_csv(
         StringIO(
             """sleepSummaryId,timezoneOffsetInMs,unixTimestampInMs,isoDate,durationInMs,type
-x4c64722-64595538-6630,7200000,1683576120000,2023-05-08T22:02:00.000+02:00,600000,n1
-x4c64722-64595538-6630,7200000,1683576720000,2023-05-08T22:12:00.000+02:00,960000,n3
+x4c64722-64595538-6630,7200000,1683576120000,2023-05-08T22:02:00.000+02:00,600000,light
+x4c64722-64595538-6630,7200000,1683576720000,2023-05-08T22:12:00.000+02:00,960000,deep
 x4c64722-64595538-6630,7200000,1683577680000,2023-05-08T22:28:00.000+02:00,60000,awake
-x4c64722-64595538-6630,7200000,1683577740000,2023-05-08T22:29:00.000+02:00,600000,n1
-x4c64722-64595538-6630,7200000,1683578340000,2023-05-08T22:39:00.000+02:00,720000,n3
-x4c64722-64595538-6630,7200000,1683579060000,2023-05-08T22:51:00.000+02:00,1800000,n1
+x4c64722-64595538-6630,7200000,1683577740000,2023-05-08T22:29:00.000+02:00,600000,light
+x4c64722-64595538-6630,7200000,1683578340000,2023-05-08T22:39:00.000+02:00,720000,deep
+x4c64722-64595538-6630,7200000,1683579060000,2023-05-08T22:51:00.000+02:00,1800000,light
 x4c64722-64595538-6630,7200000,1683580860000,2023-05-08T23:21:00.000+02:00,2700000,rem
-x4c64722-64595538-6630,7200000,1683583560000,2023-05-09T00:06:00.000+02:00,840000,n1
-x4c64722-64595538-6630,7200000,1683584400000,2023-05-09T00:20:00.000+02:00,1080000,n3
-x4c64722-64595538-6630,7200000,1683585480000,2023-05-09T00:38:00.000+02:00,2520000,n1
+x4c64722-64595538-6630,7200000,1683583560000,2023-05-09T00:06:00.000+02:00,840000,light
+x4c64722-64595538-6630,7200000,1683584400000,2023-05-09T00:20:00.000+02:00,1080000,deep
+x4c64722-64595538-6630,7200000,1683585480000,2023-05-09T00:38:00.000+02:00,2520000,light
 x4c64722-64595538-6630,7200000,1683588000000,2023-05-09T01:20:00.000+02:00,1260000,rem
-x4c64722-64595538-6630,7200000,1683589260000,2023-05-09T01:41:00.000+02:00,2760000,n1
-x4c64722-64595538-6630,7200000,1683592020000,2023-05-09T02:27:00.000+02:00,360000,n3
-x4c64722-64595538-6630,7200000,1683592380000,2023-05-09T02:33:00.000+02:00,240000,n1
+x4c64722-64595538-6630,7200000,1683589260000,2023-05-09T01:41:00.000+02:00,2760000,light
+x4c64722-64595538-6630,7200000,1683592020000,2023-05-09T02:27:00.000+02:00,360000,deep
+x4c64722-64595538-6630,7200000,1683592380000,2023-05-09T02:33:00.000+02:00,240000,light
 x4c64722-64595538-6630,7200000,1683592620000,2023-05-09T02:37:00.000+02:00,660000,awake
-x4c64722-64595538-6630,7200000,1683593280000,2023-05-09T02:48:00.000+02:00,1440000,n1
-x4c64722-64595538-6630,7200000,1683594720000,2023-05-09T03:12:00.000+02:00,780000,n3
-x4c64722-64595538-6630,7200000,1683595500000,2023-05-09T03:25:00.000+02:00,540000,n1
+x4c64722-64595538-6630,7200000,1683593280000,2023-05-09T02:48:00.000+02:00,1440000,light
+x4c64722-64595538-6630,7200000,1683594720000,2023-05-09T03:12:00.000+02:00,780000,deep
+x4c64722-64595538-6630,7200000,1683595500000,2023-05-09T03:25:00.000+02:00,540000,light
 x4c64722-64595538-6630,7200000,1683596040000,2023-05-09T03:34:00.000+02:00,2820000,rem
-x4c64722-64595538-6630,7200000,1683598860000,2023-05-09T04:21:00.000+02:00,960000,n1
+x4c64722-64595538-6630,7200000,1683598860000,2023-05-09T04:21:00.000+02:00,960000,light
 x4c64722-64595538-6630,7200000,1683599820000,2023-05-09T04:37:00.000+02:00,60000,awake
-x4c64722-64595538-6630,7200000,1683599880000,2023-05-09T04:38:00.000+02:00,3180000,n1
-x4c64722-645bf6d0-6888,7200000,1683748560000,2023-05-10T21:56:00.000+02:00,26760000,n3
+x4c64722-64595538-6630,7200000,1683599880000,2023-05-09T04:38:00.000+02:00,3180000,light
+x4c64722-645bf6d0-6888,7200000,1683748560000,2023-05-10T21:56:00.000+02:00,26760000,deep
 x4c64722-645d63f8-5c94,7200000,1683842040000,2023-05-11T23:54:00.000+02:00,600000,awake
-x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700000,n1
+x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700000,light
         """
         )
     )
@@ -145,11 +143,14 @@ def test_get_total_sleep_time(base_loader):
     starting from a loader returns the proper
     values.
     """
-    tst = pywearable.sleep.get_total_sleep_time(base_loader, user_id="1")
+    tst = pywearable.sleep.get_total_sleep_time(
+        base_loader, user_id="1", return_df=False
+    )
+    print(tst)
     assert tst == {
         "1": {
             datetime.date(2023, 5, 9): 436.0,
-            datetime.date(2023, 5, 10): 0.0,
+            datetime.date(2023, 5, 10): np.nan,
             datetime.date(2023, 5, 11): 446.0,
             datetime.date(2023, 5, 12): 395.0,
         }
@@ -168,7 +169,27 @@ def test_get_wake_after_sleep_onset(base_loader):
     raise AssertionError
 
 
-def get_n1_latency(base_loader):
+def get_light_latency(base_loader):
+    raise AssertionError
+
+
+def get_n2_latency(base_loader):
+    raise AssertionError
+
+
+def get_deep_latency(base_loader):
+    raise AssertionError
+
+
+def get_rem_latency(base_loader):
+    raise AssertionError
+
+
+def get_deep_latency(base_loader):
+    raise AssertionError
+
+
+def get_light_latency(base_loader):
     raise AssertionError
 
 
@@ -197,22 +218,73 @@ def test_get_bedtime(base_loader):
     raise AssertionError
 
 
-def test_compute_sleep_score(sleep_summary_id_as_idx):
-    sleep_score = pywearable.sleep._compute_sleep_score(sleep_summary_id_as_idx)
+def test_compute_bedtime(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    bedtime = pywearable.sleep._compute_bedtime(sleep_summary)
+    assert type(bedtime) == pd.Series
+    pandas.testing.assert_series_equal(
+        bedtime,
+        pd.Series(
+            [
+                pd.Timestamp(2023, 5, 8, 22, 2),
+                pd.Timestamp(2023, 5, 9, 23, 23),
+                pd.Timestamp(2023, 5, 10, 21, 56),
+                pd.Timestamp(2023, 5, 11, 23, 54),
+            ],
+            index=[
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
+            ],
+        ),
+        check_names=False,
+        check_dtype=True,
+    )
+
+
+def test_compute_wakeup_time(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary)
+    assert type(wakeup_time) == pd.Series
+    pandas.testing.assert_series_equal(
+        wakeup_time,
+        pd.Series(
+            [
+                pd.Timestamp(2023, 5, 9, 5, 31),
+                pd.Timestamp(2023, 5, 10, 5, 29),
+                pd.Timestamp(2023, 5, 11, 5, 22),
+                pd.Timestamp(2023, 5, 12, 6, 39),
+            ],
+            index=[
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
+            ],
+        ),
+        check_names=False,
+        check_dtype=True,
+    )
+
+
+def test_compute_sleep_score(sleep_summary):
+    sleep_summary = sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL)
+    sleep_score = pywearable.sleep._compute_sleep_score(sleep_summary)
     assert type(sleep_score) == pd.Series
     pandas.testing.assert_series_equal(
         sleep_score,
         pd.Series(
             [88.0, np.nan, 40.0, 70.0],
             index=[
-                "x4c64722-64595538-6630",
-                "x4c64722-645ab9b4-55c8",
-                "x4c64722-645bf6d0-6888",
-                "x4c64722-645d63f8-5c94",
+                pd.Timestamp(2023, 5, 9),
+                pd.Timestamp(2023, 5, 10),
+                pd.Timestamp(2023, 5, 11),
+                pd.Timestamp(2023, 5, 12),
             ],
         ),
         check_names=False,
-        check_dtype=False,
+        check_dtype=True,
     )
 
 
@@ -226,17 +298,18 @@ def test_compute_sleep_efficiency(sleep_summary_id_as_idx, sleep_stages):
     )
 
 
-def test_compute_total_sleep_time(sleep_summary_id_as_idx, sleep_stages):
+def test_compute_total_sleep_time(sleep_summary, sleep_stages):
     tst = pywearable.sleep._compute_total_sleep_time(
-        sleep_summary=sleep_summary_id_as_idx, sleep_stages=sleep_stages
+        sleep_summary=sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL),
+        sleep_stages=sleep_stages,
     )
     correct_tst = pd.Series(
-        [436.0, 366.0, 446.0, 395.0],
+        [436.0, np.nan, 446.0, 395.0],
         index=[
-            "x4c64722-64595538-6630",
-            "x4c64722-645ab9b4-55c8",
-            "x4c64722-645bf6d0-6888",
-            "x4c64722-645d63f8-5c94",
+            pd.Timestamp(2023, 5, 9),
+            pd.Timestamp(2023, 5, 10),
+            pd.Timestamp(2023, 5, 11),
+            pd.Timestamp(2023, 5, 12),
         ],
     )
     pd.testing.assert_series_equal(left=tst, right=correct_tst, check_names=False)
@@ -292,31 +365,30 @@ def test_compute_latencies(
         ]
     ).issubset(sleep_latencies.columns)
     # Check latencies for a given sleep summary
-    assert sleep_latencies.loc["x4c64722-64595538-6630", "n3"] == 10
+    assert sleep_latencies.loc["x4c64722-64595538-6630", "deep"] == 10
     assert sleep_latencies.loc["x4c64722-64595538-6630", "awake"] == 26
-    assert sleep_latencies.loc["x4c64722-64595538-6630", "n1"] == 0
+    assert sleep_latencies.loc["x4c64722-64595538-6630", "light"] == 0
     assert sleep_latencies.loc["x4c64722-64595538-6630", "rem"] == 79
     # Check latencies for sleep summary with only one sleep stage
-    assert sleep_latencies.loc["x4c64722-645bf6d0-6888", "n3"] == 0
-    assert np.isnan(sleep_latencies.loc["x4c64722-645bf6d0-6888", "n1"])
+    assert sleep_latencies.loc["x4c64722-645bf6d0-6888", "deep"] == 0
+    assert np.isnan(sleep_latencies.loc["x4c64722-645bf6d0-6888", "light"])
     # Check latencies for sleep summary with no sleep stages
     assert np.isnan(sleep_latencies.loc["x4c64722-645ab9b4-55c8", "rem"])
-    assert np.isnan(sleep_latencies.loc["x4c64722-645ab9b4-55c8", "n1"])
+    assert np.isnan(sleep_latencies.loc["x4c64722-645ab9b4-55c8", "light"])
 
 
-def test_compute_waso(
-    sleep_summary_id_as_idx: pd.DataFrame, sleep_stages: pd.DataFrame
-):
+def test_compute_waso(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
     waso = pywearable.sleep._compute_wake_after_sleep_onset(
-        sleep_summary_id_as_idx, sleep_stages
+        sleep_summary.set_index(pywearable.constants._CALENDAR_DATE_COL), sleep_stages
     )
+    print(waso)
     assert type(waso) == pd.Series
     # Check latencies for a given sleep summary
-    assert waso.loc["x4c64722-64595538-6630"] == 13.0
+    assert waso.loc[pd.Timestamp(2023, 5, 9)] == 13.0
     # Check latencies for sleep summary with no wake sleep stage
-    assert waso.loc["x4c64722-645bf6d0-6888"] == 0
-    # Check latencies for sleep summary with no sleep stages
-    assert np.isnan(waso.loc["x4c64722-645ab9b4-55c8"])
+    assert waso.loc[pd.Timestamp(2023, 5, 11)] == 0
+    # Check waso for sleep summary with no sleep stages
+    assert np.isnan(waso.loc[pd.Timestamp(2023, 5, 10)])
 
 
 def test_compute_sleep_onset_latency(
@@ -426,17 +498,17 @@ def test_compute_rem_count(
     assert counts.loc["x4c64722-64595538-6630"] == 3.0
 
 
-def test_compute_n1_duration(
+def test_compute_light_duration(
     sleep_summary_id_as_idx: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
 
     # Setup
-    n1 = pywearable.sleep._compute_n1_duration(
+    light = pywearable.sleep._compute_light_duration(
         sleep_summary=sleep_summary_id_as_idx, sleep_stages=sleep_stages
     )
     # Check and assert
     pd.testing.assert_series_equal(
-        n1,
+        light,
         pd.Series(
             [258.0, np.nan, 0.0, 395.0],
             index=[
@@ -476,17 +548,17 @@ def test_compute_n2_duration(
     )
 
 
-def test_compute_n3_duration(
+def test_compute_deep_duration(
     sleep_summary_id_as_idx: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
     # Setup
-    n3 = pywearable.sleep._compute_n3_duration(
+    deep = pywearable.sleep._compute_deep_duration(
         sleep_summary=sleep_summary_id_as_idx, sleep_stages=sleep_stages
     )
 
     # Check and assert
     pd.testing.assert_series_equal(
-        n3,
+        deep,
         pd.Series(
             [65.0, np.nan, 446.0, 0.0],
             index=[

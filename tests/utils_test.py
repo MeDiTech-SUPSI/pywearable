@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 import pywearable.utils
@@ -7,6 +8,14 @@ import pywearable.utils
     "times, mean_time",
     [
         [["23:30", "00:00", "23:00"], "23:30"],
+        [
+            [
+                pd.Timestamp(2024, 1, 1, 23, 30),
+                pd.Timestamp(2024, 1, 2, 0, 0),
+                pd.Timestamp(2024, 1, 3, 23, 0),
+            ],
+            "23:30",
+        ],
         [["23:30", "00:30"], "00:00"],
         [["21:15", "22:47"], "22:01"],
     ],

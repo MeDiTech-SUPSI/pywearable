@@ -759,10 +759,10 @@ def get_heart_rate_statistics(
     The type of statistic to be computed can be set using
     the ``statistic`` parameter. Available options are:
 
-        - ``"restHR"```for resting heart rate
-        - ``"minHR"```for minimum heart rate
-        - ``"maxHR"```for maximum heart rate
-        - ``"avgHR"```for average heart rate
+        - ``"restHR"`` for resting heart rate
+        - ``"minHR"`` for minimum heart rate
+        - ``"maxHR"`` for maximum heart rate
+        - ``"avgHR"`` for average heart rate
 
     Both single statistics and multiple statistics can
     be computed. If all the available statistics have
@@ -1615,6 +1615,7 @@ def get_hrv_statistics(
         # load the whole bbi history required, with some room (+- 12 hrs at start/end)
         # to account for timezones
         # TODO split loading into multiple days
+        # TODO load from min sleep timestamp to max sleep timestamp
         bbi_dict = {}
         bbi_df = loader.load_bbi(
             user_id=user,
@@ -1625,8 +1626,8 @@ def get_hrv_statistics(
         if len(bbi_df) > 0:
             for date, (start_hour, end_hour) in sleep_timestamps.items():
                 night_bbi = bbi_df.loc[
-                    (bbi_df[constants.ISODATE_COL] > start_hour)
-                    & (bbi_df[constants.ISODATE_COL] < end_hour)
+                    (bbi_df[constants._ISODATE_COL] >= start_hour)
+                    & (bbi_df[constants._ISODATE_COL] <= end_hour)
                 ]
                 filtered_night_bbi = utils.filter_out_awake(
                     loader, user, night_bbi, date, resolution=1
