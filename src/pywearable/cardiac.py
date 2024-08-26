@@ -1626,8 +1626,8 @@ def get_hrv_statistics(
         if len(bbi_df) > 0:
             for date, (start_hour, end_hour) in sleep_timestamps.items():
                 night_bbi = bbi_df.loc[
-                    (bbi_df[constants._ISODATE_COL] >= start_hour)
-                    & (bbi_df[constants._ISODATE_COL] <= end_hour)
+                    (bbi_df[constants.ISODATE_COL] >= start_hour)
+                    & (bbi_df[constants.ISODATE_COL] <= end_hour)
                 ]
                 filtered_night_bbi = utils.filter_out_awake(
                     loader, user, night_bbi, date, resolution=1
