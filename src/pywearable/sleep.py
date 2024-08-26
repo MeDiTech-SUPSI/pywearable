@@ -2306,15 +2306,9 @@ def _compute_total_sleep_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Serie
         )
     ):
         tst = (
-            sleep_summary[
-                constants._SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL
-            ].fillna(0)
-            + sleep_summary[
-                constants._SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL
-            ].fillna(0)
-            + sleep_summary[
-                constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL
-            ].fillna(0)
+            sleep_summary[constants._SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL]
+            + sleep_summary[constants._SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL]
+            + sleep_summary[constants._SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL]
         ) / (
             1000 * 60
         )  # convert from ms to seconds, and then to minutes
@@ -3705,7 +3699,7 @@ def get_sleep_statistics(
                 if not (end_date is None):
                     max_date = end_date
                 elif len(ser) > 0:
-                    max_date = ser.index.max()
+                    max_date = ser.index.max() + pd.Timedelta(days=1)
 
                 if not ((min_date is None) and (max_date is None)):
                     user_date_range = pd.date_range(
