@@ -1,8 +1,5 @@
-july
-numpy
-pandas
+-r common.txt
 pymongo
 pytest
-scipy
 sphinx
 sphinx-rtd-theme
