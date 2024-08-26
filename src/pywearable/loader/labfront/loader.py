@@ -38,7 +38,7 @@ _LABFRONT_METRICS_DICT = {
     },
 }
 
-LABFRONT_FILE_INDEX_NAME = ".pywearable_labfront_file_index.csv"
+LABFRONT_FILE_INDEX_NAME = ".pywearable_file_index.csv"
 
 
 class LabfrontLoader(BaseLoader):
@@ -347,7 +347,10 @@ class LabfrontLoader(BaseLoader):
                         x for x in participant_folder.iterdir() if x.is_dir()
                     ]
                     for metric_folder in metrics_folders:
-                        if metric_folder.name == "movesense-stream":
+                        if (
+                            "movesense-stream" in metric_folder.name
+                            or "women" in metric_folder.name
+                        ):
                             continue
                         # Set is_questionnaire/is_todo
                         is_questionnaire = False
@@ -381,7 +384,9 @@ class LabfrontLoader(BaseLoader):
                         # Get first dates in the csv files
                         dates = [
                             self._get_first_and_last_date_in_csv_file(
-                                csv_file, n_files=n_files
+                                csv_file,
+                                n_files=n_files,
+                                is_questionnaire=is_questionnaire,
                             )
                             for csv_file in csv_files
                         ]
@@ -429,10 +434,20 @@ class LabfrontLoader(BaseLoader):
                             metric_file_index[lf_constants.FILE_INDEX_TASK_FOLDER] = (
                                 subfolders
                             )
+                        # Let's drop the row in which we have NaT on both timestamps
+                        metric_file_index = metric_file_index.dropna(
+                            subset=[
+                                lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
+                                lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY,
+                            ],
+                            axis=0,
+                            how="all",
+                        )
+                        if len(metric_file_index) == 0:
+                            continue
 
                         # Reindex based on first and last dates
                         def reindex_by_dates_on_groupby(groupby: pd.DataFrame):
-
                             dates = pd.date_range(
                                 groupby.index.min(),
                                 groupby[
@@ -539,7 +554,10 @@ class LabfrontLoader(BaseLoader):
         return (todo_name, todo_id, task_id)
 
     def _get_first_and_last_date_in_csv_file(
-        self, path_to_file: Union[str, Path], n_files: int
+        self,
+        path_to_file: Union[str, Path],
+        n_files: int,
+        is_questionnaire: bool,
     ) -> datetime.date:
         # Get first date of the data in CSV file
         # Either we have it in the file Name (e.g. 240313) or we
@@ -614,9 +632,15 @@ class LabfrontLoader(BaseLoader):
             if n_files == 1:
                 # Read full CSV file and get last date
                 try:
+                    n_rows_to_skip = 1
+                    if is_questionnaire:
+                        n_rows_to_skip += (
+                            self.get_key_length(file_path=path_to_file) + 1
+                        )
                     temp_df = pd.read_csv(
                         path_to_file,
-                        skiprows=self.get_header_length(file_path=path_to_file) + 1,
+                        skiprows=self.get_header_length(file_path=path_to_file)
+                        + n_rows_to_skip,
                     )
                     if constants.ISODATE_COL in temp_df:
                         column = constants.ISODATE_COL

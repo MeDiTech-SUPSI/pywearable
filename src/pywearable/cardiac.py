@@ -1690,7 +1690,7 @@ def get_hrv_statistics(
         return mi_df
 
 
-def getCARDIAC_statistics(
+def get_cardiac_statistics(
     loader: BaseLoader,
     user_id: Union[str, list],
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
