@@ -12,7 +12,6 @@ Welcome to pywearable's documentation!
 
    _pages/getting_started
    _pages/data_sources
-   _pages/metrics
    _pages/tutorials
    _pages/metrics
    _pages/statistics
