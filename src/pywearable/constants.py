@@ -97,6 +97,9 @@ EPOCH_ACTIVE_TIME_MS_COL = "activeTimeInMs"
 # User column (for index and related)
 USER_COL = "user"
 
+STEPS_STEPS_COL = "steps"
+STEPS_TOTAL_STEPS_COL = "totalSteps"
+
 #################################################
 #           CSV FILES - COLUMN VALUES          #
 #################################################
