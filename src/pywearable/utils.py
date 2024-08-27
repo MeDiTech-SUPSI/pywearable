@@ -6,7 +6,7 @@ import datetime
 import time
 from cmath import phase, rect
 from math import degrees, floor, radians
-from typing import Union
+from typing import Literal, Union
 
 import dateutil.parser
 import numpy as np
@@ -57,7 +57,9 @@ def check_date(
 
 
 def check_start_and_end_dates(
-    start_date: Union[datetime.datetime, None], end_date: Union[datetime.datetime, None]
+    start_date: Union[datetime.datetime, None],
+    end_date: Union[datetime.datetime, None],
+    error: Literal["raise", "skip"] = "skip",
 ) -> bool:
     """Check if dates are in correct order.
 
@@ -71,6 +73,8 @@ def check_start_and_end_dates(
         Start date that needs to be checked.
     end_date : :class:`datetime.datetime` or None
         End date that needs to be checked.
+    error: "raise" or "skip"
+        Whehter to raise an error (``"raise"``) or not, by default ``"raise"``.
 
     Returns
     -------
@@ -80,6 +84,10 @@ def check_start_and_end_dates(
     """
     if not ((start_date is None) and (end_date is None)):
         if end_date < start_date:
+            if error == "raise":
+                raise ValueError(
+                    f"end_date {end_date} is lower than start_date {start_date}"
+                )
             return False
     return True
 
