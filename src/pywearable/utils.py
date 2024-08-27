@@ -22,18 +22,18 @@ _MS_TO_DAY_CONVERSION = 1000 * 60 * 60 * 24
 
 
 def check_date(
-    date: Union[datetime.datetime, datetime.date, str, None]
+    date: Union[datetime.datetime, datetime.date, str, pd.Timestamp, None]
 ) -> datetime.datetime:
     """Convert date to :class:`datetime.datetime` format
 
     Parameters
     ----------
-    date : datetime.datetime or datetime.date or str or None
-        Date to be converted
+    date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pandas.Timestamp` or ``None``
+        Date to be converted.
 
     Returns
     -------
-    datetime.datetime
+    :class:`datetime.datetime`
         Converted date.
 
     Raises
@@ -50,6 +50,8 @@ def check_date(
         return None
     elif type(date) == datetime.datetime:
         return date
+    elif type(date) == pd.Timestamp:
+        return date.to_pydatetime()
     else:
         raise ValueError(f"{type(date)} is not valid.")
 
@@ -462,7 +464,7 @@ def get_earliest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    
+
     return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
