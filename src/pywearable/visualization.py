@@ -341,7 +341,9 @@ def get_cardiac_line_graph_and_stats(
 
     # if there's no data at all raise error
     if np.isnan(rest_hr).all() or np.isnan(max_hr).all():
-        raise ValueError(f"Cardiac data not available between {start_date} and {end_date}")
+        raise ValueError(
+            f"Cardiac data not available between {start_date} and {end_date}"
+        )
 
     # plotting
     with plt.style.context("ggplot"):
@@ -923,6 +925,7 @@ def get_sleep_summary_graph(
     title_fontsize: int = 20,
     score_fontsize: int = 15,
     kwargs_trend_analysis: dict = {},
+    resolution: int = 1,
 ):
     """
     Generates a graph of all hypnograms of main sleeps of `user_id` for the period of interest
@@ -1051,12 +1054,10 @@ def get_sleep_summary_graph(
     ).dt.total_seconds()
 
     time_period = pd.date_range(
-        start_date,
-        periods=(end_date - start_date).days,
-        freq="D",
+        start_date, periods=(end_date - start_date).days, freq="D", normalize=True
     )
 
-    time_period = pd.Series(time_period).dt.date
+    time_period = pd.Series(time_period)
 
     # define color-coding based on garmin connect visuals
     color_dict = {
@@ -1095,7 +1096,9 @@ def get_sleep_summary_graph(
             else:
                 return "firebrick"
 
-    hypnograms = loader.load_hypnogram(user_id, start_date, end_date, resolution=1)
+    hypnograms = loader.load_hypnogram(
+        user_id, start_date, end_date, resolution=resolution
+    )
     if consistency_metric is None:
         fig, ax = plt.subplots(figsize=figsize)
     elif consistency_metric == "midpoint" or consistency_metric == "duration":
@@ -1111,7 +1114,9 @@ def get_sleep_summary_graph(
 
     # for every day in the period of interest, we plot the hypnogram
     for j, night in enumerate(time_period):
-        try:  # this takes care of days where data is missing, skipping days through the plot y-axis
+        if (
+            night in hypnograms.keys()
+        ):  # this takes care of days where data is missing, skipping days through the plot y-axis
             # get the hypnogram
             hypnogram = hypnograms[night]
             # create dataframe for hypnogram
@@ -1119,13 +1124,14 @@ def get_sleep_summary_graph(
                 {
                     "stage": hypnogram["values"],
                     "isoDate": [
-                        hypnogram["start_time"] + i * datetime.timedelta(minutes=1)
+                        hypnogram["start_time"]
+                        + i * datetime.timedelta(minutes=resolution)
                         for i in range(
                             int(
                                 (
                                     hypnogram["end_time"] - hypnogram["start_time"]
                                 ).total_seconds()
-                                / 60
+                                / (60 * resolution)
                             )
                         )
                     ],
@@ -1206,8 +1212,6 @@ def get_sleep_summary_graph(
                 color=appropriate_color,
                 fontsize=score_fontsize,
             )
-        except Exception as e:  # skip missing dates
-            continue
 
     # Set limits to be an hour lower than lowest difference
     # and one hour more than longest and latest sleep
@@ -1731,7 +1735,7 @@ def radar_chart(
     loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str`
-        The id(s) for which the sleep statistic must be computed.
+        The id of the user for which the visualization must be created.
     start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
         Start date for data retrieval, by default None
     end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
@@ -1745,8 +1749,8 @@ def radar_chart(
     metrics : :class:`list` or None, optional
         List of pywearable function for metrics calculation. The list must contain more than 1 metric, by default None
     save_to : :class:`str` or None, optional
-        Path where to save the grid plot, by default None
-    show : :class:`str`, optional
+        Path where to save the plot, by default None
+    show : :class:`bool`, optional
         Whether to show the plot, by default True
     title : :class:`str`, optional
         Title of the plot, by default None
@@ -1823,8 +1827,6 @@ def radar_chart(
             stacklevel=2,
         )
 
-    print(ref_metrics)
-    print(comp_metrics)
     # Prepare plot
     if legend:
         fig, (ax_l, ax) = plt.subplots(
