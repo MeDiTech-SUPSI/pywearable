@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,8 +8,8 @@ version = "0.0.1"
 description = "A package to parse, analyse, and visualize wearable data."
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">= 3.8"
-dependencies = ["pandas>=2.0", "matplotlib", "scipy"]
+requires-python = ">= 3.10"
+dependencies = ["pandas", "matplotlib", "scipy"]
 authors = [
     { name = "Davide Marzorati", email = "davide.marzorati.93@gmail.com" },
     { name = "Alvise Dei Rossi" },
