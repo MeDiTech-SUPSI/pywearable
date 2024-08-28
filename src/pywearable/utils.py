@@ -90,7 +90,7 @@ def check_is_df(input, raise_name="input"):
     return input
 
 
-def get_user_ids(loader: "BaseLoader", user_id: Union[str, list] = "all"):
+def get_user_ids(loader, user_id: Union[str, list] = "all"):
     """Returns user ids in the appropriate format required by pywearable functions
 
     Parameters
@@ -190,11 +190,11 @@ def return_multiindex_df(
         else:
             # Single index dataframe
             return df.reset_index(
-                level=[constants._USER_COL, constants._CALENDAR_DATE_COL]
+                level=[constants.USER_COL, constants.CALENDAR_DATE_COL]
             )
 
 
-def get_summary(loader: "BaseLoader", comparison_date=time.time()):
+def get_summary(loader, comparison_date=time.time()):
     """Returns a general summary of the latest update of every metric for every participant
 
     Args:
@@ -462,7 +462,7 @@ def get_earliest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    
+
     return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
@@ -601,7 +601,7 @@ def std_time(times):
 
 
 def filter_out_awake(
-    loader: "BaseLoader",
+    loader,
     user: str,
     df: pd.DataFrame,
     date: datetime.date,
@@ -658,7 +658,7 @@ def filter_out_awake(
 
     for start, end in zip(datetime_starts, datetime_ends):
         df = df.loc[
-            (df[constants._ISODATE_COL] < start) | (df[constants._ISODATE_COL] > end)
+            (df[constants.ISODATE_COL] < start) | (df[constants.ISODATE_COL] > end)
         ]
 
     return df
