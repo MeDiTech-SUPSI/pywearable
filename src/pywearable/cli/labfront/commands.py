@@ -182,12 +182,15 @@ def convert_folder(input_folder, output_folder):
                     old_csv_paths=csv_files,
                 )
             for metric_subfolder in metric_subfolders:
+                csv_files = [
+                    x for x in metric_folder.iterdir() if x.name.endswith("csv")
+                ]
                 write_new_task_csv_file(
                     output_folder=output_folder,
                     participant_id=folder.name,
                     metric=metric_folder.name,
                     task=metric_subfolder.name,
-                    old_csv_path=csv_file,
+                    old_csv_path=csv_files,
                 )
 
 
