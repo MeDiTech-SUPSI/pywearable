@@ -35,6 +35,15 @@ _METRIC_DICT = {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
     },
+    lf_constants.METRIC_DEVICE_TEMP: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEVICE_TEMP_RECORDED_TIME_KEY,
+    },
+    lf_constants.METRIC_HRV_DETAILS: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
+        "end_date_key": None,
+    },
     lf_constants.METRIC_STEPS: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_STEPS_DATETIME_COL,
@@ -678,6 +687,98 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
 
+    def load_daily_spo2(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load daily SpO2 values.
+
+        This function loads SpO2 values from the DB. The returned
+        :class:`pd.DataFrame` contains the following colums:
+
+        - timestamp: date
+        - average_value: average measured SpO2
+        - lower_bound: lower bound of measured SpO2
+        - upper_bound: upper bound of measured SpO2
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : datetime.datetime or datetime.date or str or None, optional
+            Start date for data retrieval, by default None
+        end_date : datetime.datetime or datetime.date or str or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            Daily SpO2 values.
+        """
+        return self.load_metric(
+            metric=lf_constants.METRIC_SPO2,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def load_device_temperature(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load device temperature.
+
+        This function loads device temperature for a given
+        ``user_id`` with the time period defined by
+        ``start_date`` and ``end_date``.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        return self.load_metric(
+            metric=lf_constants.METRIC_DEVICE_TEMP,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def load_hrv_details(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        hrv_details = self.load_metric(
+            metric=lf_constants.METRIC_HRV_DETAILS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return hrv_details
+
     def load_metric(
         self,
         metric: str,
@@ -740,9 +841,6 @@ class LifeSnapsLoader(BaseLoader):
             start_date=start_date,
             end_date=end_date,
         )
-
-        print(date_conversion_dict)
-        print(date_filter_dict)
 
         if not _METRIC_COLLECTION_KEY in _METRIC_DICT[metric].keys():
             collection = self.fitbit_collection
@@ -880,12 +978,12 @@ class LifeSnapsLoader(BaseLoader):
                 "$match": {
                     "$and": [
                         {start_date_key: {"$gte": start_date}},
-                        {end_date_key: {"$lte": end_date}},
+                        {end_date_key: {"$lt": end_date}},
                     ]
                 }
             }
         elif (start_date is None) and (not (end_date is None)):
-            date_filter = {"$match": {end_date_key: {"$lte": end_date}}}
+            date_filter = {"$match": {end_date_key: {"$lt": end_date}}}
         elif (not (start_date is None)) and (end_date is None):
             date_filter = {"$match": {start_date_key: {"$gte": start_date}}}
         else:
