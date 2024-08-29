@@ -1,5 +1,6 @@
 import datetime
 import warnings
+from ast import literal_eval
 from typing import Union
 
 import numpy as np
@@ -10,7 +11,8 @@ try:
     from bson.objectid import ObjectId
 except ImportError:
     warnings.warn(
-        "pymongo is required when using LifeSnapsLoader", category=ImportWarning
+        "pymongo was not detected, but is required when using LifeSnapsLoader",
+        category=ImportWarning,
     )
 
 from ... import constants, utils
@@ -31,18 +33,25 @@ _METRIC_DICT = {
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
         _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
     },
-    lf_constants.METRIC_SPO2: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
-    },
     lf_constants.METRIC_DEVICE_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEVICE_TEMP_RECORDED_TIME_KEY,
     },
+    lf_constants.METRIC_ECG: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_AFIB_ECG_READINGS,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_DATETIME_COL,
+    },
     lf_constants.METRIC_HRV_DETAILS: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
-        "end_date_key": None,
+    },
+    lf_constants.METRIC_PROFILE: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_PROFILE,
+        _METRIC_START_DATE_KEY: None,
+    },
+    lf_constants.METRIC_SPO2: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
     },
     lf_constants.METRIC_STEPS: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
@@ -106,9 +115,9 @@ class LifeSnapsLoader(BaseLoader):
 
     Parameters
     ----------
-    host : str
+    host : :class:`str`
         Host address of pymongo DB instance.
-    port: int
+    port: :class:`int`
         Port of the pymongo DB instance.
     """
 
@@ -765,6 +774,97 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
 
+    def load_ecg(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load Afib ECG recordings.
+
+        This function loads atrial fibrillation (Afib)
+        ECG recordings, and returns a :class:`pandas.DataFrame`
+        with the following columns:
+
+            - reading_id
+            - wire_id
+            - result_classification
+            - heart_rate
+            - heart_rate_alert
+            - firmware_version
+            - device_app_version
+            - hardware_version
+            - value
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            User profile data.
+        """
+        ecg = self.load_metric(
+            metric=lf_constants.METRIC_ECG,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        ecg = self._reorder_datetime_columns(ecg)
+        if len(ecg) > 0:
+            # Reformat wave form samples
+            ecg[
+                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
+            ] = ecg[
+                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
+            ].apply(
+                lambda x: literal_eval(x.replace("  ", ","))
+            )
+            # Get number of samples
+            ecg["nSamples"] = ecg[
+                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
+            ].apply(lambda x: len(x))
+            # Get time info
+            ecg["timeInMs"] = ecg["nSamples"].apply(
+                lambda x: [1 / (512 / y) * 1000 if y > 0 else 0 for y in range(x)]
+            )
+            ecg = ecg.drop(["nSamples"], axis=1)
+
+            # Explode waveform samples
+            ecg = ecg.explode(
+                column=[
+                    lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL,
+                    "timeInMs",
+                ],
+                ignore_index=True,
+            )
+            ecg[constants.UNIXTIMESTAMP_IN_MS_COL] = (
+                ecg[constants.UNIXTIMESTAMP_IN_MS_COL] + ecg["timeInMs"]
+            )
+            ecg[constants.ISODATE_COL] = pd.to_datetime(
+                ecg[constants.UNIXTIMESTAMP_IN_MS_COL]
+                + ecg[constants.TIMEZONEOFFSET_IN_MS_COL],
+                unit="ms",
+                utc=True,
+            ).dt.tz_localize(None)
+            ecg = ecg.drop(["timeInMs"], axis=1)
+            ecg = ecg.rename(
+                columns={
+                    lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL: lf_constants.ECG_SAMPLE_VALUE_COL
+                }
+            )
+        return ecg
+
     def load_hrv_details(
         self,
         user_id: Union[ObjectId, str],
@@ -778,6 +878,56 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
         return hrv_details
+
+    def load_profile(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load user profile information.
+
+        This function loads the following user profile
+        information:
+
+            - child
+            - start_of_week
+            - sleep_tracking
+            - time_display_format
+            - gender
+            - weight_unit
+            - distance_unit
+            - height_unit
+            - water_unit
+            - glucose_unit
+            - swim_unit
+            - bmi
+            - age
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            User profile data.
+        """
+        return self.load_metric(
+            metric=lf_constants.METRIC_PROFILE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
     def load_metric(
         self,
