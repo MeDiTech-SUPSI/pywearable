@@ -380,16 +380,16 @@ def _compute_rest_pulse_ox_statistic(
         raise ValueError(
             f"rest_pulse_ox must be of type pd.DataFrame and not {type(rest_pulse_ox)}"
         )
-    if constants._CALENDAR_DATE_COL not in rest_pulse_ox.columns:
+    if constants.CALENDAR_DATE_COL not in rest_pulse_ox.columns:
         raise ValueError(
-            f"{constants._CALENDAR_DATE_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
+            f"{constants.CALENDAR_DATE_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
         )
-    if constants._SPO2_SPO2_COL not in rest_pulse_ox.columns:
+    if constants.SPO2_SPO2_COL not in rest_pulse_ox.columns:
         raise ValueError(
-            f"{constants._SPO2_SPO2_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
+            f"{constants.SPO2_SPO2_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
         )
-    agg_series = rest_pulse_ox.groupby(constants._CALENDAR_DATE_COL)[
-        constants._SPO2_SPO2_COL
+    agg_series = rest_pulse_ox.groupby(constants.CALENDAR_DATE_COL)[
+        constants.SPO2_SPO2_COL
     ].agg(agg, *agg_args, **agg_kwargs)
     return agg_series
 
@@ -590,7 +590,7 @@ def get_rest_pulse_ox_statistics(
         date_periods = pd.date_range(start_date, end_date, freq="D")
         multi_index = pd.MultiIndex.from_product(
             [user_id, date_periods],
-            names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
+            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
         )
         rest_pulse_ox_stat_df = pd.DataFrame(index=multi_index, columns=metrics)
         both_dates_valid = True
@@ -610,11 +610,11 @@ def get_rest_pulse_ox_statistics(
             # Get only data with calendar date between start and end date and reset index
             if not (start_date is None):
                 rest_pulse_ox = rest_pulse_ox[
-                    rest_pulse_ox[constants._CALENDAR_DATE_COL] >= start_date
+                    rest_pulse_ox[constants.CALENDAR_DATE_COL] >= start_date
                 ].reset_index(drop=True)
             if not (end_date is None):
                 rest_pulse_ox = rest_pulse_ox[
-                    rest_pulse_ox[constants._CALENDAR_DATE_COL] < end_date
+                    rest_pulse_ox[constants.CALENDAR_DATE_COL] < end_date
                 ].reset_index(drop=True)
             for metric in metrics:
                 # Get series with metrics by calendarDate
@@ -634,8 +634,8 @@ def get_rest_pulse_ox_statistics(
                             pd.MultiIndex.from_product(
                                 [[user], user_date_range],
                                 names=[
-                                    constants._USER_COL,
-                                    constants._CALENDAR_DATE_COL,
+                                    constants.USER_COL,
+                                    constants.CALENDAR_DATE_COL,
                                 ],
                             )
                         ).rename(metric)
@@ -657,7 +657,7 @@ def get_rest_pulse_ox_statistics(
     # Perform kind operation by user
     if not (kind is None):
         rest_pulse_ox_stat_df = rest_pulse_ox_stat_df.groupby(
-            level=constants._USER_COL
+            level=constants.USER_COL
         ).agg(kind, *kind_args, **kind_kwargs)
         if return_df:
             return rest_pulse_ox_stat_df
@@ -804,12 +804,12 @@ def _compute_breaths_per_minute_statistic(
         raise ValueError(
             f"breaths_per_minute must be of type pd.DataFrame and not {type(breaths_per_minute)}"
         )
-    if constants._CALENDAR_DATE_COL not in breaths_per_minute.columns:
+    if constants.CALENDAR_DATE_COL not in breaths_per_minute.columns:
         return pd.Series()
-    if constants._RESPIRATION_BREATHS_PER_MINUTE_COL not in breaths_per_minute.columns:
+    if constants.RESPIRATION_BREATHS_PER_MINUTE_COL not in breaths_per_minute.columns:
         return pd.Series()
-    agg_series = breaths_per_minute.groupby(constants._CALENDAR_DATE_COL)[
-        constants._RESPIRATION_BREATHS_PER_MINUTE_COL
+    agg_series = breaths_per_minute.groupby(constants.CALENDAR_DATE_COL)[
+        constants.RESPIRATION_BREATHS_PER_MINUTE_COL
     ].agg(agg, *agg_args, **agg_kwargs)
     return agg_series
 
@@ -899,7 +899,7 @@ def get_breaths_per_minute_statistics(
         # Let's set up a dataframe in which we will store all the data
         date_periods = pd.date_range(start_date, end_date, freq="D")
         multi_index = pd.MultiIndex.from_product(
-            [user_id, date_periods], names=["user", constants._CALENDAR_DATE_COL]
+            [user_id, date_periods], names=["user", constants.CALENDAR_DATE_COL]
         )
         breaths_per_minute_stats_df = pd.DataFrame(index=multi_index, columns=metrics)
         both_dates_valid = True
@@ -918,16 +918,15 @@ def get_breaths_per_minute_statistics(
         if len(breaths_per_minute) > 0:
             # Get only data when no sleeping is occurring
             breaths_per_minute = breaths_per_minute[
-                breaths_per_minute[constants._IS_SLEEPING_COL] == False
+                breaths_per_minute[constants.IS_SLEEPING_COL] == False
             ].reset_index(drop=True)
             # Add calendar Date information
-            breaths_per_minute[constants._CALENDAR_DATE_COL] = breaths_per_minute[
-                constants._ISODATE_COL
+            breaths_per_minute[constants.CALENDAR_DATE_COL] = breaths_per_minute[
+                constants.ISODATE_COL
             ].dt.normalize()
             if remove_zero:
                 breaths_per_minute = breaths_per_minute[
-                    breaths_per_minute[constants._RESPIRATION_BREATHS_PER_MINUTE_COL]
-                    > 0
+                    breaths_per_minute[constants.RESPIRATION_BREATHS_PER_MINUTE_COL] > 0
                 ].reset_index(drop=True)
         # Load sleep respiration
         rest_breaths_per_minute = loader.load_sleep_respiration(
@@ -940,16 +939,16 @@ def get_breaths_per_minute_statistics(
             # Get only data with calendar date between start and end date and reset index
             if not (start_date is None):
                 rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[constants._CALENDAR_DATE_COL] >= start_date
+                    rest_breaths_per_minute[constants.CALENDAR_DATE_COL] >= start_date
                 ].reset_index(drop=True)
             if not (end_date is None):
                 rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[constants._CALENDAR_DATE_COL] < end_date
+                    rest_breaths_per_minute[constants.CALENDAR_DATE_COL] < end_date
                 ].reset_index(drop=True)
             if remove_zero:
                 rest_breaths_per_minute = rest_breaths_per_minute[
                     rest_breaths_per_minute[
-                        constants._RESPIRATION_BREATHS_PER_MINUTE_COL
+                        constants.RESPIRATION_BREATHS_PER_MINUTE_COL
                     ]
                     > 0
                 ].reset_index(drop=True)
@@ -970,7 +969,7 @@ def get_breaths_per_minute_statistics(
                     ser = ser.set_axis(
                         pd.MultiIndex.from_product(
                             [[user], user_date_range],
-                            names=[constants._USER_COL, constants._CALENDAR_DATE_COL],
+                            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
                         )
                     ).rename(metric)
                     if len(user_breaths_per_minute_stats_df) == 0:

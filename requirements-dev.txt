@@ -1,7 +1,5 @@
-numpy
-pandas
+-r requirements.txt
 pymongo
 pytest
-scipy
 sphinx
 sphinx-rtd-theme

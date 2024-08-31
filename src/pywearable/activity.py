@@ -402,21 +402,21 @@ def get_daily_steps(
         participant_daily_summary = loader.load_daily_summary(id, start_date, end_date)
         if len(participant_daily_summary) > 0:
             participant_daily_summary = participant_daily_summary.groupby(
-                constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                constants.DAILY_SUMMARY_CALENDAR_DATE_COL
             ).tail(1)
             if average:
                 data_dict[id] = int(
                     participant_daily_summary[
-                        constants._DAILY_SUMMARY_STEPS_COL
+                        constants.DAILY_SUMMARY_STEPS_COL
                     ].values.mean()
                 )
             else:
                 data_dict[id] = pd.Series(
                     participant_daily_summary[
-                        constants._DAILY_SUMMARY_STEPS_COL
+                        constants.DAILY_SUMMARY_STEPS_COL
                     ].values,
                     index=participant_daily_summary[
-                        constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                        constants.DAILY_SUMMARY_CALENDAR_DATE_COL
                     ].dt.date,
                 ).to_dict()
         else:
@@ -466,21 +466,21 @@ def get_daily_distance(
         participant_daily_summary = loader.load_daily_summary(id, start_date, end_date)
         if len(participant_daily_summary) > 0:
             participant_daily_summary = participant_daily_summary.groupby(
-                constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                constants.DAILY_SUMMARY_CALENDAR_DATE_COL
             ).tail(1)
             if average:
                 data_dict[id] = int(
                     participant_daily_summary[
-                        constants._DAILY_SUMMARY_DISTANCE_COL
+                        constants.DAILY_SUMMARY_DISTANCE_COL
                     ].values.mean()
                 )
             else:
                 data_dict[id] = pd.Series(
                     participant_daily_summary[
-                        constants._DAILY_SUMMARY_DISTANCE_COL
+                        constants.DAILY_SUMMARY_DISTANCE_COL
                     ].values,
                     index=participant_daily_summary[
-                        constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                        constants.DAILY_SUMMARY_CALENDAR_DATE_COL
                     ].dt.date,
                 ).to_dict()
         else:
@@ -525,14 +525,14 @@ def get_daily_steps_goal(
         participant_daily_summary = loader.load_daily_summary(id, start_date, end_date)
         if len(participant_daily_summary) > 0:
             participant_daily_summary = participant_daily_summary.groupby(
-                constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                constants.DAILY_SUMMARY_CALENDAR_DATE_COL
             ).tail(1)
             data_dict[id] = pd.Series(
                 participant_daily_summary[
-                    constants._DAILY_SUMMARY_STEPS_GOAL_COL
+                    constants.DAILY_SUMMARY_STEPS_GOAL_COL
                 ].values,
                 index=participant_daily_summary[
-                    constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                    constants.DAILY_SUMMARY_CALENDAR_DATE_COL
                 ].dt.date,
             ).to_dict()
         else:
@@ -585,18 +585,18 @@ def get_daily_intensity(
         )
         if len(participant_daily_summaries) > 0:
             participant_daily_summaries = participant_daily_summaries.groupby(
-                constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                constants.DAILY_SUMMARY_CALENDAR_DATE_COL
             ).tail(1)
             moderate_intensities = (
                 participant_daily_summaries[
-                    constants._DAILY_SUMMARY_MODERATE_INTENSITY_COL
+                    constants.DAILY_SUMMARY_MODERATE_INTENSITY_COL
                 ]
                 .div(1000 * 60)
                 .values
             )
             vigorous_intensities = (
                 participant_daily_summaries[
-                    constants._DAILY_SUMMARY_VIGOROUS_INTENSITY_COL
+                    constants.DAILY_SUMMARY_VIGOROUS_INTENSITY_COL
                 ]
                 .div(1000 * 60)
                 .values
@@ -609,7 +609,7 @@ def get_daily_intensity(
                 data_dict[user] = pd.Series(
                     daily_intensities,
                     index=participant_daily_summaries[
-                        constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                        constants.DAILY_SUMMARY_CALENDAR_DATE_COL
                     ].dt.date,
                 ).to_dict()
             else:
@@ -623,7 +623,7 @@ def get_daily_intensity(
                     data_dict[user] = pd.Series(
                         merged_intensities,
                         index=participant_daily_summaries[
-                            constants._DAILY_SUMMARY_CALENDAR_DATE_COL
+                            constants.DAILY_SUMMARY_CALENDAR_DATE_COL
                         ].dt.date,
                     ).to_dict()
         else:
@@ -694,17 +694,17 @@ def get_average_daily_activity_minutes(
             )
             if len(df) == 0:
                 raise Exception
-            df["date"] = df[constants._ISODATE_COL].apply(lambda x: x.date())
+            df["date"] = df[constants.ISODATE_COL].apply(lambda x: x.date())
             # group per date and type of activity
             df = (
-                df.groupby(["date", constants._EPOCH_INTENSITY_COL])[
-                    constants._EPOCH_ACTIVE_TIME_MS_COL
+                df.groupby(["date", constants.EPOCH_INTENSITY_COL])[
+                    constants.EPOCH_ACTIVE_TIME_MS_COL
                 ]
                 .sum()
                 .reset_index()
             )
             df = df.rename(
-                columns={constants._EPOCH_ACTIVE_TIME_MS_COL: _ACTIVITY_TIME_IN_MINUTES}
+                columns={constants.EPOCH_ACTIVE_TIME_MS_COL: _ACTIVITY_TIME_IN_MINUTES}
             )
             if return_as_ratio:
                 time_collected_per_day = (
@@ -713,7 +713,7 @@ def get_average_daily_activity_minutes(
                 # pivot the data so to be in dimensions that allow for division with pandas funcs
                 activity_durations_per_day = df.pivot(
                     index="date",
-                    columns=constants._EPOCH_INTENSITY_COL,
+                    columns=constants.EPOCH_INTENSITY_COL,
                     values=_ACTIVITY_TIME_IN_MINUTES,
                 ).reset_index()
                 ratio_df = (
@@ -725,7 +725,7 @@ def get_average_daily_activity_minutes(
                 activities_dict[id] = ratio_df.mean().round(1)
             else:
                 activities_dict[id] = round(
-                    df.groupby([constants._EPOCH_INTENSITY_COL])[
+                    df.groupby([constants.EPOCH_INTENSITY_COL])[
                         _ACTIVITY_TIME_IN_MINUTES
                     ].mean()
                     / _MS_TO_MINUTES_CONVERSION,
@@ -780,7 +780,7 @@ def get_average_daily_sedentary_minutes(
         participant_activities = activities_dict[participant_id]
         try:
             sedentary_dict[participant_id] = participant_activities.get(
-                constants._EPOCH_ACTIVITY_SEDENTARY_VALUE, 0
+                constants.EPOCH_ACTIVITY_SEDENTARY_VALUE, 0
             )
         except:
             sedentary_dict[participant_id] = None
@@ -831,7 +831,7 @@ def get_average_daily_active_minutes(
         participant_activities = activities_dict[participant_id]
         try:
             active_dict[participant_id] = participant_activities.get(
-                constants._EPOCH_ACTIVITY_ACTIVE_VALUE, 0
+                constants.EPOCH_ACTIVITY_ACTIVE_VALUE, 0
             )
         except:
             active_dict[participant_id] = None
@@ -881,7 +881,7 @@ def get_average_daily_highly_active_minutes(
         participant_activities = activities_dict[participant_id]
         try:
             highly_active_dict[participant_id] = participant_activities.get(
-                constants._EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE, 0
+                constants.EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE, 0
             )
         except:
             highly_active_dict[participant_id] = None
@@ -939,12 +939,12 @@ def get_average_weekly_activities(
             if len(df) == 0:
                 raise Exception
             # create columns to tell for each entry which day it is, both calendar date and weekday
-            df["date"] = df[constants._ISODATE_COL].apply(lambda x: x.date())
-            df["weekday"] = df[constants._ISODATE_COL].apply(lambda x: x.weekday())
+            df["date"] = df[constants.ISODATE_COL].apply(lambda x: x.date())
+            df["weekday"] = df[constants.ISODATE_COL].apply(lambda x: x.weekday())
             # calculate for every calendar date the total amount time for each activity
             df = (
-                df.groupby(["date", constants._EPOCH_INTENSITY_COL, "weekday"])[
-                    constants._EPOCH_ACTIVE_TIME_MS_COL
+                df.groupby(["date", constants.EPOCH_INTENSITY_COL, "weekday"])[
+                    constants.EPOCH_ACTIVE_TIME_MS_COL
                 ]
                 .sum()
                 .reset_index()
@@ -952,11 +952,11 @@ def get_average_weekly_activities(
             if return_as_ratio:
                 activity_df = df.pivot(
                     index=["date", "weekday"],
-                    columns=constants._EPOCH_INTENSITY_COL,
-                    values=constants._EPOCH_ACTIVE_TIME_MS_COL,
+                    columns=constants.EPOCH_INTENSITY_COL,
+                    values=constants.EPOCH_ACTIVE_TIME_MS_COL,
                 ).reset_index()
                 time_collected_df = (
-                    df.groupby(["date"])[constants._EPOCH_ACTIVE_TIME_MS_COL]
+                    df.groupby(["date"])[constants.EPOCH_ACTIVE_TIME_MS_COL]
                     .sum()
                     .reset_index()
                 )
@@ -964,7 +964,7 @@ def get_average_weekly_activities(
                     [
                         activity_df.iloc[:, 2:]
                         .div(
-                            time_collected_df[constants._EPOCH_ACTIVE_TIME_MS_COL],
+                            time_collected_df[constants.EPOCH_ACTIVE_TIME_MS_COL],
                             axis=0,
                         )
                         .fillna(0),
@@ -978,8 +978,8 @@ def get_average_weekly_activities(
             else:
                 # calculate for every weekday the mean amount of time for each activity
                 df = (
-                    df.groupby([constants._EPOCH_INTENSITY_COL, "weekday"])[
-                        constants._EPOCH_ACTIVE_TIME_MS_COL
+                    df.groupby([constants.EPOCH_INTENSITY_COL, "weekday"])[
+                        constants.EPOCH_ACTIVE_TIME_MS_COL
                     ]
                     .mean()
                     .reset_index()
@@ -988,8 +988,8 @@ def get_average_weekly_activities(
                 df = (
                     df.pivot(
                         index="weekday",
-                        columns=constants._EPOCH_INTENSITY_COL,
-                        values=constants._EPOCH_ACTIVE_TIME_MS_COL,
+                        columns=constants.EPOCH_INTENSITY_COL,
+                        values=constants.EPOCH_ACTIVE_TIME_MS_COL,
                     )
                     / _MS_TO_MINUTES_CONVERSION
                 )
@@ -1043,7 +1043,7 @@ def get_average_weekday_sedentary_minutes(
             df = v.reset_index()
             avg_sedentary_dict[k] = round(
                 df.loc[df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_SEDENTARY_VALUE
+                    constants.EPOCH_ACTIVITY_SEDENTARY_VALUE
                 ].mean(),
                 1,
             )
@@ -1094,7 +1094,7 @@ def get_average_weekday_active_minutes(
             df = v.reset_index()
             avg_active_dict[k] = round(
                 df.loc[df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_ACTIVE_VALUE
+                    constants.EPOCH_ACTIVITY_ACTIVE_VALUE
                 ].mean(),
                 1,
             )
@@ -1145,7 +1145,7 @@ def get_average_weekday_highly_active_minutes(
             df = v.reset_index()
             avg_highly_active_dict[k] = round(
                 df.loc[df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE
+                    constants.EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE
                 ].mean(),
                 1,
             )
@@ -1196,7 +1196,7 @@ def get_average_weekend_sedentary_minutes(
             df = v.reset_index()
             avg_sedentary_dict[k] = round(
                 df.loc[~df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_SEDENTARY_VALUE
+                    constants.EPOCH_ACTIVITY_SEDENTARY_VALUE
                 ].mean(),
                 1,
             )
@@ -1247,7 +1247,7 @@ def get_average_weekend_active_minutes(
             df = v.reset_index()
             avg_active_dict[k] = round(
                 df.loc[~df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_ACTIVE_VALUE
+                    constants.EPOCH_ACTIVITY_ACTIVE_VALUE
                 ].mean(),
                 1,
             )
@@ -1298,7 +1298,7 @@ def get_average_weekend_highly_active_minutes(
             df = v.reset_index()
             avg_highly_active_dict[k] = round(
                 df.loc[~df.weekday.isin(range(0, 5))][
-                    constants._EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE
+                    constants.EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE
                 ].mean(),
                 1,
             )
