@@ -2654,7 +2654,7 @@ def summary_longitudinal_chart(
     if cardiac_fn is None:
         cardiac_fn = loader.load_heart_rate
     if activity_fn is None:
-        activity_fn = activity.get_steps_series # TODO: implement this function for every loader instead
+        activity_fn = loader.load_steps
 
     # load all the data with some room for the next day due to start_hour
     hypnograms = hypnogram_fn(user_id=user_id, 
@@ -2663,10 +2663,9 @@ def summary_longitudinal_chart(
     cardiac_data = cardiac_fn(user_id=user_id, 
                               start_date=start_date, 
                               end_date=end_date+datetime.timedelta(days=1))
-    activity_data = activity_fn(loader=loader, # TODO change this when above is implemented
-                                user_id=user_id, 
+    activity_data = activity_fn(user_id=user_id, 
                                 start_date=start_date, 
-                                end_date=end_date+datetime.timedelta(days=1))[user_id]
+                                end_date=end_date+datetime.timedelta(days=1))
 
     plt.figure(figsize=figsize)
     axes = []
@@ -2734,19 +2733,27 @@ def summary_longitudinal_chart(
         full_day_hypnogram[full_day_hypnogram == 0] = 5 
 
         # get cardiac data
-        full_day_range_cardiac = pd.date_range(start=start_date_hour, 
-                                               periods=int(24*((60)/ resolution_cardiac)+1), 
-                                               freq=f"{resolution_cardiac}min")
-        date_cardiac_expanded = pd.merge(left=full_day_range_cardiac.to_series(name="isoDate"),
-                                          right=cardiac_data, 
-                                          how="left")
+        full_day_range_cardiac = pd.date_range(
+            start=start_date_hour, 
+            periods=int(24*((60)/ resolution_cardiac)+1), 
+            freq=f"{resolution_cardiac}min"
+        )
+        date_cardiac_expanded = pd.merge(
+            left=full_day_range_cardiac.to_series(name=pywearable.constants.ISODATE_COL),
+            right=cardiac_data, 
+            how="left"
+        )
         # get activity data
-        full_day_range_activity = pd.date_range(start=start_date_hour, 
-                                                periods=int(24*((60)/ resolution_activity)+1), 
-                                                freq=f"{resolution_activity}min")
-        date_activity_expanded = pd.merge(full_day_range_activity.to_series(name="isoDate"), 
-                                          activity_data.reset_index(), # TODO : change this when activity_fn is implemented
-                                          how="left")
+        full_day_range_activity = pd.date_range(
+            start=start_date_hour, 
+            periods=int(24*((60)/ resolution_activity)+1), 
+            freq=f"{resolution_activity}min"
+        )
+        date_activity_expanded = pd.merge(
+            left=full_day_range_activity.to_series(name=pywearable.constants.ISODATE_COL), 
+            right=activity_data,
+            how="left"
+        )
 
         ax = plt.subplot((end_date - start_date).days, 1, i+1)
         date_times = pd.date_range(start=start_date_hour, periods=9, freq='3h')
@@ -2765,14 +2772,15 @@ def summary_longitudinal_chart(
             ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
 
         #plot activity data
-        ax.bar(date_activity_expanded["isoDate"], 
-                date_activity_expanded["steps"] / resolution_activity, 
+        ax.bar(date_activity_expanded[pywearable.constants.ISODATE_COL], 
+                date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity, 
                 color="green",
                 alpha=0.5,
                 width=0.01,
                 edgecolor="black")
-        max_yaxis_activity = max(1000 / resolution_activity, 
-                                max(date_activity_expanded["steps"]/resolution_activity) + 100/resolution_activity)
+        max_yaxis_activity = max(
+            1000 / resolution_activity, 
+            max(date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity) + 100/resolution_activity)
         ax.set_ylim([0, max_yaxis_activity])
         ax.tick_params(axis='y', colors='green')
         ax.set_ylabel("Steps per minute", color='green', fontsize=fontsize)
@@ -2781,12 +2789,12 @@ def summary_longitudinal_chart(
 
         # plot cardiac data
         ax2 = ax.twinx()
-        ax2.plot(date_cardiac_expanded["isoDate"], 
-                 date_cardiac_expanded["beatsPerMinute"], 
+        ax2.plot(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
+                 date_cardiac_expanded[pywearable.constants.HR_COLUMN], 
                  color="red")
-        max_yaxis = max(175, max(date_cardiac_expanded["beatsPerMinute"]))
+        max_yaxis = max(175, max(date_cardiac_expanded[pywearable.constants.HR_COLUMN]))
         if show_missing:
-            ax2.fill_between(date_cardiac_expanded["isoDate"], 
+            ax2.fill_between(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
                             max_yaxis - 10, 
                             where=date_cardiac_expanded.beatsPerMinute.isna(),
                             facecolor="darkgrey", 
