@@ -125,3 +125,10 @@ _STRESS_STRESS_LEVEL_COL = "stressLevel"
 _STRESS_BODY_BATTERY_COL = "bodyBattery"
 _STRESS_BODY_BATTERY_BEDTIME_COL = "bodyBatteryBedtime"
 _STRESS_BODY_BATTERY_WAKING_COL = "bodyBatteryWakeup"
+
+##################################################
+#                 Activity columns               #
+##################################################
+
+ACTIVITY_TOTAL_STEPS_COL = "totalSteps"
+ACTIVITY_STEPS_COL = "steps"

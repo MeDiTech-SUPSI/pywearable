@@ -2138,6 +2138,57 @@ class LabfrontLoader(BaseLoader):
             filter_on_calendar_date=False,
         )
         return data
+    
+    def load_garmin_connect_step(
+            self,
+            user_id: str,
+            start_date: Union[str, datetime.date, datetime.date] = None,
+            end_date: Union[str, datetime.date, datetime.date] = None,
+    ) -> pd.DataFrame:
+        """
+        Load Garmin Connect steps data.
+        
+        This function loads Garmin Connect steps data from a given participant and within a specified date and time range.
+        
+        Parameters
+        ----------
+        user_id : :class:`str`
+            ID of the user.
+        start_date : str or datetime.date or datetime.date, optional
+            Start date from which data should be retrieved, by default None
+        end_date : str or datetime.date or datetime.date, optional
+            End date from which data should be retrieved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Dataframe containing Garmin Connect steps data.
+        """
+
+        df = self.load_garmin_connect_epoch(
+            user_id, start_date, end_date
+        )
+        steps_df = df.groupby(constants.ISODATE_COL)[
+            lf_constants.ACTIVITY_STEPS_COL
+        ].sum().reset_index()
+        # add back the most frequent timezone offset
+        steps_df[constants.TIMEZONEOFFSET_IN_MS_COL] = df.groupby(constants.ISODATE_COL)[
+            constants.TIMEZONEOFFSET_IN_MS_COL
+        ].mean().reset_index()[constants.TIMEZONEOFFSET_IN_MS_COL]
+        # add the unix timestamp column
+        steps_df[constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
+            constants.ISODATE_COL
+        ].apply(lambda x: int(x.timestamp() * 1000))
+        # add sampling frequency column durationInMs
+        steps_df[constants.DURATION_IN_MS_COL] = 15 * 60 * 1000 
+        # add a column for calendar date
+        steps_df[constants.CALENDAR_DATE_COL] = steps_df[constants.ISODATE_COL].dt.date
+        # add a column for cumulative steps at a daily level
+        steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(constants.CALENDAR_DATE_COL)[
+            lf_constants.ACTIVITY_STEPS_COL
+        ].cumsum()
+
+        return steps_df
 
     def load_hypnogram(
         self,
@@ -2743,3 +2794,44 @@ class LabfrontLoader(BaseLoader):
                         ],
                     ]
         return pd.DataFrame()
+
+    def load_steps(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+    ) -> pd.DataFrame:
+        """
+        Load steps data.
+
+        This function loads steps data from a given user and within a specified date and time range.
+        
+        Parameters
+        ----------
+        user_id : str
+            Unique user identifier for steps data retrieval.
+        start_date : datetime.datetime or datetime.date or str or None, optional
+            Start date for steps data retrieval, by default None
+        end_date : datetime.datetime or datetime.date or str or None, optional
+            End date for steps data retrieval, by default None
+        source : str, optional
+            Source of the data, by default lf_constants.DATA_SOURCE_GARMIN_HEALTH_API
+        """
+
+        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
+            data = self.load_garmin_connect_step(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        elif source == lf_constants.DATA_SOURCE_GARMIN_SDK:
+            data = self.load_garmin_device_step(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+            )
+        else:
+            raise ValueError(f"Source {source} not supported.")
+
+        return data
