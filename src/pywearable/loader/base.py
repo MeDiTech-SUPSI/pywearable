@@ -160,6 +160,14 @@ class BaseLoader:
     ) -> pd.DataFrame:
         raise NotImplementedError
 
+    def load_steps(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        raise NotImplementedError
+
     def load_hypnogram(
         self,
         user_id: str,
@@ -214,15 +222,15 @@ class BaseLoader:
         if len(sleep_summaries) == 0:
             return {}
 
-        sleep_start_time = sleep_summaries.iloc[0][constants._ISODATE_COL]
+        sleep_start_time = sleep_summaries.iloc[0][constants.ISODATE_COL]
 
         sleep_end_time = pd.to_datetime(
             (
-                sleep_summaries.iloc[-1][constants._UNIXTIMESTAMP_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants._TIMEZONEOFFSET_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
+                sleep_summaries.iloc[-1][constants.UNIXTIMESTAMP_IN_MS_COL]
+                + sleep_summaries.iloc[-1][constants.TIMEZONEOFFSET_IN_MS_COL]
+                + sleep_summaries.iloc[-1][constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
                 + sleep_summaries.iloc[-1][
-                    constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
+                    constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
                 ]
             ),
             unit="ms",
@@ -241,30 +249,30 @@ class BaseLoader:
         # Keep only sleep stages with correct sleep summaries
         sleep_stages = (
             sleep_stages[
-                sleep_stages[constants._SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].isin(
+                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].isin(
                     sleep_summaries[
-                        constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
+                        constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
                     ].unique()
                 )
             ]
-            .sort_values(by=[constants._UNIXTIMESTAMP_IN_MS_COL])
+            .sort_values(by=[constants.UNIXTIMESTAMP_IN_MS_COL])
             .reset_index(drop=True)
         )
 
         # set index on sleep summaries
         sleep_summaries = sleep_summaries.set_index(
-            constants._SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
+            constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
         )
         hypnograms = {}
         for sleep_summary_id, sleep_summary in sleep_summaries.iterrows():
-            calendar_day = sleep_summary[constants._CALENDAR_DATE_COL]
-            sleep_start_time = sleep_summary[constants._ISODATE_COL]
+            calendar_day = sleep_summary[constants.CALENDAR_DATE_COL]
+            sleep_start_time = sleep_summary[constants.ISODATE_COL]
             sleep_end_time = pd.to_datetime(
                 (
-                    sleep_summary[constants._UNIXTIMESTAMP_IN_MS_COL]
-                    + sleep_summary[constants._TIMEZONEOFFSET_IN_MS_COL]
-                    + sleep_summary[constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                    + sleep_summary[constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
+                    sleep_summary[constants.UNIXTIMESTAMP_IN_MS_COL]
+                    + sleep_summary[constants.TIMEZONEOFFSET_IN_MS_COL]
+                    + sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
+                    + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
                 ),
                 unit="ms",
                 utc=True,
@@ -281,46 +289,46 @@ class BaseLoader:
             ]
 
             daily_sleep_stages = sleep_stages.loc[
-                sleep_stages[constants._SLEEP_STAGE_SLEEP_SUMMARY_ID_COL]
+                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL]
                 == sleep_summary_id
             ]
 
             hypnogram = pd.DataFrame(
-                data={constants._ISODATE_COL: time_delta_intervals}
+                data={constants.ISODATE_COL: time_delta_intervals}
             )
 
             hypnogram = hypnogram.merge(
                 daily_sleep_stages.loc[
                     :,
                     [
-                        constants._ISODATE_COL,
-                        constants._SLEEP_STAGE_SLEEP_TYPE_COL,
+                        constants.ISODATE_COL,
+                        constants.SLEEP_STAGE_SLEEP_TYPE_COL,
                     ],
                 ],
                 how="left",
-                on=constants._ISODATE_COL,
+                on=constants.ISODATE_COL,
             )
 
-            hypnogram[constants._SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram.loc[
-                :, constants._SLEEP_STAGE_SLEEP_TYPE_COL
+            hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram.loc[
+                :, constants.SLEEP_STAGE_SLEEP_TYPE_COL
             ].ffill()
             if map_hypnogram:
-                hypnogram[constants._SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram[
-                    constants._SLEEP_STAGE_SLEEP_TYPE_COL
+                hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram[
+                    constants.SLEEP_STAGE_SLEEP_TYPE_COL
                 ].map(
                     {
-                        constants._SLEEP_STAGE_REM_STAGE_VALUE: constants._SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_AWAKE_STAGE_VALUE: constants._SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N3_STAGE_VALUE: constants._SLEEP_STAGE_N3_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_N1_STAGE_VALUE: constants._SLEEP_STAGE_N1_STAGE_MAPPED_VALUE,
-                        constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants._SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_N3_STAGE_VALUE: constants.SLEEP_STAGE_N3_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_N1_STAGE_VALUE: constants.SLEEP_STAGE_N1_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
                     }
                 )
             hypnograms[calendar_day] = {}
             hypnograms[calendar_day]["start_time"] = sleep_start_time.to_pydatetime()
             hypnograms[calendar_day]["end_time"] = sleep_end_time.to_pydatetime()
             hypnograms[calendar_day]["values"] = hypnogram[
-                constants._SLEEP_STAGE_SLEEP_TYPE_COL
+                constants.SLEEP_STAGE_SLEEP_TYPE_COL
             ].values
 
         return hypnograms
