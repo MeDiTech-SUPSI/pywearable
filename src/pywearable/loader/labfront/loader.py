@@ -2614,7 +2614,7 @@ class LabfrontLoader(BaseLoader):
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source="health_api",
+        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ):
         """Load recovery data.
 
