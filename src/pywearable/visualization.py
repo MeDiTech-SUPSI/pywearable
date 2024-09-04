@@ -1333,11 +1333,11 @@ def get_sleep_summary_graph(
 
     sleep_summaries["endIsoDate"] = pd.to_datetime(
         (
-            sleep_summaries[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-            + sleep_summaries[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL]
-            + sleep_summaries[pywearable.constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
+            sleep_summaries[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
+            + sleep_summaries[pywearable.constants.TIMEZONEOFFSET_IN_MS_COL]
+            + sleep_summaries[pywearable.constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
             + sleep_summaries[
-                pywearable.constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
+                pywearable.constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
             ]
         ),
         unit="ms",
