@@ -1624,6 +1624,10 @@ def get_hrv_statistics(
             **loader_kwargs,
         )
         if len(bbi_df) > 0:
+            # drop dates with start_hour and end_hour which are NaT from sleep_timestamps
+            sleep_timestamps =  {date: (start_hour, end_hour) for date, 
+                                 (start_hour, end_hour) in sleep_timestamps.items() 
+                                 if not (pd.isnull(start_hour) or pd.isnull(end_hour))}
             for date, (start_hour, end_hour) in sleep_timestamps.items():
                 night_bbi = bbi_df.loc[
                     (bbi_df[constants.ISODATE_COL] >= start_hour)

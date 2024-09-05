@@ -5,18 +5,21 @@ This module contains all the functions related to the visualization of data
 import datetime
 import warnings
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Union, Optional, List, Any
 
-import july
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import calendar
+from datetime import date
+
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
 from matplotlib.dates import DateFormatter, DayLocator, MonthLocator, WeekdayLocator
 from matplotlib.projections import register_projection
 from matplotlib.projections.polar import PolarAxes
-from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter
+from matplotlib.pyplot import Axes
+from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter, ScalarFormatter
 
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
@@ -29,6 +32,8 @@ import pywearable.utils as utils
 from .loader.base import BaseLoader
 
 date_form = DateFormatter("%m-%d")
+cmaps_list = plt.colormaps()
+cmaps_dict = dict(zip(cmaps_list, cmaps_list))
 
 
 def _define_custom_colormap(
@@ -57,7 +62,7 @@ def _define_custom_colormap(
     """
 
     if type(base_colormap) == str:
-        cmap = plt.cm.get_cmap(base_colormap)
+        cmap = plt.get_cmap(base_colormap)
 
     # ListedColormap with the same colors but extended to include a specific color for missing data
     cmap_list = [cmap(i) for i in range(cmap.N)]
@@ -129,7 +134,7 @@ def get_steps_line_graph_and_stats(
     locator_interval : :class:`int`, optional
         Interval for the x-axis dates, by default 2
     plot_guideline_zones : :class:`bool`, optional
-        Whether to plot shaded regions corresponding to general guidelines for steps, by default False
+        Whether to plot shaded regions corresponding to general guidelines for daily steps as reported in [1], by default False
     zones_labels : :class:`str`, optional
         labels of the guideline ranges, by default ["Sedentary", "Low active", "Somewhat active", "Active", "Highly active"]
     zones_colors : :class:`list`, optional
@@ -142,6 +147,10 @@ def get_steps_line_graph_and_stats(
     :class:`dict`
         dictionary of daily activity statistics
         (Mean daily steps, Mean daily distance, Percentage goal completion)
+
+    References
+    ----------
+    [1] Tudor-Locke, Catrine, Yoshiro Hatano, Robert Pangrazi, and Minsoo Kang. “Revisiting How Many Steps Are Enough?” Medicine and Science in Sports and Exercise 40 (July 1, 2008): S537-43. https://doi.org/10.1249/MSS.0b013e31817c7133.
     """
 
     # get dates,steps,goals,compare steps to goal to get goal completion
@@ -589,8 +598,12 @@ def get_respiration_line_graph_and_stats(
         list(set(rest_dates + waking_dates))
     )  # not always we have waking/rest data, but need consistent x labeling
     # get stats
-    avg_sleeping_breaths = round(np.mean(rest_resp), 2)
-    avg_waking_breaths = round(np.mean(waking_resp), 2)
+    avg_sleeping_breaths = np.nanmean(rest_resp)
+    avg_waking_breaths = np.nanmean(waking_resp)
+
+    avg_sleeping_breaths = float(round(avg_sleeping_breaths, 2)) if not np.isnan(avg_sleeping_breaths) else None
+    avg_waking_breaths = float(round(avg_waking_breaths, 2)) if not np.isnan(avg_waking_breaths) else None
+
     stats_dict = {
         "Average sleep breaths": avg_sleeping_breaths,
         "Average waking breaths": avg_waking_breaths,
@@ -628,6 +641,289 @@ def get_respiration_line_graph_and_stats(
 
     return stats_dict
 
+class CalendarHeatmap:
+
+    def __init__(
+        self,
+        dates: List[Union[str, datetime.date, datetime.datetime]],
+        data: List[float],
+        cmap: Union[str, LinearSegmentedColormap, ListedColormap] = "Greens",
+        value_label: bool = False,
+        weekday_label: bool = True,
+        month_label: bool = True,
+        year_label: bool = True,
+        month_grid: bool = False,
+        month_grid_color: str = "black",
+        colorbar: bool = False,
+        frame_on: bool = False,
+        value_format: str = "int",
+        title: Optional[str] = None,
+        cmin: Optional[int] = None,
+        cmax: Optional[int] = None,
+        cbar_label_format: Optional[str] = None,
+        figsize: tuple = (12, 5),
+        fontsize: int = 14,
+    ):
+        self.dates = dates
+        self.data = data
+        self.cmap = cmap
+        self.value_label = value_label
+        self.weekday_label = weekday_label
+        self.month_label = month_label
+        self.year_label = year_label
+        self.month_grid = month_grid
+        self.month_grid_color = month_grid_color
+        self.colorbar = colorbar
+        self.frame_on = frame_on
+        self.value_format = value_format
+        self.title = title
+        self.cmin = cmin
+        self.cmax = cmax
+        self.cbar_label_format = cbar_label_format
+        self.figsize = figsize
+        self.fontsize = fontsize
+
+    def generate(self):
+        cal = self._date_grid(self.dates, self.data)
+        ax = self._cal_heatmap(
+            cal=cal,
+            dates=self.dates,
+            cmap=self.cmap,
+            value_label=self.value_label,
+            weekday_label=self.weekday_label,
+            month_label=self.month_label,
+            year_label=self.year_label,
+            month_grid=self.month_grid,
+            month_grid_color=self.month_grid_color,
+            colorbar=self.colorbar,
+            frame_on=self.frame_on,
+            value_format=self.value_format,
+            title=self.title,
+            cmin=self.cmin,
+            cmax=self.cmax,
+            cbar_label_format=self.cbar_label_format,
+        )
+        self.ax = ax
+        
+
+    def plot(self):
+        plt.show()
+        
+    def save(self, path: str):
+        self.ax.get_figure().savefig(path, bbox_inches="tight")
+
+    def _date_grid(self, dates: List[date], data: List[Any],  dtype: str = "float64"):
+        iso_dates = np.array([day.isocalendar() for day in dates])
+        unique_weeks = sorted(list(set([tuple(row) for row in iso_dates[:, :2]])))
+
+        weeknum2idx = {week: i for i, week in enumerate(unique_weeks)}
+        week_coords = np.array([weeknum2idx[tuple(week)] for week in iso_dates[:, :2]])
+        day_coords = iso_dates[:, 2] - 1
+
+        n_weeks = len(unique_weeks)
+        n_days = 7
+
+        grid = np.empty((n_weeks, n_days), dtype=dtype)
+        grid = np.nan * grid if dtype == "float64" else grid
+        grid[week_coords, day_coords] = data
+
+        return grid.T
+    
+    def _cal_heatmap(
+        self,
+        cal: np.ndarray,
+        dates: List[date],
+        cmap: Union[str, LinearSegmentedColormap, ListedColormap] = "Greens",
+        value_label: bool = False,
+        weekday_label: bool = True,
+        month_label: bool = True,
+        year_label: bool = True,
+        month_grid: bool = False,
+        month_grid_color: str = "black",
+        colorbar: bool = False,
+        frame_on: bool = False,
+        value_format: str = "int",
+        title: Optional[str] = None,
+        cmin: Optional[int] = None,
+        cmax: Optional[int] = None,
+        cbar_label_format: Optional[str] = None,
+        ax: Optional[plt.axes] = None,
+    ):
+        if not ax:
+            fig, ax = plt.subplots(figsize=self.figsize, dpi=100)
+        else:
+            fig = ax.get_figure()
+
+        if isinstance(cmap, str):
+            cmap = cmaps_dict[cmap]
+
+        pc = ax.pcolormesh(cal, 
+                            edgecolors=ax.get_facecolor(), 
+                            linewidth=0.25, 
+                            cmap=cmap)
+        pc.set_clim(cmin or np.nanmin(cal), cmax or np.nanmax(cal))
+        ax.invert_yaxis()
+        ax.set_aspect("equal")
+        bbox = ax.get_position()
+
+        if value_label:
+            self._add_value_label(ax, cal, value_format)
+        else:
+            ax.set_xticklabels("")
+        if weekday_label:
+            self._add_weekday_label(ax)
+        if month_label:
+            self._add_month_label(ax, dates)
+        if year_label:
+            self._add_year_label(ax, dates)
+        if month_grid:
+            self._add_month_grid(ax, dates, cal, month_grid_color)
+        if colorbar:
+            self._add_colorbar(pc, fig, ax, bbox, cbar_label_format)
+        if title:
+            ax.set_title(title)
+
+        ax.set_frame_on(frame_on)
+        return ax
+    
+    def _get_month_outline(self, dates, month_grid, month):
+        day_grid = self._date_grid(dates, dates, dtype="object").T
+        month_grid = month_grid.T
+
+        nrows, ncols = month_grid.shape
+        coords_list = []
+
+        for y in range(nrows):
+            for x in range(ncols):
+                if np.isfinite(month_grid[y, x]) and day_grid[y, x] is not None:
+                    if day_grid[y, x].month == month:
+                        coords_list.append((x, y))
+
+        sorted_coords = np.array(coords_list)
+        min_y = sorted_coords[:, 1].min()
+        max_y = sorted_coords[:, 1].max()
+        upper_left = sorted_coords[0]
+        upper_right = np.array([7, min_y])
+        lower_right = np.array([7, max_y])
+        lower_right2 = sorted_coords[-1] + np.array([1, 1])
+
+        lower_right1 = (
+            lower_right2
+            if np.array_equal(lower_right, lower_right2)
+            else lower_right2 - np.array([0, 1])
+        )
+        lower_left = np.array([0, sorted_coords[:, 1].max() + 1])
+        corner_last = upper_left + np.array([0, 1])
+        second_last = np.copy(corner_last)
+        second_last[0] = 0
+
+        coords = np.array(
+            [
+                upper_left,
+                upper_right,
+                lower_right,
+                lower_right1,
+                lower_right2,
+                lower_left,
+                second_last,
+                corner_last,
+                upper_left,
+            ]
+        )
+
+        return coords[:, [1, 0]]
+    
+    def _add_value_label(self, ax, cal, value_format):
+        if value_format == "int":
+            val_format = "{:0.0f}"
+        elif value_format == "decimal":
+            val_format = "{:0.1f}"
+        else:
+            raise ValueError(
+                "Argument 'value_format' must be equal to either "
+                f"'int' or 'float'. Got: {value_format}."
+            )
+
+        for (i, j), z in np.ndenumerate(cal):
+            if np.isfinite(z):
+                ax.text(j + 0.5, i + 0.5, val_format.format(z), ha="center", va="center")
+
+    def _add_weekday_label(self, ax):
+        ax.tick_params(axis="y", which="major", pad=8)
+        ax.set_yticks([x + 0.5 for x in range(0, 7)])
+        ax.set_yticklabels(
+            calendar.weekheader(width=1).split(" "),
+        )
+
+    def _add_month_label(self, ax, dates):
+        month_years = [(day.year, day.month) for day in dates]
+        month_years_str = list(map(str, month_years))
+        month_year_grid = self._date_grid(dates, month_years_str, dtype="object")
+        unique_month_years = sorted(set(month_years))
+
+        month_locs = {}
+        for month in unique_month_years:
+            yy, xx = np.nonzero(month_year_grid == str(month))
+            month_locs[month] = (xx.max() + 1 + xx.min()) / 2
+
+        month_labels = [calendar.month_abbr[x[1]] for x in month_locs.keys()]
+
+        ax.set_xticks([*month_locs.values()])
+        ax.set_xticklabels(month_labels, ha="center")
+
+    def _add_year_label(self, ax, dates):
+        years = [day.year for day in dates]
+        year_grid = self._date_grid(dates, years)
+        unique_years = sorted(set(years))
+
+        year_locs = {}
+        for year in unique_years:
+            yy, xx = np.nonzero(year_grid == year)
+            year_locs[year] = (
+                xx.max() + 1 + xx.min()) / 2
+
+        for year, loc in year_locs.items():
+            ax.annotate(
+                year,
+                (loc / year_grid.shape[1], 1),
+                (0, 12),
+                xycoords="axes fraction",
+                textcoords="offset points",
+                fontsize="large",
+                va="center",
+                ha="center",
+            )
+
+    def _add_colorbar(self, pc, fig, ax, bbox, cbar_label_format):
+        adj_bbox = ax.get_position()
+        height_diff = adj_bbox.height - bbox.height
+        cax = fig.add_axes(
+            [
+                bbox.x1 + 0.015,
+                adj_bbox.y0 + height_diff / 2,
+                0.015,
+                bbox.height,
+            ]
+        )
+        cbar_label_format = cbar_label_format or ScalarFormatter()
+        plt.colorbar(pc, cax=cax, format=cbar_label_format)
+
+    def _add_month_grid(self, ax, dates, month_grid, color):
+        months = set([d.month for d in dates])
+        for month in months:
+            coords = self._get_month_outline(
+                dates, month_grid, month=month
+            )
+            ax.plot(coords[:, 0], coords[:, 1], color=color, linewidth=1)
+
+        ax.set_xlim(ax.get_xlim()[0] - 0.1, ax.get_xlim()[1] + 0.1)
+        ax.set_ylim(ax.get_ylim()[0] + 0.1, ax.get_ylim()[1] - 0.1)
+
+        fig = ax.get_figure()
+
+        for pos in ["top", "bottom", "right", "left"]:
+            ax.spines[pos].set_edgecolor(fig.get_facecolor())
+            return ax
 
 def get_metric_heatmap(
     loader: BaseLoader,
@@ -641,14 +937,14 @@ def get_metric_heatmap(
     kwargs_heatmap: dict = {},
 ):
     """
-    Generate a github-like grid plot of the sleep scores over that years for `user_id`
+    Generate a github-like grid plot of a metric, user, and period of interest
 
     Parameters
     ----------
     loader : :class:`pywearable.loader.base.BaseLoader`
         An instance of a data loader.
     user_id : :class:`str`
-        The id(s) for which the sleep statistic must be computed.
+        The id of the user for which the heatmap must be generated.
     metric_fn : :class:`callable`
         A pywearable function to calculate the metric of interest for which the heatmap must be generated.
         The function is expected to return a dictionary for the user, such that the primary key
@@ -663,7 +959,7 @@ def get_metric_heatmap(
     save_to : :class:`str` or None, optional
         Path where to save the grid plot, by default None
     show : :class:`str`, optional
-        _Whether to show the plot, by default True
+        Whether to show the plot, by default True
     kwargs_heatmap : :class:`dict`, optional
         Additional keyword arguments for the july's heatmap function, by default {}
     """
@@ -673,6 +969,7 @@ def get_metric_heatmap(
     dates, scores = zip(
         *metric_fn(loader, user_id, start_date, end_date)[user_id].items()
     )
+    
     # Get start and end days for the heatmap, based on data and desired backward extension
     start_date = (
         dates[0]
@@ -691,14 +988,19 @@ def get_metric_heatmap(
 
     extended_df = pd.merge(left=extended_df, right=data_df, on="date", how="left")
     extended_df.loc[extended_df.metric.isna(), "metric"] = 0
-
-    july.heatmap(extended_df.date, extended_df.metric, **kwargs_heatmap)
-
+    
+    heatmap = CalendarHeatmap(
+        dates=extended_df.date,
+        data=extended_df.metric,
+        **kwargs_heatmap,
+    )
+    heatmap.generate()
+    
     if show:
-        plt.show()
+        heatmap.plot()
 
     if save_to:
-        plt.savefig(save_to, bbox_inches="tight")
+        heatmap.save(save_to)
 
 
 def get_sleep_performance_heatmap(
@@ -1006,14 +1308,14 @@ def get_sleep_summary_graph(
                 start_date=start_date,
                 end_date=end_date,
                 kind="mean",
-            )[user_id]["bedTime"]
+            )["bedtime"].iloc[0]
             chronotype_sleep_end = sleep.get_wakeup_time(
                 loader=loader,
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
                 kind="mean",
-            )[user_id]["wakeupTime"]
+            )["wakeup"].iloc[0]
         else:
             assertion_msg = "Must specify chronotype in format 'HH:MM' when plotting circadian measures"
             assert (
@@ -1031,11 +1333,11 @@ def get_sleep_summary_graph(
 
     sleep_summaries["endIsoDate"] = pd.to_datetime(
         (
-            sleep_summaries[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-            + sleep_summaries[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL]
-            + sleep_summaries[pywearable.constants._SLEEP_SUMMARY_DURATION_IN_MS_COL]
+            sleep_summaries[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
+            + sleep_summaries[pywearable.constants.TIMEZONEOFFSET_IN_MS_COL]
+            + sleep_summaries[pywearable.constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
             + sleep_summaries[
-                pywearable.constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
+                pywearable.constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
             ]
         ),
         unit="ms",
@@ -1071,14 +1373,6 @@ def get_sleep_summary_graph(
     scores_series = sleep.get_sleep_score(
         loader=loader, start_date=start_date, end_date=end_date, user_id=user_id
     )[user_id]
-    # get maximum amount of time spent in bed to know x-axis limit
-    max_bed_time = np.max(
-        list(
-            sleep.get_time_in_bed(
-                loader=loader, start_date=start_date, end_date=end_date, user_id=user_id
-            )[user_id].values()
-        )
-    )
 
     # setup an internal fn to get appropriate sleep score colors:
     def get_color(score):
@@ -1197,7 +1491,7 @@ def get_sleep_summary_graph(
                 bottom += stage_duration_array[i]
 
             # annotate on top of the daily bar with the daily sleep score, color-coded appropriately
-            score = scores_series.get(night)
+            score = scores_series.get(pd.Timestamp(night))
             appropriate_color = get_color(score)
             # not sure why but with horizontal bars the annotation has to be manually adjusted in position
             ax.annotate(
@@ -1264,7 +1558,7 @@ def get_sleep_summary_graph(
         fontsize=legend_fontsize,
     )
     # take care of opacity of of the colors selected
-    for i, lh in enumerate(lgd.legendHandles):
+    for i, lh in enumerate(lgd.legend_handles):
         lh.set_color(colors[i])
         lh.set_alpha(alphas[i])
     lgd.get_frame().set_alpha(0.0)
@@ -1323,8 +1617,6 @@ def get_sleep_summary_graph(
             )[user_id]
             cpd_trend = utils.trend_analysis(
                 cpd_dict,
-                start_date - datetime.timedelta(days=30),
-                end_date,
                 **kwargs_trend_analysis,
             )
             # filter out to keep appropriate period
@@ -1595,55 +1887,139 @@ def compare_against_group(
 
 
 def plot_trend_analysis(
-    df: pd.DataFrame,
-    ax: Union[plt.axes, None] = None,
+    loader: BaseLoader,
+    user_id: str,
+    metric_fn: Callable,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ax: Union[None, plt.axes] = None,
+    ma_type: str = "MA",
+    baseline_periods: int = 7,
+    min_periods_baseline: int = 3,
+    normal_range_periods: int = 30,
+    min_periods_normal_range: int = 20,
+    std_multiplier: float = 1.0,
     save_to: Union[str, None] = None,
     show: bool = True,
     xlabel: str = "",
     ylabel: str = "",
     title: str = "",
-    fontsize: int = 16,
-    alpha: float = 0.3,
+    fontsize: int = 12,
     xticks_frequency: int = 3,
     xticks_rotation: int = 45,
+    ylim: Union[tuple, None] = None,
     figsize: tuple = (10, 6),
     show_legend: bool = False,
-    normal_range: tuple = None,
+    fixed_normal_range: tuple = None,
+    metric_fn_kwargs: dict = {},
+    barplot_kwargs: dict = {},
+    baseline_kwargs: dict = {},
+    normal_range_kwargs: dict = {},
 ):
-    """Plots a trend analysis graph including short-term, mid-term, and long-term metrics
+    """Plots a trend analysis graph
+
+    This function plots a trend analysis graph for a given metric, a given user, and a period of interest,
+    showing the short term variations (daily values), mid-term variations (the baseline), 
+    and long term variations (the normal range).
 
     Parameters
     ----------
-    df : :class:`pandas.DataFrame`
-        DataFrame of the processed metric data returned by the `pylabfront.utils.trend_analysis` function
+    loader : :class:`pylabfront.loader.BaseLoader`
+        Loader object to load the data
+    user_id : :class:`str`
+        ID of the user for which to plot the trend analysis
+    metric_fn : :class:`Callable`
+        Pywearable function to calculate the metric of interest
+    start_date : :class:`datetime.datetime`, :class:`datetime.date`, :class:`str`, optional
+        Start date of the period of interest, by default None
+    end_date : :class:`datetime.datetime`, :class:`datetime.date`, :class:`str`, optional
+        End date of the period of interest, by default None
     ax : None or class:`matplotlib.axes`, optional
         Axes where to build the figure, by default None
+    ma_type : :class:`str`, optional
+        Type of moving average to use, can be either "MA" or "EMA", by default "MA"
+    baseline_periods : :class:`int`, optional
+        Number of periods to consider for the baseline, by default 7
+    min_periods_baseline : :class:`int`, optional
+        Minimum number of periods to consider for the baseline, by default 3
+    normal_range_periods : :class:`int`, optional
+        Number of periods to consider for the normal range, by default 30
+    min_periods_normal_range : :class:`int`, optional
+        Minimum number of periods to consider for the normal range, by default 20
+    std_multiplier : :class:`float`, optional
+        Multiplier for the standard deviation to consider for the normal range, by default 1.0
     save_to : :class:`str`, optional
-        path where to save the plot, by default None
+        Path where to save the plot, by default None
     show : :class:`bool`, optional
-        whether to show the plot
+        Whether to show the plot, by default True
     xlabel : :class:`str`, optional
-        label of the x-axis, by default ""
+        Label of the x-axis, by default ""
     ylabel : :class:`str`, optional
-        label of the y-axis, by default ""
+        Label of the y-axis, by default ""
     title : :class:`str`, optional
-        title of the plot, by default ""
+        Title of the plot, by default ""
     fontsize : :class:`int`, optional
-        fonti size for the plot, by default 16
-    alpha : :class:`float`, optional
-        Alpha of the shaded regions, by default 0.3
+        Font size for the plot, by default 12
     xticks_frequency : :class:`int`, optional
-        frequency of visualization of x-axis ticks, by default 3
-    xticksrotaton : :class:`int`, optional
-        rotation of ticks on the x-axis, by default 45
+        Frequency of visualization of x-axis ticks, by default 3
+    xticks_rotation : :class:`int`, optional
+        Rotation of ticks on the x-axis, by default 45
+    ylim : :class:`tuple`, optional
+        Limits of the y-axis, by default None
     figsize : :class:`tuple`, optional
-        size of the figure, by default (10,6)
+        Size of the figure, by default (10,6)
     show_legend : :class:`bool`, optional
-        whether to show the legend of the plot, by default False
-    normal_range : :class:`tuple`, optional
-        start and end of a fixed range (based on norm values) instead of a trend NR, by default None
+        Whether to show the legend of the plot, by default False
+    fixed_normal_range : :class:`tuple`, optional
+        Start and end of a fixed range (based on norm values) instead of a trend NR, by default None
+    metric_fn_kwargs : :class:`dict`, optional
+        Additional kwargs for the metric function, by default {}
+    barplot_kwargs : :class:`dict`, optional
+        Additional kwargs for the barplot, by default {}
+    baseline_kwargs : :class:`dict`, optional
+        Additional kwargs for the baseline plot, by default {}
+    normal_range_kwargs : :class:`dict`, optional
+        Additional kwargs for the normal range plot, by default {}
+    
+    Returns
+    -------
+    :class:`matplotlib.axes._subplots.AxesSubplot`
+        Axes object of the plot
     """
-    df = df.dropna(how="all")  # restrict viz to period with available data
+    data_dict = metric_fn(
+        loader=loader,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        **metric_fn_kwargs,
+    )[user_id]
+
+    df = utils.trend_analysis(
+        data_dict=data_dict,
+        ma_type=ma_type,
+        baseline_periods=baseline_periods,
+        min_periods_baseline=min_periods_baseline,
+        normal_range_periods=normal_range_periods,
+        min_periods_normal_range=min_periods_normal_range,
+        std_multiplier=std_multiplier
+    )
+
+    # default kwargs for normal range in case they're not provided
+    if "alpha" not in normal_range_kwargs:
+        normal_range_kwargs["alpha"] = 0.5
+    if "color" not in normal_range_kwargs:
+        normal_range_kwargs["color"] = "green"
+
+    # default kwargs for baseline in case they're not provided
+    if "color" not in baseline_kwargs:
+        baseline_kwargs["color"] = "red"
+    if "linestyle" not in baseline_kwargs:
+        baseline_kwargs["linestyle"] = "-"
+    if "linewidth" not in baseline_kwargs:
+        baseline_kwargs["linewidth"] = 2
+
+    # restrict viz to period with available data
+    df = df.dropna(how="all")  
     dates = df.index
     metric = df.metric
     baseline = df.BASELINE
@@ -1651,21 +2027,27 @@ def plot_trend_analysis(
     UB = df.NR_UPPER_BOUND
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
-    ax.bar(dates, metric, label="Daily metric")
-    ax.plot(baseline, linestyle="-", linewidth=3, color="red", label="Baseline")
-    if normal_range is not None:
-        assert type(normal_range) == tuple and len(normal_range) == 2
-        LB = normal_range[0]
-        UB = normal_range[1]
-    ax.fill_between(dates, LB, UB, alpha=alpha, color="green", label="Normal range")
+    ax.bar(dates, metric, label="Daily metric", **barplot_kwargs)
+    ax.plot(baseline, label="Baseline", **baseline_kwargs)
+    if fixed_normal_range is not None:
+        assert type(fixed_normal_range) == tuple and len(fixed_normal_range) == 2
+        LB = fixed_normal_range[0]
+        UB = fixed_normal_range[1]
+    ax.fill_between(dates, LB, UB, label="Normal range", **normal_range_kwargs, zorder=-1)
     ax.grid("on")
     ax.set_xticks(dates[::xticks_frequency])
     ax.tick_params(axis="x", labelrotation=xticks_rotation)
     ax.set_xlabel(xlabel, fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
     ax.set_title(title, fontsize=fontsize + 2)
+
+    if ylim:
+        ax.set_ylim(ylim)
     if show_legend:
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    
+    plt.tight_layout()
+        
     if save_to:
         plt.savefig(save_to, bbox_inches="tight")
     if show:
@@ -1726,6 +2108,7 @@ def radar_chart(
     Plots a radar chart comparing the values between two periods for the desired pywearable metrics.
     The radar chart is not limited by the number of the metrics to be included in the chart;
     it dynamically adjusts itself to the number of compared metrics.
+    
     Parameters
     ----------
     loader : :class:`pywearable.loader.base.BaseLoader`
@@ -1823,8 +2206,6 @@ def radar_chart(
             stacklevel=2,
         )
 
-    print(ref_metrics)
-    print(comp_metrics)
     # Prepare plot
     if legend:
         fig, (ax_l, ax) = plt.subplots(
@@ -1892,10 +2273,6 @@ def radar_chart(
         plt.close()
 
 
-def intensity_chart():
-    pass
-
-
 def period_to_period_comparison_chart(
     loader: BaseLoader,
     user_id: str,
@@ -1912,7 +2289,48 @@ def period_to_period_comparison_chart(
     locator_interval: int = 1,
     title: str = "",
     fontsize: int = 14,
+    metric_fn_kwargs : dict = {},
 ):
+    """Generates a period-to-period comparison chart for a user and a metric of interest.
+    
+    This function is used to visualize period to period comparison of a metric. It can be used
+    to show weekly variations or monthly variations over extended periods.
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id(s) for which the sleep statistic must be computed.
+    metric_fn : :class:`callable`
+        A pywearable function that computes the metric of interest.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    kind : :class:`str`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    period_interval : :class:`str`, optional
+        Interval of the period (month or week) to be considered for the comparison, by default "month"
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default (12, 8)
+    xlabel : :class:`str` or None, optional
+        Label of the x-axis, by default None
+    ylabel : :class:`str` or None, optional
+        Label of the y-axis, by default None
+    locator_interval : :class:`int`, optional
+        Interval of the locator, by default 1
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 14
+    metric_fn_kwargs : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}    
+    """
     if period_interval not in ["month", "week"]:
         raise ValueError(f"period interval {period_interval} is not a valid interval.")
 
@@ -1928,9 +2346,12 @@ def period_to_period_comparison_chart(
         ax.xaxis.set_major_formatter(DateFormatter("%m-%d"))
         date_aggr_fn = lambda x: x.week
 
-    metric_data = metric_fn(loader, user_id, start_date, end_date)[user_id]
-    metric_dates = list(metric_data.keys())
-    metric_values = list(metric_data.values())
+    metric_data = metric_fn(loader, 
+                            user_id, 
+                            start_date, 
+                            end_date,
+                            **metric_fn_kwargs)[user_id]
+    metric_dates, metric_values = zip(*metric_data.items())
 
     # compute metric aggregate transformation (kind) during each period and its changes
     metric_df = pd.DataFrame({"Date": metric_dates, "metric": metric_values})
@@ -2003,5 +2424,404 @@ def period_to_period_comparison_chart(
         plt.close()
 
 
-def weekday_barplot():
-    pass
+def weekday_barplot(
+    loader: BaseLoader,
+    user_id: str,
+    metric_fn: Callable,
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    aggr_fn: Union[str, callable] = "mean",
+    figsize: tuple = (12, 8),
+    title: str = "",
+    xlabel: str = "",
+    ylabel: str = "",
+    save_to: Union[str, None] = None,
+    show: bool = True,
+    horizontal: bool = False,
+    fontsize: int = 12,
+    alpha: float = 0.7,
+    color: Union[str, list] = "blue",
+    errorbar: bool = False,
+    error_range: str = "std",
+    metric_lim: Union[list, None] = None,
+    metric_fn_kwargs : dict = {},
+    bar_kwargs: dict = {},
+):
+    """Generates a barplot showing how a metric changes over the week.
+    
+    For a metric of interest, aggregate statistics, determined by the `kind` parameter,
+    are showed as averages throughout the days of the week.
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id for which the weekday barplot must be generated.
+    metric_fn : :class:`Callable`
+        A pywearable function that computes the metric of interest.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+    aggr_fn : :class:`str` or class:`Callable`, optional
+        Summary statistic to calculate for the metrics to be displayed, by default "mean"
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default (12, 8)
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    xlabel : :class:`str`, optional
+        Label of the x-axis, by default ""
+    ylabel : :class:`str`, optional
+        Label of the y-axis, by default ""
+    save_to : :class:`str` or None, optional
+        Path where to save the grid plot, by default None
+    show : :class:`str`, optional
+        Whether to show the plot, by default True
+    horizontal : :class:`bool`, optional
+        Whether to show the barplot horizontally, by default False
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 12
+    alpha : :class:`float`, optional
+        Alpha of the bars, by default 0.7
+    color : :class:`str` or :class:`list`, optional
+        Color(s) of the bars, by default "blue"
+    errorbar : :class:`bool`, optional
+        Whether to show error bars, by default False
+    error_range : :class:`str`, optional
+        Range of the error bars, can be either "std", "IQR" or "minmax", by default "std"
+    metric_lim : :class:`list`, optional
+        Limits of the metric in the plot, by default None
+    metric_fn_kwargs : :class:`dict`, optional
+        Keyword arguments for the computation of the pywearable functions, by default {}
+    bar_kwargs : :class:`dict`, optional
+        Additional keyword arguments for the bar plot, by default {}
+        
+    Raises
+    -------
+    ValueError
+        If the error range is not a valid range.
+    """
+    metric_data = metric_fn(loader=loader, 
+                            user_id=user_id, 
+                            start_date=start_date, 
+                            end_date=end_date, 
+                            **metric_fn_kwargs)[user_id]
+
+    if isinstance(aggr_fn, str) and aggr_fn.lower() == "mean":
+        aggr_fn = np.nanmean
+    elif isinstance(aggr_fn, str) and aggr_fn.lower() == "median":
+        aggr_fn = np.nanmedian
+    
+    if errorbar:
+        if isinstance(error_range, str) and error_range.lower() == "std":
+            error_fn = np.nanstd
+        # note that the following assumes that aggr_fn computes a central statistic of the metric
+        elif isinstance(error_range, str) and error_range.lower() == "iqr":
+            error_fn = lambda x: (abs(aggr_fn(x) - np.nanpercentile(x, 25)),
+                                  abs(aggr_fn(x) - np.nanpercentile(x, 75)))
+        elif isinstance(error_range, str) and error_range.lower() == "minmax":
+            error_fn = lambda x: (abs(aggr_fn(x) - np.nanmin(x)), 
+                                  abs(aggr_fn(x) - np.nanmax(x)))
+        else:
+            raise ValueError(f"Error range {error_range} is not a valid range.")
+
+    weekday_metrics = [[] for _ in range(7)]
+
+    for date, value in metric_data.items():
+        weekday = date.weekday()
+        weekday_metrics[weekday].append(value)
+
+    mean_weekday_metrics = [aggr_fn(weekday) for weekday in weekday_metrics]
+    if errorbar:
+        error_weekday_metrics = np.array([error_fn(weekday) for weekday in weekday_metrics]).T
+
+    weekdays_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize)
+
+    if not horizontal:
+        ax.bar(weekdays_labels, 
+               mean_weekday_metrics,
+               color=color,
+               alpha=alpha,
+               yerr=error_weekday_metrics if errorbar else None,
+               **bar_kwargs)
+        if metric_lim:
+            ax.set_ylim(metric_lim)
+    else:
+        ax.barh(weekdays_labels, 
+                mean_weekday_metrics,
+                color=color,
+                alpha=alpha,
+                xerr=error_weekday_metrics if errorbar else None,
+                **bar_kwargs)
+        if metric_lim:
+            ax.set_xlim(metric_lim)
+        ax.invert_yaxis()
+
+    ax.set_xlabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
+    ax.set_title(title, fontsize=fontsize + 2)
+
+    plt.tight_layout()
+
+    if save_to:
+        plt.savefig(save_to, bbox_inches="tight")
+
+    if show:
+        plt.show()
+
+
+def summary_longitudinal_chart(
+        loader : BaseLoader,
+        user_id : str,
+        start_date : Union[datetime.datetime, datetime.date, str],
+        end_date : Union[datetime.datetime, datetime.date, str],
+        start_hour : int = 0,
+        figsize : Union[tuple,None] = None,
+        hypnogram_fn : Union[Callable, None] = None,
+        cardiac_fn : Union[Callable, None] = None,
+        activity_fn : Union[Callable, None] = None,
+        show_missing : bool = True,
+        resolution_sleep : Union[float, int] = 1.,
+        resolution_cardiac : Union[float, int] = 1.,
+        resolution_activity : Union[float, int] = 15.,
+        fontsize : int = 10,
+        show : bool = True,
+        save_to : str = None,
+        title : str = "",
+        show_dates : bool = False,
+        ):
+    """
+    Generates a longitudinal chart for a user and period of interest
+    
+    The idea of this function is to show for a period of interest cardiac data,
+    in terms of heart rate, activity data, in terms of steps, and sleep data, in
+    terms of hypnograms. The data is showing on daily subplots, starting from the chosen
+    start_time. 
+
+    Parameters
+    ----------
+    loader : :class:`pywearable.loader.base.BaseLoader`
+        An instance of a data loader.
+    user_id : :class:`str`
+        The id for which the longitudinal chart must be generated.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str`
+        Start date for data retrieval.
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str`
+        End date for data retrieval.
+    start_hour : :class:`int`, optional
+        Start hour for the daily subplots, by default 0
+    figsize : :class:`tuple`, optional
+        Size of the figure, by default None
+    hypnogram_fn : :class:`Callable`, optional
+        Function to load the hypnogram data, by default None
+    cardiac_fn : :class:`Callable`, optional
+        Function to load the cardiac data, by default None
+    activity_fn : :class:`Callable`, optional
+        Function to load the activity data, by default None
+    show_missing : :class:`bool`, optional
+        Whether to show missing data, by default True
+    resolution_sleep : :class:`float` or :class:`int`, optional
+        Resolution of the sleep data in minutes, by default 1.
+    resolution_cardiac : :class:`float` or :class:`int`, optional
+        Resolution of the cardiac data in minutes, by default 1.
+    resolution_activity : :class:`float` or :class:`int`, optional
+        Resolution of the activity data in minutes, by default 15.
+    fontsize : :class:`int`, optional
+        Font size for the plot, by default 10
+    show : :class:`bool`, optional
+        Whether to show the plot, by default True
+    save_to : :class:`str`, optional
+        Path where to save the grid plot, by default None
+    title : :class:`str`, optional
+        Title of the plot, by default ""
+    show_dates : :class:`bool`, optional
+        Whether to show the dates on the x-axis, by default False
+
+    Returns
+    -------
+    :class:`list[matplotlib.axes._subplots.AxesSubplot]`
+        Axes objects of the plot
+    """
+    
+    if figsize is None:
+        figsize = (10, (end_date-start_date).days*2)
+    if hypnogram_fn is None:
+        hypnogram_fn = loader.load_hypnogram
+    if cardiac_fn is None:
+        cardiac_fn = loader.load_heart_rate
+    if activity_fn is None:
+        activity_fn = loader.load_steps
+
+    # load all the data with some room for the next day due to start_hour
+    hypnograms = hypnogram_fn(user_id=user_id, 
+                          start_date=start_date, 
+                            end_date=end_date+datetime.timedelta(days=1))
+    cardiac_data = cardiac_fn(user_id=user_id, 
+                              start_date=start_date, 
+                              end_date=end_date+datetime.timedelta(days=1))
+    activity_data = activity_fn(user_id=user_id, 
+                                start_date=start_date, 
+                                end_date=end_date+datetime.timedelta(days=1))
+
+    plt.figure(figsize=figsize)
+    axes = []
+
+    for i in range((end_date - start_date).days):
+        date = start_date + datetime.timedelta(days=i)
+        start_date_hour = datetime.datetime.combine(date, datetime.time(start_hour))
+        
+        # get the hypnogram for the given date
+        hypnogram = hypnograms.get(date, None)
+        if hypnogram is not None:
+            hypnogram_stages = hypnogram["values"]
+            hypnogram_length = len(hypnogram_stages)
+            hypnogram_start = hypnogram["start_time"]
+            hypnogram_end = hypnogram["end_time"]
+            hypnogram_time = pd.date_range(start=hypnogram_start, 
+                                        periods=hypnogram_length+1, 
+                                        freq=f"{resolution_sleep}min")
+            
+        # and for the next date
+        next_hypnogram = hypnograms.get(date + datetime.timedelta(days=1), None)
+        if next_hypnogram is not None:
+            next_hypnogram_stages = next_hypnogram["values"]
+            next_hypnogram_length = len(next_hypnogram_stages)
+            next_hypnogram_start = next_hypnogram["start_time"]
+            next_hypnogram_end = next_hypnogram["end_time"]
+            next_hypnogram_time = pd.date_range(start=next_hypnogram_start, 
+                                                periods=next_hypnogram_length+1, 
+                                                freq=f"{resolution_sleep}min")
+
+
+        full_day_range = pd.date_range(start=start_date_hour, 
+                                       periods=int(24*((60)/ resolution_sleep)+1), 
+                                       freq=f"{resolution_sleep}min")
+        full_day_hypnogram = np.full(len(full_day_range) - 1, 5) # 5 (wake) is assumed as default value
+
+        if hypnogram is not None or next_hypnogram is not None:
+            if hypnogram is not None:
+                diff_init = hypnogram_start - start_date_hour
+                # in case the hypnogram starts before the start of the subplot 
+                # we need to see only the last part of the hypnogram
+                if diff_init.days < 0:
+                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep*60)))
+                    hypnogram_time = hypnogram_time[diff_steps:]
+                    hypnogram_values = hypnogram_stages[diff_steps:]
+                    full_day_hypnogram[:len(hypnogram_values)] = hypnogram_values
+                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep * 60)))
+                    full_day_hypnogram[diff_steps:hypnogram_length+diff_steps] = hypnogram_stages
+            if next_hypnogram is not None:
+                diff_end = next_hypnogram_end - (start_date_hour + datetime.timedelta(days=1))
+                # in case the hypnogram ends after the end of the subplot
+                if diff_end.days >= 0:
+                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
+                    next_hypnogram_time = next_hypnogram_time[:-diff_steps]
+                    next_hypnogram_values = next_hypnogram_stages[:-diff_steps]
+                    # Note that if the hypnogram is completely in the next subplot, we must avoid the next part
+                    # If it is not, we need to see only the first part of the hypnogram
+                    if len(next_hypnogram_values) > 0:
+                        full_day_hypnogram[-len(next_hypnogram_values):] = next_hypnogram_values
+                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
+                    full_day_hypnogram[-next_hypnogram_length-diff_steps:-diff_steps] = next_hypnogram_stages
+        # map 0 (previous encoding of wake) to 5 in full_day_hypnogram for visualization purposes
+        full_day_hypnogram[full_day_hypnogram == 0] = 5 
+
+        # get cardiac data
+        full_day_range_cardiac = pd.date_range(
+            start=start_date_hour, 
+            periods=int(24*((60)/ resolution_cardiac)+1), 
+            freq=f"{resolution_cardiac}min"
+        )
+        date_cardiac_expanded = pd.merge(
+            left=full_day_range_cardiac.to_series(name=pywearable.constants.ISODATE_COL),
+            right=cardiac_data, 
+            how="left"
+        )
+        # get activity data
+        full_day_range_activity = pd.date_range(
+            start=start_date_hour, 
+            periods=int(24*((60)/ resolution_activity)+1), 
+            freq=f"{resolution_activity}min"
+        )
+        date_activity_expanded = pd.merge(
+            left=full_day_range_activity.to_series(name=pywearable.constants.ISODATE_COL), 
+            right=activity_data,
+            how="left"
+        )
+
+        ax = plt.subplot((end_date - start_date).days, 1, i+1)
+        date_times = pd.date_range(start=start_date_hour, periods=9, freq='3h')
+        ax.set_xlim([date_times[0], date_times[-1]])
+
+        # show times on x-axis top only in the first subplot
+        if i == 0:
+            ax.set_title(title, fontsize=fontsize + 4)
+            ax.xaxis.tick_top()
+            ax.set_xticks(date_times)
+            ax.set_xticklabels(date_times.strftime("%H:%M"))
+            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+        else:
+            ax.set_xticks([])
+            ax.set_xticklabels([])
+            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+
+        #plot activity data
+        ax.bar(date_activity_expanded[pywearable.constants.ISODATE_COL], 
+                date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity, 
+                color="green",
+                alpha=0.5,
+                width=0.01,
+                edgecolor="black")
+        max_yaxis_activity = max(
+            1000 / resolution_activity, 
+            max(date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity) + 100/resolution_activity)
+        ax.set_ylim([0, max_yaxis_activity])
+        ax.tick_params(axis='y', colors='green')
+        ax.set_ylabel("Steps per minute", color='green', fontsize=fontsize)
+        if show_dates:
+            ax.set_xlabel(date, fontsize=fontsize+2)
+
+        # plot cardiac data
+        ax2 = ax.twinx()
+        ax2.plot(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
+                 date_cardiac_expanded[pywearable.constants.HR_COLUMN], 
+                 color="red")
+        max_yaxis = max(175, max(date_cardiac_expanded[pywearable.constants.HR_COLUMN]))
+        if show_missing:
+            ax2.fill_between(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
+                            max_yaxis - 10, 
+                            where=date_cardiac_expanded.beatsPerMinute.isna(),
+                            facecolor="darkgrey", 
+                            alpha=0.5)
+        ax2.set_ylim([35, max_yaxis])
+        ax2.tick_params(axis='y', colors='red')
+        ax2.set_ylabel("Heart rate (bpm)", color='red', fontsize=fontsize)
+        
+        # plot hypnogram(s)
+        ax3 = ax.twinx()
+        ax3.set_ylim([0, 5.5])
+        ax3.stairs(full_day_hypnogram, 
+                   full_day_range, 
+                   baseline=4, 
+                   color="darkblue")
+        # Offset the third y-axis to the right
+        ax3.spines['right'].set_position(('outward', 50)) 
+        ax3.set_yticks(ticks=[1, 2, 3, 4, 5],labels=["Light", "", "Deep", "REM", "Wake"])
+        ax3.tick_params(axis='y', colors='darkblue')
+
+        axes.append([ax, ax2, ax3])
+    
+    plt.tight_layout()
+
+    if save_to:
+        plt.savefig(save_to)
+    if show:
+        plt.show()
+    
+    return axes

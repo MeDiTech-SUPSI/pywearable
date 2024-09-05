@@ -71,11 +71,11 @@ def get_activity_series(
                 end_date - datetime.timedelta(minutes=15),  # TODO Do we need to do it?
             )
             activity_dict[id] = pd.Series(
-                df[df[constants._EPOCH_INTENSITY_COL] == activity][
-                    constants._EPOCH_ACTIVE_TIME_MS_COL
+                df[df[constants.EPOCH_INTENSITY_COL] == activity][
+                    constants.EPOCH_ACTIVE_TIME_MS_COL
                 ].values,
-                index=df[df[constants._EPOCH_INTENSITY_COL] == activity][
-                    constants._ISODATE_COL
+                index=df[df[constants.EPOCH_INTENSITY_COL] == activity][
+                    constants.ISODATE_COL
                 ],
             )
         except Exception as e:
@@ -136,7 +136,7 @@ def get_active_activity_series(
     """
     return get_activity_series(
         loader,
-        constants._EPOCH_ACTIVITY_ACTIVE_VALUE,
+        constants.EPOCH_ACTIVITY_ACTIVE_VALUE,
         user_id,
         start_date,
         end_date,
@@ -178,7 +178,7 @@ def get_highly_active_activity_series(
     """
     return get_activity_series(
         loader,
-        constants._EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE,
+        constants.EPOCH_ACTIVITY_HIGHLY_ACTIVE_VALUE,
         user_id,
         start_date,
         end_date,
@@ -220,7 +220,7 @@ def get_sedentary_activity_series(
     """
     return get_activity_series(
         loader,
-        constants._EPOCH_ACTIVITY_SEDENTARY_VALUE,
+        constants.EPOCH_ACTIVITY_SEDENTARY_VALUE,
         user_id,
         start_date,
         end_date,
@@ -292,8 +292,8 @@ def get_steps_series(
             df = loader.load_garmin_connect_epoch(
                 id, start_date, end_date - datetime.timedelta(minutes=15)
             )
-            steps_dict[id] = df.groupby(constants._ISODATE_COL)[
-                constants._DAILY_SUMMARY_STEPS_COL
+            steps_dict[id] = df.groupby(constants.ISODATE_COL)[
+                constants.DAILY_SUMMARY_STEPS_COL
             ].sum()
         except:
             steps_dict[id] = None
@@ -346,8 +346,8 @@ def get_distance_series(
             df = loader.load_garmin_connect_epoch(
                 id, start_date, end_date - datetime.timedelta(minutes=15)
             )
-            distance_dict[id] = df.groupby(constants._ISODATE_COL)[
-                constants._DAILY_SUMMARY_DISTANCE_COL
+            distance_dict[id] = df.groupby(constants.ISODATE_COL)[
+                constants.DAILY_SUMMARY_DISTANCE_COL
             ].sum()
         except:
             distance_dict[id] = None
