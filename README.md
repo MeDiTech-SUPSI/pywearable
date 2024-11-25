@@ -1,9 +1,8 @@
 # pywearable
-[![Documentation Status](https://readthedocs.org/projects/pywearable/badge/?version=latest)](https://pywearable.readthedocs.io/en/latest/?badge=latest)
-![tests](https://github.com/dado93/pywearable/actions/workflows/python-app.yml/badge.svg)
 
 Do you need to deal with wearable data? Then you are in the right place!
-In this repository you will find a Python package that you can use to analyse all data collected with several data sources. At the moment, we support:
+In this repository you will find a Python package that you can use to analyse all data collected with several data sources, with a particular focus on longitudinal data. 
+At the moment, we support:
 - [Labfront](https://labfront.com/)
 - [LifeSnaps Dataset](https://zenodo.org/records/7229547)
   
