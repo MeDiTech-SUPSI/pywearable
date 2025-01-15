@@ -785,19 +785,16 @@ class LabfrontLoader(BaseLoader):
         # TODO it may happen that end_date is lower than the firstTimestamp in file_index
         if len(participant_files) == 1:
             # We only have one file
-            if not (
-                (
-                    start_date
-                    >= participant_files.iloc[0].loc[
-                        lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
-                    ]
-                )
-                or (
-                    end_date
-                    <= participant_files.iloc[0].loc[
-                        lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
-                    ]
-                )
+            if (
+                start_date
+                >= participant_files.iloc[0].loc[
+                    lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
+                ]
+            ) or (
+                end_date
+                <= participant_files.iloc[0].loc[
+                    lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY
+                ]
             ):
                 return []
         else:
@@ -896,15 +893,6 @@ class LabfrontLoader(BaseLoader):
         if not (end_date is None):
             end_date = pd.Timestamp(end_date)
 
-        files = self.get_files_from_timerange(
-            user_id,
-            metric,
-            start_date,
-            end_date,
-            is_questionnaire,
-            is_todo,
-            task_name,
-        )
         # Get full participant_id (user + labfront)
         participant_id = self.get_full_id(user_id)
         files = self.get_files_from_timerange(
@@ -2138,18 +2126,18 @@ class LabfrontLoader(BaseLoader):
             filter_on_calendar_date=False,
         )
         return data
-    
+
     def load_garmin_connect_step(
-            self,
-            user_id: str,
-            start_date: Union[str, datetime.date, datetime.date] = None,
-            end_date: Union[str, datetime.date, datetime.date] = None,
+        self,
+        user_id: str,
+        start_date: Union[str, datetime.date, datetime.date] = None,
+        end_date: Union[str, datetime.date, datetime.date] = None,
     ) -> pd.DataFrame:
         """
         Load Garmin Connect steps data.
-        
+
         This function loads Garmin Connect steps data from a given participant and within a specified date and time range.
-        
+
         Parameters
         ----------
         user_id : :class:`str`
@@ -2165,28 +2153,30 @@ class LabfrontLoader(BaseLoader):
             Dataframe containing Garmin Connect steps data.
         """
 
-        df = self.load_garmin_connect_epoch(
-            user_id, start_date, end_date
+        df = self.load_garmin_connect_epoch(user_id, start_date, end_date)
+        steps_df = (
+            df.groupby(constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
+            .sum()
+            .reset_index()
         )
-        steps_df = df.groupby(constants.ISODATE_COL)[
-            lf_constants.ACTIVITY_STEPS_COL
-        ].sum().reset_index()
         # add back the most frequent timezone offset
-        steps_df[constants.TIMEZONEOFFSET_IN_MS_COL] = df.groupby(constants.ISODATE_COL)[
-            constants.TIMEZONEOFFSET_IN_MS_COL
-        ].mean().reset_index()[constants.TIMEZONEOFFSET_IN_MS_COL]
+        steps_df[constants.TIMEZONEOFFSET_IN_MS_COL] = (
+            df.groupby(constants.ISODATE_COL)[constants.TIMEZONEOFFSET_IN_MS_COL]
+            .mean()
+            .reset_index()[constants.TIMEZONEOFFSET_IN_MS_COL]
+        )
         # add the unix timestamp column
         steps_df[constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
             constants.ISODATE_COL
         ].apply(lambda x: int(x.timestamp() * 1000))
         # add sampling frequency column durationInMs
-        steps_df[constants.DURATION_IN_MS_COL] = 15 * 60 * 1000 
+        steps_df[constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
         # add a column for calendar date
         steps_df[constants.CALENDAR_DATE_COL] = steps_df[constants.ISODATE_COL].dt.date
         # add a column for cumulative steps at a daily level
-        steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(constants.CALENDAR_DATE_COL)[
-            lf_constants.ACTIVITY_STEPS_COL
-        ].cumsum()
+        steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(
+            constants.CALENDAR_DATE_COL
+        )[lf_constants.ACTIVITY_STEPS_COL].cumsum()
 
         return steps_df
 
@@ -2806,7 +2796,7 @@ class LabfrontLoader(BaseLoader):
         Load steps data.
 
         This function loads steps data from a given user and within a specified date and time range.
-        
+
         Parameters
         ----------
         user_id : str
