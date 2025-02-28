@@ -1,10 +1,11 @@
 stages:
+  - docs
   - deploy
 
 image: python:3.10-alpine
 
 pages:
-  stage: deploy
+  stage: docs
   script:
   - pip install -U sphinx==6.2.1
   - pip install furo
