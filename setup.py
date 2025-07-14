@@ -16,10 +16,11 @@ config = {
     "scripts": [],
     "name": "pywearable",
     "python_requires": ">=3.9.0",
-    "entry_points": """
-        [console_scripts]
-        pywearable-cli=pywearable.cli.cli:cli
-    """,
+    "entry_points": {
+        "console_scripts": [
+            "pywearable-cli=pywearable.cli.cli:cli",
+        ],
+    },
 }
 
 setup(**config)
