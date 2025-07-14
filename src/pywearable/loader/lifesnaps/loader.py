@@ -33,6 +33,10 @@ _METRIC_DICT = {
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
         _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
     },
+    lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESPIRATORY_RATE_SUMMARY,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_RESP_RATE_SUMMARY_FULL_SLEEP_BREATHING_RATE_COL,
+    },
     lf_constants.METRIC_DEVICE_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEVICE_TEMP_RECORDED_TIME_KEY,
@@ -1085,6 +1089,42 @@ class LifeSnapsLoader(BaseLoader):
             )[constants.STEPS_STEPS_COL].cumsum()
             steps = steps.drop([constants.CALENDAR_DATE_COL], axis=1)
         return steps
+    
+    def load_respiration(
+        self,
+        user_id: str,
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load respiration data.
+
+        Parameters
+        ----------
+        user_id : :class:`str`
+            Unique user identifier for the loading of steps data.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            Start date for the retrieval of steps data, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            End date for the retrieval of steps data, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            Respiration data.
+        """
+
+        respiratory_summary = self.load_metric(
+            metric=lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return respiratory_summary
 
     def load_very_active_minutes(
         self,
