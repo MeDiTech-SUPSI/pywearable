@@ -45,6 +45,10 @@ _METRIC_DICT = {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_AFIB_ECG_READINGS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_DATETIME_COL,
     },
+    lf_constants.METRIC_DAILY_HRV_SUMMARY: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_HRV_SUMMARY,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DAILY_HRV_SUMMARY_TIMESTAMP_KEY,
+    },
     lf_constants.METRIC_HRV_DETAILS: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
@@ -868,6 +872,20 @@ class LifeSnapsLoader(BaseLoader):
                 }
             )
         return ecg
+
+    def load_hrv_summary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        hrv_summary = self.load_metric(
+            metric=lf_constants.METRIC_DAILY_HRV_SUMMARY,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return hrv_summary
 
     def load_hrv_details(
         self,
