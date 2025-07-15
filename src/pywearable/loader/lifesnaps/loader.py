@@ -28,10 +28,18 @@ _METRIC_DATE_FORMAT_KEY = "date_format"
 
 _METRIC_DICT = {
     # Fitbit data
+    lf_constants.METRIC_STRESS: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STRESS_SCORE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_STRESS_SCORE_DATE_COL,
+    },
     lf_constants.METRIC_COMP_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
         _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
+    },
+    lf_constants.METRIC_SPO2: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
     },
     lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESPIRATORY_RATE_SUMMARY,
@@ -708,6 +716,34 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
 
+    def load_stress_score(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        ) -> pd.DataFrame:
+
+        stress =  self.load_metric(
+            metric=lf_constants.METRIC_STRESS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if len(stress) > 0:
+            stress = stress.loc[:, [
+                "timezoneOffsetInMs",
+                "unixTimestampInMs",
+                "isoDate",
+                "STRESS_SCORE"]]
+            stress = stress.rename(
+                columns={"STRESS_SCORE": "stressScore"})
+        return stress
+
+
     def load_daily_spo2(
         self,
         user_id: Union[ObjectId, str],
@@ -877,6 +913,20 @@ class LifeSnapsLoader(BaseLoader):
             )
         return ecg
 
+    def load_pulse_ox(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        spo2 = self.load_metric(
+            metric=lf_constants.METRIC_SPO2,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return spo2
+
     def load_heart_rate(
         self,
         user_id: Union[ObjectId, str],
@@ -889,6 +939,12 @@ class LifeSnapsLoader(BaseLoader):
             start_date=start_date,
             end_date=end_date,
         )
+        if heart_rate.empty:
+            return heart_rate
+        heart_rate = heart_rate.drop(
+            columns=["value.confidence"], axis=1, errors="ignore")
+        heart_rate = heart_rate.rename(
+            columns={"value.bpm": "beatsPerMinute"})
         return heart_rate
 
     def load_hrv_summary(
@@ -1126,7 +1182,7 @@ class LifeSnapsLoader(BaseLoader):
             steps = steps.drop([constants.CALENDAR_DATE_COL], axis=1)
         return steps
     
-    def load_respiration(
+    def load_sleep_respiration(
         self,
         user_id: str,
         start_date: Union[
@@ -1136,7 +1192,7 @@ class LifeSnapsLoader(BaseLoader):
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
     ) -> pd.DataFrame:
-        """Load respiration data.
+        """Load sleep respiration data.
 
         Parameters
         ----------
@@ -1153,14 +1209,25 @@ class LifeSnapsLoader(BaseLoader):
             Respiration data.
         """
 
-        respiratory_summary = self.load_metric(
+        sleep_resp = self.load_metric(
             metric=lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
+        """
+        if len(sleep_resp) > 0:
+            # modifichiamo la lista dei nomi delle colonne
+            # TODO rename cols and merge?
+            # TODO remove signal to noise and sd?
 
-        return respiratory_summary
+            sleep_resp.columns = (
+                sleep_resp.columns
+                .str.replace("breathing_rate", "breathsPerMinute", regex=True)
+                #.str.replace("full_sleep", "", regex=True)
+            )
+        """
+        return sleep_resp
 
     def load_very_active_minutes(
         self,
