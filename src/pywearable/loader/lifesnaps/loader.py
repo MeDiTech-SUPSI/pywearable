@@ -32,14 +32,38 @@ _METRIC_DICT = {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STRESS_SCORE,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_STRESS_SCORE_DATE_COL,
     },
+    lf_constants.METRIC_CALORIES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_CALORIES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_CALORIES_DATETIME_COL,
+    },
+    lf_constants.METRIC_DEMOGRAPHIC_VO2_MAX: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEMOGRAPHIC_VO2_MAX,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEMOGRAPHIC_VO2_MAX_DATETIME_COL,
+    },
+    lf_constants.METRIC_DISTANCE: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DISTANCE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DISTANCE_DATETIME_COL,
+    },
+    lf_constants.METRIC_EST_OXY_VARIATION: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_ESTIMATED_OXYGEN_VARIATION,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_EST_OXY_VAR_DATETIME_COL,
+    },
+    lf_constants.METRIC_LIGHTLY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_LIGHTLY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_LIGHTLY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lf_constants.METRIC_MODERATELY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MODERATELY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_MODERATELY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lf_constants.METRIC_SEDENTARY_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SEDENTARY_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SEDENTARY_MIN_DATETIME_COL,
+    },
     lf_constants.METRIC_COMP_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
         _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
-    },
-    lf_constants.METRIC_SPO2: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
     },
     lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESPIRATORY_RATE_SUMMARY,
@@ -743,47 +767,88 @@ class LifeSnapsLoader(BaseLoader):
                 columns={"STRESS_SCORE": "stressScore"})
         return stress
 
-
-    def load_daily_spo2(
+    def load_calories(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
-        ] = None,
-        end_date: Union[
+        ] = None, end_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
-        ] = None,
-    ) -> pd.DataFrame:
-        """Load daily SpO2 values.
+        ] = None) -> pd.DataFrame:
 
-        This function loads SpO2 values from the DB. The returned
-        :class:`pd.DataFrame` contains the following colums:
-
-        - timestamp: date
-        - average_value: average measured SpO2
-        - lower_bound: lower bound of measured SpO2
-        - upper_bound: upper bound of measured SpO2
-
-        Parameters
-        ----------
-        user_id : :class:`bson.ObjectId` or :class:`str`
-            Unique identifier for the user.
-        start_date : datetime.datetime or datetime.date or str or None, optional
-            Start date for data retrieval, by default None
-        end_date : datetime.datetime or datetime.date or str or None, optional
-            End date for data retrieval, by default None
-
-        Returns
-        -------
-        :class:`pandas.DataFrame`
-            Daily SpO2 values.
-        """
-        return self.load_metric(
-            metric=lf_constants.METRIC_SPO2,
+        calories =  self.load_metric(
+            metric=lf_constants.METRIC_CALORIES,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
+        return calories 
+
+    def load_vo2_max(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        vo2max =  self.load_metric(
+            metric=lf_constants.METRIC_DEMOGRAPHIC_VO2_MAX,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        vo2max = self._reorder_datetime_columns(vo2max)
+
+        vo2max.columns = vo2max.columns.map(str).str.replace("value.", "", regex=True)
+
+        return vo2max
+
+    def load_distance(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        distance =  self.load_metric(
+            metric=lf_constants.METRIC_DISTANCE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        distance = self._reorder_datetime_columns(distance)
+
+        distance = distance.rename(
+            columns={"value": "distance"})
+
+        return distance
+
+    def load_oxygen_variation(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        oxygen_variation =  self.load_metric(
+            metric=lf_constants.METRIC_EST_OXY_VARIATION,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        oxygen_variation = self._reorder_datetime_columns(oxygen_variation) 
+
+        oxygen_variation = oxygen_variation.rename(
+            columns={"Infrared to Red Signal Ratio": "infraredToRedSignalRatio",})
+
+        return oxygen_variation 
+
 
     def load_device_temperature(
         self,
@@ -1242,7 +1307,73 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
         very_active_minutes = self._reorder_datetime_columns(very_active_minutes)
+
+        very_active_minutes = very_active_minutes.rename(
+            columns={"value": "veryActiveMinutes"})
         return very_active_minutes
+
+    def load_lightly_active(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        lightly_active =  self.load_metric(
+            metric=lf_constants.METRIC_LIGHTLY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        lightly_active = self._reorder_datetime_columns(lightly_active)
+
+        lightly_active = lightly_active.rename(
+            columns={"value": "lightlyActiveMinutes"})
+        return lightly_active
+
+    def load_moderately_active(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        moderately_active =  self.load_metric(
+            metric=lf_constants.METRIC_MODERATELY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        moderately_active = self._reorder_datetime_columns(moderately_active)
+
+        moderately_active = moderately_active.rename(
+            columns={"value": "moderatelyActiveMinutes"})
+        return moderately_active
+
+    def load_sedentary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+
+        sedentary =  self.load_metric(
+            metric=lf_constants.METRIC_SEDENTARY_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        sedentary = self._reorder_datetime_columns(sedentary)
+
+        sedentary = sedentary.rename(
+            columns={"value": "sedentaryMinutes"})
+        return sedentary
 
     def load_water_logs(
         self,
