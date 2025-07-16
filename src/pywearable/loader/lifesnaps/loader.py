@@ -1294,7 +1294,7 @@ class LifeSnapsLoader(BaseLoader):
         """
         return sleep_resp
 
-    def load_very_active_minutes(
+    def load_very_active(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
