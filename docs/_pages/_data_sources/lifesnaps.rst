@@ -31,7 +31,7 @@ To do so, follow these steps:
     <mongodb host> with the hostname of your MongoDB instance (default: localhost),
 
     <mongodb port> with the port number of your MongoDB instance (default: 27017),
-    
+
     <path to file .bson> with the path to the corresponding .bson file you previously extracted.
 
 .. code-block:: bash
@@ -55,6 +55,18 @@ To start using the library with the LifeSnaps data and verify that everything is
 
 At this point, ``pywearable`` will be connected to the database you previously created, and it will be able to extract and process the data stored in it.
 
+Below is an example of extracting a specific metric for a given user:
+
+.. code-block:: python
+
+    import pywearable.loader
+
+    loader = pywearable.loader.LifeSnapsLoader(host="localhost", port=27017)
+    uuid = "..." # example of user id
+    respiration = loader.load_respiration(user_id=uuid)
+
+You can replace `load_respiration` with any of the available functions to extract different types of data.  
+For a complete list of available functions, please refer to the table below.
 
 pymongo
 -------
