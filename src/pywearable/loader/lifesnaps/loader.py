@@ -212,7 +212,15 @@ class LifeSnapsLoader(BaseLoader):
         with each row representing an unique entry of sleep data for
         the given `user_id`. If no sleep data are available for the
         provided `user_id`, then an empty :class:`pd.DataFrame` is
-        returned.
+        returned. The following columns are available: 
+
+            - sleep summary id
+            - duration in ms
+            - deep sleep duration in ms
+            - light sleep duration in ms
+            - rem sleep duration in ms
+            - unmeasurable sleep duration in ms
+            - awake duration in ms
 
         Parameters
         ----------
@@ -551,8 +559,10 @@ class LifeSnapsLoader(BaseLoader):
         This function loads sleep stage data for a given user
         and timeframe. If ``include_short_data`` is `True`, then
         also sleep stages with a duration lower than 30 seconds
-        are returned.
-
+        are returned. It contains the following columns:
+            - sleep summary id
+            - duration in ms
+            - type (sleep stage)
 
         Parameters
         ----------
@@ -1199,7 +1209,11 @@ class LifeSnapsLoader(BaseLoader):
 
         This function loads the summary of heart rate variability data
         for a given user over a specified time interval. HRV is the
-        variation of time between each heartbeat.
+        variation of time between each heartbeat. The summary contains
+        the following columns:
+            - rmssd
+            - nremhr 
+            - entropy
 
         Parameters
         ----------
@@ -1234,7 +1248,12 @@ class LifeSnapsLoader(BaseLoader):
 
         This function loads the detailed heart rate variability data
         for a given user over a specified time interval. HRV is the
-        variation of time between each heartbeat.
+        variation of time between each heartbeat. The dataset contains 
+        the following columns:
+            - rmssd
+            - coverage
+            - low_frequency
+            - high_frequency
 
         Parameters
         ----------
@@ -1440,6 +1459,34 @@ class LifeSnapsLoader(BaseLoader):
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
     ) -> pd.DataFrame:
+        """Load user daily summary.
+
+        This function loads and returns a Dataframe containing the daily 
+        summary of the user's activity and health metrics. The following columns 
+        are included in the DataFrame:
+
+            - steps
+            - distance
+            - kilocalories
+            - activity of moderate intensity
+            - average heart rate in beats per minute
+            - average resting heart rate in beats per minute
+            - stress score
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            DataFrame containing the daily summary of the user's activity and health metrics.
+        """
         steps = self.load_steps(
             user_id=user_id,
             start_date=start_date,
@@ -1522,19 +1569,6 @@ class LifeSnapsLoader(BaseLoader):
         )
         return merged
 
-        
-        
-        
-
-
-
-
-
-
-
-
-    
-
     def load_steps(
         self,
         user_id: str,
@@ -1607,7 +1641,20 @@ class LifeSnapsLoader(BaseLoader):
         """Load sleep respiration data.
 
         This function loads sleep respiration data for a given ``user_id`` in the
-        timeframe defined by ``start_date`` and ``end_date``.
+        timeframe defined by ``start_date`` and ``end_date``. The returned dataset 
+        contains the following features:
+
+            - full sleep standard deviation 
+            - full sleep signal to noise
+            - deep sleep standard deviation 
+            - deep sleep signal to noise
+            - deep sleep breathing rate
+            - light sleep standard deviation 
+            - light sleep signal to noise
+            - light sleep breathing rate
+            - rem sleep standard deviation 
+            - rem sleep signal to noise
+            - rem sleep breathing rate
 
         Parameters
         ----------
