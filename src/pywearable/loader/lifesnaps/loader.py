@@ -28,10 +28,46 @@ _METRIC_DATE_FORMAT_KEY = "date_format"
 
 _METRIC_DICT = {
     # Fitbit data
+    lf_constants.METRIC_STRESS: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STRESS_SCORE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_STRESS_SCORE_DATE_COL,
+    },
+    lf_constants.METRIC_CALORIES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_CALORIES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_CALORIES_DATETIME_COL,
+    },
+    lf_constants.METRIC_DEMOGRAPHIC_VO2_MAX: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEMOGRAPHIC_VO2_MAX,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEMOGRAPHIC_VO2_MAX_DATETIME_COL,
+    },
+    lf_constants.METRIC_DISTANCE: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DISTANCE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DISTANCE_DATETIME_COL,
+    },
+    lf_constants.METRIC_EST_OXY_VARIATION: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_ESTIMATED_OXYGEN_VARIATION,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_EST_OXY_VAR_DATETIME_COL,
+    },
+    lf_constants.METRIC_LIGHTLY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_LIGHTLY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_LIGHTLY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lf_constants.METRIC_MODERATELY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MODERATELY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_MODERATELY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lf_constants.METRIC_SEDENTARY_MINUTES: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SEDENTARY_MINUTES,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SEDENTARY_MIN_DATETIME_COL,
+    },
     lf_constants.METRIC_COMP_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
         _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
+    },
+    lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESPIRATORY_RATE_SUMMARY,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_RESP_RATE_SUMMARY_FULL_SLEEP_BREATHING_RATE_COL,
     },
     lf_constants.METRIC_DEVICE_TEMP: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
@@ -41,9 +77,21 @@ _METRIC_DICT = {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_AFIB_ECG_READINGS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_DATETIME_COL,
     },
+    lf_constants.METRIC_HEART_RATE: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HEART_RATE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HEART_RATE_DATETIME_COL,
+    },
+    lf_constants.METRIC_DAILY_HRV_SUMMARY: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_HRV_SUMMARY,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DAILY_HRV_SUMMARY_TIMESTAMP_KEY,
+    },
     lf_constants.METRIC_HRV_DETAILS: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
         _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
+    },
+    lf_constants.METRIC_RESTING_HEART_RATE: {
+        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESTING_HEART_RATE,
+        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_RESTING_HEART_RATE_DATETIME_COL,
     },
     lf_constants.METRIC_PROFILE: {
         _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_PROFILE,
@@ -164,7 +212,15 @@ class LifeSnapsLoader(BaseLoader):
         with each row representing an unique entry of sleep data for
         the given `user_id`. If no sleep data are available for the
         provided `user_id`, then an empty :class:`pd.DataFrame` is
-        returned.
+        returned. The following columns are available: 
+
+            - sleep summary id
+            - duration in ms
+            - deep sleep duration in ms
+            - light sleep duration in ms
+            - rem sleep duration in ms
+            - unmeasurable sleep duration in ms
+            - awake duration in ms
 
         Parameters
         ----------
@@ -503,8 +559,10 @@ class LifeSnapsLoader(BaseLoader):
         This function loads sleep stage data for a given user
         and timeframe. If ``include_short_data`` is `True`, then
         also sleep stages with a duration lower than 30 seconds
-        are returned.
-
+        are returned. It contains the following columns:
+            - sleep summary id
+            - duration in ms
+            - type (sleep stage)
 
         Parameters
         ----------
@@ -683,11 +741,6 @@ class LifeSnapsLoader(BaseLoader):
         -------
         pd.DataFrame
             _description_
-
-        Raises
-        ------
-        ValueError
-            If incorrect values for parameters are used.
         """
         return self.load_metric(
             lf_constants.METRIC_COMP_TEMP,
@@ -696,7 +749,7 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
 
-    def load_daily_spo2(
+    def load_resting_heart_rate(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[
@@ -705,37 +758,242 @@ class LifeSnapsLoader(BaseLoader):
         end_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
-    ) -> pd.DataFrame:
-        """Load daily SpO2 values.
+        ) -> pd.DataFrame:
 
-        This function loads SpO2 values from the DB. The returned
-        :class:`pd.DataFrame` contains the following colums:
-
-        - timestamp: date
-        - average_value: average measured SpO2
-        - lower_bound: lower bound of measured SpO2
-        - upper_bound: upper bound of measured SpO2
-
-        Parameters
-        ----------
-        user_id : :class:`bson.ObjectId` or :class:`str`
-            Unique identifier for the user.
-        start_date : datetime.datetime or datetime.date or str or None, optional
-            Start date for data retrieval, by default None
-        end_date : datetime.datetime or datetime.date or str or None, optional
-            End date for data retrieval, by default None
-
-        Returns
-        -------
-        :class:`pandas.DataFrame`
-            Daily SpO2 values.
-        """
-        return self.load_metric(
-            metric=lf_constants.METRIC_SPO2,
+        rest_hr =  self.load_metric(
+            metric=lf_constants.METRIC_RESTING_HEART_RATE,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
+        if len(rest_hr) > 0:
+
+            rest_hr = rest_hr.rename(
+                columns={"value.value": "restingHeartRateInBeatsPerMinute"})
+            rest_hr = rest_hr.loc[:, [
+                "timezoneOffsetInMs",
+                "unixTimestampInMs",
+                "isoDate",
+                "restingHeartRateInBeatsPerMinute"]]
+        return rest_hr 
+
+    def load_stress_score(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        ) -> pd.DataFrame:
+        """Load stress score data.
+
+        This function loads the stress score data for a given user
+        over a specified time interval. The stress score is an
+        estimation of how the body responds to stress based on
+        heart rate, sleep, and activity level data.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with stress score data, including 'stressScore' as an integer score.
+        """
+
+        stress =  self.load_metric(
+            metric=lf_constants.METRIC_STRESS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if len(stress) > 0:
+            stress = stress.loc[:, [
+                "timezoneOffsetInMs",
+                "unixTimestampInMs",
+                "isoDate",
+                "STRESS_SCORE"]]
+            stress = stress.rename(
+                columns={"STRESS_SCORE": "stressScore"})
+        return stress
+
+    def load_calories(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load calories burned data.
+
+        This function loads the total calories burned data for a
+        given user over a specified time interval.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with calories burned data, in kilocalories (kcal).
+        """
+
+        calories =  self.load_metric(
+            metric=lf_constants.METRIC_CALORIES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        calories = calories.rename(
+            columns={"value": "kilocalories"})
+        
+        calories = self._reorder_datetime_columns(calories)
+        calories["kilocalories"] = calories["kilocalories"].astype(float)
+        return calories 
+
+    def load_vo2_max(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load VO2 max data.
+
+        This function loads the VO2 max data for a given user over
+        a specified time interval. VO2 max is a measure of the
+        maximum amount of oxygen the body can utilize during exercise.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with VO2 max data, in milliliters of oxygen per
+            kilogram of body mass per minute (mL/kg/min).
+        """
+
+        vo2max =  self.load_metric(
+            metric=lf_constants.METRIC_DEMOGRAPHIC_VO2_MAX,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        vo2max = self._reorder_datetime_columns(vo2max)
+
+        vo2max.columns = vo2max.columns.map(str).str.replace("value.", "", regex=True)
+
+        return vo2max
+
+    def load_distance(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load distance data.
+
+        This function loads the distance walked by a given user over
+        a specified time interval.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with distance data. The specific unit (e.g., meters) is mentioned as 'distance_unit' in the paper's Profile section.
+        """
+        # TODO check units
+
+        distance =  self.load_metric(
+            metric=lf_constants.METRIC_DISTANCE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        distance = self._reorder_datetime_columns(distance)
+
+        distance = distance.rename(
+            columns={"value": "distance"})
+        distance["distance"] = distance["distance"].astype(int)
+
+        return distance
+
+    def load_oxygen_variation(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load estimated oxygen variation data.
+
+        This function loads the estimated oxygen variation data for a
+        given user over a specified time interval. This metric is an
+        approximation of the changes in blood oxygen saturation levels.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            _description_
+        """
+
+        oxygen_variation =  self.load_metric(
+            metric=lf_constants.METRIC_EST_OXY_VARIATION,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        oxygen_variation = self._reorder_datetime_columns(oxygen_variation) 
+
+        oxygen_variation = oxygen_variation.rename(
+            columns={"Infrared to Red Signal Ratio": "infraredToRedSignalRatio",})
+
+        return oxygen_variation 
+
 
     def load_device_temperature(
         self,
@@ -865,12 +1123,152 @@ class LifeSnapsLoader(BaseLoader):
             )
         return ecg
 
+    def load_pulse_ox(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load pulse oximetry (SpO2) data.
+
+        This function loads the blood oxygen saturation (SpO2) data
+        for a given user over a specified time interval. SpO2
+        represents the percentage of your blood that is saturated
+        with oxygen.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with pulse oximetry (SpO2) data, in percentage (%).
+        """
+        spo2 = self.load_metric(
+            metric=lf_constants.METRIC_SPO2,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return spo2
+
+    def load_heart_rate(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load heart rate data.
+
+        This function loads the heart rate data for a given user
+        over a specified time interval. Heart rate is the speed of
+        the heartbeat measured by the number of contractions of the
+        heart per minute.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with heart rate data, in beats per minute (bpm).
+        """
+        heart_rate = self.load_metric(
+            metric=lf_constants.METRIC_HEART_RATE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if heart_rate.empty:
+            return heart_rate
+        heart_rate = heart_rate.drop(
+            columns=["value.confidence"], axis=1, errors="ignore")
+        heart_rate = heart_rate.rename(
+            columns={"value.bpm": "beatsPerMinute"})
+        return heart_rate
+
+    def load_hrv_summary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load Heart Rate Variability (HRV) summary data.
+
+        This function loads the summary of heart rate variability data
+        for a given user over a specified time interval. HRV is the
+        variation of time between each heartbeat. The summary contains
+        the following columns:
+            - rmssd
+            - nremhr 
+            - entropy
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with HRV summary data, in milliseconds (ms).
+        """
+
+        hrv_summary = self.load_metric(
+            metric=lf_constants.METRIC_DAILY_HRV_SUMMARY,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        return hrv_summary
+
     def load_hrv_details(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        """Load Heart Rate Variability (HRV) detailed data.
+
+        This function loads the detailed heart rate variability data
+        for a given user over a specified time interval. HRV is the
+        variation of time between each heartbeat. The dataset contains 
+        the following columns:
+            - rmssd
+            - coverage
+            - low_frequency
+            - high_frequency
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with detailed HRV data, in milliseconds (ms).
+        """
         hrv_details = self.load_metric(
             metric=lf_constants.METRIC_HRV_DETAILS,
             user_id=user_id,
@@ -1026,6 +1424,150 @@ class LifeSnapsLoader(BaseLoader):
         metric_df = self._setup_datetime_columns(df=metric_df, metric=metric)
         metric_df = self._reorder_datetime_columns(metric_df)
         return metric_df
+    
+    def to_daily(self, df, agg="sum", cols=None):
+        df = df.copy()
+        df["isoDate"] = pd.to_datetime(df["isoDate"])
+        df["calendarDate"] = df["isoDate"].dt.date
+
+        unique_dates = df["isoDate"].dt.date
+        if unique_dates.duplicated().sum() == 0:
+            return df
+
+        if cols is None:
+            cols = df.select_dtypes(include="number").columns.tolist()
+
+        grouped = df.groupby("calendarDate")[cols]
+
+        if isinstance(agg, str):
+            result = grouped.agg(agg)
+        elif isinstance(agg, dict):
+            result = grouped.agg(agg)
+        else:
+            raise ValueError("agg deve essere una stringa ('sum', 'mean', ecc.) o un dict")
+
+        result = result.reset_index()
+        return result
+
+    def load_daily_summary(
+        self,
+        user_id: str,
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load user daily summary.
+
+        This function loads and returns a Dataframe containing the daily 
+        summary of the user's activity and health metrics. The following columns 
+        are included in the DataFrame:
+
+            - steps
+            - distance
+            - kilocalories
+            - activity of moderate intensity
+            - average heart rate in beats per minute
+            - average resting heart rate in beats per minute
+            - stress score
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            DataFrame containing the daily summary of the user's activity and health metrics.
+        """
+        steps = self.load_steps(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date)
+        steps = self.to_daily(
+            steps,
+            agg="sum",)
+        distance = self.load_distance(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        distance = self.to_daily(
+            distance,
+            agg="mean",)
+        calories = self.load_calories(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        calories = self.to_daily(
+            calories,
+            agg="sum",)
+        moderate_intensity = self.load_moderately_active(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        moderate_intensity = self.to_daily(
+            moderate_intensity,)
+        moderate_intensity["moderateIntensityDurationMs"] = (
+            moderate_intensity["moderatelyActiveMinutes"] * 60 * 1000)
+        moderate_intensity = moderate_intensity.drop(
+            columns=["moderatelyActiveMinutes"],
+            errors="ignore",)
+        hr = self.load_heart_rate(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        hr = self.to_daily(
+            hr,
+            agg="mean",)
+        hr = hr.rename(
+            columns={"beatsPerMinute": "averageHeartrateInBeatsPerMinute"})
+        rest_hr = self.load_resting_heart_rate(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        rest_hr = self.to_daily(
+            rest_hr,
+            agg="mean",)
+        stress = self.load_stress_score(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,)
+        stress = self.to_daily(
+            stress,
+            agg="mean",)
+        
+        dfs = [
+            steps,
+            distance,
+            calories,
+            moderate_intensity,
+            hr,
+            rest_hr,
+            stress,
+        ]
+        columns_to_drop = [
+            "timezoneOffsetInMs",
+            "unixTimestampInMs",
+            "isoDate",
+            "totalSteps",
+        ]
+        cleaned_dfs = [df.drop(columns=columns_to_drop, errors="ignore") for df in dfs]
+
+        from functools import reduce
+        merged = reduce(
+            lambda left, right: pd.merge(
+                left, right, on=["calendarDate"], how="outer"
+            ),
+            cleaned_dfs,
+        )
+        return merged
 
     def load_steps(
         self,
@@ -1085,13 +1627,96 @@ class LifeSnapsLoader(BaseLoader):
             )[constants.STEPS_STEPS_COL].cumsum()
             steps = steps.drop([constants.CALENDAR_DATE_COL], axis=1)
         return steps
+    
+    def load_sleep_respiration(
+        self,
+        user_id: str,
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load sleep respiration data.
 
-    def load_very_active_minutes(
+        This function loads sleep respiration data for a given ``user_id`` in the
+        timeframe defined by ``start_date`` and ``end_date``. The returned dataset 
+        contains the following features:
+
+            - full sleep standard deviation 
+            - full sleep signal to noise
+            - deep sleep standard deviation 
+            - deep sleep signal to noise
+            - deep sleep breathing rate
+            - light sleep standard deviation 
+            - light sleep signal to noise
+            - light sleep breathing rate
+            - rem sleep standard deviation 
+            - rem sleep signal to noise
+            - rem sleep breathing rate
+
+        Parameters
+        ----------
+        user_id : :class:`str`
+            Unique user identifier for the loading of sleep respiration data.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            Start date for the retrieval of sleep respiration data, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or ``None``, optional
+            End date for the retrieval of sleep respiration data, by default None
+
+        Returns
+        -------
+        :class:`pandas.DataFrame`
+            DataFrame with sleep respiration data, in breaths per minute.
+        """
+
+        sleep_resp = self.load_metric(
+            metric=lf_constants.METRIC_RESPIRATORY_RATE_SUMMARY,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        """
+        if len(sleep_resp) > 0:
+            # modifichiamo la lista dei nomi delle colonne
+            # TODO rename cols and merge?
+            # TODO remove signal to noise and sd?
+
+            sleep_resp.columns = (
+                sleep_resp.columns
+                .str.replace("breathing_rate", "breathsPerMinute", regex=True)
+                #.str.replace("full_sleep", "", regex=True)
+            )
+        """
+        return sleep_resp
+
+    def load_very_active(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        """Load very active minutes data.
+
+    This function loads the very active minutes data for a given user
+    over a specified time interval. This represents time spent in very
+    active physical activity.
+
+    Parameters
+    ----------
+    user_id : :class:`ObjectId` or :class:`str`
+        Unique identifier for the user.
+    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        Start date for data retrieval, by default None
+    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+        End date for data retrieval, by default None
+
+    Returns
+    -------
+    :class:`pd.DataFrame`
+        DataFrame with very active minutes data, in minutes.
+    """
         very_active_minutes = self.load_metric(
             metric=lf_constants.METRIC_VERY_ACTIVE_MINUTES,
             user_id=user_id,
@@ -1099,7 +1724,140 @@ class LifeSnapsLoader(BaseLoader):
             end_date=end_date,
         )
         very_active_minutes = self._reorder_datetime_columns(very_active_minutes)
+
+        very_active_minutes = very_active_minutes.rename(
+            columns={"value": "veryActiveMinutes"})
+        very_active_minutes["veryActiveMinutes"] = very_active_minutes[
+            "veryActiveMinutes"].astype(int)
         return very_active_minutes
+
+    def load_lightly_active(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load lightly active minutes data.
+
+        This function loads the lightly active minutes data for a given user
+        over a specified time interval. This represents time spent in lightly
+        active physical activity.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with lightly active minutes data, in minutes.
+        """
+
+        lightly_active =  self.load_metric(
+            metric=lf_constants.METRIC_LIGHTLY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        lightly_active = self._reorder_datetime_columns(lightly_active)
+
+        lightly_active = lightly_active.rename(
+            columns={"value": "lightlyActiveMinutes"})
+        lightly_active["lightlyActiveMinutes"] = lightly_active[
+            "lightlyActiveMinutes"].astype(int)
+        return lightly_active
+
+    def load_moderately_active(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load moderately active minutes data.
+
+        This function loads the moderately active minutes data for a given user
+        over a specified time interval. This represents time spent in moderately
+        active physical activity.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with moderately active minutes data, in minutes.
+        """
+
+        moderately_active =  self.load_metric(
+            metric=lf_constants.METRIC_MODERATELY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        moderately_active = self._reorder_datetime_columns(moderately_active)
+
+        moderately_active = moderately_active.rename(
+            columns={"value": "moderatelyActiveMinutes"})
+        moderately_active["moderatelyActiveMinutes"] = moderately_active[
+            "moderatelyActiveMinutes"].astype(int)
+        return moderately_active
+
+    def load_sedentary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None, end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None) -> pd.DataFrame:
+        """Load sedentary minutes data.
+
+        This function loads the sedentary minutes data for a given user
+        over a specified time interval. This represents time spent in sedentariness.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or :class:`pd.Timestamp` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with sedentary minutes data, in minutes.
+        """
+
+        sedentary =  self.load_metric(
+            metric=lf_constants.METRIC_SEDENTARY_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        sedentary = self._reorder_datetime_columns(sedentary)
+
+        sedentary = sedentary.rename(
+            columns={"value": "sedentaryMinutes"})
+        sedentary["sedentaryMinutes"] = sedentary[
+            "sedentaryMinutes"].astype(int)
+        return sedentary
 
     def load_water_logs(
         self,
@@ -1107,6 +1865,25 @@ class LifeSnapsLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        """Load water logs data.
+
+        This function loads water logs data for a given user
+        over a specified time interval.
+
+        Parameters
+        ----------
+        user_id : :class:`ObjectId` or :class:`str`
+            Unique identifier for the user.
+        start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        :class:`pd.DataFrame`
+            DataFrame with water logs data.
+        """
         water_logs = self.load_metric(
             metric=lf_constants.METRIC_WATER_LOGS,
             user_id=user_id,

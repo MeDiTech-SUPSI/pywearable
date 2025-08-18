@@ -106,7 +106,7 @@ def sleep_summary_id_as_idx(sleep_summary):
     the _compute functions of the sleep
     module.
     """
-    return sleep_summary.set_index(pywearable.constants.SLEEP_SUMMARY_ID_COL, drop=True)
+    return  sleep_summary.set_index(pywearable.constants.SLEEP_SUMMARY_ID_COL, drop=True)
 
 
 @pytest.fixture()

@@ -3641,6 +3641,7 @@ def get_sleep_statistics(
             same_day_filter=True,
             **loader_kwargs,
         )
+        print(list(sleep_summary.columns))
         if len(sleep_summary) > 0:
             # Check if we have a chronotype for the user
             user_chronotype = None
@@ -3667,6 +3668,7 @@ def get_sleep_statistics(
                 start_date=sleep_summary_start_date,
                 end_date=sleep_summary_end_date,
             )
+            print(list(sleep_stages.columns))
             # Keep only those belonging to sleep summaries
             sleep_stages = sleep_stages[
                 sleep_stages[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
