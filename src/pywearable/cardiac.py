@@ -1,5 +1,5 @@
 """
-This module contains all the functions related to the analysis 
+This module contains all the functions related to the analysis
 of cardiac data, mostly for heart rate (HR) and heart rate
 variability (HRV).
 """
@@ -851,8 +851,8 @@ def get_heart_rate_statistics(
     # Get user id from the loader
     user_id = utils.get_user_ids(loader, user_id)
     # Convert to datetime
-    start_date = utils.check_date(start_date)
-    end_date = utils.check_date(end_date)
+    start_date = None if start_date is None else pd.Timestamp(start_date)
+    end_date = None if end_date is None else pd.Timestamp(end_date)
 
     # Check statistic
     if statistic is None:
@@ -914,7 +914,14 @@ def get_heart_rate_statistics(
                 # Get series with statistics by calendarDate
                 ser = _HEART_RATE_STATISTICS_DICT[statistic](heart_rate=heart_rate)
                 if both_dates_valid:
-                    heart_rate_stats_df.loc[(user, ser.index), statistic] = ser.values
+                    try:
+                        heart_rate_stats_df.loc[(user, ser.index), statistic] = (
+                            ser.values
+                        )
+                    except:
+                        print(user)
+                        print(ser)
+                        raise
                 else:
                     if len(ser) > 0:
                         min_date = ser.index.min() if start_date is None else start_date
@@ -1571,8 +1578,8 @@ def get_hrv_statistics(
     # Get user id from the loader
     user_id = utils.get_user_ids(loader, user_id)
     # Convert to datetime
-    start_date = utils.check_date(start_date)
-    end_date = utils.check_date(end_date)
+    start_date = None if start_date is None else pd.Timestamp(start_date)
+    end_date = None if end_date is None else pd.Timestamp(end_date)
 
     # Check metrics
     if statistic is None:
@@ -1625,9 +1632,11 @@ def get_hrv_statistics(
         )
         if len(bbi_df) > 0:
             # drop dates with start_hour and end_hour which are NaT from sleep_timestamps
-            sleep_timestamps =  {date: (start_hour, end_hour) for date, 
-                                 (start_hour, end_hour) in sleep_timestamps.items() 
-                                 if not (pd.isnull(start_hour) or pd.isnull(end_hour))}
+            sleep_timestamps = {
+                date: (start_hour, end_hour)
+                for date, (start_hour, end_hour) in sleep_timestamps.items()
+                if not (pd.isnull(start_hour) or pd.isnull(end_hour))
+            }
             for date, (start_hour, end_hour) in sleep_timestamps.items():
                 night_bbi = bbi_df.loc[
                     (bbi_df[constants.ISODATE_COL] >= start_hour)

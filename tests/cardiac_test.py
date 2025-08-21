@@ -19,7 +19,7 @@ def test_get_average_heart_rate(base_loader):
     )
     assert type(average_hr) is pd.Series
     assert type(average_hr.index) is pd.MultiIndex
-    assert average_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_AVERAGE_HEART_RATE
+    assert average_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_AVERAGE_HEART_RATE
     assert "user-01" in average_hr.index.get_level_values("user")
 
 
@@ -29,7 +29,7 @@ def test_get_average_heart_rate_kind(base_loader):
     )
     assert type(average_hr) is pd.Series
     assert type(average_hr.index) is pd.MultiIndex
-    assert average_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_AVERAGE_HEART_RATE
+    assert average_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_AVERAGE_HEART_RATE
     assert "user-01" in average_hr.index.get_level_values("user")
 
 
@@ -39,7 +39,7 @@ def test_get_maximum_heart_rate(base_loader):
     )
     assert type(max_hr) is pd.Series
     assert type(max_hr.index) is pd.MultiIndex
-    assert max_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
+    assert max_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
     assert "user-01" in max_hr.index.get_level_values("user")
 
 
@@ -49,7 +49,7 @@ def test_get_rest_heart_rate(base_loader):
     )
     assert type(rest_hr) is pd.Series
     assert type(rest_hr.index) is pd.MultiIndex
-    assert rest_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_RESTING_HEART_RATE
+    assert rest_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_RESTING_HEART_RATE
     assert "user-01" in rest_hr.index.get_level_values("user")
 
 
@@ -59,7 +59,7 @@ def test_get_minimum_heart_rate(base_loader):
     )
     assert type(min_hr) is pd.Series
     assert type(min_hr.index) is pd.MultiIndex
-    assert min_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_MINIMUM_HEART_RATE
+    assert min_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_MINIMUM_HEART_RATE
     assert "user-01" in min_hr.index.get_level_values("user")
 
 
@@ -83,14 +83,14 @@ def test_get_heart_rate_statistics(base_loader):
     ################################################
     rest_hr = pywearable.cardiac.get_heart_rate_statistics(
         loader=base_loader,
-        statistic=pywearable.cardiac._CARDIAC_STATISTIC_RESTING_HEART_RATE,
+        statistic=pywearable.cardiac.CARDIAC_STATISTIC_RESTING_HEART_RATE,
         user_id="user-01",
         return_df=True,
         return_multi_index=True,
     )
     assert type(rest_hr) is pd.Series
     assert type(rest_hr.index) is pd.MultiIndex
-    assert rest_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_RESTING_HEART_RATE
+    assert rest_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_RESTING_HEART_RATE
     assert "user-01" in rest_hr.index.get_level_values("user")
 
     ################################################
@@ -98,14 +98,14 @@ def test_get_heart_rate_statistics(base_loader):
     ################################################
     avg_hr = pywearable.cardiac.get_heart_rate_statistics(
         loader=base_loader,
-        statistic=pywearable.cardiac._CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
+        statistic=pywearable.cardiac.CARDIAC_STATISTIC_AVERAGE_HEART_RATE,
         user_id="user-01",
         return_df=True,
         return_multi_index=True,
     )
     assert type(avg_hr) is pd.Series
     assert type(avg_hr.index) is pd.MultiIndex
-    assert avg_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_AVERAGE_HEART_RATE
+    assert avg_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_AVERAGE_HEART_RATE
     assert "user-01" in avg_hr.index.get_level_values("user")
 
     ################################################
@@ -113,14 +113,14 @@ def test_get_heart_rate_statistics(base_loader):
     ################################################
     min_hr = pywearable.cardiac.get_heart_rate_statistics(
         loader=base_loader,
-        statistic=pywearable.cardiac._CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
+        statistic=pywearable.cardiac.CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
         user_id="user-01",
         return_df=True,
         return_multi_index=True,
     )
     assert type(min_hr) is pd.Series
     assert type(min_hr.index) is pd.MultiIndex
-    assert min_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_MINIMUM_HEART_RATE
+    assert min_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_MINIMUM_HEART_RATE
     assert "user-01" in min_hr.index.get_level_values("user")
 
     ################################################
@@ -128,21 +128,21 @@ def test_get_heart_rate_statistics(base_loader):
     ################################################
     max_hr = pywearable.cardiac.get_heart_rate_statistics(
         loader=base_loader,
-        statistic=pywearable.cardiac._CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
+        statistic=pywearable.cardiac.CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
         user_id="user-01",
         return_df=True,
         return_multi_index=True,
     )
     assert type(max_hr) is pd.Series
     assert type(max_hr.index) is pd.MultiIndex
-    assert max_hr.name == pywearable.cardiac._CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
+    assert max_hr.name == pywearable.cardiac.CARDIAC_STATISTIC_MAXIMUM_HEART_RATE
     assert "user-01" in max_hr.index.get_level_values("user")
 
     hr_df = pywearable.cardiac.get_heart_rate_statistics(
         loader=base_loader,
         statistic=[
-            pywearable.cardiac._CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
-            pywearable.cardiac._CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
+            pywearable.cardiac.CARDIAC_STATISTIC_MAXIMUM_HEART_RATE,
+            pywearable.cardiac.CARDIAC_STATISTIC_MINIMUM_HEART_RATE,
         ],
         user_id="user-01",
         return_df=True,
@@ -150,8 +150,8 @@ def test_get_heart_rate_statistics(base_loader):
     )
     assert type(hr_df) is pd.DataFrame
     assert type(hr_df.index) is pd.MultiIndex
-    assert pywearable.cardiac._CARDIAC_STATISTIC_MAXIMUM_HEART_RATE in hr_df.columns
-    assert pywearable.cardiac._CARDIAC_STATISTIC_MINIMUM_HEART_RATE in hr_df.columns
+    assert pywearable.cardiac.CARDIAC_STATISTIC_MAXIMUM_HEART_RATE in hr_df.columns
+    assert pywearable.cardiac.CARDIAC_STATISTIC_MINIMUM_HEART_RATE in hr_df.columns
     assert "user-01" in max_hr.index.get_level_values("user")
 
 
@@ -164,7 +164,7 @@ def test_get_hf(base_loader):
     )
     assert type(night_hf) is pd.Series
     assert type(night_hf.index) is pd.MultiIndex
-    assert night_hf.name == pywearable.cardiac._CARDIAC_STATISTIC_HIGH_FREQUENCY
+    assert night_hf.name == pywearable.cardiac.CARDIAC_STATISTIC_HIGH_FREQUENCY
     assert "user-01" in night_hf.index.get_level_values("user")
 
 
@@ -174,7 +174,7 @@ def test_get_lf(base_loader):
     )
     assert type(night_lf) is pd.Series
     assert type(night_lf.index) is pd.MultiIndex
-    assert night_lf.name == pywearable.cardiac._CARDIAC_STATISTIC_LOW_FREQUENCY
+    assert night_lf.name == pywearable.cardiac.CARDIAC_STATISTIC_LOW_FREQUENCY
     assert "user-01" in night_lf.index.get_level_values("user")
 
 
@@ -186,7 +186,7 @@ def test_get_lfhf(base_loader):
     assert type(night_lfhf.index) is pd.MultiIndex
     assert (
         night_lfhf.name
-        == pywearable.cardiac._CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO
+        == pywearable.cardiac.CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO
     )
     assert "user-01" in night_lfhf.index.get_level_values("user")
 
@@ -199,7 +199,7 @@ def test_get_rmssd(base_loader):
     assert type(night_rmssd.index) is pd.MultiIndex
     assert (
         night_rmssd.name
-        == pywearable.cardiac._CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES
+        == pywearable.cardiac.CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES
     )
     assert "user-01" in night_rmssd.index.get_level_values("user")
 
@@ -212,13 +212,13 @@ def test_get_sdnn(base_loader):
     assert type(night_sdnn.index) is pd.MultiIndex
     assert (
         night_sdnn.name
-        == pywearable.cardiac._CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL
+        == pywearable.cardiac.CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL
     )
     assert "user-01" in night_sdnn.index.get_level_values("user")
 
 
 def test_heart_rate_variability_statistics(base_loader):
-    for statistic in pywearable.cardiac._CARDIAC_HRV_STATISTICS:
+    for statistic in pywearable.cardiac.CARDIAC_HRV_STATISTICS:
         hrv_statistic = pywearable.cardiac.get_hrv_statistic(
             loader=base_loader,
             statistic=statistic,
@@ -239,6 +239,6 @@ def test_heart_rate_variability_statistics(base_loader):
     assert type(hrv_statistics) is pd.DataFrame
     assert type(hrv_statistics.index) is pd.MultiIndex
     assert "user-01" in hrv_statistics.index.get_level_values("user")
-    assert set(pywearable.cardiac._CARDIAC_HRV_STATISTICS).issubset(
+    assert set(pywearable.cardiac.CARDIAC_HRV_STATISTICS).issubset(
         hrv_statistics.columns
     )

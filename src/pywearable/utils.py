@@ -22,7 +22,7 @@ _MS_TO_DAY_CONVERSION = 1000 * 60 * 60 * 24
 
 
 def check_date(
-    date: Union[datetime.datetime, datetime.date, str, None]
+    date: Union[datetime.datetime, datetime.date, str, None],
 ) -> datetime.datetime:
     """Convert date to :class:`datetime.datetime` format
 
@@ -331,8 +331,8 @@ def trend_analysis(
 
     This function performs trend analysis, i.e. it comptues medium, and long-term trends
     in a metric of interest for a user. The function computes the moving average of the metric
-    and the normal range of the metric. 
-    
+    and the normal range of the metric.
+
     Parameters
     ----------
     data_dict : :class:`dict`
@@ -349,7 +349,7 @@ def trend_analysis(
         Minimum number of period values needed for the normal range to be considered valid, by default 20
     std_multiplier : :class:`float`, optional
         Multiplier of the standard deviation for the computation of lower and upper bounds of the normal range, by default 1.0
-        
+
     Returns
     -------
     :class:`pandas.DataFrame`
@@ -374,10 +374,10 @@ def trend_analysis(
             window=baseline_periods, min_periods=min_periods_baseline
         ).mean()
         df["NR_MEAN"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
+            window=normal_range_periods, min_periods=min_periods_normal_range
         ).mean()
         df["NR_STD"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
+            window=normal_range_periods, min_periods=min_periods_normal_range
         ).std()
     elif ma_type == "EMA":
         df["BASELINE"] = df.metric.ewm(
@@ -391,7 +391,7 @@ def trend_analysis(
         ).std()
     else:
         raise ValueError('Moving average kind can only be "normal" or "exponential"')
-    
+
     df["NR_LOWER_BOUND"] = df["NR_MEAN"] - std_multiplier * df["NR_STD"]
     df["NR_UPPER_BOUND"] = df["NR_MEAN"] + std_multiplier * df["NR_STD"]
     return df
@@ -641,12 +641,22 @@ def filter_out_awake(
     :class:`pandas.DataFrame`
         Filtered version of the original `df`, including only data of periods when the participant is asleep.
     """
+    print(f"User: {user}")
+    print(f"Date: {date}")
+    hypnogram = loader.load_hypnogram(
+        user_id=user,
+        start_date=date,
+        end_date=date + datetime.timedelta(days=1),
+        resolution=resolution,
+    )
+    print(hypnogram)
+    print(hypnogram.keys())
     # we get the hypnogram for that day
     hypnogram = loader.load_hypnogram(
-        user_id=user, 
-        start_date=date, 
-        end_date=date + datetime.timedelta(days=1), 
-        resolution=resolution
+        user_id=user,
+        start_date=date,
+        end_date=date + datetime.timedelta(days=1),
+        resolution=resolution,
     )[date]
     hypnogram_start = hypnogram["start_time"]
     hypnogram_end = hypnogram["end_time"]

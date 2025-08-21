@@ -258,7 +258,6 @@ class BaseLoader:
             .sort_values(by=[constants.UNIXTIMESTAMP_IN_MS_COL])
             .reset_index(drop=True)
         )
-
         # set index on sleep summaries
         sleep_summaries = sleep_summaries.set_index(
             constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
@@ -293,9 +292,7 @@ class BaseLoader:
                 == sleep_summary_id
             ]
 
-            hypnogram = pd.DataFrame(
-                data={constants.ISODATE_COL: time_delta_intervals}
-            )
+            hypnogram = pd.DataFrame(data={constants.ISODATE_COL: time_delta_intervals})
 
             hypnogram = hypnogram.merge(
                 daily_sleep_stages.loc[
@@ -319,8 +316,8 @@ class BaseLoader:
                     {
                         constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
                         constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_N3_STAGE_VALUE: constants.SLEEP_STAGE_N3_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_N1_STAGE_VALUE: constants.SLEEP_STAGE_N1_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_DEEP_STAGE_MAPPED_VALUE,
+                        constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_LIGHT_STAGE_MAPPED_VALUE,
                         constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
                     }
                 )

@@ -297,6 +297,7 @@ class LabfrontLoader(BaseLoader):
                     lf_constants.FILE_INDEX_FIRST_TIMESTAMP_KEY,
                     lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY,
                 ],
+                date_format="ISO8601",
             )
             return file_index
         else:
@@ -559,117 +560,56 @@ class LabfrontLoader(BaseLoader):
         n_files: int,
         is_questionnaire: bool,
     ) -> datetime.date:
+        print(path_to_file)
         # Get first date of the data in CSV file
         # Either we have it in the file Name (e.g. 240313) or we
         # need to get this information from the CSV file itself
         # -> Let's read the header and see if we have first an last unixTimestamp
-        head = self.read_csv_file_header_info(path_to_csv_file=path_to_file)
-        if lf_constants.FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL in head.columns:
-            first_sample_unixtimestamp = (
-                head[lf_constants.FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL].iloc[0] / 1000
-            )
-            last_sample_unixtimestamp = (
-                head[lf_constants.LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL].iloc[0] / 1000
-            )
-            # We have unix timestamps
-            # We don't know the timezone, so we add a clearance of 14 hours to keep it safe
-            # considering that the maximum tz diff from utc is 14
-            if not (np.isnan(first_sample_unixtimestamp)):
-                first_date = (
-                    datetime.datetime.fromtimestamp(
-                        first_sample_unixtimestamp,
-                        tz=datetime.timezone.utc,
-                    )
-                    - datetime.timedelta(hours=14)
-                ).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-                if not (np.isnan(last_sample_unixtimestamp)):
-                    last_date = (
-                        datetime.datetime.fromtimestamp(
-                            last_sample_unixtimestamp,
-                            tz=datetime.timezone.utc,
-                        )
-                        + datetime.timedelta(hours=14)
-                    ).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-            else:
-                # Let's read the entire CSV file
-                try:
-                    temp_df = pd.read_csv(
-                        path_to_file,
-                        skiprows=self.get_header_length(file_path=path_to_file) + 1,
-                    )
-                    if constants.ISODATE_COL in temp_df:
-                        column = constants.ISODATE_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column].str.rsplit("+", expand=True)[0], utc=True
-                        ).dt.tz_localize(None)
-                        first_date = temp_df[column].min().normalize()
-                        last_date = temp_df[column].max().normalize()
-                    elif constants.CALENDAR_DATE_COL in temp_df:
-                        column = constants.CALENDAR_DATE_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column], format="%Y-%m-%d"
-                        ).dt.tz_localize(None)
-                        first_date = temp_df[column].min()
-                        last_date = temp_df[column].max()
-                    elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
-                        column = constants.UNIXTIMESTAMP_IN_MS_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column], unit="ms", utc=True
-                        ).dt.tz_localize(None)
-                        first_date = temp_df[column].min() - pd.Timedelta(hours=14)
-                        last_date = temp_df[column].max() + pd.Timedelta(hours=14)
-                    else:
-                        raise ValueError(
-                            f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
-                        )
-                except pd.errors.EmptyDataError:
-                    first_date = pd.NaT
-                    last_date = pd.NaT
+        # -> If not, date must be retrieved from the name
 
+        n_rows_to_skip = 1
+        if is_questionnaire:
+            n_rows_to_skip += self.get_key_length(file_path=path_to_file) + 1
+
+        try:
+            temp_df = pd.read_csv(
+                path_to_file,
+                skiprows=self.get_header_length(file_path=path_to_file)
+                + n_rows_to_skip,
+            )
+        except pd.errors.EmptyDataError:
+            return pd.NaT, pd.NaT
+        if constants.CALENDAR_DATE_COL in temp_df:
+            column = constants.CALENDAR_DATE_COL
+            temp_df[column] = pd.to_datetime(
+                temp_df[column], format="%Y-%m-%d"
+            ).dt.tz_localize(None)
+            first_date = temp_df[column].min()
+            last_date = temp_df[column].max()
+        elif constants.ISODATE_COL in temp_df:
+            column = constants.ISODATE_COL
+            try:
+                temp_df[column] = pd.to_datetime(
+                    temp_df[constants.ISODATE_COL].str[:-6],
+                    utc=True,
+                ).dt.tz_localize(None)
+            except:
+                print(path_to_file)
+                raise
+            first_date = temp_df[column].min().normalize()
+            last_date = temp_df[column].max().normalize()
+        elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
+            column = constants.UNIXTIMESTAMP_IN_MS_COL
+            temp_df[column] = pd.to_datetime(
+                temp_df[column], unit="ms", utc=True
+            ).dt.tz_localize(None)
+            first_date = temp_df[column].min() - pd.Timedelta(hours=14)
+            last_date = temp_df[column].max() + pd.Timedelta(hours=14)
         else:
-            # -> If not, date must be retrieved from the name
-            first_date = datetime.datetime.strptime(path_to_file.name[:6], "%y%m%d")
-            if n_files == 1:
-                # Read full CSV file and get last date
-                try:
-                    n_rows_to_skip = 1
-                    if is_questionnaire:
-                        n_rows_to_skip += (
-                            self.get_key_length(file_path=path_to_file) + 1
-                        )
-                    temp_df = pd.read_csv(
-                        path_to_file,
-                        skiprows=self.get_header_length(file_path=path_to_file)
-                        + n_rows_to_skip,
-                    )
-                    if constants.ISODATE_COL in temp_df:
-                        column = constants.ISODATE_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column].str.rsplit("+", expand=True)[0], utc=True
-                        ).dt.tz_localize(None)
-                        last_date = temp_df[column].max().normalize()
-                    elif constants.CALENDAR_DATE_COL in temp_df:
-                        column = constants.CALENDAR_DATE_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column], format="%Y-%m-%d"
-                        ).dt.tz_localize(None)
-                        last_date = temp_df[column].max()
-                    elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
-                        column = constants.UNIXTIMESTAMP_IN_MS_COL
-                        temp_df[column] = pd.to_datetime(
-                            temp_df[column], unit="ms", utc=True
-                        ).dt.tz_localize(None)
-                        first_date = temp_df[column].min() - pd.Timedelta(hours=14)
-                        last_date = temp_df[column].max() + pd.Timedelta(hours=14)
-                    else:
-                        raise ValueError(
-                            f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
-                        )
-                except pd.errors.EmptyDataError:
-                    first_date = pd.NaT
-                    last_date = pd.NaT
-            else:
-                last_date = first_date + datetime.timedelta(days=1)
+            raise ValueError(
+                f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
+            )
+
         return first_date, last_date
 
     def read_csv_file_header_info(
@@ -750,6 +690,7 @@ class LabfrontLoader(BaseLoader):
         participant_files = self.file_index.loc[
             (participant_id, slice(None), slice(None), metric), :
         ].reset_index(drop=True)
+
         # Return empty list if no files are available for this metric
         if len(participant_files) == 0:
             return []
@@ -926,7 +867,6 @@ class LabfrontLoader(BaseLoader):
         # Convert columns to datetime
         cols_to_sort = []
         if constants.ISODATE_COL in data.columns:
-            # TODO fix this as it does not work with negative timezone
             data[constants.ISODATE_COL] = pd.to_datetime(
                 data[constants.ISODATE_COL].str[:-6],
                 utc=True,
@@ -1065,7 +1005,11 @@ class LabfrontLoader(BaseLoader):
                 > 1
             ):
                 raise ValueError(
-                    f"Multiple tasks exist with the same name {task_id}. Specify either Task ID or Task Full ID."
+                    f"Multiple tasks exist with the same name {task_id}. Specify either Task ID or Task Full ID: {[x for x in self.file_index.loc[
+                        self.file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY]
+                        == task_id,
+                        lf_constants.FILE_INDEX_TASK_FULL_ID_KEY,
+                    ].unique()]}"
                 )
             # Return full id corresponding to this task name
             return self.file_index.loc[
@@ -1126,46 +1070,44 @@ class LabfrontLoader(BaseLoader):
         """
         no_user_id = True
         full_task_id = self.get_task_full_id(questionnaire_name)
-        for user_id in self.data_dictionary.keys():
-            if (
-                lf_constants.QUESTIONNAIRE_FOLDER
-                in self.data_dictionary[user_id].keys()
-            ):
-                if (
-                    full_task_id
-                    in self.data_dictionary[user_id][
-                        lf_constants.QUESTIONNAIRE_FOLDER
-                    ].keys()
-                ):
-                    no_user_id = False
-                    participant_id = user_id
-                    break
-        if no_user_id:
+
+        if (
+            len(
+                self.file_index[
+                    self.file_index[lf_constants.FILE_INDEX_TASK_FULL_ID_KEY]
+                    == full_task_id
+                ]
+            )
+            == 0
+        ):
             raise ValueError(
                 f"Could not find questions for questionnaire {questionnaire_name}"
             )
 
-        files = self.get_files_from_timerange(
-            participant_id,
-            lf_constants.QUESTIONNAIRE_FOLDER,
-            start_date=None,
-            end_date=None,
-            is_questionnaire=True,
-            is_todo=False,
-            task_name=questionnaire_name,
+        questionnaire_files = self.file_index[
+            self.file_index[lf_constants.FILE_INDEX_TASK_FULL_ID_KEY] == full_task_id
+        ].head(1)
+        # print(questionnaire_files)
+        questionnaire_info_file = (
+            questionnaire_files[lf_constants.FILE_INDEX_BASE_FOLDER_KEY]
+            .astype(str)
+            .unique()[0]
+            + os.path.sep
+            + questionnaire_files.index.get_level_values(level=0)
+            .astype(str)
+            .unique()[0]
+            + os.path.sep
+            + "questionnaire"
+            + os.path.sep
+            + questionnaire_files[lf_constants.FILE_INDEX_TASK_FOLDER]
+            .astype(str)
+            .unique()[0]
+            + os.path.sep
+            + questionnaire_files[lf_constants.FILE_INDEX_FILENAME_KEY]
+            .astype(str)
+            .unique()[0]
         )
 
-        if len(files) == 0:
-            return {}
-
-        path_to_folder = (
-            self.data_path
-            / participant_id
-            / lf_constants.QUESTIONNAIRE_FOLDER
-            / full_task_id
-        )
-
-        questionnaire_info_file = path_to_folder / files[0]
         header_length = self.get_header_length(questionnaire_info_file)
         key_length = self.get_key_length(questionnaire_info_file)
 
@@ -1177,19 +1119,16 @@ class LabfrontLoader(BaseLoader):
         # For each row, we need to get the question and all the options
         option_cols = []
         for col in questions_df.columns:
-            regex_match = re.search(constants.QUESTIONNAIRE_QUESTION_NAME_REGEX, col)
+            regex_match = re.search("option\dName", col)
             if regex_match:
                 option_cols.append(col)
         for idx, row in questions_df.iterrows():
-            question_id = f"{row[constants.QUESTIONNAIRE_SECTION_INDEX_COL]}_{row[constants.QUESTIONNAIRE_QUESTION_INDEX_COL]}"
+            question_id = f"{row["sectionIndex"]}_{row["questionIndex"]}"
             questions_dict[question_id] = {
-                "type": row[constants.QUESTIONNAIRE_QUESTION_TYPE_COL],
-                "description": row[constants.QUESTIONNAIRE_QUESTION_DESCRIPTION_COL],
+                "type": row["questionType"],
+                "description": row["questionDescription"],
             }
-            if (
-                row[constants.QUESTIONNAIRE_QUESTION_TYPE_COL]
-                == constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE
-            ):
+            if row["questionType"] == constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
                 continue
             question_options = []
             for col in option_cols:
@@ -2230,7 +2169,6 @@ class LabfrontLoader(BaseLoader):
         sleep_summaries = self.load_sleep_summary(
             user_id=user_id, start_date=start_date, end_date=end_date
         )
-
         if len(sleep_summaries) == 0:
             return {}
 
@@ -2270,7 +2208,6 @@ class LabfrontLoader(BaseLoader):
             .sort_values(by=[constants.UNIXTIMESTAMP_IN_MS_COL])
             .reset_index(drop=True)
         )
-
         # set index on sleep summaries
         sleep_summaries = sleep_summaries.set_index(
             constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL

@@ -3611,8 +3611,8 @@ def get_sleep_statistics(
     # Get user id from the loader
     user_id = utils.get_user_ids(loader, user_id)
     # Convert to datetime
-    start_date = utils.check_date(start_date)
-    end_date = utils.check_date(end_date)
+    start_date = None if start_date is None else pd.Timestamp(start_date)
+    end_date = None if end_date is None else pd.Timestamp(end_date)
 
     # Check metrics
     if statistic is None:
