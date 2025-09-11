@@ -1130,10 +1130,10 @@ class LabfrontLoader(BaseLoader):
             }
             if row["questionType"] == constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
                 continue
-            question_options = []
+            question_options = {}
             for col in option_cols:
                 if not pd.isna(row[col]):
-                    question_options.append(row[col])
+                    question_options[int(col.strip("option").strip("Name"))] = row[col]
             questions_dict[question_id]["options"] = question_options
         return questions_dict
 
