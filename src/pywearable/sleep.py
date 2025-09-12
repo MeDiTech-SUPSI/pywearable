@@ -1631,7 +1631,6 @@ def get_sleep_timestamps(
             bedtime_dict = get_bedtime(
                 loader, user, start_date, end_date, return_df=False
             )[user]
-
             wakeup_time_dict = get_wakeup_time(
                 loader, user, start_date, end_date, return_df=False
             )[user]
@@ -1641,6 +1640,7 @@ def get_sleep_timestamps(
             }
         except:
             data_dict[user] = {}
+            raise
     return data_dict
 
 
@@ -3638,7 +3638,7 @@ def get_sleep_statistics(
             user_id=user,
             start_date=start_date,
             end_date=end_date,
-            same_day_filter=True,
+            drop_duplicates=True,
             **loader_kwargs,
         )
         if len(sleep_summary) > 0:
