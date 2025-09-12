@@ -19,7 +19,12 @@ from matplotlib.dates import DateFormatter, DayLocator, MonthLocator, WeekdayLoc
 from matplotlib.projections import register_projection
 from matplotlib.projections.polar import PolarAxes
 from matplotlib.pyplot import Axes
-from matplotlib.ticker import FuncFormatter, MultipleLocator, PercentFormatter, ScalarFormatter
+from matplotlib.ticker import (
+    FuncFormatter,
+    MultipleLocator,
+    PercentFormatter,
+    ScalarFormatter,
+)
 
 import pywearable.activity as activity
 import pywearable.cardiac as cardiac
@@ -350,7 +355,9 @@ def get_cardiac_line_graph_and_stats(
 
     # if there's no data at all raise error
     if np.isnan(rest_hr).all() or np.isnan(max_hr).all():
-        raise ValueError(f"Cardiac data not available between {start_date} and {end_date}")
+        raise ValueError(
+            f"Cardiac data not available between {start_date} and {end_date}"
+        )
 
     # plotting
     with plt.style.context("ggplot"):
@@ -601,8 +608,16 @@ def get_respiration_line_graph_and_stats(
     avg_sleeping_breaths = np.nanmean(rest_resp)
     avg_waking_breaths = np.nanmean(waking_resp)
 
-    avg_sleeping_breaths = float(round(avg_sleeping_breaths, 2)) if not np.isnan(avg_sleeping_breaths) else None
-    avg_waking_breaths = float(round(avg_waking_breaths, 2)) if not np.isnan(avg_waking_breaths) else None
+    avg_sleeping_breaths = (
+        float(round(avg_sleeping_breaths, 2))
+        if not np.isnan(avg_sleeping_breaths)
+        else None
+    )
+    avg_waking_breaths = (
+        float(round(avg_waking_breaths, 2))
+        if not np.isnan(avg_waking_breaths)
+        else None
+    )
 
     stats_dict = {
         "Average sleep breaths": avg_sleeping_breaths,
@@ -640,6 +655,7 @@ def get_respiration_line_graph_and_stats(
         print(f"Avg awake: {avg_waking_breaths}")
 
     return stats_dict
+
 
 class CalendarHeatmap:
 
@@ -704,15 +720,14 @@ class CalendarHeatmap:
             cbar_label_format=self.cbar_label_format,
         )
         self.ax = ax
-        
 
     def plot(self):
         plt.show()
-        
+
     def save(self, path: str):
         self.ax.get_figure().savefig(path, bbox_inches="tight")
 
-    def _date_grid(self, dates: List[date], data: List[Any],  dtype: str = "float64"):
+    def _date_grid(self, dates: List[date], data: List[Any], dtype: str = "float64"):
         iso_dates = np.array([day.isocalendar() for day in dates])
         unique_weeks = sorted(list(set([tuple(row) for row in iso_dates[:, :2]])))
 
@@ -728,7 +743,7 @@ class CalendarHeatmap:
         grid[week_coords, day_coords] = data
 
         return grid.T
-    
+
     def _cal_heatmap(
         self,
         cal: np.ndarray,
@@ -757,10 +772,9 @@ class CalendarHeatmap:
         if isinstance(cmap, str):
             cmap = cmaps_dict[cmap]
 
-        pc = ax.pcolormesh(cal, 
-                            edgecolors=ax.get_facecolor(), 
-                            linewidth=0.25, 
-                            cmap=cmap)
+        pc = ax.pcolormesh(
+            cal, edgecolors=ax.get_facecolor(), linewidth=0.25, cmap=cmap
+        )
         pc.set_clim(cmin or np.nanmin(cal), cmax or np.nanmax(cal))
         ax.invert_yaxis()
         ax.set_aspect("equal")
@@ -785,7 +799,7 @@ class CalendarHeatmap:
 
         ax.set_frame_on(frame_on)
         return ax
-    
+
     def _get_month_outline(self, dates, month_grid, month):
         day_grid = self._date_grid(dates, dates, dtype="object").T
         month_grid = month_grid.T
@@ -832,7 +846,7 @@ class CalendarHeatmap:
         )
 
         return coords[:, [1, 0]]
-    
+
     def _add_value_label(self, ax, cal, value_format):
         if value_format == "int":
             val_format = "{:0.0f}"
@@ -846,7 +860,9 @@ class CalendarHeatmap:
 
         for (i, j), z in np.ndenumerate(cal):
             if np.isfinite(z):
-                ax.text(j + 0.5, i + 0.5, val_format.format(z), ha="center", va="center")
+                ax.text(
+                    j + 0.5, i + 0.5, val_format.format(z), ha="center", va="center"
+                )
 
     def _add_weekday_label(self, ax):
         ax.tick_params(axis="y", which="major", pad=8)
@@ -879,8 +895,7 @@ class CalendarHeatmap:
         year_locs = {}
         for year in unique_years:
             yy, xx = np.nonzero(year_grid == year)
-            year_locs[year] = (
-                xx.max() + 1 + xx.min()) / 2
+            year_locs[year] = (xx.max() + 1 + xx.min()) / 2
 
         for year, loc in year_locs.items():
             ax.annotate(
@@ -911,9 +926,7 @@ class CalendarHeatmap:
     def _add_month_grid(self, ax, dates, month_grid, color):
         months = set([d.month for d in dates])
         for month in months:
-            coords = self._get_month_outline(
-                dates, month_grid, month=month
-            )
+            coords = self._get_month_outline(dates, month_grid, month=month)
             ax.plot(coords[:, 0], coords[:, 1], color=color, linewidth=1)
 
         ax.set_xlim(ax.get_xlim()[0] - 0.1, ax.get_xlim()[1] + 0.1)
@@ -924,6 +937,7 @@ class CalendarHeatmap:
         for pos in ["top", "bottom", "right", "left"]:
             ax.spines[pos].set_edgecolor(fig.get_facecolor())
             return ax
+
 
 def get_metric_heatmap(
     loader: BaseLoader,
@@ -969,7 +983,7 @@ def get_metric_heatmap(
     dates, scores = zip(
         *metric_fn(loader, user_id, start_date, end_date)[user_id].items()
     )
-    
+
     # Get start and end days for the heatmap, based on data and desired backward extension
     start_date = (
         dates[0]
@@ -988,14 +1002,14 @@ def get_metric_heatmap(
 
     extended_df = pd.merge(left=extended_df, right=data_df, on="date", how="left")
     extended_df.loc[extended_df.metric.isna(), "metric"] = 0
-    
+
     heatmap = CalendarHeatmap(
         dates=extended_df.date,
         data=extended_df.metric,
         **kwargs_heatmap,
     )
     heatmap.generate()
-    
+
     if show:
         heatmap.plot()
 
@@ -1919,7 +1933,7 @@ def plot_trend_analysis(
     """Plots a trend analysis graph
 
     This function plots a trend analysis graph for a given metric, a given user, and a period of interest,
-    showing the short term variations (daily values), mid-term variations (the baseline), 
+    showing the short term variations (daily values), mid-term variations (the baseline),
     and long term variations (the normal range).
 
     Parameters
@@ -1980,7 +1994,7 @@ def plot_trend_analysis(
         Additional kwargs for the baseline plot, by default {}
     normal_range_kwargs : :class:`dict`, optional
         Additional kwargs for the normal range plot, by default {}
-    
+
     Returns
     -------
     :class:`matplotlib.axes._subplots.AxesSubplot`
@@ -2001,7 +2015,7 @@ def plot_trend_analysis(
         min_periods_baseline=min_periods_baseline,
         normal_range_periods=normal_range_periods,
         min_periods_normal_range=min_periods_normal_range,
-        std_multiplier=std_multiplier
+        std_multiplier=std_multiplier,
     )
 
     # default kwargs for normal range in case they're not provided
@@ -2019,7 +2033,7 @@ def plot_trend_analysis(
         baseline_kwargs["linewidth"] = 2
 
     # restrict viz to period with available data
-    df = df.dropna(how="all")  
+    df = df.dropna(how="all")
     dates = df.index
     metric = df.metric
     baseline = df.BASELINE
@@ -2033,7 +2047,9 @@ def plot_trend_analysis(
         assert type(fixed_normal_range) == tuple and len(fixed_normal_range) == 2
         LB = fixed_normal_range[0]
         UB = fixed_normal_range[1]
-    ax.fill_between(dates, LB, UB, label="Normal range", **normal_range_kwargs, zorder=-1)
+    ax.fill_between(
+        dates, LB, UB, label="Normal range", **normal_range_kwargs, zorder=-1
+    )
     ax.grid("on")
     ax.set_xticks(dates[::xticks_frequency])
     ax.tick_params(axis="x", labelrotation=xticks_rotation)
@@ -2045,9 +2061,9 @@ def plot_trend_analysis(
         ax.set_ylim(ylim)
     if show_legend:
         plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
-    
+
     plt.tight_layout()
-        
+
     if save_to:
         plt.savefig(save_to, bbox_inches="tight")
     if show:
@@ -2108,7 +2124,7 @@ def radar_chart(
     Plots a radar chart comparing the values between two periods for the desired pywearable metrics.
     The radar chart is not limited by the number of the metrics to be included in the chart;
     it dynamically adjusts itself to the number of compared metrics.
-    
+
     Parameters
     ----------
     loader : :class:`pywearable.loader.base.BaseLoader`
@@ -2289,10 +2305,10 @@ def period_to_period_comparison_chart(
     locator_interval: int = 1,
     title: str = "",
     fontsize: int = 14,
-    metric_fn_kwargs : dict = {},
+    metric_fn_kwargs: dict = {},
 ):
     """Generates a period-to-period comparison chart for a user and a metric of interest.
-    
+
     This function is used to visualize period to period comparison of a metric. It can be used
     to show weekly variations or monthly variations over extended periods.
 
@@ -2329,7 +2345,7 @@ def period_to_period_comparison_chart(
     fontsize : :class:`int`, optional
         Font size for the plot, by default 14
     metric_fn_kwargs : :class:`dict`, optional
-        Keyword arguments for the computation of the pywearable functions, by default {}    
+        Keyword arguments for the computation of the pywearable functions, by default {}
     """
     if period_interval not in ["month", "week"]:
         raise ValueError(f"period interval {period_interval} is not a valid interval.")
@@ -2346,11 +2362,9 @@ def period_to_period_comparison_chart(
         ax.xaxis.set_major_formatter(DateFormatter("%m-%d"))
         date_aggr_fn = lambda x: x.week
 
-    metric_data = metric_fn(loader, 
-                            user_id, 
-                            start_date, 
-                            end_date,
-                            **metric_fn_kwargs)[user_id]
+    metric_data = metric_fn(loader, user_id, start_date, end_date, **metric_fn_kwargs)[
+        user_id
+    ]
     metric_dates, metric_values = zip(*metric_data.items())
 
     # compute metric aggregate transformation (kind) during each period and its changes
@@ -2444,11 +2458,11 @@ def weekday_barplot(
     errorbar: bool = False,
     error_range: str = "std",
     metric_lim: Union[list, None] = None,
-    metric_fn_kwargs : dict = {},
+    metric_fn_kwargs: dict = {},
     bar_kwargs: dict = {},
 ):
     """Generates a barplot showing how a metric changes over the week.
-    
+
     For a metric of interest, aggregate statistics, determined by the `kind` parameter,
     are showed as averages throughout the days of the week.
 
@@ -2496,33 +2510,39 @@ def weekday_barplot(
         Keyword arguments for the computation of the pywearable functions, by default {}
     bar_kwargs : :class:`dict`, optional
         Additional keyword arguments for the bar plot, by default {}
-        
+
     Raises
     -------
     ValueError
         If the error range is not a valid range.
     """
-    metric_data = metric_fn(loader=loader, 
-                            user_id=user_id, 
-                            start_date=start_date, 
-                            end_date=end_date, 
-                            **metric_fn_kwargs)[user_id]
+    metric_data = metric_fn(
+        loader=loader,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        **metric_fn_kwargs,
+    )[user_id]
 
     if isinstance(aggr_fn, str) and aggr_fn.lower() == "mean":
         aggr_fn = np.nanmean
     elif isinstance(aggr_fn, str) and aggr_fn.lower() == "median":
         aggr_fn = np.nanmedian
-    
+
     if errorbar:
         if isinstance(error_range, str) and error_range.lower() == "std":
             error_fn = np.nanstd
         # note that the following assumes that aggr_fn computes a central statistic of the metric
         elif isinstance(error_range, str) and error_range.lower() == "iqr":
-            error_fn = lambda x: (abs(aggr_fn(x) - np.nanpercentile(x, 25)),
-                                  abs(aggr_fn(x) - np.nanpercentile(x, 75)))
+            error_fn = lambda x: (
+                abs(aggr_fn(x) - np.nanpercentile(x, 25)),
+                abs(aggr_fn(x) - np.nanpercentile(x, 75)),
+            )
         elif isinstance(error_range, str) and error_range.lower() == "minmax":
-            error_fn = lambda x: (abs(aggr_fn(x) - np.nanmin(x)), 
-                                  abs(aggr_fn(x) - np.nanmax(x)))
+            error_fn = lambda x: (
+                abs(aggr_fn(x) - np.nanmin(x)),
+                abs(aggr_fn(x) - np.nanmax(x)),
+            )
         else:
             raise ValueError(f"Error range {error_range} is not a valid range.")
 
@@ -2534,29 +2554,43 @@ def weekday_barplot(
 
     mean_weekday_metrics = [aggr_fn(weekday) for weekday in weekday_metrics]
     if errorbar:
-        error_weekday_metrics = np.array([error_fn(weekday) for weekday in weekday_metrics]).T
+        error_weekday_metrics = np.array(
+            [error_fn(weekday) for weekday in weekday_metrics]
+        ).T
 
-    weekdays_labels = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    weekdays_labels = [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
 
     fig, ax = plt.subplots()
     fig.set_size_inches(figsize)
 
     if not horizontal:
-        ax.bar(weekdays_labels, 
-               mean_weekday_metrics,
-               color=color,
-               alpha=alpha,
-               yerr=error_weekday_metrics if errorbar else None,
-               **bar_kwargs)
+        ax.bar(
+            weekdays_labels,
+            mean_weekday_metrics,
+            color=color,
+            alpha=alpha,
+            yerr=error_weekday_metrics if errorbar else None,
+            **bar_kwargs,
+        )
         if metric_lim:
             ax.set_ylim(metric_lim)
     else:
-        ax.barh(weekdays_labels, 
-                mean_weekday_metrics,
-                color=color,
-                alpha=alpha,
-                xerr=error_weekday_metrics if errorbar else None,
-                **bar_kwargs)
+        ax.barh(
+            weekdays_labels,
+            mean_weekday_metrics,
+            color=color,
+            alpha=alpha,
+            xerr=error_weekday_metrics if errorbar else None,
+            **bar_kwargs,
+        )
         if metric_lim:
             ax.set_xlim(metric_lim)
         ax.invert_yaxis()
@@ -2575,32 +2609,32 @@ def weekday_barplot(
 
 
 def summary_longitudinal_chart(
-        loader : BaseLoader,
-        user_id : str,
-        start_date : Union[datetime.datetime, datetime.date, str],
-        end_date : Union[datetime.datetime, datetime.date, str],
-        start_hour : int = 0,
-        figsize : Union[tuple,None] = None,
-        hypnogram_fn : Union[Callable, None] = None,
-        cardiac_fn : Union[Callable, None] = None,
-        activity_fn : Union[Callable, None] = None,
-        show_missing : bool = True,
-        resolution_sleep : Union[float, int] = 1.,
-        resolution_cardiac : Union[float, int] = 1.,
-        resolution_activity : Union[float, int] = 15.,
-        fontsize : int = 10,
-        show : bool = True,
-        save_to : str = None,
-        title : str = "",
-        show_dates : bool = False,
-        ):
+    loader: BaseLoader,
+    user_id: str,
+    start_date: Union[datetime.datetime, datetime.date, str],
+    end_date: Union[datetime.datetime, datetime.date, str],
+    start_hour: int = 0,
+    figsize: Union[tuple, None] = None,
+    hypnogram_fn: Union[Callable, None] = None,
+    cardiac_fn: Union[Callable, None] = None,
+    activity_fn: Union[Callable, None] = None,
+    show_missing: bool = True,
+    resolution_sleep: Union[float, int] = 1.0,
+    resolution_cardiac: Union[float, int] = 1.0,
+    resolution_activity: Union[float, int] = 15.0,
+    fontsize: int = 10,
+    show: bool = True,
+    save_to: str = None,
+    title: str = "",
+    show_dates: bool = False,
+):
     """
     Generates a longitudinal chart for a user and period of interest
-    
+
     The idea of this function is to show for a period of interest cardiac data,
     in terms of heart rate, activity data, in terms of steps, and sleep data, in
     terms of hypnograms. The data is showing on daily subplots, starting from the chosen
-    start_time. 
+    start_time.
 
     Parameters
     ----------
@@ -2646,9 +2680,9 @@ def summary_longitudinal_chart(
     :class:`list[matplotlib.axes._subplots.AxesSubplot]`
         Axes objects of the plot
     """
-    
+
     if figsize is None:
-        figsize = (10, (end_date-start_date).days*2)
+        figsize = (10, (end_date - start_date).days * 2)
     if hypnogram_fn is None:
         hypnogram_fn = loader.load_hypnogram
     if cardiac_fn is None:
@@ -2657,15 +2691,21 @@ def summary_longitudinal_chart(
         activity_fn = loader.load_steps
 
     # load all the data with some room for the next day due to start_hour
-    hypnograms = hypnogram_fn(user_id=user_id, 
-                          start_date=start_date, 
-                            end_date=end_date+datetime.timedelta(days=1))
-    cardiac_data = cardiac_fn(user_id=user_id, 
-                              start_date=start_date, 
-                              end_date=end_date+datetime.timedelta(days=1))
-    activity_data = activity_fn(user_id=user_id, 
-                                start_date=start_date, 
-                                end_date=end_date+datetime.timedelta(days=1))
+    hypnograms = hypnogram_fn(
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date + datetime.timedelta(days=1),
+    )
+    cardiac_data = cardiac_fn(
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date + datetime.timedelta(days=1),
+    )
+    activity_data = activity_fn(
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date + datetime.timedelta(days=1),
+    )
 
     plt.figure(figsize=figsize)
     axes = []
@@ -2673,7 +2713,7 @@ def summary_longitudinal_chart(
     for i in range((end_date - start_date).days):
         date = start_date + datetime.timedelta(days=i)
         start_date_hour = datetime.datetime.combine(date, datetime.time(start_hour))
-        
+
         # get the hypnogram for the given date
         hypnogram = hypnograms.get(date, None)
         if hypnogram is not None:
@@ -2681,10 +2721,12 @@ def summary_longitudinal_chart(
             hypnogram_length = len(hypnogram_stages)
             hypnogram_start = hypnogram["start_time"]
             hypnogram_end = hypnogram["end_time"]
-            hypnogram_time = pd.date_range(start=hypnogram_start, 
-                                        periods=hypnogram_length+1, 
-                                        freq=f"{resolution_sleep}min")
-            
+            hypnogram_time = pd.date_range(
+                start=hypnogram_start,
+                periods=hypnogram_length + 1,
+                freq=f"{resolution_sleep}min",
+            )
+
         # and for the next date
         next_hypnogram = hypnograms.get(date + datetime.timedelta(days=1), None)
         if next_hypnogram is not None:
@@ -2692,71 +2734,96 @@ def summary_longitudinal_chart(
             next_hypnogram_length = len(next_hypnogram_stages)
             next_hypnogram_start = next_hypnogram["start_time"]
             next_hypnogram_end = next_hypnogram["end_time"]
-            next_hypnogram_time = pd.date_range(start=next_hypnogram_start, 
-                                                periods=next_hypnogram_length+1, 
-                                                freq=f"{resolution_sleep}min")
+            next_hypnogram_time = pd.date_range(
+                start=next_hypnogram_start,
+                periods=next_hypnogram_length + 1,
+                freq=f"{resolution_sleep}min",
+            )
 
-
-        full_day_range = pd.date_range(start=start_date_hour, 
-                                       periods=int(24*((60)/ resolution_sleep)+1), 
-                                       freq=f"{resolution_sleep}min")
-        full_day_hypnogram = np.full(len(full_day_range) - 1, 5) # 5 (wake) is assumed as default value
+        full_day_range = pd.date_range(
+            start=start_date_hour,
+            periods=int(24 * ((60) / resolution_sleep) + 1),
+            freq=f"{resolution_sleep}min",
+        )
+        full_day_hypnogram = np.full(
+            len(full_day_range) - 1, 5
+        )  # 5 (wake) is assumed as default value
 
         if hypnogram is not None or next_hypnogram is not None:
             if hypnogram is not None:
                 diff_init = hypnogram_start - start_date_hour
-                # in case the hypnogram starts before the start of the subplot 
+                # in case the hypnogram starts before the start of the subplot
                 # we need to see only the last part of the hypnogram
                 if diff_init.days < 0:
-                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep*60)))
+                    diff_steps = abs(
+                        int(diff_init.total_seconds() / (resolution_sleep * 60))
+                    )
                     hypnogram_time = hypnogram_time[diff_steps:]
                     hypnogram_values = hypnogram_stages[diff_steps:]
-                    full_day_hypnogram[:len(hypnogram_values)] = hypnogram_values
-                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
-                    diff_steps = abs(int(diff_init.total_seconds() / (resolution_sleep * 60)))
-                    full_day_hypnogram[diff_steps:hypnogram_length+diff_steps] = hypnogram_stages
+                    full_day_hypnogram[: len(hypnogram_values)] = hypnogram_values
+                else:  # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(
+                        int(diff_init.total_seconds() / (resolution_sleep * 60))
+                    )
+                    full_day_hypnogram[diff_steps : hypnogram_length + diff_steps] = (
+                        hypnogram_stages
+                    )
             if next_hypnogram is not None:
-                diff_end = next_hypnogram_end - (start_date_hour + datetime.timedelta(days=1))
+                diff_end = next_hypnogram_end - (
+                    start_date_hour + datetime.timedelta(days=1)
+                )
                 # in case the hypnogram ends after the end of the subplot
                 if diff_end.days >= 0:
-                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
+                    diff_steps = abs(
+                        int(diff_end.total_seconds() / (resolution_sleep * 60))
+                    )
                     next_hypnogram_time = next_hypnogram_time[:-diff_steps]
                     next_hypnogram_values = next_hypnogram_stages[:-diff_steps]
                     # Note that if the hypnogram is completely in the next subplot, we must avoid the next part
                     # If it is not, we need to see only the first part of the hypnogram
                     if len(next_hypnogram_values) > 0:
-                        full_day_hypnogram[-len(next_hypnogram_values):] = next_hypnogram_values
-                else: # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
-                    diff_steps = abs(int(diff_end.total_seconds() / (resolution_sleep * 60)))
-                    full_day_hypnogram[-next_hypnogram_length-diff_steps:-diff_steps] = next_hypnogram_stages
+                        full_day_hypnogram[-len(next_hypnogram_values) :] = (
+                            next_hypnogram_values
+                        )
+                else:  # otherwise the full hypnogram is present and we must add it to the full_day_hypnogram
+                    diff_steps = abs(
+                        int(diff_end.total_seconds() / (resolution_sleep * 60))
+                    )
+                    full_day_hypnogram[
+                        -next_hypnogram_length - diff_steps : -diff_steps
+                    ] = next_hypnogram_stages
         # map 0 (previous encoding of wake) to 5 in full_day_hypnogram for visualization purposes
-        full_day_hypnogram[full_day_hypnogram == 0] = 5 
+        full_day_hypnogram[full_day_hypnogram == 0] = 5
 
         # get cardiac data
         full_day_range_cardiac = pd.date_range(
-            start=start_date_hour, 
-            periods=int(24*((60)/ resolution_cardiac)+1), 
-            freq=f"{resolution_cardiac}min"
+            start=start_date_hour,
+            periods=int(24 * ((60) / resolution_cardiac) + 1),
+            freq=f"{resolution_cardiac}min",
         )
         date_cardiac_expanded = pd.merge(
-            left=full_day_range_cardiac.to_series(name=pywearable.constants.ISODATE_COL),
-            right=cardiac_data, 
-            how="left"
+            left=full_day_range_cardiac.to_series(
+                name=pywearable.constants.ISODATE_COL
+            ),
+            right=cardiac_data,
+            how="left",
         )
         # get activity data
         full_day_range_activity = pd.date_range(
-            start=start_date_hour, 
-            periods=int(24*((60)/ resolution_activity)+1), 
-            freq=f"{resolution_activity}min"
+            start=start_date_hour,
+            periods=int(24 * ((60) / resolution_activity) + 1),
+            freq=f"{resolution_activity}min",
         )
         date_activity_expanded = pd.merge(
-            left=full_day_range_activity.to_series(name=pywearable.constants.ISODATE_COL), 
+            left=full_day_range_activity.to_series(
+                name=pywearable.constants.ISODATE_COL
+            ),
             right=activity_data,
-            how="left"
+            how="left",
         )
 
-        ax = plt.subplot((end_date - start_date).days, 1, i+1)
-        date_times = pd.date_range(start=start_date_hour, periods=9, freq='3h')
+        ax = plt.subplot((end_date - start_date).days, 1, i + 1)
+        date_times = pd.date_range(start=start_date_hour, periods=9, freq="3h")
         ax.set_xlim([date_times[0], date_times[-1]])
 
         # show times on x-axis top only in the first subplot
@@ -2765,63 +2832,74 @@ def summary_longitudinal_chart(
             ax.xaxis.tick_top()
             ax.set_xticks(date_times)
             ax.set_xticklabels(date_times.strftime("%H:%M"))
-            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+            ax.tick_params(axis="x", labelrotation=0, labelsize=fontsize)
         else:
             ax.set_xticks([])
             ax.set_xticklabels([])
-            ax.tick_params(axis='x', labelrotation=0, labelsize=fontsize)
+            ax.tick_params(axis="x", labelrotation=0, labelsize=fontsize)
 
-        #plot activity data
-        ax.bar(date_activity_expanded[pywearable.constants.ISODATE_COL], 
-                date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity, 
-                color="green",
-                alpha=0.5,
-                width=0.01,
-                edgecolor="black")
+        # plot activity data
+        ax.bar(
+            date_activity_expanded[pywearable.constants.ISODATE_COL],
+            date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL]
+            / resolution_activity,
+            color="green",
+            alpha=0.5,
+            width=0.01,
+            edgecolor="black",
+        )
         max_yaxis_activity = max(
-            1000 / resolution_activity, 
-            max(date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL] / resolution_activity) + 100/resolution_activity)
+            1000 / resolution_activity,
+            max(
+                date_activity_expanded[pywearable.constants.ACTIVITY_STEPS_COL]
+                / resolution_activity
+            )
+            + 100 / resolution_activity,
+        )
         ax.set_ylim([0, max_yaxis_activity])
-        ax.tick_params(axis='y', colors='green')
-        ax.set_ylabel("Steps per minute", color='green', fontsize=fontsize)
+        ax.tick_params(axis="y", colors="green")
+        ax.set_ylabel("Steps per minute", color="green", fontsize=fontsize)
         if show_dates:
-            ax.set_xlabel(date, fontsize=fontsize+2)
+            ax.set_xlabel(date, fontsize=fontsize + 2)
 
         # plot cardiac data
         ax2 = ax.twinx()
-        ax2.plot(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
-                 date_cardiac_expanded[pywearable.constants.HR_COLUMN], 
-                 color="red")
+        ax2.plot(
+            date_cardiac_expanded[pywearable.constants.ISODATE_COL],
+            date_cardiac_expanded[pywearable.constants.HR_COLUMN],
+            color="red",
+        )
         max_yaxis = max(175, max(date_cardiac_expanded[pywearable.constants.HR_COLUMN]))
         if show_missing:
-            ax2.fill_between(date_cardiac_expanded[pywearable.constants.ISODATE_COL], 
-                            max_yaxis - 10, 
-                            where=date_cardiac_expanded.beatsPerMinute.isna(),
-                            facecolor="darkgrey", 
-                            alpha=0.5)
+            ax2.fill_between(
+                date_cardiac_expanded[pywearable.constants.ISODATE_COL],
+                max_yaxis - 10,
+                where=date_cardiac_expanded.beatsPerMinute.isna(),
+                facecolor="darkgrey",
+                alpha=0.5,
+            )
         ax2.set_ylim([35, max_yaxis])
-        ax2.tick_params(axis='y', colors='red')
-        ax2.set_ylabel("Heart rate (bpm)", color='red', fontsize=fontsize)
-        
+        ax2.tick_params(axis="y", colors="red")
+        ax2.set_ylabel("Heart rate (bpm)", color="red", fontsize=fontsize)
+
         # plot hypnogram(s)
         ax3 = ax.twinx()
         ax3.set_ylim([0, 5.5])
-        ax3.stairs(full_day_hypnogram, 
-                   full_day_range, 
-                   baseline=4, 
-                   color="darkblue")
+        ax3.stairs(full_day_hypnogram, full_day_range, baseline=4, color="darkblue")
         # Offset the third y-axis to the right
-        ax3.spines['right'].set_position(('outward', 50)) 
-        ax3.set_yticks(ticks=[1, 2, 3, 4, 5],labels=["Light", "", "Deep", "REM", "Wake"])
-        ax3.tick_params(axis='y', colors='darkblue')
+        ax3.spines["right"].set_position(("outward", 50))
+        ax3.set_yticks(
+            ticks=[1, 2, 3, 4, 5], labels=["Light", "", "Deep", "REM", "Wake"]
+        )
+        ax3.tick_params(axis="y", colors="darkblue")
 
         axes.append([ax, ax2, ax3])
-    
+
     plt.tight_layout()
 
     if save_to:
         plt.savefig(save_to)
     if show:
         plt.show()
-    
+
     return axes
