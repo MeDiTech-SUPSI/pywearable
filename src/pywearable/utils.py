@@ -616,10 +616,10 @@ def std_time(times):
 
 def filter_out_awake(
     loader,
-    user: str,
+    user_id: str,
     df: pd.DataFrame,
-    date: datetime.date,
-    resolution: int = 1,
+    # date: datetime.date,
+    # resolution: int = 1,
 ):
     """Filters out night data relative to periods where the user was awake
 
@@ -641,51 +641,51 @@ def filter_out_awake(
     :class:`pandas.DataFrame`
         Filtered version of the original `df`, including only data of periods when the participant is asleep.
     """
-    print(f"User: {user}")
-    print(f"Date: {date}")
-    hypnogram = loader.load_hypnogram(
-        user_id=user,
-        start_date=date,
-        end_date=date + datetime.timedelta(days=1),
-        resolution=resolution,
+    sleep_stages: pd.DataFrame = loader.load_sleep_stage(
+        user_id=user_id,
+        start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
+        end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
     )
-    print(hypnogram)
-    print(hypnogram.keys())
-    # we get the hypnogram for that day
-    hypnogram = loader.load_hypnogram(
-        user_id=user,
-        start_date=date,
-        end_date=date + datetime.timedelta(days=1),
-        resolution=resolution,
-    )[date]
-    hypnogram_start = hypnogram["start_time"]
-    hypnogram_end = hypnogram["end_time"]
-    hypnogram = hypnogram["values"]
-
-    # stage differences
-    hypnogram_diff = np.concatenate([[0], np.diff(hypnogram)])
-    # if there has been a negative change and the current stage is awake, then count it as awakening start
-    awakening_starts = np.logical_and(hypnogram == 0, hypnogram_diff < 0)
-    # if there has been a positive change and the previous stage was awake, then count it as awakening end
-    awakening_ends = np.concatenate(
-        [[0], np.logical_and(hypnogram[:-1] == 0, hypnogram_diff[1:] > 0)]
-    )
-    # get the indexes of starts and ends
-    idx_starts = [idx for idx, start in enumerate(awakening_starts) if start]
-    idx_ends = [idx for idx, end in enumerate(awakening_ends) if end]
-    # based on the start of the sleep and the indexes of the awakenings, get the datetimes
-    datetime_starts = [
-        hypnogram_start + datetime.timedelta(minutes=idx * resolution)
-        for idx in idx_starts
-    ]
-    datetime_ends = [
-        hypnogram_start + datetime.timedelta(minutes=idx * resolution)
-        for idx in idx_ends
-    ]
-
-    for start, end in zip(datetime_starts, datetime_ends):
-        df = df.loc[
-            (df[constants.ISODATE_COL] < start) | (df[constants.ISODATE_COL] > end)
+    sleep_stages = sleep_stages.drop_duplicates(
+        subset=[
+            constants.UNIXTIMESTAMP_IN_MS_COL,
+            constants.SLEEP_SUMMARY_ID_COL,
+            constants.SLEEP_STAGE_SLEEP_TYPE_COL,
         ]
-
+    )
+    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
+        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
+    )
+    sleep_stages = (
+        pd.melt(
+            frame=sleep_stages,
+            id_vars=[
+                constants.UNIXTIMESTAMP_IN_MS_COL,
+                constants.SLEEP_SUMMARY_ID_COL,
+                constants.SLEEP_STAGE_SLEEP_TYPE_COL,
+            ],
+            value_vars=[constants.ISODATE_COL, "endIsoDate"],
+        )
+        .set_index("value")
+        .sort_index(ascending=True)
+    )
+    sleep_stages = (
+        sleep_stages.groupby(constants.UNIXTIMESTAMP_IN_MS_COL)
+        .resample(rule="30s", include_groups=False)
+        .ffill()
+        .reset_index(names=[constants.UNIXTIMESTAMP_IN_MS_COL, constants.ISODATE_COL])
+    )
+    df = pd.merge_asof(
+        left=df,
+        right=sleep_stages,
+        left_on=constants.ISODATE_COL,
+        right_on=constants.ISODATE_COL,
+        direction="nearest",
+        tolerance=pd.Timedelta(seconds=60),
+    )
+    df = df.loc[
+        df[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+        != constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+        :,
+    ]
     return df
