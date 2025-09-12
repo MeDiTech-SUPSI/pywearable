@@ -1623,6 +1623,7 @@ def get_hrv_statistics(
         # to account for timezones
         # TODO split loading into multiple days
         # TODO load from min sleep timestamp to max sleep timestamp
+        # TODO assign calendarDate to BBI based on sleep_summaries
         bbi_dict = {}
         bbi_df = loader.load_bbi(
             user_id=user,
@@ -1632,20 +1633,24 @@ def get_hrv_statistics(
         )
         if len(bbi_df) > 0:
             # drop dates with start_hour and end_hour which are NaT from sleep_timestamps
+            # TODO rewrite sleep timestamp to avoid having dictionary
             sleep_timestamps = {
                 date: (start_hour, end_hour)
                 for date, (start_hour, end_hour) in sleep_timestamps.items()
                 if not (pd.isnull(start_hour) or pd.isnull(end_hour))
             }
+            filtered_night_bbi = utils.filter_out_awake(
+                loader,
+                user,
+                bbi_df,
+            )
             for date, (start_hour, end_hour) in sleep_timestamps.items():
-                night_bbi = bbi_df.loc[
+                night_bbi = filtered_night_bbi.loc[
                     (bbi_df[constants.ISODATE_COL] >= start_hour)
                     & (bbi_df[constants.ISODATE_COL] <= end_hour)
                 ]
-                filtered_night_bbi = utils.filter_out_awake(
-                    loader, user, night_bbi, date, resolution=1
-                )
-                bbi_dict[date] = filtered_night_bbi
+
+                bbi_dict[date] = night_bbi
             for statistic in statistics:
                 # Get series with metrics by calendarDate
                 ser = _HRV_STATISTICS_DICT[statistic](
