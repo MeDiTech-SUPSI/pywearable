@@ -13,6 +13,7 @@ from scipy import interpolate, signal
 
 from . import constants, sleep, utils
 from .loader.base import BaseLoader
+import math
 
 # TODO Helper function that performs statistics computation
 #   Inputs:
@@ -1522,12 +1523,26 @@ def _compute_lfhf(bbi_dict: dict, coverage: float = 0.7, **kwargs) -> dict:
     )
 
 
+def _compute_bbi_wearing_time(bbi_dict: dict, **kwargs) -> pd.Series:
+    if len(bbi_dict) > 0:
+        bbi_df_list = []
+        for k, v in bbi_dict.items():
+            tmp_df = pd.DataFrame({"bbi": v["bbi"], "calendarDate": k})
+            bbi_df_list.append(tmp_df)
+        bbi_df = pd.concat(bbi_df_list, axis=0)
+        return pd.to_timedelta(bbi_df.groupby("calendarDate")["bbi"].sum(), unit="ms")
+
+    else:
+        return pd.Series()
+
+
 _HRV_STATISTICS_DICT = {
     CARDIAC_STATISTIC_LOW_FREQUENCY: _compute_lf,
     CARDIAC_STATISTIC_HIGH_FREQUENCY: _compute_hf,
     CARDIAC_STATISTIC_LOW_HIGH_FREQUENCY_RATIO: _compute_lfhf,
     CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: _compute_rmssd,
     CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: _compute_sdnn,
+    "night_bbi_wearing_time": _compute_bbi_wearing_time,
 }
 
 
@@ -1563,23 +1578,25 @@ def get_hrv_statistic(
 
 def get_hrv_statistics(
     loader: BaseLoader,
+    user_id: Union[str, list, None],
+    start_date: Union[pd.Timestamp, str],
+    end_date: Union[pd.Timestamp, str],
     statistic: Union[str, list, tuple, None] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     coverage: float = 0.7,
     kind=None,
     kind_args: list = [],
     kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
+    filter_out_stages: Union[list, None] = ["awake"],
+    overlap_days: int = 7,
 ):
     # Get user id from the loader
-    user_id = utils.get_user_ids(loader, user_id)
+    if user_id is None:
+        user_id = "all"
+    user_ids = utils.get_user_ids(loader, user_id)
     # Convert to datetime
-    start_date = None if start_date is None else pd.Timestamp(start_date)
-    end_date = None if end_date is None else pd.Timestamp(end_date)
+    start_date = pd.Timestamp(start_date)
+    end_date = pd.Timestamp(end_date)
 
     # Check metrics
     if statistic is None:
@@ -1597,115 +1614,105 @@ def get_hrv_statistics(
         raise ValueError(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
-    both_dates_valid = False
-    if (not (start_date is None)) and (not (end_date is None)):
-        # Let's set up a dataframe in which we will store all the data
-        date_periods = pd.date_range(
-            start_date, end_date, inclusive="left", normalize=True, freq="D"
+
+    hrv_stats_df_list = []
+
+    for user_id in user_ids:
+
+        sleep_summary = (
+            loader.load_sleep_summary(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+                drop_duplicates=True,
+            )
+            .sort_values(constants.CALENDAR_DATE_COL, ascending=True)
+            .set_index(constants.CALENDAR_DATE_COL)
         )
-        multi_index = pd.MultiIndex.from_product(
-            [user_id, date_periods],
-            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
+        sleep_summary["wakeup"] = sleep_summary[
+            constants.ISODATE_COL
+        ] + pd.to_timedelta(
+            sleep_summary[constants.DURATION_IN_MS_COL]
+            + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+            unit="ms",
         )
-        hrv_stats_df = pd.DataFrame(index=multi_index, columns=statistics)
-        both_dates_valid = True
-    else:
-        # Set up a standard df and we will populate it later with indexes
-        hrv_stats_df = pd.DataFrame()
-    for user in user_id:
-        if not (both_dates_valid):
-            user_hrv_stats_df = pd.DataFrame()
-        # Load sleep timestamps for user
-        sleep_timestamps = sleep.get_sleep_timestamps(
-            loader, user, start_date, end_date
-        )[user]
+
         # load the whole bbi history required, with some room (+- 12 hrs at start/end)
         # to account for timezones
-        # TODO split loading into multiple days
-        # TODO load from min sleep timestamp to max sleep timestamp
-        # TODO assign calendarDate to BBI based on sleep_summaries
-        bbi_dict = {}
-        bbi_df = loader.load_bbi(
-            user_id=user,
-            start_date=start_date,
-            end_date=end_date,
-            **loader_kwargs,
-        )
-        if len(bbi_df) > 0:
-            # drop dates with start_hour and end_hour which are NaT from sleep_timestamps
-            # TODO rewrite sleep timestamp to avoid having dictionary
-            sleep_timestamps = {
-                date: (start_hour, end_hour)
-                for date, (start_hour, end_hour) in sleep_timestamps.items()
-                if not (pd.isnull(start_hour) or pd.isnull(end_hour))
-            }
-            filtered_night_bbi = utils.filter_out_awake(
-                loader,
-                user,
-                bbi_df,
-            )
-            for date, (start_hour, end_hour) in sleep_timestamps.items():
-                night_bbi = filtered_night_bbi.loc[
-                    (bbi_df[constants.ISODATE_COL] >= start_hour)
-                    & (bbi_df[constants.ISODATE_COL] <= end_hour)
-                ]
 
-                bbi_dict[date] = night_bbi
-            for statistic in statistics:
-                # Get series with metrics by calendarDate
-                ser = _HRV_STATISTICS_DICT[statistic](
-                    bbi_dict=bbi_dict,
-                    coverage=coverage,
+        intervals = math.ceil(len(sleep_summary) / (overlap_days))
+        user_hrv_stats_df_list = []
+        for i in range(intervals):
+            tmp_start_date = sleep_summary.iloc[
+                i * overlap_days : (i + 1) * overlap_days, :
+            ][constants.ISODATE_COL].min()
+            tmp_end_date = sleep_summary.iloc[
+                i * overlap_days : (i + 1) * overlap_days, :
+            ]["wakeup"].max() + pd.Timedelta(microseconds=1)
+
+            bbi_df = loader.load_bbi(
+                user_id=user_id,
+                start_date=tmp_start_date,
+                end_date=tmp_end_date,
+                **loader_kwargs,
+            )
+            user_interval_hrv_stats_df_list = []
+            if len(bbi_df) > 0:
+                filtered_night_bbi = utils.filter_out_sleep_stages(
+                    loader=loader,
+                    user_id=user_id,
+                    df=bbi_df,
+                    stages_to_filter=[constants.SLEEP_STAGE_AWAKE_STAGE_VALUE],
                 )
-                if both_dates_valid:
-                    hrv_stats_df.loc[(user, ser.index), statistic] = ser.values
-                else:
-                    if len(ser) > 0:
-                        min_date = ser.index.min() if start_date is None else start_date
-                        max_date = ser.index.max() if end_date is None else end_date
-                        user_date_range = pd.date_range(min_date, max_date, freq="D")
-                        ser = ser.reindex(user_date_range)
-                        # We have different dates based on user
-                        ser = ser.set_axis(
-                            pd.MultiIndex.from_product(
-                                [[user], user_date_range],
-                                names=[
-                                    constants.USER_COL,
-                                    constants.CALENDAR_DATE_COL,
-                                ],
-                            )
-                        ).rename(statistic)
-                        if len(user_hrv_stats_df) == 0:
-                            # Empty df, first metric
-                            user_hrv_stats_df = ser.to_frame()
-                        else:
-                            user_hrv_stats_df = pd.merge(
-                                user_hrv_stats_df,
-                                ser,
-                                left_index=True,
-                                right_index=True,
-                                how="outer",
-                            )
-            if not both_dates_valid:
-                hrv_stats_df = pd.concat((hrv_stats_df, user_hrv_stats_df))
+                bbi_dict = {}
+                for idx, row in sleep_summary.iloc[
+                    i * overlap_days : (i + 1) * overlap_days, :
+                ].iterrows():
+                    bbi_dict[idx] = filtered_night_bbi.loc[
+                        (
+                            filtered_night_bbi[constants.ISODATE_COL]
+                            >= row[constants.ISODATE_COL]
+                        )
+                        & (filtered_night_bbi[constants.ISODATE_COL] <= row["wakeup"])
+                    ]
+
+                for statistic in statistics:
+                    # Get series with metrics by calendarDate
+                    ser: pd.Series = _HRV_STATISTICS_DICT[statistic](
+                        bbi_dict=bbi_dict,
+                        coverage=coverage,
+                    ).rename(statistic)
+                    user_interval_hrv_stats_df_list.append(ser)
+                if len(user_interval_hrv_stats_df_list) > 0:
+                    user_hrv_stats_df_list.append(
+                        pd.concat(user_interval_hrv_stats_df_list, axis=1)
+                    )
+        if len(user_hrv_stats_df_list) > 0:
+            user_hrv_stats_df = pd.concat(user_hrv_stats_df_list, axis=0)
+        else:
+            user_hrv_stats_df = (
+                pd.DataFrame(columns=statistics)
+                if len(statistics) > 1
+                else pd.Series(name=statistics[0])
+            )
+        user_hrv_stats_df = user_hrv_stats_df.reindex(
+            pd.date_range(
+                start=start_date, end=end_date, inclusive="left", normalize=True
+            )
+        )
+        hrv_stats_df_list.append(user_hrv_stats_df)
+    hrv_stats_df = pd.concat(hrv_stats_df_list, axis=0)
+
     # Perform kind operation by user
     if not (kind is None):
         hrv_stats_df = hrv_stats_df.groupby(level=constants.USER_COL).agg(
             kind, *kind_args, **kind_kwargs
         )
-        if return_df:
-            return hrv_stats_df
-        else:
-            return hrv_stats_df.to_dict(orient="index")
-    # Return based on settings
-    mi_df = utils.return_multiindex_df(hrv_stats_df, return_df, return_multi_index)
-    # Return series if only statistic
-    if (
-        (type(statistic) is str) or ((type(statistic) is list) and len(statistic) == 1)
-    ) and return_df:
-        return mi_df.squeeze(axis=1)
+        return hrv_stats_df
+    if len(statistic) == 1:
+        return hrv_stats_df[statistic[0]]
     else:
-        return mi_df
+        return hrv_stats_df
 
 
 def get_cardiac_statistics(

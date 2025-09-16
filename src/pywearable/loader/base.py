@@ -25,7 +25,7 @@ class BaseLoader:
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        same_day_filter: bool = True,
+        drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         raise NotImplementedError
 

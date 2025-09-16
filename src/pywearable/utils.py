@@ -614,10 +614,11 @@ def std_time(times):
     return "%02i:%02i" % (h_std, m_std)
 
 
-def filter_out_awake(
+def filter_out_sleep_stages(
     loader,
     user_id: str,
     df: pd.DataFrame,
+    stages_to_filter: Union[list, str],
     # date: datetime.date,
     # resolution: int = 1,
 ):
@@ -641,6 +642,20 @@ def filter_out_awake(
     :class:`pandas.DataFrame`
         Filtered version of the original `df`, including only data of periods when the participant is asleep.
     """
+    # Check stages to filter
+    if type(stages_to_filter) == str:
+        stages_to_filter = [stages_to_filter]
+    assert type(stages_to_filter) is list
+    for stage in stages_to_filter:
+        if not stage in [
+            constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+            constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+            constants.SLEEP_STAGE_REM_STAGE_VALUE,
+            constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+        ]:
+            raise ValueError(f"Sleep stage {stage} is not valid")
+
     sleep_stages: pd.DataFrame = loader.load_sleep_stage(
         user_id=user_id,
         start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
@@ -684,8 +699,7 @@ def filter_out_awake(
         tolerance=pd.Timedelta(seconds=60),
     )
     df = df.loc[
-        df[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
-        != constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+        ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
         :,
     ]
     return df
