@@ -1536,6 +1536,15 @@ def _compute_bbi_wearing_time(bbi_dict: dict, **kwargs) -> pd.Series:
         return pd.Series()
 
 
+def _compute_expected_bbi_wearing_time(
+    sleep_summary: pd.DataFrame, **kwargs
+) -> pd.Series:
+    if len(sleep_summary) > 0:
+        return sleep_summary["wakeup"] - sleep_summary[constants.ISODATE_COL]
+    else:
+        return pd.Series()
+
+
 _HRV_STATISTICS_DICT = {
     CARDIAC_STATISTIC_LOW_FREQUENCY: _compute_lf,
     CARDIAC_STATISTIC_HIGH_FREQUENCY: _compute_hf,
@@ -1543,6 +1552,7 @@ _HRV_STATISTICS_DICT = {
     CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: _compute_rmssd,
     CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: _compute_sdnn,
     "night_bbi_wearing_time": _compute_bbi_wearing_time,
+    "night_bbi_expected_wearing_time": _compute_expected_bbi_wearing_time,
 }
 
 
@@ -1587,7 +1597,7 @@ def get_hrv_statistics(
     kind_args: list = [],
     kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    filter_out_stages: Union[list, None] = ["awake"],
+    sleep_stages_to_remove: Union[list, None] = ["awake"],
     overlap_days: int = 7,
 ):
     # Get user id from the loader
@@ -1662,7 +1672,7 @@ def get_hrv_statistics(
                     loader=loader,
                     user_id=user_id,
                     df=bbi_df,
-                    stages_to_filter=[constants.SLEEP_STAGE_AWAKE_STAGE_VALUE],
+                    stages_to_filter=sleep_stages_to_remove,
                 )
                 bbi_dict = {}
                 for idx, row in sleep_summary.iloc[
@@ -1681,6 +1691,9 @@ def get_hrv_statistics(
                     ser: pd.Series = _HRV_STATISTICS_DICT[statistic](
                         bbi_dict=bbi_dict,
                         coverage=coverage,
+                        sleep_summary=sleep_summary.iloc[
+                            i * overlap_days : (i + 1) * overlap_days, :
+                        ],
                     ).rename(statistic)
                     user_interval_hrv_stats_df_list.append(ser)
                 if len(user_interval_hrv_stats_df_list) > 0:
@@ -1709,7 +1722,7 @@ def get_hrv_statistics(
             kind, *kind_args, **kind_kwargs
         )
         return hrv_stats_df
-    if len(statistic) == 1:
+    if len(statistics) == 1:
         return hrv_stats_df[statistic[0]]
     else:
         return hrv_stats_df

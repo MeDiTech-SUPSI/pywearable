@@ -661,15 +661,16 @@ def filter_out_sleep_stages(
         start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
         end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
     )
+
+    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
+        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
+    )
     sleep_stages = sleep_stages.drop_duplicates(
         subset=[
             constants.UNIXTIMESTAMP_IN_MS_COL,
             constants.SLEEP_SUMMARY_ID_COL,
-            constants.SLEEP_STAGE_SLEEP_TYPE_COL,
-        ]
-    )
-    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
-        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
+        ],
+        keep="last",
     )
     sleep_stages = (
         pd.melt(
@@ -684,15 +685,19 @@ def filter_out_sleep_stages(
         .set_index("value")
         .sort_index(ascending=True)
     )
-    sleep_stages = (
+
+    resampled_sleep_stages = (
         sleep_stages.groupby(constants.UNIXTIMESTAMP_IN_MS_COL)
         .resample(rule="30s", include_groups=False)
         .ffill()
         .reset_index(names=[constants.UNIXTIMESTAMP_IN_MS_COL, constants.ISODATE_COL])
     )
+    resampled_sleep_stages = resampled_sleep_stages.drop_duplicates(
+        subset=constants.ISODATE_COL, keep="first"
+    )
     df = pd.merge_asof(
         left=df,
-        right=sleep_stages,
+        right=resampled_sleep_stages.drop(constants.UNIXTIMESTAMP_IN_MS_COL, axis=1),
         left_on=constants.ISODATE_COL,
         right_on=constants.ISODATE_COL,
         direction="nearest",
@@ -701,5 +706,5 @@ def filter_out_sleep_stages(
     df = df.loc[
         ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
         :,
-    ]
+    ].rename(columns={constants.SLEEP_STAGE_SLEEP_TYPE_COL: "sleep_stage"})
     return df
