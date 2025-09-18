@@ -1597,7 +1597,7 @@ def get_hrv_statistics(
     kind_args: list = [],
     kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    sleep_stages_to_remove: Union[list, None] = ["awake"],
+    sleep_stages_to_remove: Union[list, None] = ["awake", "unmeasurable"],
     overlap_days: int = 7,
 ):
     # Get user id from the loader
