@@ -707,8 +707,10 @@ def filter_out_sleep_stages(
         subset=constants.ISODATE_COL, keep="first"
     )
     df = pd.merge_asof(
-        left=df,
-        right=resampled_sleep_stages.drop(constants.UNIXTIMESTAMP_IN_MS_COL, axis=1),
+        left=df.sort_values(by=constants.ISODATE_COL),
+        right=resampled_sleep_stages.drop(
+            constants.UNIXTIMESTAMP_IN_MS_COL, axis=1
+        ).sort_values(constants.ISODATE_COL),
         left_on=constants.ISODATE_COL,
         right_on=constants.ISODATE_COL,
         direction="nearest",
