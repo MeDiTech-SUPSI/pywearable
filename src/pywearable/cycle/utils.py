@@ -19,9 +19,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from ... import dates
 from .. import constants, loader
-from . import awake, physiological, sleep
 
 CYCLE_NEXT_BEDTIME_COL = "next_bedtime"
 CYCLE_NEXT_WAKEUP_TIME_COL = "next_wakeup"
@@ -231,13 +229,13 @@ def compute_cycle_heart_rate_statistic(
                 )
                 # Perform 30 minute average
                 mean_hr = filtered_cycle_heart_rate.rolling(window="30Min")[
-                    constants.HEART_RATE_COL
+                    constants.HR_COLUMN
                 ].mean()
                 # Return minimum 30 minute average
                 hr_stat.loc[calendar_date] = mean_hr.resample("1d", label="left").min()
             else:
                 hr_stat.loc[calendar_date] = filtered_cycle_heart_rate[
-                    constants.HEART_RATE_COL
+                    constants.HR_COLUMN
                 ].agg(stat)
     return hr_stat
 
@@ -277,7 +275,7 @@ def compute_cycle_steps(
         ]
         # Get steps sum
         steps.loc[calendar_date] = filtered_cycle_epochs[
-            constants.EPOCH_STEPS_COL
+            constants.ACTIVITY_STEPS_COL
         ].sum()
     return steps
 
@@ -874,9 +872,7 @@ def compute_cycle_wearing_time(
             ]
             # Get hr hours
             cycle_wearing_time.loc[calendar_date] = (
-                filtered_cycle_heart_rate[constants.HEART_RATE_COL].count()
-                * 15
-                / (60 * 60)
+                filtered_cycle_heart_rate[constants.HR_COLUMN].count() * 15 / (60 * 60)
             )
     return cycle_wearing_time
 
@@ -902,11 +898,9 @@ def get_date_range(start_date, end_date):
 def get_cycle_statistics(
     loader: loader.BaseLoader,
     user_id: str,
-    voucher: Union[str, None] = None,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
     cycle_statistics: Union[str, list, None] = None,
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    questionnaire_folder: Union[os.PathLike, None] = None,
     hr_coverage: float = 0.8,
 ) -> Union[pd.DataFrame, pd.Series]:
     """Extract cycle-based statistics.
@@ -954,6 +948,8 @@ def get_cycle_statistics(
         If ``cycle_statistics`` is not of the correct type.
     """
     date_range = get_date_range(start_date=start_date, end_date=end_date)
+    from . import awake, physiological, sleep
+
     # Check statistics
     CYCLE_STATISTICS_DICT = {
         **awake.CYCLE_AWAKE_STATISTICS_DICT,
@@ -974,7 +970,7 @@ def get_cycle_statistics(
         user_id=user_id,
         start_date=pd.Timestamp(start_date) - pd.Timedelta(days=2),
         end_date=pd.Timestamp(end_date) + pd.Timedelta(days=2),
-        same_day_filter=True,
+        drop_duplicates=True,
     )
 
     if len(sleep_summaries) == 0:

@@ -668,14 +668,15 @@ def filter_out_sleep_stages(
         start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
         end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
     )
+
+    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
+        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
+    )
     sleep_stages = sleep_stages.loc[
         sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
             sleep_summary[constants.SLEEP_SUMMARY_ID_COL].unique()
         )
     ]
-    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
-        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
-    )
 
     sleep_stages = sleep_stages.drop_duplicates(
         subset=[

@@ -46,5 +46,16 @@ CYCLE_SLEEP_STATISTICS_DICT = {
 }
 
 
-def get_cycle_sleep_statistics() -> Union[pd.Series, pd.DataFrame]:
-    pass
+def get_cycle_sleep_statistics(
+    loader, user_id, start_date, end_date, statistics, hr_coverage=0.8
+) -> Union[pd.Series, pd.DataFrame]:
+    if statistics is None:
+        statistics = list(CYCLE_SLEEP_STATISTICS_DICT.keys())
+    return utils.get_cycle_statistics(
+        loader=loader,
+        user_id=user_id,
+        cycle_statistics=statistics,
+        start_date=start_date,
+        end_date=end_date,
+        hr_coverage=hr_coverage,
+    )

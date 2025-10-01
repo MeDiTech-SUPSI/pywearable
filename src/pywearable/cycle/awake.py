@@ -1270,5 +1270,11 @@ CYCLE_AWAKE_STATISTICS_DICT = {
 }
 
 
-def get_cycle_awake_statistics() -> Union[pd.Series, pd.DataFrame]:
+def get_cycle_awake_statistics(
+    loader: BaseLoader,
+    user_id: str,
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
+    statistics: Union[str, list, None] = None,
+) -> Union[pd.Series, pd.DataFrame]:
     pass

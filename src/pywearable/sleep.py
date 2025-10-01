@@ -43,6 +43,7 @@ SLEEP_STATISTIC_WAKEUP = "wakeup"
 SLEEP_STATISTIC_MIDPOINT = "midpoint"
 SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
 SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
+SLEEP_STATISTIC_VALIDATION = "validation"
 
 SLEEP_DATETIME_STATISTICS = [
     SLEEP_STATISTIC_BEDTIME,
@@ -3464,6 +3465,10 @@ def _compute_cpd_duration(
     return pd.Series(data=CPDs, index=sleep_summary.index)
 
 
+def compute_sleep_validation(sleep_summary: pd.DataFrame, **kwargs):
+    return sleep_summary["validation"]
+
+
 SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,
     SLEEP_STATISTIC_TST: _compute_total_sleep_time,
@@ -3495,7 +3500,13 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_MIDPOINT: _compute_sleep_midpoint,
     SLEEP_STATISTIC_CPD_MIDPOINT: _compute_cpd_midpoint,
     SLEEP_STATISTIC_CPD_DURATION: _compute_cpd_duration,
+    SLEEP_STATISTIC_VALIDATION: compute_sleep_validation,
 }
+
+# TODO reduce number of function calls
+# TODO work by calendarDate and not by sleepSummaryId
+# TODO add sleep regularity index
+# TODO add consistent bedtime/wakeup time on rolling basis
 
 
 def get_sleep_statistic(
@@ -3594,17 +3605,15 @@ def get_sleep_statistic(
 
 def get_sleep_statistics(
     loader: BaseLoader,
+    user_id: Union[str, list, None],
+    start_date: pd.Timestamp,
+    end_date: pd.Timestamp,
     statistic: Union[str, list, tuple, None] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype: Union[dict, None] = {},
     kind=None,
     kind_args: list = [],
     kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
     **kwargs,
 ) -> Union[pd.DataFrame, dict]:
 
@@ -3681,35 +3690,8 @@ def get_sleep_statistics(
                     sleep_stages=sleep_stages,
                     chronotype=user_chronotype,
                 )
-                min_date, max_date = None, None
-                if not (start_date is None):
-                    min_date = start_date
-                elif len(ser) > 0:
-                    min_date = ser.index.min()
-                if not (end_date is None):
-                    max_date = end_date
-                elif len(ser) > 0:
-                    max_date = ser.index.max() + pd.Timedelta(days=1)
 
-                if not ((min_date is None) and (max_date is None)):
-                    user_date_range = pd.date_range(
-                        min_date, max_date, freq="D", inclusive="left"
-                    )
-                    ser = ser.reindex(user_date_range)
-                    # We have different dates based on user
-                    ser = ser.set_axis(
-                        pd.MultiIndex.from_product(
-                            [[user], user_date_range],
-                            names=[
-                                constants.USER_COL,
-                                constants.CALENDAR_DATE_COL,
-                            ],
-                        )
-                    ).rename(statistic)
-                else:
-                    ser = pd.Series(name=statistic)
-
-                user_statistics_list.append(ser)
+                user_statistics_list.append(ser.rename(statistic))
             sleep_stats_df = pd.concat(
                 (sleep_stats_df, pd.concat(user_statistics_list, axis=1)), axis=0
             )
@@ -3721,7 +3703,9 @@ def get_sleep_statistics(
         # For bedtime, wakeup, and midpoint columns we need to use a different
         # approach
         aggregated_sleep_stats_df = (
-            sleep_stats_df.drop(SLEEP_DATETIME_STATISTICS, axis=1, errors="ignore")
+            sleep_stats_df.drop(
+                [SLEEP_DATETIME_STATISTICS, "validation"], axis=1, errors="ignore"
+            )
             .groupby(level=constants.USER_COL)
             .agg(kind, *kind_args, **kind_kwargs)
         )
@@ -3744,19 +3728,10 @@ def get_sleep_statistics(
                 aggregated_sleep_stats_df = pd.concat(
                     (aggregated_sleep_stats_df, temp_col), axis=1
                 )
-        if return_df:
-            if return_multi_index:
-                return aggregated_sleep_stats_df
-            else:
-                return aggregated_sleep_stats_df.reset_index(level=[constants.USER_COL])
-        else:
-            return aggregated_sleep_stats_df.to_dict(orient="index")
-    # Return based on settings
-    mi_df = utils.return_multiindex_df(sleep_stats_df, return_df, return_multi_index)
+        return aggregated_sleep_stats_df
+
     # Return series if only statistic
-    if (
-        (type(statistic) is str) or ((type(statistic) is list) and len(statistic) == 1)
-    ) and return_df:
-        return mi_df.squeeze(axis=1)
+    if len(statistics) == 1:
+        return sleep_stats_df.squeeze(axis=1)
     else:
-        return mi_df
+        return sleep_stats_df
