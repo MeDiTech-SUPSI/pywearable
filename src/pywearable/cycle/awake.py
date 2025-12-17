@@ -1275,6 +1275,14 @@ def get_cycle_awake_statistics(
     user_id: str,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
+    hr_coverage: float = 0.8,
     statistics: Union[str, list, None] = None,
 ) -> Union[pd.Series, pd.DataFrame]:
-    pass
+    return utils.get_cycle_statistics(
+        loader=loader,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        cycle_statistics=statistics,
+        hr_coverage=hr_coverage,
+    )

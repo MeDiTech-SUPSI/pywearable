@@ -3629,6 +3629,8 @@ def get_sleep_statistics(
         statistics = list(SLEEP_STATISTICS_DICT.keys())
     elif type(statistic) == str:
         statistics = [statistic]
+    else:
+        statistics = statistic
 
     # Check args and kwargs
     if type(kind_args) != list:
