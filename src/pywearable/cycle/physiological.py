@@ -47,7 +47,7 @@ CYCLE_PHYSIOLOGICAL_STATISTICS_DICT = {
 
 
 def get_cycle_physiological_statistics(
-    loader, user_id, start_date, end_date, hr_coverage
+    loader, user_id, start_date, end_date, statistics, hr_coverage
 ) -> Union[pd.Series, pd.DataFrame]:
     if statistics is None:
         statistics = list(CYCLE_PHYSIOLOGICAL_STATISTICS_DICT.keys())
