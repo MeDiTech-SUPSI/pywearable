@@ -1278,6 +1278,8 @@ def get_cycle_awake_statistics(
     hr_coverage: float = 0.8,
     statistics: Union[str, list, None] = None,
 ) -> Union[pd.Series, pd.DataFrame]:
+    if statistics is None:
+        statistics = list(CYCLE_AWAKE_STATISTICS_DICT.keys())
     return utils.get_cycle_statistics(
         loader=loader,
         user_id=user_id,
