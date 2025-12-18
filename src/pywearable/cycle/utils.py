@@ -232,7 +232,7 @@ def compute_cycle_heart_rate_statistic(
                     constants.HR_COLUMN
                 ].mean()
                 # Return minimum 30 minute average
-                hr_stat.loc[calendar_date] = mean_hr.resample("1d", label="left").min()
+                hr_stat.loc[calendar_date] = mean_hr.min()
             else:
                 hr_stat.loc[calendar_date] = filtered_cycle_heart_rate[
                     constants.HR_COLUMN
