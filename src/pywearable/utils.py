@@ -668,6 +668,9 @@ def filter_out_sleep_stages(
         start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
         end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
     )
+    sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stages[
+        constants.SLEEP_STAGE_SLEEP_TYPE_COL
+    ].str.lower()
 
     sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
         sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
