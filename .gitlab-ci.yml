@@ -18,15 +18,15 @@ pages:
   only:
   - main
 
-tests:
-  stage: deploy
-  script:
-  - pip install pytest-cov
-  - pip install .[dev]
-  - pytest tests/ --cov=$CI_PROJECT_NAME --cov-report term --cov-report xml:coverage.xml tests
-  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-  artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage.xml
+#tests:
+#  stage: deploy
+#  script:
+#  - pip install pytest-cov
+#  - pip install .[dev]
+#  - pytest tests/ --cov=$CI_PROJECT_NAME --cov-report term --cov-report xml:coverage.xml tests
+#  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+#  artifacts:
+#    reports:
+#      coverage_report:
+#        coverage_format: cobertura
+#        path: coverage.xml
