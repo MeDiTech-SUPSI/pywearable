@@ -7,3 +7,4 @@ and how it can help you in analyzing data collected with wearable sensors.
 .. toctree:: 
     
     _tutorials/respiration.rst
+    _notebooks/imputation.ipynb
