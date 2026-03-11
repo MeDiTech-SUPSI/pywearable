@@ -168,6 +168,30 @@ class BaseLoader:
     ) -> pd.DataFrame:
         raise NotImplementedError
 
+    def load_stress(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        raise NotImplementedError
+
+    def load_epoch(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        raise NotImplementedError
+
+    def load_bbi(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        raise NotImplementedError
+
     def load_hypnogram(
         self,
         user_id: str,

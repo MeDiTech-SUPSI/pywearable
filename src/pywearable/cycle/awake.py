@@ -8,6 +8,9 @@ import pandas as pd
 
 from ..loader import BaseLoader
 from . import utils
+from . import base
+
+CYCLE_AWAKE_STATISTICS_LIST = base.registry.get_feature_names_for_cycle("awake")
 
 
 ############################################
@@ -1232,42 +1235,46 @@ def get_cycle_awake_highly_active_time(
     )
 
 
-CYCLE_AWAKE_STATISTICS_DICT = {
-    "cycle_awake_duration": utils.compute_cycle_duration,
-    "cycle_awake_wearing_time": utils.compute_cycle_wearing_time,
-    "cycle_awake_start": utils.compute_cycle_start,
-    "cycle_awake_end": utils.compute_cycle_end,
-    "cycle_awake_heart_rate_count": utils.compute_cycle_heart_rate_count,
-    "cycle_awake_heart_rate_max": utils.compute_cycle_heart_rate_max,
-    "cycle_awake_heart_rate_mean": utils.compute_cycle_heart_rate_mean,
-    "cycle_awake_heart_rate_median": utils.compute_cycle_heart_rate_median,
-    "cycle_awake_heart_rate_min": utils.compute_cycle_heart_rate_min,
-    "cycle_awake_heart_rate_rest": utils.compute_cycle_heart_rate_rest,
-    "cycle_awake_heart_rate_std": utils.compute_cycle_heart_rate_std,
-    "cycle_awake_steps": utils.compute_cycle_steps,
-    "cycle_awake_stress_count": utils.compute_cycle_stress_count,
-    "cycle_awake_stress_max": utils.compute_cycle_stress_max,
-    "cycle_awake_stress_mean": utils.compute_cycle_stress_mean,
-    "cycle_awake_stress_median": utils.compute_cycle_stress_median,
-    "cycle_awake_stress_min": utils.compute_cycle_stress_min,
-    "cycle_awake_stress_std": utils.compute_cycle_stress_std,
-    "cycle_awake_high_stress_ms": utils.compute_cycle_high_stress_duration,
-    "cycle_awake_high_stress_percentage": utils.compute_cycle_high_stress_percentage,
-    "cycle_awake_low_stress_ms": utils.compute_cycle_low_stress_duration,
-    "cycle_awake_low_stress_percentage": utils.compute_cycle_low_stress_percentage,
-    "cycle_awake_medium_stress_ms": utils.compute_cycle_medium_stress_duration,
-    "cycle_awake_medium_stress_percentage": utils.compute_cycle_medium_stress_percentage,
-    "cycle_awake_rest_stress_ms": utils.compute_cycle_rest_stress_duration,
-    "cycle_awake_rest_stress_percentage": utils.compute_cycle_rest_stress_percentage,
-    "cycle_awake_unmeasurable_stress_ms": utils.compute_cycle_unmeasurable_stress_duration,
-    "cycle_awake_unmeasurable_stress_percentage": utils.compute_cycle_unmeasurable_stress_percentage,
-    "cycle_awake_sedentary_time_ms": utils.compute_cycle_epochs_sedentary_duration,
-    "cycle_awake_sedentary_time_percentage": utils.compute_cycle_epochs_sedentary_percentage,
-    "cycle_awake_active_time_ms": utils.compute_cycle_epochs_active_duration,
-    "cycle_awake_active_time_percentage": utils.compute_cycle_epochs_active_percentage,
-    "cycle_awake_highly_active_time_ms": utils.compute_cycle_epochs_highly_active_duration,
-    "cycle_awake_highly_active_time_percentage": utils.compute_cycle_epochs_highly_active_percentage,
-}
+@base.registry.register_cycle("awake")
+class AwakeCycle(base.BaseCycle):
+    def get_intervals(
+        self,
+        loader: BaseLoader,
+        user_id: str,
+        start_date: pd.Timestamp,
+        end_date: pd.Timestamp,
+    ):
+        """
+        Return start as awake and end as next bedtime
+        """
+        sleep_summaries = loader.load_sleep_summary(
+            user_id=user_id,
+            start_date=pd.Timestamp(start_date),
+            end_date=pd.Timestamp(end_date) + pd.Timedelta(days=1),
+            drop_duplicates=True,
+        )
+        if len(sleep_summaries) == 0:
+            return pd.DataFrame(
+                index=pd.date_range(
+                    start=start_date, end=end_date, normalize=True, inclusive="left"
+                ),
+                columns=["start", "end"],
+                dtype=pd.Timestamp,
+            )
+
+        sleep_summaries["wakeup"] = sleep_summaries["isoDate"] + pd.to_timedelta(
+            sleep_summaries["durationInMs"] + sleep_summaries["awakeDurationInMs"],
+            unit="ms",
+        )
+        intervals = (
+            sleep_summaries.set_index("calendarDate")
+            .asfreq("1d")
+            .loc[:, ["isoDate", "wakeup"]]
+            .rename(columns={"wakeup": "start"})
+        )
+        intervals["end"] = intervals["isoDate"].shift(-1)
+        intervals = intervals.dropna(how="any")
+        return intervals.loc[:, ["start", "end"]]
 
 
 def get_cycle_awake_statistics(
@@ -1275,16 +1282,15 @@ def get_cycle_awake_statistics(
     user_id: str,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
-    hr_coverage: float = 0.8,
-    statistics: Union[str, list, None] = None,
+    hr_coverage: float,
 ) -> Union[pd.Series, pd.DataFrame]:
-    if statistics is None:
-        statistics = list(CYCLE_AWAKE_STATISTICS_DICT.keys())
-    return utils.get_cycle_statistics(
+    from . import get_cycle_statistics
+
+    return get_cycle_statistics(
         loader=loader,
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
-        cycle_statistics=statistics,
         hr_coverage=hr_coverage,
+        cycle="awake",
     )
