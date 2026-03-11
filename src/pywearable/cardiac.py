@@ -1412,6 +1412,10 @@ def _compute_hrv_statistic(
             daily_mean = ST_analysis.values.mean()
             if daily_mean is not None:
                 daily_means[date] = round(daily_mean, 2)
+            else:
+                daily_means[date] = np.nan
+        else:
+            daily_means[date] = np.nan
     daily_means = pd.Series(daily_means)
     daily_means.index = pd.to_datetime(daily_means.index)
     return daily_means

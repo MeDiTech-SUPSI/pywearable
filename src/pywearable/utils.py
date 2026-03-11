@@ -615,12 +615,11 @@ def std_time(times):
 
 
 def filter_out_sleep_stages(
-    loader,
-    user_id: str,
     df: pd.DataFrame,
     stages_to_filter: Union[list, str],
-    # date: datetime.date,
-    # resolution: int = 1,
+    loader=None,
+    user_id: str = None,
+    sleep_stages=None,
 ):
     """Filters out night data relative to periods where the user was awake
 
@@ -655,31 +654,44 @@ def filter_out_sleep_stages(
             constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
         ]:
             raise ValueError(f"Sleep stage {stage} is not valid")
+    if sleep_stages is None:
 
-    sleep_summary: pd.DataFrame = loader.load_sleep_summary(
-        user_id=user_id,
-        start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=48),
-        end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=48),
-        drop_duplicates=True,
+        sleep_stages: pd.DataFrame = loader.load_sleep_stage(
+            user_id=user_id,
+            start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
+            end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
+        )
+        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stages[
+            constants.SLEEP_STAGE_SLEEP_TYPE_COL
+        ].str.lower()
+    else:
+        sleep_stages = sleep_stages.copy()
+
+    resampled_sleep_stages = resample_sleep_stages(
+        sleep_stages=sleep_stages, resolution="30s"
     )
 
-    sleep_stages: pd.DataFrame = loader.load_sleep_stage(
-        user_id=user_id,
-        start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
-        end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
+    df = pd.merge_asof(
+        left=df.sort_values(by=constants.ISODATE_COL),
+        right=resampled_sleep_stages.drop(
+            constants.UNIXTIMESTAMP_IN_MS_COL, axis=1
+        ).sort_values(constants.ISODATE_COL),
+        left_on=constants.ISODATE_COL,
+        right_on=constants.ISODATE_COL,
+        direction="nearest",
+        tolerance=pd.Timedelta(seconds=60),
     )
-    sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stages[
-        constants.SLEEP_STAGE_SLEEP_TYPE_COL
-    ].str.lower()
+    df = df.loc[
+        ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
+        :,
+    ].rename(columns={constants.SLEEP_STAGE_SLEEP_TYPE_COL: "sleep_stage"})
+    return df
 
+
+def resample_sleep_stages(sleep_stages: pd.DataFrame, resolution: str) -> pd.DataFrame:
     sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
         sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
     )
-    sleep_stages = sleep_stages.loc[
-        sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
-            sleep_summary[constants.SLEEP_SUMMARY_ID_COL].unique()
-        )
-    ]
 
     sleep_stages = sleep_stages.drop_duplicates(
         subset=[
@@ -703,25 +715,11 @@ def filter_out_sleep_stages(
     )
     resampled_sleep_stages = (
         sleep_stages.groupby(constants.UNIXTIMESTAMP_IN_MS_COL)
-        .resample(rule="30s", include_groups=False)
+        .resample(rule=resolution, include_groups=False)
         .ffill()
         .reset_index(names=[constants.UNIXTIMESTAMP_IN_MS_COL, constants.ISODATE_COL])
     )
     resampled_sleep_stages = resampled_sleep_stages.drop_duplicates(
         subset=constants.ISODATE_COL, keep="first"
     )
-    df = pd.merge_asof(
-        left=df.sort_values(by=constants.ISODATE_COL),
-        right=resampled_sleep_stages.drop(
-            constants.UNIXTIMESTAMP_IN_MS_COL, axis=1
-        ).sort_values(constants.ISODATE_COL),
-        left_on=constants.ISODATE_COL,
-        right_on=constants.ISODATE_COL,
-        direction="nearest",
-        tolerance=pd.Timedelta(seconds=60),
-    )
-    df = df.loc[
-        ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
-        :,
-    ].rename(columns={constants.SLEEP_STAGE_SLEEP_TYPE_COL: "sleep_stage"})
-    return df
+    return resampled_sleep_stages
