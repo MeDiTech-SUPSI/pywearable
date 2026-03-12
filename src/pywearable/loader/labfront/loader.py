@@ -1005,11 +1005,11 @@ class LabfrontLoader(BaseLoader):
                 > 1
             ):
                 raise ValueError(
-                    f"Multiple tasks exist with the same name {task_id}. Specify either Task ID or Task Full ID: {[x for x in self.file_index.loc[
+                    f"""Multiple tasks exist with the same name {task_id}. Specify either Task ID or Task Full ID: {[x for x in self.file_index.loc[
                         self.file_index[lf_constants.FILE_INDEX_TASK_NAME_KEY]
                         == task_id,
                         lf_constants.FILE_INDEX_TASK_FULL_ID_KEY,
-                    ].unique()]}"
+                    ].unique()]}"""
                 )
             # Return full id corresponding to this task name
             return self.file_index.loc[
@@ -1123,7 +1123,7 @@ class LabfrontLoader(BaseLoader):
             if regex_match:
                 option_cols.append(col)
         for idx, row in questions_df.iterrows():
-            question_id = f"{row["sectionIndex"]}_{row["questionIndex"]}"
+            question_id = f"{row['sectionIndex']}_{row['questionIndex']}"
             questions_dict[question_id] = {
                 "type": row["questionType"],
                 "description": row["questionDescription"],
