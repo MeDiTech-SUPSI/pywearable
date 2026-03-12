@@ -1,4 +1,5 @@
 import datetime
+from abc import ABC, abstractmethod
 from typing import Union
 
 import pandas as pd
@@ -6,20 +7,22 @@ import pandas as pd
 from .. import constants
 
 
-class BaseLoader:
+class BaseLoader(ABC):
     """Abstract class for the implementation of loader classes."""
 
     def __init__(self):
         pass
 
+    @abstractmethod
     def load_daily_summary(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_sleep_summary(
         self,
         user_id: str,
@@ -27,32 +30,36 @@ class BaseLoader:
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_sleep_stage(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_heart_rate(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_pulse_ox(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_respiration(
         self,
         user_id: str,
@@ -86,6 +93,7 @@ class BaseLoader:
         """
         raise NotImplementedError
 
+    @abstractmethod
     def load_sleep_pulse_ox(
         self,
         user_id: str,
@@ -117,8 +125,9 @@ class BaseLoader:
         NotImplementedError
             Method must be implement by loaders.
         """
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_sleep_respiration(
         self,
         user_id: str,
@@ -150,23 +159,16 @@ class BaseLoader:
         NotImplementedError
             Method must be implement by loaders.
         """
-        raise NotImplementedError
+        pass
 
+    @abstractmethod
     def load_bbi(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        raise NotImplementedError
-
-    def load_steps(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    ) -> pd.DataFrame:
-        raise NotImplementedError
+        pass
 
     def load_stress(
         self,
@@ -354,6 +356,7 @@ class BaseLoader:
 
         return hypnograms
 
+    @abstractmethod
     def get_user_ids(self) -> list:
         """Get list of available user IDs.
 

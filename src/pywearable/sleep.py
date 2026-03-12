@@ -44,6 +44,7 @@ SLEEP_STATISTIC_MIDPOINT = "midpoint"
 SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
 SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
 SLEEP_STATISTIC_VALIDATION = "validation"
+SLEEP_STATISTIC_SRI = "SRI"
 
 SLEEP_DATETIME_STATISTICS = [
     SLEEP_STATISTIC_BEDTIME,
@@ -3469,6 +3470,226 @@ def compute_sleep_validation(sleep_summary: pd.DataFrame, **kwargs):
     return sleep_summary["validation"]
 
 
+def _resample_sleep_stages(sleep_stages: pd.DataFrame, rule: str) -> pd.DataFrame:
+    """Resample sleep stages with the desired resolution.
+
+    Parameters
+    ----------
+    sleep_stages : :class:`pandas.DataFrame`
+        Sleep stages to be resampled.
+    rule : :class:`str`
+        The target resolution.
+
+    Returns
+    -------
+    :class:`pandas.DataFrame`
+        Sleep stages resampled with resolution defined by ``rule``.
+    """
+    sleep_stages = sleep_stages.copy()
+    sleep_stages["endDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
+        sleep_stages[constants.DURATION_IN_MS_COL] - 1000, unit="ms"
+    )
+
+    sleep_stages = sleep_stages.melt(
+        id_vars=[
+            constants.UNIXTIMESTAMP_IN_MS_COL,
+            constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL,
+            constants.SLEEP_STAGE_SLEEP_TYPE_COL,
+        ],
+        value_vars=[constants.ISODATE_COL, "endDate"],
+    )
+
+    sleep_stages = (
+        sleep_stages.sort_values(by="value")
+        .rename(columns={"value": constants.ISODATE_COL})
+        .drop("variable", axis=1)
+        .set_index(constants.ISODATE_COL)
+    )
+
+    sleep_stages = sleep_stages[~sleep_stages.index.duplicated(keep="first")]
+    sleep_stages = (
+        sleep_stages.groupby(constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL)
+        .resample(rule=rule, include_groups=False)
+        .ffill()
+        .droplevel(level=constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL)
+        .sort_index()
+    )
+    sleep_stages["sleep"] = "sleep"
+    sleep_stages.loc[
+        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+        == constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+        "sleep",
+    ] = "awake"
+    return sleep_stages
+
+
+def _compute_sleep_regularity_index(
+    sleep_summary: pd.DataFrame,
+    sleep_stages: pd.DataFrame,
+    first_avg_wakeup: bool = True,
+    last_avg_bedtime: bool = True,
+    **kwargs,
+) -> pd.Series:
+    """Compute sleep regularity index (SRI).
+
+    The SRI measures the similarity of an individual's sleep-wake patterns
+    from one day to the next, based on binary sleep-wake state classifications.
+    It calculates the percentage probability of being in the same state
+    (sleep vs. wake) at any two time points 24-h apart.
+    The SRI is scaled to range from 0 (random) to 100 (perfectly regular):
+
+    .. math::
+
+        SRI_i = -100+\\frac{200}{M}\\sum_{j=1}^M\\delta(s_{i,j},s_{i+1,j})
+
+    where M is the number of daily epochs, :math:`s_{i,j}=0` for sleep and
+    :math:`s_{i,j} = 1` for wake, and :math:`\\delta(s_{i,j},s_{i+1,j})=1`
+    for :math:`s_{i,j}=s_{i+1,j}` and 0 otherwise.
+
+    Parameters
+    ----------
+    sleep_summary : :class:`pandas.DataFrame`
+        Sleep summaries indexed by calendarDate.
+    sleep_stages : :class:`pandas.DataFrame`
+        Sleep stages.
+    first_avg_wakeup : :class:`bool`, optional
+        Whether to use the average wakeup value on the first date, by default True.
+    last_avg_bedtime : :class:`bool`, optional
+        Whether to use the average bedtime value on the last date, by default True.
+
+    Returns
+    -------
+    :class:`pandas.Series`
+        Daily SRI values indexed by calendarDate.
+    """
+    sleep_stages = sleep_stages.copy()
+    sleep_summary = sleep_summary.copy()
+
+    # Ensure one row per day
+    sleep_summary = sleep_summary.asfreq("D")
+
+    min_date = sleep_summary.index.min()
+    max_date = sleep_summary.index.max()
+
+    if first_avg_wakeup:
+        mean_wakeup = utils.mean_time(
+            _compute_wakeup_time(sleep_summary=sleep_summary)
+        )
+        mean_wakeup = pd.Timedelta(
+            hours=int(mean_wakeup.split(":")[0]),
+            minutes=int(mean_wakeup.split(":")[1]),
+        )
+    if last_avg_bedtime:
+        mean_bedtime = utils.mean_time(
+            _compute_bedtime(sleep_summary=sleep_summary)
+        )
+        mean_bedtime = pd.Timedelta(
+            hours=int(mean_bedtime.split(":")[0]),
+            minutes=int(mean_bedtime.split(":")[1]),
+        )
+
+    # Resample sleep stages to one-minute resolution
+    sleep_stages = _resample_sleep_stages(sleep_stages=sleep_stages, rule="60s")
+
+    sri_series = pd.Series(
+        index=sleep_summary.index, name=SLEEP_STATISTIC_SRI, dtype=float
+    )
+
+    for idx, summary_data in sleep_summary.iterrows():
+        if pd.isnull(summary_data[constants.SLEEP_SUMMARY_ID_COL]):
+            continue
+        if idx > min_date:
+            if pd.isnull(
+                sleep_summary.loc[
+                    idx - pd.Timedelta(days=1),
+                    constants.SLEEP_SUMMARY_ID_COL,
+                ]
+            ):
+                continue
+
+        previous_day_data = sleep_stages.truncate(
+            before=idx - pd.Timedelta(days=1),
+            after=idx - pd.Timedelta(seconds=1),
+            copy=True,
+        )
+        current_day_data = sleep_stages.truncate(
+            before=idx,
+            after=idx + pd.Timedelta(days=1, seconds=-1),
+            copy=True,
+        )
+
+        if len(previous_day_data) == 0 and not (idx == min_date and first_avg_wakeup):
+            sri_series.loc[idx] = np.nan
+        elif len(current_day_data) == 0 and not (
+            idx == max_date and last_avg_bedtime
+        ):
+            sri_series.loc[idx] = np.nan
+        else:
+            if idx == min_date and not first_avg_wakeup:
+                continue
+            elif idx == max_date and not last_avg_bedtime:
+                continue
+
+            previous_day_minute_data = pd.Series(
+                index=pd.timedelta_range(
+                    start=0, end="1 day", freq="min", closed="left"
+                )
+            )
+            current_day_minute_data = pd.Series(
+                index=pd.timedelta_range(
+                    start=0, end="1 day", freq="min", closed="left"
+                )
+            )
+
+            # Convert timestamps to timedelta for day-level comparison
+            previous_day_data.index = previous_day_data.index - (
+                idx - pd.Timedelta(days=1)
+            )
+            current_day_data.index = current_day_data.index - idx
+
+            # Mark sleep periods
+            previous_day_minute_data.loc[
+                previous_day_data[
+                    previous_day_data["sleep"] == "sleep"
+                ].index
+            ] = 0
+            current_day_minute_data.loc[
+                current_day_data[
+                    current_day_data["sleep"] == "sleep"
+                ].index
+            ] = 0
+
+            if idx == min_date and first_avg_wakeup:
+                if mean_bedtime < mean_wakeup:
+                    previous_day_minute_data.loc[
+                        pd.Timedelta(value="0 day"):mean_bedtime
+                    ] = 1
+                    previous_day_minute_data.loc[
+                        mean_bedtime:mean_wakeup
+                    ] = 0
+                else:
+                    previous_day_minute_data.loc[
+                        pd.Timedelta(value="0 day"):mean_wakeup
+                    ] = 0
+
+            if idx == max_date and last_avg_bedtime:
+                current_day_minute_data.loc[
+                    mean_bedtime:pd.Timedelta(value="1 day")
+                ] = 0
+
+            # Fill remaining with 1 (wake)
+            previous_day_minute_data = previous_day_minute_data.fillna(1)
+            current_day_minute_data = current_day_minute_data.fillna(1)
+
+            comparison = previous_day_minute_data.astype(
+                "int"
+            ) == current_day_minute_data.astype("int")
+            sri = -100 + 200 / (24 * 60) * comparison.sum()
+            sri_series.loc[idx] = sri
+
+    return sri_series
+
+
 SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,
     SLEEP_STATISTIC_TST: _compute_total_sleep_time,
@@ -3501,11 +3722,11 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_CPD_MIDPOINT: _compute_cpd_midpoint,
     SLEEP_STATISTIC_CPD_DURATION: _compute_cpd_duration,
     SLEEP_STATISTIC_VALIDATION: compute_sleep_validation,
+    SLEEP_STATISTIC_SRI: _compute_sleep_regularity_index,
 }
 
 # TODO reduce number of function calls
 # TODO work by calendarDate and not by sleepSummaryId
-# TODO add sleep regularity index
 # TODO add consistent bedtime/wakeup time on rolling basis
 
 
