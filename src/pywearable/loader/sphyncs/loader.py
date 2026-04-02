@@ -204,6 +204,11 @@ class SphyncsDataLoader(BaseLoader):
                 # No stage data for this episode, skip or use zeros
                 continue
             
+            # This aligns the summary with the artificial 'awake' stage created in load_sleep_stage.
+            first_stage_time = episode_stages.index[0]
+            initial_gap_ms = (first_stage_time - start_time).total_seconds() * 1000
+            initial_gap_ms = int(initial_gap_ms)
+            
             # Calculate duration for each stage
             # Add next timestamp to compute time differences
             episode_stages['next_time'] = episode_stages.index.to_series().shift(-1)
@@ -228,7 +233,7 @@ class SphyncsDataLoader(BaseLoader):
             deep_sleep_ms = int(stage_durations.get('deep', 0))
             light_sleep_ms = int(stage_durations.get('light', 0))
             rem_sleep_ms = int(stage_durations.get('rem', 0))
-            awake_ms = int(stage_durations.get('wake', 0) + stage_durations.get('awake', 0))
+            awake_ms = int(stage_durations.get('wake', 0) + stage_durations.get('awake', 0)) + initial_gap_ms
             unmeasurable_ms = int(stage_durations.get('restless', 0) + stage_durations.get('asleep', 0))
             
             # Calculate total sleep duration (excluding awake periods)

@@ -45,6 +45,7 @@ SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
 SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
 SLEEP_STATISTIC_VALIDATION = "validation"
 SLEEP_STATISTIC_SRI = "SRI"
+SLEEP_STATISTIC_GETUP_LATENCY = "getup_latency"
 
 SLEEP_DATETIME_STATISTICS = [
     SLEEP_STATISTIC_BEDTIME,
@@ -2139,6 +2140,64 @@ def get_cpd_midpoint(
         return_df=return_df,
         return_multi_index=return_multi_index,
     )
+    
+def get_sleep_regularity_index(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+):
+    """Get Sleep Regularity Index (SRI)."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_SRI,
+        start_date=start_date,
+        end_date=end_date,
+        kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
+    )
+    
+def get_getup_latency(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    kind: Union[str, None] = None,
+    kind_args: list = [],
+    kind_kwargs: dict = {},
+    loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
+):
+    """Get get-up latency sleep metric.
+
+    This function computes the time spent in bed after the last actual
+    sleep stage until the final wakeup time.
+    """
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_GETUP_LATENCY,
+        start_date=start_date,
+        end_date=end_date,
+        kind=kind,
+        kind_args=kind_args,
+        kind_kwargs=kind_kwargs,
+        loader_kwargs=loader_kwargs,
+        return_df=return_df,
+        return_multi_index=return_multi_index,
+    )
 
 
 def get_cpd_duration(
@@ -3515,9 +3574,9 @@ def _resample_sleep_stages(sleep_stages: pd.DataFrame, rule: str) -> pd.DataFram
         .sort_index()
     )
     sleep_stages["sleep"] = "sleep"
+    awake_labels = [constants.SLEEP_STAGE_AWAKE_STAGE_VALUE, "awake", "wake"]
     sleep_stages.loc[
-        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
-        == constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(awake_labels),
         "sleep",
     ] = "awake"
     return sleep_stages
@@ -3689,10 +3748,70 @@ def _compute_sleep_regularity_index(
 
     return sri_series
 
+def _compute_getup_latency(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Compute get-up latency.
+
+    Parameters
+    ----------
+    sleep_summary : :class:`pd.DataFrame`
+        Sleep summaries data.
+    sleep_stages : :class:`pd.DataFrame`
+        Sleep stages data.
+
+    Returns
+    -------
+    :class:`pd.Series`
+        Get-up latency in minutes.
+    """
+    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+
+    if len(sleep_summary) == 0:
+        return pd.Series()
+    if len(sleep_stages) == 0:
+        return pd.Series(index=sleep_summary.index)
+
+    wakeup_times = _compute_wakeup_time(sleep_summary)
+    awake_labels = [constants.SLEEP_STAGE_AWAKE_STAGE_VALUE, "awake", "wake"]
+
+    stages_with_date = pd.merge(
+        left=sleep_stages,
+        right=sleep_summary.reset_index(names=[constants.CALENDAR_DATE_COL])[
+            [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+        ],
+        on=constants.SLEEP_SUMMARY_ID_COL,
+        how="inner",
+    )
+
+    stages_with_date["end_time"] = stages_with_date[constants.ISODATE_COL] + pd.to_timedelta(
+        stages_with_date[constants.DURATION_IN_MS_COL], unit="ms"
+    )
+
+    # Identify the last recorded stage for each night to check validity
+    last_stages = stages_with_date.sort_values(by=constants.ISODATE_COL).groupby(constants.CALENDAR_DATE_COL).last()
+    valid_mask = last_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(awake_labels)
+
+    # Filter for true sleep stages to find the final sleep offset
+    sleep_mask = ~stages_with_date[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
+        awake_labels + [constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE]
+    )
+    last_sleep_end = stages_with_date[sleep_mask].groupby(constants.CALENDAR_DATE_COL)["end_time"].max()
+
+    # Calculate latency and apply NaN if the night didn't end with a wake stage
+    getup_latency = (wakeup_times - last_sleep_end).dt.total_seconds() / 60.0
+    getup_latency = getup_latency.where(valid_mask, np.nan)
+
+    # Ensure the index matches the original summary and handle nights with zero valid stages
+    getup_latency = getup_latency.reindex(sleep_summary.index)
+
+    return getup_latency
 
 SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,
     SLEEP_STATISTIC_TST: _compute_total_sleep_time,
+    SLEEP_STATISTIC_GETUP_LATENCY: _compute_getup_latency,
     SLEEP_STATISTIC_SE: _compute_sleep_efficiency,
     SLEEP_STATISTIC_SME: _compute_sleep_maintenance_efficiency,
     SLEEP_STATISTIC_SPT: _compute_sleep_period_time,
