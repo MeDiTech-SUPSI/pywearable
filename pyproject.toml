@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pywearable"
+version = "0.1.0"
+description = "A package to parse, analyse, and visualize wearable data."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">= 3.10"
+dependencies = ["pandas", "matplotlib", "scipy"]
+authors = [
+    { name = "Davide Marzorati", email = "davide.marzorati.93@gmail.com" },
+    { name = "Alvise Dei Rossi" },
+]
+
+[project.urls]
+Homepage = "https://github.com/dado93/pywearable/"
+Documentation = "https://pywearable.readthedocs.io/en/latest/"
+Repository = "https://github.com/dado93/pywearable/"
+"Bug Tracker" = "https://github.com/dado93/pywearable/issues"
+
+[project.optional-dependencies]
+dev = ["freezegun", "pytest", "pytest-mock", "sphinx", "sphinx-rtd-theme"]
+lifesnaps = ["pymongo"]
+
+[tool.setuptools.packages.find]
+where = ["src"] # ["."]

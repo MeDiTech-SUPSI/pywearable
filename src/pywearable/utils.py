@@ -9,13 +9,11 @@ from math import degrees, floor, radians
 from typing import Union
 
 import dateutil.parser
-import hrvanalysis
 import numpy as np
 import pandas as pd
 import scipy.stats
 
 from . import constants
-from .loader.base import BaseLoader
 
 _LABFRONT_LAST_SAMPLE_UNIX_TIMESTAMP_IN_MS_KEY = "lastSampleUnixTimestampInMs"
 _LABFRONT_QUESTIONNAIRE_STRING = "questionnaire"
@@ -24,7 +22,7 @@ _MS_TO_DAY_CONVERSION = 1000 * 60 * 60 * 24
 
 
 def check_date(
-    date: Union[datetime.datetime, datetime.date, str, None]
+    date: Union[datetime.datetime, datetime.date, str, None],
 ) -> datetime.datetime:
     """Convert date to :class:`datetime.datetime` format
 
@@ -92,15 +90,15 @@ def check_is_df(input, raise_name="input"):
     return input
 
 
-def get_user_ids(loader: "BaseLoader", user_id: Union[str, list]):
+def get_user_ids(loader, user_id: Union[str, list] = "all"):
     """Returns user ids in the appropriate format required by pywearable functions
 
     Parameters
     ----------
     loader : :class:`loader.base.BaseLoader`
-        An instance of a data loader
-    user_id : :class:`str` or :class:`list`
-        The id(s) of the user(s) of interest
+        An instance of a data loader.
+    user_id : :class:`str` or :class:`list`, optional
+        The id(s) of the user(s) of interest, by default "all".
 
     Returns
     -------
@@ -119,7 +117,84 @@ def get_user_ids(loader: "BaseLoader", user_id: Union[str, list]):
     return user_id
 
 
-def get_summary(loader: "BaseLoader", comparison_date=time.time()):
+def return_multiindex_df(
+    df: pd.DataFrame, return_df: bool, return_multi_index: bool
+) -> Union[dict, pd.DataFrame]:
+    # Check if df is pd.DataFrame
+    if not (type(df) == pd.DataFrame):
+        raise ValueError(f"df must be of type pd.DataFrame, not of {type(df)}")
+    # Check if we have multilevel index
+    if not (type(df.index) == pd.MultiIndex):
+        raise ValueError(
+            f"df.index must be of type pd.MultiIndex, not of {type(df.index)}"
+        )
+    if not return_df:
+        # We need to perform some changes to return dictionary with dates
+        # and not pd.Timestamp as keys
+        if len(df.columns) > 1:
+            """
+            More than one column, dictionary will be:
+            {
+                user_id1: {
+                    datetime.date1: {
+                        metric1: value1,
+                        metric2: value2,
+                        ...
+                    },
+                    datetime.date2: {
+                        metric1: value1,
+                        metric2: value2,
+                    }
+                },
+                user_id2: {
+                    datetime.date1: {
+                        ...
+                    }
+                }
+            }
+
+            """
+            return {
+                user: {
+                    date.to_pydatetime().date(): df.xs((user, date)).to_dict()
+                    for date in df.index.levels[1]
+                }
+                for user in df.index.levels[0]
+            }
+        else:
+            """
+            Single metric, dictionary will be:
+            {
+                user_id1: {
+                    datetime.date1: value1,
+                    datetime.date2: value2
+                },
+                user_id2: {
+                    datetime.date1: value1,
+                    datetime.date2: value2
+                }
+            }
+            """
+            return {
+                level: {
+                    k.to_pydatetime().date(): v
+                    for k, v in df.xs(level).loc[:, df.columns[0]].to_dict().items()
+                }
+                for level in df.index.levels[0]
+            }
+    else:
+        # We return a dataframe
+        if return_multi_index:
+            # Standard multi-index dataframe
+            return df
+        else:
+            # Single index dataframe
+            return df.reset_index(
+                level=[constants.USER_COL, constants.CALENDAR_DATE_COL]
+            )
+
+
+def get_summary(loader, comparison_date=time.time()):
     """Returns a general summary of the latest update of every metric for every participant
 
     Args:
@@ -245,64 +320,78 @@ def find_nearest_timestamp(timestamp, timestamp_array):
 
 def trend_analysis(
     data_dict: dict,
-    start_date: datetime.datetime,
-    end_date: datetime.datetime,
-    ma_kind: str = "normal",
+    ma_type: str = "MA",
     baseline_periods: int = 7,
     min_periods_baseline: int = 3,
     normal_range_periods: int = 30,
     min_periods_normal_range: int = 20,
     std_multiplier: float = 1.0,
 ):
-    """Performs trend analysis on daily data for a pre-loaded metric.
+    """Perform trend analysis for a pre-loaded metric of interest.
+
+    This function performs trend analysis, i.e. it comptues medium, and long-term trends
+    in a metric of interest for a user. The function computes the moving average of the metric
+    and the normal range of the metric.
 
     Parameters
     ----------
-    data_dict : class: dict
-        Dictionary with dates as keys and daily metric data as values.
-    start_date : :class:`datetime.datetime`
-        Start date of the period of interest
-    end_date : :class:`datetime.datetime`
-        End date of the period of interest (inclusive)
-    ma_kind : :class: str, optional
-        type of moving average to compute, can be either normal or exponential, by default "normal"
-    baseline_periods : int, optional
-        number of period values to be used for the computation of the rolling baseline, by default 7 (MA7)
-    min_periods_baseline : int, optional
-        minimum number of period values needed for the baseline to be considered valid, by default 3
-    normal_range_periods : int, optional
-        number of period values to be used for the computation of the rolling normal range, by default 30
-    min_periods_normal_range : int, optional
-        minimum number of period values needed for the normal range to be considered valid, by default 20
-    std_multiplier : int, optional
-        multiplier of the standard deviation for the computation of lower and upper bounds of the normal range, by default 1
+    data_dict : :class:`dict`
+        Dictionary containing the pre-loaded metric values for the user.
+    ma_type : :class:`str`, optional
+        Type of moving average to compute, can be either "MA" or "EMA", by default "MA"
+    baseline_periods : :class:`int`, optional
+        Number of period values to be used for the computation of the rolling baseline, by default 7
+    min_periods_baseline : :class:`int`, optional
+        Minimum number of period values needed for the baseline to be considered valid, by default 3
+    normal_range_periods : :class:`int`, optional
+        Number of period values to be used for the computation of the rolling normal range, by default 30
+    min_periods_normal_range : :class:`int`, optional
+        Minimum number of period values needed for the normal range to be considered valid, by default 20
+    std_multiplier : :class:`float`, optional
+        Multiplier of the standard deviation for the computation of lower and upper bounds of the normal range, by default 1.0
 
     Returns
     -------
-    pandas.DataFrame
-    including daily metric, baseline, and normal range params.
+    :class:`pandas.DataFrame`
+        DataFrame containing daily metric, baseline, and normal range params.
+
+    Raises
+    ------
+    ValueError
+        If the moving average type is not "MA" or "EMA".
     """
+
+    start_date = min(data_dict.keys())
+    end_date = max(data_dict.keys())
+
     idx = pd.date_range(start_date, end_date)
     s = pd.Series(data_dict)
     s.index = pd.DatetimeIndex(s.index)
     s = s.reindex(idx, fill_value=None)
-    df = pd.DataFrame(s, columns=["metric"])
-    if ma_kind == "normal":
+    df = pd.DataFrame(data=s.values, index=s.index, columns=["metric"])
+    if ma_type == "MA":
         df["BASELINE"] = df.metric.rolling(
             window=baseline_periods, min_periods=min_periods_baseline
         ).mean()
-    elif ma_kind == "exponential":
+        df["NR_MEAN"] = df.metric.rolling(
+            window=normal_range_periods, min_periods=min_periods_normal_range
+        ).mean()
+        df["NR_STD"] = df.metric.rolling(
+            window=normal_range_periods, min_periods=min_periods_normal_range
+        ).std()
+    elif ma_type == "EMA":
         df["BASELINE"] = df.metric.ewm(
             span=baseline_periods, min_periods=min_periods_baseline
         ).mean()
+        df["NR_MEAN"] = df.metric.ewm(
+            span=normal_range_periods, min_periods=min_periods_normal_range
+        ).mean()
+        df["NR_STD"] = df.metric.ewm(
+            span=normal_range_periods, min_periods=min_periods_normal_range
+        ).std()
     else:
         raise ValueError('Moving average kind can only be "normal" or "exponential"')
-    df["NR_MEAN"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
-    ).mean()
-    df["NR_STD"] = df.metric.rolling(
-        window=normal_range_periods, min_periods=min_periods_normal_range
-    ).std()
+
     df["NR_LOWER_BOUND"] = df["NR_MEAN"] - std_multiplier * df["NR_STD"]
     df["NR_UPPER_BOUND"] = df["NR_MEAN"] + std_multiplier * df["NR_STD"]
     return df
@@ -312,8 +401,13 @@ def mean_angle(deg):
     return degrees(phase(sum(rect(1, radians(d)) for d in deg) / len(deg)))
 
 
-def mean_time(times):
-    t = (time.split(":") for time in times)
+def mean_time(times: Union[str, list]) -> str:
+    t = [
+        time.split(":") if type(time) is str else (time.hour, time.minute)
+        for time in times
+        if not (pd.isnull(time))
+    ]
+    # t = (time.split(":") for time in times)
     seconds = ((int(m) * 60 + int(h) * 3600) for h, m in t)
     day = 24 * 60 * 60
     to_angles = [s * 360.0 / day for s in seconds]
@@ -343,23 +437,33 @@ def get_earliest_bedtime(times: list) -> str:
     ----------
     times : :class:`list`
         List of times from which the earliest bedtime must be determined.
+        The times can be either of class :class:`str` or :class:`datetime.datetime`
+        or :class:`pandas.Timestamp`
 
     Returns
     -------
     :class:`str`
         Earliest bedtime in HH:MM format.
     """
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
+
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time + datetime.timedelta(days=1)
-        if (dt_time.hour >= 0 and dt_time.hour < 12)
-        else dt_time
+        (
+            dt_time + datetime.timedelta(days=1)
+            if (dt_time.hour >= 0 and dt_time.hour < 12)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -372,21 +476,30 @@ def get_earliest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmin()]
+
+    return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
 def get_earliest_wakeup_time(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
+
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time - datetime.timedelta(days=1)
-        if (dt_time.hour >= 12 and dt_time.hour <= 23)
-        else dt_time
+        (
+            dt_time - datetime.timedelta(days=1)
+            if (dt_time.hour >= 12 and dt_time.hour <= 23)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -399,21 +512,29 @@ def get_earliest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmax()]
+
+    return dt_times[dt_diff.argmax()].strftime("%H:%M")
 
 
 def get_latest_bedtime(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time + datetime.timedelta(days=1)
-        if (dt_time.hour >= 0 and dt_time.hour < 12)
-        else dt_time
+        (
+            dt_time + datetime.timedelta(days=1)
+            if (dt_time.hour >= 0 and dt_time.hour < 12)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -426,21 +547,29 @@ def get_latest_bedtime(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmax()]
+
+    return dt_times[dt_diff.argmax()].strftime("%H:%M")
 
 
 def get_latest_wakeup_time(times: list) -> str:
-    dt_times = [
-        datetime.time(int(t.split(":")[0]), int(t.split(":")[1])) for t in times
-    ]
+    dt_times = []
+    for time in times:
+        if not pd.isnull(time):
+            if type(time) is str:
+                hour, minute = [int(x) for x in time.split(":")]
+            else:
+                hour, minute = time.hour, time.minute
+            dt_times.append(datetime.time(hour, minute))
     converted_dt_times = [
         datetime.datetime.combine(datetime.date.today(), dt_time)
         for dt_time in dt_times
     ]
     converted_dt_times = [
-        dt_time - datetime.timedelta(days=1)
-        if (dt_time.hour >= 12 and dt_time.hour <= 23)
-        else dt_time
+        (
+            dt_time - datetime.timedelta(days=1)
+            if (dt_time.hour >= 12 and dt_time.hour <= 23)
+            else dt_time
+        )
         for dt_time in converted_dt_times
     ]
 
@@ -453,12 +582,20 @@ def get_latest_wakeup_time(times: list) -> str:
             for dt_time in converted_dt_times
         ]
     )
-    return times[dt_diff.argmin()]
+
+    return dt_times[dt_diff.argmin()].strftime("%H:%M")
 
 
 def std_time(times):
+    if type(times) is str:
+        times = [times]
+    t = [
+        time.split(":") if type(time) is str else (time.hour, time.minute)
+        for time in times
+        if not pd.isnull(time)
+    ]
+
     # Get seconds
-    t = (time.split(":") for time in times)
     seconds = [(int(m) * 60 + int(h) * 3600) for h, m in t]
 
     # Get angle in degrees
@@ -477,110 +614,112 @@ def std_time(times):
     return "%02i:%02i" % (h_std, m_std)
 
 
-def filter_bbi(
-    bbi,
-    remove_outliers=True,
-    remove_ectopic=True,
-    verbose=False,
-    low_rri=300,
-    high_rri=2000,
-    ectopic_method="malik",
-    interpolation_method="linear",
+def filter_out_sleep_stages(
+    df: pd.DataFrame,
+    stages_to_filter: Union[list, str],
+    loader=None,
+    user_id: str = None,
+    sleep_stages=None,
 ):
-    """Get filtered bbi data.
-
-    This function returns bbi data filtered out from outliers and/or ectopic beats.
+    """Filters out night data relative to periods where the user was awake
 
     Parameters
     ----------
-    bbi : list
-        series of beat to beat interval
-    remove_outliers : bool, optional
-        determines if outliers below ``low_rri`` and above ``high_rri`` should be filtered out, by default True
-    remove_ectopic : bool, optional
-        determines if ectopic beats should be removed from the bbi series, by default True
-    verbose : bool, optional
-        whether the function should print out data about the amount of outliers/ectopic beats removed, by default False
-    low_rri : int, optional
-        lower threshold for outlier detection, by default 300
-    high_rri : int, optional
-        upper threshold for outlier detection, by default 2000
-    ectopic_method : str, optional
-        method used to determine and filter out ectopic beats, by default "malik"
-    interpolation_method : str, optional
-        method used to interpolate missing values after the removal of outliers/ectopic beats, by default "linear"
-    """
-    if remove_outliers:
-        bbi = hrvanalysis.remove_outliers(
-            bbi, low_rri=low_rri, high_rri=high_rri, verbose=verbose
-        )
-        bbi = hrvanalysis.interpolate_nan_values(
-            bbi, interpolation_method=interpolation_method
-        )
-    if remove_ectopic:
-        bbi = hrvanalysis.remove_ectopic_beats(
-            bbi, method=ectopic_method, verbose=verbose
-        )
-        bbi = hrvanalysis.interpolate_nan_values(
-            bbi, interpolation_method=interpolation_method
-        )
-    return bbi
-
-
-def filter_out_awake_bbi(loader, user, bbi_df, date, resolution=1):
-    """Filters out night bbi data relative to periods where the user was awake
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
+    loader : :class:`pywearable.loader.base.BaseLoader`
         Initialized instance of data loader.
     user : class:`str`
-        ID of the user for which bbi data has to be filtered.
-    bbi_df : class:`pandas.DataFrame`
-        DataFrame of bbi data
-    date : class:`pandas.Timestamp`
-        Timestamp of the date relative to the night in consideration.
-    resolution : class:`int`
-        Resolution of the hypnogram used to find awakening periods
+        ID of the user for which data has to be filtered.
+    df : class:`pandas.DataFrame`
+        DataFrame of the data to filter, must contain an isoDate column
+    date : class:`datetime.date`
+        Date relative to the night in consideration.
+    resolution : class:`int`, optional
+        Resolution of the hypnogram used to find awake periods, by default 1
 
     Returns
     -------
-    pandas.DataFrame
-    DataFrame in the same format of `bbi_df`, including only bbi data of periods when the participant is asleep.
+    :class:`pandas.DataFrame`
+        Filtered version of the original `df`, including only data of periods when the participant is asleep.
     """
-    # we get the hypnogram for that day
-    hypnogram = loader.load_hypnogram(
-        user_id=user, start_date=date, end_date=date, resolution=resolution
-    )[date]
-    hypnogram_start = hypnogram["start_time"]
-    hypnogram_end = hypnogram["end_time"]
-    hypnogram = hypnogram["values"]
+    # Check stages to filter
+    if type(stages_to_filter) == str:
+        stages_to_filter = [stages_to_filter]
+    assert type(stages_to_filter) is list
+    for stage in stages_to_filter:
+        if not stage in [
+            constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+            constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+            constants.SLEEP_STAGE_REM_STAGE_VALUE,
+            constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+        ]:
+            raise ValueError(f"Sleep stage {stage} is not valid")
+    if sleep_stages is None:
 
-    # stage differences
-    hypnogram_diff = np.concatenate([[0], np.diff(hypnogram)])
-    # if there has been a negative change and the current stage is awake, then count it as awakening start
-    awakening_starts = np.logical_and(hypnogram == 0, hypnogram_diff < 0)
-    # if there has been a positive change and the previous stage was awake, then count it as awakening end
-    awakening_ends = np.concatenate(
-        [[0], np.logical_and(hypnogram[:-1] == 0, hypnogram_diff[1:] > 0)]
+        sleep_stages: pd.DataFrame = loader.load_sleep_stage(
+            user_id=user_id,
+            start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
+            end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
+        )
+        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stages[
+            constants.SLEEP_STAGE_SLEEP_TYPE_COL
+        ].str.lower()
+    else:
+        sleep_stages = sleep_stages.copy()
+
+    resampled_sleep_stages = resample_sleep_stages(
+        sleep_stages=sleep_stages, resolution="30s"
     )
-    # get the indexes of starts and ends
-    idx_starts = [idx for idx, start in enumerate(awakening_starts) if start]
-    idx_ends = [idx for idx, end in enumerate(awakening_ends) if end]
-    # based on the start of the sleep and the indexes of the awakenings, get the datetimes
-    datetime_starts = [
-        hypnogram_start + datetime.timedelta(minutes=idx * resolution)
-        for idx in idx_starts
-    ]
-    datetime_ends = [
-        hypnogram_start + datetime.timedelta(minutes=idx * resolution)
-        for idx in idx_ends
-    ]
 
-    for start, end in zip(datetime_starts, datetime_ends):
-        bbi_df = bbi_df.loc[
-            (bbi_df[constants._ISODATE_COL] < start)
-            | (bbi_df[constants._ISODATE_COL] > end)
-        ]
+    df = pd.merge_asof(
+        left=df.sort_values(by=constants.ISODATE_COL),
+        right=resampled_sleep_stages.drop(
+            constants.UNIXTIMESTAMP_IN_MS_COL, axis=1
+        ).sort_values(constants.ISODATE_COL),
+        left_on=constants.ISODATE_COL,
+        right_on=constants.ISODATE_COL,
+        direction="nearest",
+        tolerance=pd.Timedelta(seconds=60),
+    )
+    df = df.loc[
+        ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
+        :,
+    ].rename(columns={constants.SLEEP_STAGE_SLEEP_TYPE_COL: "sleep_stage"})
+    return df
 
-    return bbi_df
+
+def resample_sleep_stages(sleep_stages: pd.DataFrame, resolution: str) -> pd.DataFrame:
+    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
+        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
+    )
+
+    sleep_stages = sleep_stages.drop_duplicates(
+        subset=[
+            constants.UNIXTIMESTAMP_IN_MS_COL,
+            constants.SLEEP_SUMMARY_ID_COL,
+        ],
+        keep="last",
+    )
+    sleep_stages = (
+        pd.melt(
+            frame=sleep_stages,
+            id_vars=[
+                constants.UNIXTIMESTAMP_IN_MS_COL,
+                constants.SLEEP_SUMMARY_ID_COL,
+                constants.SLEEP_STAGE_SLEEP_TYPE_COL,
+            ],
+            value_vars=[constants.ISODATE_COL, "endIsoDate"],
+        )
+        .set_index("value")
+        .sort_index(ascending=True)
+    )
+    resampled_sleep_stages = (
+        sleep_stages.groupby(constants.UNIXTIMESTAMP_IN_MS_COL)
+        .resample(rule=resolution, include_groups=False)
+        .ffill()
+        .reset_index(names=[constants.UNIXTIMESTAMP_IN_MS_COL, constants.ISODATE_COL])
+    )
+    resampled_sleep_stages = resampled_sleep_stages.drop_duplicates(
+        subset=constants.ISODATE_COL, keep="first"
+    )
+    return resampled_sleep_stages
