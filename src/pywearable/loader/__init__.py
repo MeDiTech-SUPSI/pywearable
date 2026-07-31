@@ -1,4 +1,4 @@
 from .base import BaseLoader
 from .labfront.loader import LabfrontLoader
-from .lifesnaps.loader import LifeSnapsLoader
+from .lifesnaps import LifeSnapsMongoDBLoader, LifeSnapsParquetLoader
 from .sphyncs.loader import SphyncsDataLoader

@@ -13,14 +13,14 @@ class BaseLoader(ABC):
     def __init__(self):
         pass
 
-    @abstractmethod
-    def load_daily_summary(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    ) -> pd.DataFrame:
-        pass
+    # @abstractmethod
+    # def load_daily_summary(
+    #    self,
+    #    user_id: str,
+    #    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    #    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    # ) -> pd.DataFrame:
+    #    pass
 
     @abstractmethod
     def load_sleep_summary(

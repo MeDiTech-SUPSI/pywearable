@@ -84,7 +84,7 @@ RESPIRATION_CALENDAR_DATE_COL = "calendarDate"
 
 # Cardiac data columns #
 SPO2_COLUMN = "spo2"
-HR_COLUMN = "beatsPerMinute"
+HR_COLUMN = "heart_rate"
 RESTING_HR_COLUMN = "restingHeartRateInBeatsPerMinute"
 AVG_HR_COLUMN = "averageHeartRateInBeatsPerMinute"
 MAX_HR_COLUMN = "maxHeartRateInBeatsPerMinute"

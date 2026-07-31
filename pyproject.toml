@@ -11,8 +11,8 @@ license = { file = "LICENSE" }
 requires-python = ">= 3.10"
 dependencies = ["pandas", "matplotlib", "scipy"]
 authors = [
-    { name = "Davide Marzorati", email = "davide.marzorati.93@gmail.com" },
-    { name = "Alvise Dei Rossi" },
+    { name = "Davide Marzorati", email = "davide.marzorati@supsi.ch" },
+    { name = "Alvise Dei Rossi", email = "alvise.deirossi@supsi.ch" },
 ]
 
 [project.urls]
@@ -23,7 +23,9 @@ Repository = "https://github.com/dado93/pywearable/"
 
 [project.optional-dependencies]
 dev = ["freezegun", "pytest", "pytest-mock", "sphinx", "sphinx-rtd-theme"]
-lifesnaps = ["pymongo"]
 
 [tool.setuptools.packages.find]
 where = ["src"] # ["."]
+
+[project.scripts]
+pywearable = "pywearable.cli.cli:cli"

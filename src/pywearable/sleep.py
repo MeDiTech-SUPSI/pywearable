@@ -13,6 +13,8 @@ import pandas as pd
 from . import constants, utils
 from .loader.base import BaseLoader
 
+# TODO add support for quantiles
+
 SLEEP_STATISTIC_TIB = "TIB"
 SLEEP_STATISTIC_TST = "TST"
 SLEEP_STATISTIC_WASO = "WASO"
@@ -55,24 +57,24 @@ SLEEP_DATETIME_STATISTICS = [
 
 SLEEP_KIND_MAPPING = {
     "mean": {
-        SLEEP_STATISTIC_BEDTIME: utils.mean_time,
-        SLEEP_STATISTIC_WAKEUP: utils.mean_time,
-        SLEEP_STATISTIC_MIDPOINT: utils.mean_time,
+        SLEEP_STATISTIC_BEDTIME: "",  # utils.mean_time,
+        SLEEP_STATISTIC_WAKEUP: "",  # utils.mean_time,
+        SLEEP_STATISTIC_MIDPOINT: "",  # utils.mean_time,
     },
     "std": {
-        SLEEP_STATISTIC_BEDTIME: utils.std_time,
-        SLEEP_STATISTIC_WAKEUP: utils.std_time,
-        SLEEP_STATISTIC_MIDPOINT: utils.std_time,
+        SLEEP_STATISTIC_BEDTIME: "",  # utils.std_time,
+        SLEEP_STATISTIC_WAKEUP: "",  # utils.std_time,
+        SLEEP_STATISTIC_MIDPOINT: "",  # utils.std_time,
     },
     "min": {
-        SLEEP_STATISTIC_BEDTIME: utils.get_earliest_bedtime,
-        SLEEP_STATISTIC_WAKEUP: utils.get_earliest_wakeup_time,
-        SLEEP_STATISTIC_MIDPOINT: utils.get_earliest_wakeup_time,
+        SLEEP_STATISTIC_BEDTIME: "",  # utils.get_earliest_bedtime,
+        SLEEP_STATISTIC_WAKEUP: "",  # utils.get_earliest_wakeup_time,
+        SLEEP_STATISTIC_MIDPOINT: "",  # utils.get_earliest_wakeup_time,
     },
     "max": {
-        SLEEP_STATISTIC_BEDTIME: utils.get_latest_bedtime,
-        SLEEP_STATISTIC_WAKEUP: utils.get_latest_wakeup_time,
-        SLEEP_STATISTIC_MIDPOINT: utils.get_latest_wakeup_time,
+        SLEEP_STATISTIC_BEDTIME: "",  # utils.get_latest_bedtime,
+        SLEEP_STATISTIC_WAKEUP: "",  # utils.get_latest_wakeup_time,
+        SLEEP_STATISTIC_MIDPOINT: "",  # utils.get_latest_wakeup_time,
     },
 }
 
@@ -2140,7 +2142,8 @@ def get_cpd_midpoint(
         return_df=return_df,
         return_multi_index=return_multi_index,
     )
-    
+
+
 def get_sleep_regularity_index(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -2167,7 +2170,8 @@ def get_sleep_regularity_index(
         return_df=return_df,
         return_multi_index=return_multi_index,
     )
-    
+
+
 def get_getup_latency(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -3631,17 +3635,13 @@ def _compute_sleep_regularity_index(
     max_date = sleep_summary.index.max()
 
     if first_avg_wakeup:
-        mean_wakeup = utils.mean_time(
-            _compute_wakeup_time(sleep_summary=sleep_summary)
-        )
+        mean_wakeup = utils.mean_time(_compute_wakeup_time(sleep_summary=sleep_summary))
         mean_wakeup = pd.Timedelta(
             hours=int(mean_wakeup.split(":")[0]),
             minutes=int(mean_wakeup.split(":")[1]),
         )
     if last_avg_bedtime:
-        mean_bedtime = utils.mean_time(
-            _compute_bedtime(sleep_summary=sleep_summary)
-        )
+        mean_bedtime = utils.mean_time(_compute_bedtime(sleep_summary=sleep_summary))
         mean_bedtime = pd.Timedelta(
             hours=int(mean_bedtime.split(":")[0]),
             minutes=int(mean_bedtime.split(":")[1]),
@@ -3679,9 +3679,7 @@ def _compute_sleep_regularity_index(
 
         if len(previous_day_data) == 0 and not (idx == min_date and first_avg_wakeup):
             sri_series.loc[idx] = np.nan
-        elif len(current_day_data) == 0 and not (
-            idx == max_date and last_avg_bedtime
-        ):
+        elif len(current_day_data) == 0 and not (idx == max_date and last_avg_bedtime):
             sri_series.loc[idx] = np.nan
         else:
             if idx == min_date and not first_avg_wakeup:
@@ -3708,32 +3706,26 @@ def _compute_sleep_regularity_index(
 
             # Mark sleep periods
             previous_day_minute_data.loc[
-                previous_day_data[
-                    previous_day_data["sleep"] == "sleep"
-                ].index
+                previous_day_data[previous_day_data["sleep"] == "sleep"].index
             ] = 0
             current_day_minute_data.loc[
-                current_day_data[
-                    current_day_data["sleep"] == "sleep"
-                ].index
+                current_day_data[current_day_data["sleep"] == "sleep"].index
             ] = 0
 
             if idx == min_date and first_avg_wakeup:
                 if mean_bedtime < mean_wakeup:
                     previous_day_minute_data.loc[
-                        pd.Timedelta(value="0 day"):mean_bedtime
+                        pd.Timedelta(value="0 day") : mean_bedtime
                     ] = 1
-                    previous_day_minute_data.loc[
-                        mean_bedtime:mean_wakeup
-                    ] = 0
+                    previous_day_minute_data.loc[mean_bedtime:mean_wakeup] = 0
                 else:
                     previous_day_minute_data.loc[
-                        pd.Timedelta(value="0 day"):mean_wakeup
+                        pd.Timedelta(value="0 day") : mean_wakeup
                     ] = 0
 
             if idx == max_date and last_avg_bedtime:
                 current_day_minute_data.loc[
-                    mean_bedtime:pd.Timedelta(value="1 day")
+                    mean_bedtime : pd.Timedelta(value="1 day")
                 ] = 0
 
             # Fill remaining with 1 (wake)
@@ -3747,6 +3739,7 @@ def _compute_sleep_regularity_index(
             sri_series.loc[idx] = sri
 
     return sri_series
+
 
 def _compute_getup_latency(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
@@ -3785,19 +3778,27 @@ def _compute_getup_latency(
         how="inner",
     )
 
-    stages_with_date["end_time"] = stages_with_date[constants.ISODATE_COL] + pd.to_timedelta(
-        stages_with_date[constants.DURATION_IN_MS_COL], unit="ms"
-    )
+    stages_with_date["end_time"] = stages_with_date[
+        constants.ISODATE_COL
+    ] + pd.to_timedelta(stages_with_date[constants.DURATION_IN_MS_COL], unit="ms")
 
     # Identify the last recorded stage for each night to check validity
-    last_stages = stages_with_date.sort_values(by=constants.ISODATE_COL).groupby(constants.CALENDAR_DATE_COL).last()
+    last_stages = (
+        stages_with_date.sort_values(by=constants.ISODATE_COL)
+        .groupby(constants.CALENDAR_DATE_COL)
+        .last()
+    )
     valid_mask = last_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(awake_labels)
 
     # Filter for true sleep stages to find the final sleep offset
     sleep_mask = ~stages_with_date[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
         awake_labels + [constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE]
     )
-    last_sleep_end = stages_with_date[sleep_mask].groupby(constants.CALENDAR_DATE_COL)["end_time"].max()
+    last_sleep_end = (
+        stages_with_date[sleep_mask]
+        .groupby(constants.CALENDAR_DATE_COL)["end_time"]
+        .max()
+    )
 
     # Calculate latency and apply NaN if the night didn't end with a wake stage
     getup_latency = (wakeup_times - last_sleep_end).dt.total_seconds() / 60.0
@@ -3807,6 +3808,7 @@ def _compute_getup_latency(
     getup_latency = getup_latency.reindex(sleep_summary.index)
 
     return getup_latency
+
 
 SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,

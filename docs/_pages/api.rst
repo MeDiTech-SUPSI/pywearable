@@ -8,9 +8,9 @@ API documentation.
 
    _api/activity
    _api/adherence
-   _api/cardiac
-   _api/constants
    _api/cycle
+   _api/heart_rate
+   _api/hrv
    _api/loader
    _api/respiration
    _api/sleep

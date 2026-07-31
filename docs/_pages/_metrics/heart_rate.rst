@@ -10,21 +10,19 @@ The required fields for this metric are the following ones:
     
     * - Name
       - Description
-      - Constant
       - Data type
-    * - timezoneOffsetInMs
-      - Timezone offset in milliseconds
-      - ``pywearable.constants._TIMEZONEOFFSET_IN_MS_COL``
-      - :class:`int`
-    * - unixTimestampInMs
+    * - utc_time
+      - Timezone offset
+      - :class:`int` or :class:`str` or :class:`pandas.Timedelta`
+    * - timezone
       - Unix timestamp in milliseconds
       - ``pywearable.constants._UNIXTIMESTAMP_IN_MS_COL``
       - :class:`int`
-    * - isoDate
+    * - local_time
       - Time in `ISO <https://en.wikipedia.org/wiki/ISO_8601>`_ format
       - ``pywearable.constants._ISODATE_COL``
       - :class:`pd.Timestamp`
-    * - beatsPerMinute
+    * - heart_rate
       - Heart rate values
       - ``pywearable.constants._BEATS_PER_MINUTE_COL``
       - :class:`float`
