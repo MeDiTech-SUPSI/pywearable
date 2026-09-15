@@ -106,15 +106,10 @@ class TesseraeParquetLoader(BaseLoader):
     def load_sleep_stage(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
     ) -> pd.DataFrame:
-        sleep_summary = self.load_sleep_summary(user_id=user_id).rename(
-            columns={"Timestamp": "utc_time"}
-        )
+        sleep_summary = self.load_sleep_summary(user_id=user_id)
         if len(sleep_summary) == 0:
             return pd.DataFrame(columns=["utc_time", "local_time", "type"])
 
-        sleep_summary["utc_time"] = (
-            sleep_summary["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
-        )
         sleep_summary["timezone_offset"] = (
             sleep_summary["local_time"] - sleep_summary["utc_time"]
         )
@@ -125,9 +120,6 @@ class TesseraeParquetLoader(BaseLoader):
         )
 
         # Let's create the same sleep summary identifier
-        sleep_summary["sleep_summary_id"] = (
-            user_id + "-" + sleep_summary.index.astype(str)
-        )
         sleep_summary["local_end_time"] = sleep_summary["local_time"] + pd.to_timedelta(
             sleep_summary["duration_seconds"].fillna(0)
             + sleep_summary["awake_seconds"].fillna(0),
@@ -217,13 +209,16 @@ class TesseraeParquetLoader(BaseLoader):
                 (sleep_stage["local_time"] < end_date),
                 :,
             ]
-        return sleep_stage
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(sleep_stage)
 
     def load_sleep_summary(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
+        drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         path_to_file = self.root_folder / user_id / "GarminHealthAPI" / "Sleep.parquet"
 
@@ -283,9 +278,26 @@ class TesseraeParquetLoader(BaseLoader):
                 ]
             ),
             ascending=True,
-        ).drop_duplicates(subset=["calendar_date"], keep="last")
+        )
+        if drop_duplicates:
+            sleep = sleep.drop_duplicates(subset=["calendar_date"], keep="last")
         # Remove created column
         sleep = sleep.drop(["validation_map"], axis=1)
+        sleep["sleep_summary_id"] = user_id + "-" + sleep.index.astype(str)
+        sleep["utc_time"] = sleep["Timestamp"].dt.tz_convert("UTC").dt.tz_localize(None)
+        sleep["timezone_offset_in_ms"] = (
+            (sleep["local_time"] - sleep["utc_time"]) / pd.Timedelta(milliseconds=1)
+        )
+        sleep["unix_timestamp_in_ms"] = sleep["utc_time"].astype("int64") // 1_000_000
+        for source, target in (
+            ("duration_seconds", "duration_in_ms"),
+            ("awake_seconds", "awake_duration_in_ms"),
+            ("deep_sleep_seconds", "deep_sleep_duration_in_ms"),
+            ("light_sleep_seconds", "light_sleep_duration_in_ms"),
+            ("rem_sleep_seconds", "rem_sleep_duration_in_ms"),
+        ):
+            sleep[target] = sleep[source].fillna(0) * 1000
+        sleep["unmeasurable_sleep_duration_in_ms"] = 0
         # Filter by isoDate
         if not (start_date is None):
             sleep = sleep.loc[
@@ -298,7 +310,9 @@ class TesseraeParquetLoader(BaseLoader):
                 :,
             ]
 
-        return sleep
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(sleep)
 
     def load_bbi(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp

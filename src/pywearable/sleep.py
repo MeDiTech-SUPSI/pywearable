@@ -10,43 +10,43 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from . import constants, utils
+from . import sleep_schema as constants, utils
 from .loader.base import BaseLoader
 
 # TODO add support for quantiles
 
-SLEEP_STATISTIC_TIB = "TIB"
-SLEEP_STATISTIC_TST = "TST"
-SLEEP_STATISTIC_WASO = "WASO"
-SLEEP_STATISTIC_SPT = "SPT"
-SLEEP_STATISTIC_DEEP_DURATION = "deep"
-SLEEP_STATISTIC_LIGHT_DURATION = "light"
-SLEEP_STATISTIC_REM_DURATION = "REM"
-SLEEP_STATISTIC_NREM_DURATION = "NREM"
-SLEEP_STATISTIC_AWAKE_DURATION = "awake"
-SLEEP_STATISTIC_UNMEASURABLE_DURATION = "unmeasurable"
-SLEEP_STATISTIC_SOL = "SOL"
-SLEEP_STATISTIC_DEEP_LATENCY = "lat_deep"
-SLEEP_STATISTIC_LIGHT_LATENCY = "lat_light"
-SLEEP_STATISTIC_REM_LATENCY = "lat_REM"
-SLEEP_STATISTIC_DEEP_PERCENTAGE = "%_deep"
-SLEEP_STATISTIC_LIGHT_PERCENTAGE = "%_light"
-SLEEP_STATISTIC_NREM_PERCENTAGE = "%_NREM"
-SLEEP_STATISTIC_REM_PERCENTAGE = "%_REM"
-SLEEP_STATISTIC_SE = "SE"
-SLEEP_STATISTIC_SME = "SME"
+SLEEP_STATISTIC_TIB = "time_in_bed"
+SLEEP_STATISTIC_TST = "total_sleep_time"
+SLEEP_STATISTIC_WASO = "wake_after_sleep_onset"
+SLEEP_STATISTIC_SPT = "sleep_period_time"
+SLEEP_STATISTIC_DEEP_DURATION = "deep_sleep_duration"
+SLEEP_STATISTIC_LIGHT_DURATION = "light_sleep_duration"
+SLEEP_STATISTIC_REM_DURATION = "rem_sleep_duration"
+SLEEP_STATISTIC_NREM_DURATION = "nrem_sleep_duration"
+SLEEP_STATISTIC_AWAKE_DURATION = "awake_duration"
+SLEEP_STATISTIC_UNMEASURABLE_DURATION = "unmeasurable_duration"
+SLEEP_STATISTIC_SOL = "sleep_onset_latency"
+SLEEP_STATISTIC_DEEP_LATENCY = "deep_sleep_latency"
+SLEEP_STATISTIC_LIGHT_LATENCY = "light_sleep_latency"
+SLEEP_STATISTIC_REM_LATENCY = "rem_sleep_latency"
+SLEEP_STATISTIC_DEEP_PERCENTAGE = "deep_sleep_percentage"
+SLEEP_STATISTIC_LIGHT_PERCENTAGE = "light_sleep_percentage"
+SLEEP_STATISTIC_NREM_PERCENTAGE = "nrem_sleep_percentage"
+SLEEP_STATISTIC_REM_PERCENTAGE = "rem_sleep_percentage"
+SLEEP_STATISTIC_SE = "sleep_efficiency"
+SLEEP_STATISTIC_SME = "sleep_maintenance_efficiency"
 SLEEP_STATISTIC_SLEEP_SCORE = "sleep_score"
-SLEEP_STATISTIC_AWAKE_COUNT = "count_awake"
-SLEEP_STATISTIC_DEEP_COUNT = "count_deep"
-SLEEP_STATISTIC_LIGHT_COUNT = "count_light"
-SLEEP_STATISTIC_REM_COUNT = "count_REM"
+SLEEP_STATISTIC_AWAKE_COUNT = "awake_count"
+SLEEP_STATISTIC_DEEP_COUNT = "deep_sleep_count"
+SLEEP_STATISTIC_LIGHT_COUNT = "light_sleep_count"
+SLEEP_STATISTIC_REM_COUNT = "rem_sleep_count"
 SLEEP_STATISTIC_BEDTIME = "bedtime"
 SLEEP_STATISTIC_WAKEUP = "wakeup"
 SLEEP_STATISTIC_MIDPOINT = "midpoint"
 SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
 SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
 SLEEP_STATISTIC_VALIDATION = "validation"
-SLEEP_STATISTIC_SRI = "SRI"
+SLEEP_STATISTIC_SRI = "sleep_regularity_index"
 SLEEP_STATISTIC_GETUP_LATENCY = "getup_latency"
 
 SLEEP_DATETIME_STATISTICS = [
@@ -2289,7 +2289,7 @@ def _compute_sleep_score(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     if constants.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL in sleep_summary.columns:
         sleep_score = sleep_summary[constants.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL]
     else:
-        sleep_score = pd.Series()
+        sleep_score = pd.Series(np.nan, index=sleep_summary.index, dtype=float)
     return sleep_score
 
 
@@ -3327,12 +3327,14 @@ def _compute_wakeup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
 
     sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
 
+    if "local_end_time" in sleep_summary.columns:
+        return sleep_summary["local_end_time"]
+
     if np.all(
         [
+            constants.ISODATE_COL in sleep_summary.columns,
             constants.SLEEP_SUMMARY_DURATION_IN_MS_COL in sleep_summary.columns,
             constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL in sleep_summary.columns,
-            constants.UNIXTIMESTAMP_IN_MS_COL in sleep_summary.columns,
-            constants.TIMEZONEOFFSET_IN_MS_COL in sleep_summary.columns,
         ]
     ):
         wakeup_time = sleep_summary[constants.ISODATE_COL] + pd.to_timedelta(
@@ -3379,6 +3381,19 @@ def _compute_sleep_midpoint(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     return midpoints
 
 
+def _get_sleep_calendar_dates(sleep_summary: pd.DataFrame) -> pd.Series:
+    """Return calendar dates aligned to the supplied sleep-summary index."""
+    values = (
+        sleep_summary[constants.CALENDAR_DATE_COL]
+        if constants.CALENDAR_DATE_COL in sleep_summary.columns
+        else sleep_summary.index
+    )
+    dates = pd.Series(pd.to_datetime(values, errors="coerce"), index=sleep_summary.index).dt.normalize()
+    if dates.isna().any():
+        raise ValueError("CPD requires a valid calendar date for every sleep summary.")
+    return dates
+
+
 def _compute_cpd_midpoint(
     sleep_summary: pd.DataFrame, chronotype: Union[tuple, None], **kwargs
 ):
@@ -3406,10 +3421,13 @@ def _compute_cpd_midpoint(
     # Check is dataframe
     sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
 
+    calendar_dates = _get_sleep_calendar_dates(sleep_summary)
+    chronological_index = calendar_dates.sort_values(kind="stable").index
+
     # get midpoints for period of interest
     midpoints: pd.Series = _compute_sleep_midpoint(
         sleep_summary=sleep_summary, **kwargs
-    ).sort_index()
+    ).reindex(chronological_index)
 
     if (
         chronotype is None
@@ -3418,15 +3436,17 @@ def _compute_cpd_midpoint(
     else:  # from specified times
         chronotype_midpoint = utils.mean_time(chronotype)
 
-    previous_midpoint = None  # the first day will have irregularity component 0
-    CPDs = []
+    previous_midpoint = None
+    previous_calendar_date = None
+    cpds = pd.Series(np.nan, index=midpoints.index, dtype=float)
 
     if len(midpoints) == 1:
         warnings.warn(
-            "Only one day is considered: CPD is only influenced by the mistiming component with respect to the chronotype."
+            "Only one day is considered: CPD cannot be computed without the previous calendar day."
         )
 
-    for calendar_date, midpoint in midpoints.items():
+    for summary_id, midpoint in midpoints.items():
+        calendar_date = calendar_dates.loc[summary_id]
         # mistiming component
         chronotype_daily_midpoint = pd.Timestamp(calendar_date).replace(
             hour=int(chronotype_midpoint[:2]), minute=int(chronotype_midpoint[3:])
@@ -3438,9 +3458,13 @@ def _compute_cpd_midpoint(
             60 * 60
         )
         # irregularity component
-        if previous_midpoint is None:
-            irregularity_component = 0
-        else:
+        has_previous_day = (
+            previous_calendar_date is not None
+            and calendar_date - previous_calendar_date == pd.Timedelta(days=1)
+            and pd.notna(previous_midpoint)
+            and pd.notna(midpoint)
+        )
+        if has_previous_day:
             previous_day_midpoint_proxy = pd.Timestamp(calendar_date).replace(
                 hour=previous_midpoint.hour,
                 minute=previous_midpoint.minute,
@@ -3454,12 +3478,14 @@ def _compute_cpd_midpoint(
                 previous_day_midpoint_proxy - midpoint
             ).total_seconds() / (60 * 60)
 
+            cpds.loc[summary_id] = np.sqrt(
+                mistiming_component**2 + irregularity_component**2
+            )
+
         previous_midpoint = midpoint
+        previous_calendar_date = calendar_date
 
-        cpd = np.sqrt(mistiming_component**2 + irregularity_component**2)
-        CPDs.append(cpd)
-
-    return pd.Series(data=CPDs, index=sleep_summary.index)
+    return cpds.reindex(sleep_summary.index)
 
 
 def _compute_cpd_duration(
@@ -3489,7 +3515,11 @@ def _compute_cpd_duration(
     # Check is dataframe
     sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
 
-    durations = _compute_total_sleep_time(sleep_summary=sleep_summary) / 60
+    calendar_dates = _get_sleep_calendar_dates(sleep_summary)
+    chronological_index = calendar_dates.sort_values(kind="stable").index
+    durations = (
+        _compute_total_sleep_time(sleep_summary=sleep_summary) / 60
+    ).reindex(chronological_index)
 
     if chronotype is None:  # from data
         chronotype_sleep_duration = durations.mean()
@@ -3507,26 +3537,33 @@ def _compute_cpd_duration(
 
     if len(durations) == 1:
         warnings.warn(
-            "Only one day is considered: CPD is only influenced by the mistiming component wrt the chronotype."
+            "Only one day is considered: CPD cannot be computed without the previous calendar day."
         )
 
-    CPDs = []
-    previous_duration = None  # first irregularity component will be 0
+    cpds = pd.Series(np.nan, index=durations.index, dtype=float)
+    previous_duration = None
+    previous_calendar_date = None
 
-    for duration in durations:
+    for summary_id, duration in durations.items():
+        calendar_date = calendar_dates.loc[summary_id]
         mistiming_component = chronotype_sleep_duration - duration
 
-        if previous_duration is None:
-            irregularity_component = 0
-        else:
+        has_previous_day = (
+            previous_calendar_date is not None
+            and calendar_date - previous_calendar_date == pd.Timedelta(days=1)
+            and pd.notna(previous_duration)
+            and pd.notna(duration)
+        )
+        if has_previous_day:
             irregularity_component = previous_duration - duration
+            cpds.loc[summary_id] = np.sqrt(
+                mistiming_component**2 + irregularity_component**2
+            )
 
         previous_duration = duration
+        previous_calendar_date = calendar_date
 
-        cpd = np.sqrt(mistiming_component**2 + irregularity_component**2)
-        CPDs.append(cpd)
-
-    return pd.Series(data=CPDs, index=sleep_summary.index)
+    return cpds.reindex(sleep_summary.index)
 
 
 def compute_sleep_validation(sleep_summary: pd.DataFrame, **kwargs):
@@ -3956,6 +3993,8 @@ def get_sleep_statistics(
     kind_args: list = [],
     kind_kwargs: dict = {},
     loader_kwargs: dict = {},
+    return_df: bool = True,
+    return_multi_index: bool = True,
     **kwargs,
 ) -> Union[pd.DataFrame, dict]:
 
@@ -3984,7 +4023,7 @@ def get_sleep_statistics(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
 
-    sleep_stats_df = pd.DataFrame()
+    user_frames = {}
     for user in user_id:
         # Load sleep summary data
         sleep_summary: pd.DataFrame = loader.load_sleep_summary(
@@ -4004,16 +4043,19 @@ def get_sleep_statistics(
             sleep_summary = sleep_summary.set_index(constants.CALENDAR_DATE_COL)
 
             sleep_summary_start_date = sleep_summary[constants.ISODATE_COL].min()
-            sleep_summary_end_date = (
-                sleep_summary[constants.ISODATE_COL]
-                + pd.to_timedelta(
-                    (
-                        sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
-                        + sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                    ),
-                    unit="ms",
-                )
-            ).max()
+            if "local_end_time" in sleep_summary.columns:
+                sleep_summary_end_date = sleep_summary["local_end_time"].max()
+            else:
+                sleep_summary_end_date = (
+                    sleep_summary[constants.ISODATE_COL]
+                    + pd.to_timedelta(
+                        (
+                            sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
+                            + sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
+                        ),
+                        unit="ms",
+                    )
+                ).max()
             # Load sleep stages
             sleep_stages = loader.load_sleep_stage(
                 user_id=user,
@@ -4036,11 +4078,12 @@ def get_sleep_statistics(
                 )
 
                 user_statistics_list.append(ser.rename(statistic))
-            sleep_stats_df = pd.concat(
-                (sleep_stats_df, pd.concat(user_statistics_list, axis=1)), axis=0
-            )
-    if len(sleep_stats_df) == 0:
-        return sleep_stats_df
+            user_frames[user] = pd.concat(user_statistics_list, axis=1)
+    if not user_frames:
+        return {} if not return_df else pd.DataFrame(columns=statistics)
+    sleep_stats_df = pd.concat(
+        user_frames, names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
+    )
 
     # Perform kind operation by user
     if not (kind is None):
@@ -4048,7 +4091,7 @@ def get_sleep_statistics(
         # approach
         aggregated_sleep_stats_df = (
             sleep_stats_df.drop(
-                [SLEEP_DATETIME_STATISTICS, "validation"], axis=1, errors="ignore"
+                columns=SLEEP_DATETIME_STATISTICS + ["validation"], errors="ignore"
             )
             .groupby(level=constants.USER_COL)
             .agg(kind, *kind_args, **kind_kwargs)
@@ -4072,10 +4115,28 @@ def get_sleep_statistics(
                 aggregated_sleep_stats_df = pd.concat(
                     (aggregated_sleep_stats_df, temp_col), axis=1
                 )
-        return aggregated_sleep_stats_df
+        return aggregated_sleep_stats_df if return_df else aggregated_sleep_stats_df.to_dict(orient="index")
+
+    if not return_df:
+        result = {}
+        for user, frame in user_frames.items():
+            if len(statistics) == 1:
+                result[user] = {
+                    pd.Timestamp(date).date(): value
+                    for date, value in frame[statistics[0]].items()
+                }
+            else:
+                result[user] = {
+                    pd.Timestamp(date).date(): values
+                    for date, values in frame.to_dict(orient="index").items()
+                }
+        return result
+
+    if not return_multi_index:
+        return sleep_stats_df.reset_index()
 
     # Return series if only statistic
     if len(statistics) == 1:
-        return sleep_stats_df.squeeze(axis=1)
+        return sleep_stats_df[statistics[0]]
     else:
         return sleep_stats_df

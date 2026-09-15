@@ -180,7 +180,9 @@ class TesseraeCSVLoader(BaseLoader):
                 by=["durationInMs", "validationMap"], ascending=[True, True]
             ).drop_duplicates(subset="calendarDate", keep="last")
 
-        return sleep_summary
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(sleep_summary)
 
     def load_sleep_stage(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
@@ -277,7 +279,9 @@ class TesseraeCSVLoader(BaseLoader):
             & (sleep_stage["isoDate"] < end_date),
             :,
         ]
-        return sleep_stage
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(sleep_stage)
 
     def load_daily_survey(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp

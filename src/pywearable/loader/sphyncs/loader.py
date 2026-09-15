@@ -282,7 +282,9 @@ class SphyncsDataLoader(BaseLoader):
         if drop_duplicates and len(result_df) > 0:
             result_df = result_df.drop_duplicates(subset=['calendarDate'], keep='first')
         
-        return result_df.reset_index(drop=True)
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(result_df).reset_index(drop=True)
 
     def load_sleep_stage(
         self, user_id: str, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
@@ -464,7 +466,9 @@ class SphyncsDataLoader(BaseLoader):
             end_date = pd.Timestamp(end_date)
             result_df = result_df[result_df['isoDate'] < end_date]
         
-        return result_df.reset_index(drop=True)
+        from ...sleep_schema import normalize_sleep_columns
+
+        return normalize_sleep_columns(result_df).reset_index(drop=True)
 
     def load_pulse_ox(
         self, user_id: str, start_date=None, end_date=None

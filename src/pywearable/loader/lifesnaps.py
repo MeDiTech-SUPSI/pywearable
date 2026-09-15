@@ -268,10 +268,10 @@ class LifeSnapsParquetLoader(BaseLoader):
             if len(sleep_summary) > 0:
                 respiration = pd.merge(
                     left=respiration,
-                    right=sleep_summary.loc[:, ["calendarDate", "endTime"]],
+                    right=sleep_summary.loc[:, ["calendar_date", "utc_end_time"]],
                     left_on="timestamp",
-                    right_on="endTime",
-                ).drop(["endTime"], axis=1)
+                    right_on="utc_end_time",
+                ).drop(["utc_end_time"], axis=1)
 
             respiration = respiration.rename(columns={"timestamp": "isoDate"})
             if not (start_date is None):
@@ -360,7 +360,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep_stages = sleep_stages[
                     sleep_stages["local_time"] < pd.Timestamp(end_date)
                 ]
-            return sleep_stages
+            from ..sleep_schema import normalize_sleep_columns
+
+            return normalize_sleep_columns(sleep_stages)
         else:
             return pd.DataFrame(
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
@@ -419,6 +421,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
+        drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "sleep.parquet"
         if file_path.exists():
@@ -451,6 +454,12 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep["awake_duration_in_ms"] = (
                     sleep["wake_minutes"].fillna(0) * 60 * 1000
                 )
+            for stage in ("deep", "light", "rem"):
+                if f"{stage}_minutes" in sleep.columns:
+                    sleep[f"{stage}_sleep_duration_in_ms"] = (
+                        sleep[f"{stage}_minutes"].fillna(0) * 60 * 1000
+                    )
+            sleep["unmeasurable_sleep_duration_in_ms"] = 0
 
             if not (start_date is None):
                 sleep = sleep[
@@ -460,7 +469,11 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep = sleep[
                     sleep["calendar_date"] < pd.Timestamp(end_date).normalize()
                 ]
-            return sleep
+            if drop_duplicates:
+                sleep = sleep.drop_duplicates(subset="calendar_date", keep="last")
+            from ..sleep_schema import normalize_sleep_columns
+
+            return normalize_sleep_columns(sleep)
         return pd.DataFrame(
             columns=[
                 "sleep_summary_id",
