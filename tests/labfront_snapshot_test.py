@@ -49,3 +49,13 @@ def test_conflicting_matching_snapshots_are_not_silently_combined():
     )
     with pytest.raises(ValueError, match="Conflicting"):
         LabfrontLoader._reconcile_sleep_stage_snapshots(rows, _summary())
+
+
+def test_missing_summary_accepts_identical_repeats_but_rejects_revisions():
+    repeated = pd.concat([_snapshot("first"), _snapshot("second")])
+    empty_summary = pd.DataFrame()
+    result = LabfrontLoader._reconcile_sleep_stage_snapshots(repeated, empty_summary)
+    assert len(result) == 2
+    revised = pd.concat([repeated, _snapshot("revised", awake_minutes=90)])
+    with pytest.raises(ValueError, match="without summary"):
+        LabfrontLoader._reconcile_sleep_stage_snapshots(revised, empty_summary)

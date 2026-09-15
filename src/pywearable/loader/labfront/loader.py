@@ -2528,8 +2528,39 @@ class LabfrontLoader(BaseLoader):
         source_col = _LABFRONT_SOURCE_FILE_COL
         id_col = constants.SLEEP_SUMMARY_ID_COL
         record_cols = [col for col in sleep_stages if col != source_col]
+        if sleep_stages.empty:
+            return sleep_stages.drop(columns=source_col)
+
+        def normalized(snapshot):
+            return (
+                snapshot[record_cols]
+                .drop_duplicates()
+                .sort_values(record_cols)
+                .reset_index(drop=True)
+            )
+
+        def identical_snapshot(rows):
+            snapshots = [
+                snapshot.drop_duplicates(subset=record_cols)
+                for _, snapshot in rows.groupby(source_col, sort=False)
+            ]
+            reference = normalized(snapshots[0])
+            if any(not reference.equals(normalized(item)) for item in snapshots[1:]):
+                raise ValueError(
+                    f"Conflicting Labfront sleep-stage snapshots without summary {rows[id_col].iloc[0]}."
+                )
+            return snapshots[0]
+
         if sleep_summaries.empty:
-            return sleep_stages.drop_duplicates(subset=record_cols).drop(columns=source_col)
+            return (
+                pd.concat(
+                    [identical_snapshot(rows) for _, rows in sleep_stages.groupby(id_col, sort=False)],
+                    ignore_index=True,
+                )
+                .drop(columns=source_col)
+                .sort_values(constants.ISODATE_COL)
+                .reset_index(drop=True)
+            )
 
         validation_rank = {
             "AUTO_TENTATIVE": 1,
@@ -2555,14 +2586,6 @@ class LabfrontLoader(BaseLoader):
             lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
         }
 
-        def normalized(snapshot):
-            return (
-                snapshot[record_cols]
-                .drop_duplicates()
-                .sort_values(record_cols)
-                .reset_index(drop=True)
-            )
-
         def matches(snapshot, summary):
             actual = snapshot.groupby(constants.SLEEP_STAGE_SLEEP_TYPE_COL)[
                 constants.SLEEP_STAGE_DURATION_IN_MS_COL
@@ -2575,7 +2598,7 @@ class LabfrontLoader(BaseLoader):
         chosen = []
         for summary_id, rows in sleep_stages.groupby(id_col, sort=False):
             if summary_id not in summaries.index:
-                chosen.append(rows.drop_duplicates(subset=record_cols))
+                chosen.append(identical_snapshot(rows))
                 continue
             summary = summaries.loc[summary_id]
             candidates = []
