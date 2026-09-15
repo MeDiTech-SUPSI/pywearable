@@ -3,7 +3,7 @@ This module contains utility functions that don't directly load/compute metrics.
 """
 
 import datetime
-import time
+import time as _clock_time
 from cmath import phase, rect
 from math import degrees, floor, radians
 from typing import Union
@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 
-from . import constants
+from .. import constants
 
 _LABFRONT_LAST_SAMPLE_UNIX_TIMESTAMP_IN_MS_KEY = "lastSampleUnixTimestampInMs"
 _LABFRONT_QUESTIONNAIRE_STRING = "questionnaire"
@@ -194,7 +194,7 @@ def return_multiindex_df(
             )
 
 
-def get_summary(loader, comparison_date=time.time()):
+def get_summary(loader, comparison_date=_clock_time.time()):
     """Returns a general summary of the latest update of every metric for every participant
 
     Args:
