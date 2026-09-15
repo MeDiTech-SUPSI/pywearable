@@ -16,10 +16,10 @@ authors = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/dado93/pywearable/"
+Homepage = "https://github.com/MeDiTech-SUPSI/pywearable/"
 Documentation = "https://pywearable.readthedocs.io/en/latest/"
-Repository = "https://github.com/dado93/pywearable/"
-"Bug Tracker" = "https://github.com/dado93/pywearable/issues"
+Repository = "https://github.com/MeDiTech-SUPSI/pywearable/"
+"Bug Tracker" = "https://github.com/MeDiTech-SUPSI/pywearable/issues"
 
 [project.optional-dependencies]
 dev = ["freezegun", "pytest", "pytest-mock", "sphinx", "sphinx-rtd-theme"]

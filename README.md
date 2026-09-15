@@ -5,6 +5,8 @@ In this repository you will find a Python package that you can use to analyse al
 At the moment, we support:
 - [Labfront](https://labfront.com/)
 - [LifeSnaps Dataset](https://zenodo.org/records/7229547)
+- Tesserae
+- Oura API v2 JSON exports (in development)
   
 The aim of this Python package is to offer a series of functions for the loading and analysis of the data, easing the feature extraction pipeline by offering standardized functions for the loading of the data.
 
@@ -16,7 +18,7 @@ The aim of this Python package is to offer a series of functions for the loading
 ## Installation
 At this stage of development, the package is still not uploaded to PyPi, and thus can be only be installed through a local installation:
 
-1. Clone the repository with `git clone git@gitlab-core.supsi.ch/dti-meditech/pywearable.git`
+1. Clone the repository with `git clone https://github.com/MeDiTech-SUPSI/pywearable.git`
 2. `cd pywearable`
 3. `pip install --editable .[dev]`
 
@@ -37,8 +39,34 @@ import pywearable.loader
 BASE_FOLDER = "..." # Path to folder with data downloaded from Labfront
 
 labfront_loader = pywearable.loader.LabfrontLoader(BASE_FOLDER)
-sleep_summaries = labfront_loader.load_garmin_connect_sleep_summary("user-01")
+sleep_summaries = labfront_loader.load_sleep_summary("user-01")
 ```
+
+For a local copy of Oura API v2 JSON files in
+`participant/metric/*.json` directories:
+
+```python
+from pywearable.loader import OuraLoader
+from pywearable import sleep, heart_rate
+
+loader = OuraLoader("/path/to/oura-export")
+user = loader.get_user_ids()[0]
+nights = loader.load_sleep_summary(user)  # long_sleep only; local calendar day
+sessions = loader.load_sleep_sessions(user)  # includes naps
+night_features = sleep.get_sleep_statistics(
+    loader, user_id=user, start_date=None, end_date=None,
+    statistic=["total_sleep_time", "wake_after_sleep_onset"],
+)
+hourly_hr = heart_rate.get_heart_rate_statistics(
+    loader, user_id=user, resolution="1h", statistic="heart_rate_mean",
+)  # UTC windows
+```
+
+Oura nightly/five-minute HRV and nightly respiration are provider estimates,
+not continuous sensor signals. Local-day HR statistics require timezone
+information the copied HR export does not reliably provide. Generic Oura
+activity-intensity and recovery mappings remain unfinished. Sleep loader
+columns and extracted feature names now use `snake_case`.
 
 ## Contributing
 

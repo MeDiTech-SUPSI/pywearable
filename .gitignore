@@ -165,3 +165,8 @@ data_*/
 **/.DS_Store
 
 playground/
+
+# Local agent instructions/logs, never repository content
+AGENTS.md
+.agents/
+.codex/
