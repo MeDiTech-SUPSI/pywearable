@@ -86,6 +86,16 @@ def test_oura_sleep_maps_long_sleep_and_keeps_naps_separate(tmp_path):
     assert loader.load_sleep_summary("person-1", "2024-01-03", "2024-01-04").empty
 
 
+def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
+    _page(tmp_path, "sleep", "data.json", [_sleep_record()])
+    result = sleep.get_sleep_statistics(
+        OuraLoader(tmp_path), user_id="person-1", start_date=None, end_date=None
+    )
+    assert result.shape == (1, 30)
+    assert {"total_sleep_time", "wake_after_sleep_onset", "sleep_score"} <= set(result)
+    assert not {"getup_latency", "validation", "sleep_regularity_index"} & set(result)
+
+
 def test_oura_stages_decode_runs_and_filter_by_local_instant(tmp_path):
     record = _sleep_record()
     record["sleep_phase_5_min"] = "2214"

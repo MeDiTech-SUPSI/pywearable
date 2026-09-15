@@ -4006,8 +4006,12 @@ def get_sleep_statistics(
 
     # Check metrics
     if statistic is None:
-        # Consider all metrics
-        statistics = list(SLEEP_STATISTICS_DICT.keys())
+        # Return the shared night-level features; optional metrics need an
+        # explicit request and may not be available for every loader.
+        statistics = [
+            name for name in SLEEP_STATISTICS_DICT
+            if name not in (SLEEP_STATISTIC_GETUP_LATENCY, SLEEP_STATISTIC_VALIDATION, SLEEP_STATISTIC_SRI)
+        ]
     elif type(statistic) == str:
         statistics = [statistic]
     else:

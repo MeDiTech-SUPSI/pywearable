@@ -67,6 +67,10 @@ not continuous sensor signals. Local-day HR statistics require timezone
 information the copied HR export does not reliably provide. Generic Oura
 activity-intensity and recovery mappings remain unfinished. Sleep loader
 columns and extracted feature names now use `snake_case`.
+With `sleep.get_sleep_statistics(..., statistic=None)`, the default result is
+the shared night-level feature set; `getup_latency`, `validation`, and
+`sleep_regularity_index` require explicit selection while their cross-loader
+definitions are assessed.
 
 ## Contributing
 
