@@ -792,6 +792,11 @@ def get_heart_rate_statistics(
     time_col = resampling_spec.time_col
     rule = resampling_spec.rule
     calendar_based = resampling_spec.calendar_based
+    if not calendar_based:
+        if start_date is not None and start_date.tzinfo is not None:
+            start_date = start_date.tz_convert("UTC").tz_localize(None)
+        if end_date is not None and end_date.tzinfo is not None:
+            end_date = end_date.tz_convert("UTC").tz_localize(None)
 
     heart_rate_stats_df_list: list[pd.DataFrame] = []
     for user in user_id:
