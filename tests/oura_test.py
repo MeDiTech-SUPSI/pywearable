@@ -39,6 +39,15 @@ def test_oura_reader_skips_numbered_placeholder_pages(tmp_path):
     assert len(OuraLoader(tmp_path)._read_records("person-1", "heartrate")) == 1
 
 
+def test_missing_oura_metric_returns_typed_empty_tables(tmp_path):
+    _page(tmp_path, "daily_activity", "data.json", [])
+    loader = OuraLoader(tmp_path)
+    stages = loader.load_sleep_stage("person-1")
+    assert stages.empty
+    assert {"sleep_summary_id", "utc_time", "local_time_uncertain"} <= set(stages)
+    assert loader.load_heart_rate("person-1").empty
+
+
 def test_subdaily_time_uses_embedded_offset_not_local_clock():
     assert OuraLoader._utc_time("2024-01-01T01:00:00+01:00") == pd.Timestamp("2024-01-01 00:00:00")
     with pytest.raises(ValueError, match="lacks an offset"):
@@ -144,6 +153,21 @@ def test_oura_sleep_stage_flags_unknown_local_clock_across_offset_change(tmp_pat
     summary = loader.load_sleep_summary("person-1")
     assert summary.loc[0, "local_end_time"] == pd.Timestamp("2024-03-31 03:10")
     assert sleep._compute_wakeup_time(summary).loc[0] == pd.Timestamp("2024-03-31 03:10")
+
+
+def test_offset_change_does_not_truncate_autumn_sleep_stages(tmp_path):
+    record = _sleep_record(day="2024-10-27")
+    record["bedtime_start"] = "2024-10-27T01:55:00+02:00"
+    record["bedtime_end"] = "2024-10-27T02:10:00+01:00"
+    record["sleep_phase_5_min"] = "2" * 8 + "4" + "2" * 6
+    _page(tmp_path, "sleep", "data.json", [record])
+    loader = OuraLoader(tmp_path)
+    stages = loader.load_sleep_stage(
+        "person-1", start_date="2024-10-27 01:55", end_date="2024-10-27 02:10"
+    )
+    assert list(stages["type"]) == ["light", "awake", "light"]
+    assert stages["local_time_uncertain"].all()
+    assert stages["duration_in_ms"].sum() == 75 * 60_000
 
 
 def test_oura_vendor_hrv_and_respiration_keep_night_and_sample_grains(tmp_path):

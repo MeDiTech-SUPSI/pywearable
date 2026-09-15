@@ -163,6 +163,9 @@ class OuraLoader(BaseLoader):
             "unix_timestamp_in_ms", "duration_in_ms", "type", "local_time_uncertain",
         ]
         rows = []
+        uncertain_sessions_in_window = set()
+        requested_start = pd.Timestamp(start_date) if start_date is not None else None
+        requested_end = pd.Timestamp(end_date) if end_date is not None else None
         for record in self._read_records(user_id, "sleep"):
             if record.get("type") != "long_sleep":
                 continue
@@ -176,6 +179,12 @@ class OuraLoader(BaseLoader):
             if end.tzinfo is None:
                 raise ValueError(f"Oura sleep session {record['id']} lacks an end time offset")
             uncertain_local_clock = start.utcoffset() != end.utcoffset()
+            if uncertain_local_clock and (
+                requested_start is None or end.tz_localize(None) > requested_start
+            ) and (
+                requested_end is None or start.tz_localize(None) < requested_end
+            ):
+                uncertain_sessions_in_window.add(record["id"])
             run_start = 0
             for index in range(1, len(phases) + 1):
                 if index < len(phases) and phases[index] == phases[run_start]:
@@ -195,10 +204,15 @@ class OuraLoader(BaseLoader):
                 )
                 run_start = index
         frame = pd.DataFrame(rows, columns=columns)
-        if start_date is not None:
-            frame = frame[frame["local_time"] >= pd.Timestamp(start_date)]
-        if end_date is not None:
-            frame = frame[frame["local_time"] < pd.Timestamp(end_date)]
+        within_clock_window = ~frame["local_time_uncertain"]
+        if requested_start is not None:
+            within_clock_window &= frame["local_time"] >= requested_start
+        if requested_end is not None:
+            within_clock_window &= frame["local_time"] < requested_end
+        frame = frame[
+            within_clock_window
+            | frame["sleep_summary_id"].isin(uncertain_sessions_in_window)
+        ]
         return frame.sort_values("local_time").reset_index(drop=True)
 
     def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="utc_time"):

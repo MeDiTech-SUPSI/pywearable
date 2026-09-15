@@ -14,6 +14,8 @@ offsets differ, the stage UTC instants remain valid but the local stage
 clock inside the night cannot be established from the export alone. Those
 rows carry ``local_time_uncertain=True`` and their ``local_time`` is an
 approximation based on the start offset. Night-level wake-up time uses the
-recorded end time instead.
+recorded end time instead. Local-clock date filtering retains the complete
+uncertain session when its recorded start/end overlap the requested interval;
+it does not discard individual runs using that approximate clock.
 
 .. automethod:: pywearable.loader.BaseLoader.load_sleep_stage
