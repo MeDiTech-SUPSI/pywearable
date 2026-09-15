@@ -13,7 +13,7 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import constants, sleep, utils
+from ... import constants, sleep, sleep_schema, utils
 from ..base import BaseLoader
 from . import constants as lf_constants
 
@@ -37,6 +37,8 @@ _LABFRONT_METRICS_DICT = {
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
     },
 }
+
+_LABFRONT_SOURCE_FILE_COL = "__labfront_source_file"
 
 LABFRONT_FILE_INDEX_NAME = ".pywearable_file_index.csv"
 
@@ -779,6 +781,8 @@ class LabfrontLoader(BaseLoader):
         is_todo: bool = False,
         task_name: str = "",
         filter_on_calendar_date: bool = False,
+        include_source_file: bool = False,
+        filter_rows: bool = True,
     ) -> pd.DataFrame:
         """Load data from a given user in a given time frame.
 
@@ -855,7 +859,10 @@ class LabfrontLoader(BaseLoader):
         df_list = []
         for f in files:
             try:
-                df_list.append(pd.read_csv(Path(f), skiprows=n_rows_to_skip))
+                file_data = pd.read_csv(Path(f), skiprows=n_rows_to_skip)
+                if include_source_file:
+                    file_data[_LABFRONT_SOURCE_FILE_COL] = str(Path(f))
+                df_list.append(file_data)
             except pd.errors.EmptyDataError:
                 # We may have empty CSV files
                 continue
@@ -879,7 +886,7 @@ class LabfrontLoader(BaseLoader):
             cols_to_sort.append(constants.CALENDAR_DATE_COL)
         data = data.sort_values(by=cols_to_sort, ignore_index=True)
         # Get data only from given start and end dates
-        if (start_date is None) and (end_date is None):
+        if not filter_rows or ((start_date is None) and (end_date is None)):
             return data
         elif not (
             constants.ISODATE_COL in data.columns
@@ -1317,11 +1324,11 @@ class LabfrontLoader(BaseLoader):
         if len(sleep_data) > 0:
             # Set information about sleep
             # We need to add information about sleep summaries
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self._load_sleep_summary_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
-                same_day_filter=False,
+                drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
                 :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
@@ -1418,8 +1425,8 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
 
         # Add calendar date from sleep summary
-        sleep_summary = self.load_sleep_summary(
-            user_id, start_date, end_date, same_day_filter=True
+        sleep_summary = self._load_sleep_summary_raw(
+            user_id, start_date, end_date, drop_duplicates=True
         ).reset_index(drop=True)
 
         if len(sleep_summary) > 0:
@@ -1496,11 +1503,11 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self._load_sleep_summary_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
-                same_day_filter=False,
+                drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
                 :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
@@ -1536,11 +1543,11 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self._load_sleep_summary_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
-                same_day_filter=False,
+                drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
                 :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
@@ -2166,7 +2173,7 @@ class LabfrontLoader(BaseLoader):
         """
 
         # Load sleep summary and sleep stages data
-        sleep_summaries = self.load_sleep_summary(
+        sleep_summaries = self._load_sleep_summary_raw(
             user_id=user_id, start_date=start_date, end_date=end_date
         )
         if len(sleep_summaries) == 0:
@@ -2190,7 +2197,7 @@ class LabfrontLoader(BaseLoader):
         sleep_start_time = sleep_start_time.to_pydatetime()
         sleep_end_time = sleep_end_time.to_pydatetime()
 
-        sleep_stages = self.load_sleep_stage(
+        sleep_stages = self._load_sleep_stage_raw(
             user_id=user_id,
             start_date=sleep_start_time,
             end_date=sleep_end_time,
@@ -2443,7 +2450,7 @@ class LabfrontLoader(BaseLoader):
                 end_date=end_date,
             )
 
-    def load_sleep_stage(
+    def _load_sleep_stage_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date, None] = None,
@@ -2468,15 +2475,25 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe with sleep stages data.
         """
+        requested_start = pd.Timestamp(start_date) if start_date is not None else None
+        requested_end = pd.Timestamp(end_date) if end_date is not None else None
         data = self.get_data_from_datetime(
             user_id,
             lf_constants.GARMIN_CONNECT_SLEEP_STAGE_FOLDER,
             start_date,
             end_date,
             filter_on_calendar_date=False,
+            include_source_file=True,
+            filter_rows=False,
         )
 
         if len(data) > 0:
+            summary_start = requested_start - pd.Timedelta(days=2) if requested_start is not None else None
+            summary_end = requested_end + pd.Timedelta(days=2) if requested_end is not None else None
+            summaries = self._load_sleep_summary_raw(
+                user_id, summary_start, summary_end, drop_duplicates=False
+            )
+            data = self._reconcile_sleep_stage_snapshots(data, summaries)
             # Change sleep stage values
             data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
                 constants.SLEEP_STAGE_SLEEP_TYPE_COL
@@ -2490,14 +2507,109 @@ class LabfrontLoader(BaseLoader):
                 }
             )
 
-        return data
+            if requested_start is not None:
+                data = data[data[constants.ISODATE_COL] >= requested_start]
+            if requested_end is not None:
+                data = data[data[constants.ISODATE_COL] < requested_end]
 
-    def load_sleep_summary(
+        return data.reset_index(drop=True)
+
+    def load_sleep_stage(self, user_id: str, start_date=None, end_date=None) -> pd.DataFrame:
+        """Return Garmin sleep stages in the shared snake_case schema."""
+        return sleep_schema.normalize_sleep_columns(
+            self._load_sleep_stage_raw(user_id, start_date, end_date)
+        )
+
+    @staticmethod
+    def _reconcile_sleep_stage_snapshots(
+        sleep_stages: pd.DataFrame, sleep_summaries: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Select one complete stage export matching each Garmin sleep summary."""
+        source_col = _LABFRONT_SOURCE_FILE_COL
+        id_col = constants.SLEEP_SUMMARY_ID_COL
+        record_cols = [col for col in sleep_stages if col != source_col]
+        if sleep_summaries.empty:
+            return sleep_stages.drop_duplicates(subset=record_cols).drop(columns=source_col)
+
+        validation_rank = {
+            "AUTO_TENTATIVE": 1,
+            "AUTO_FINAL": 2,
+            "ENHANCED_TENTATIVE": 3,
+            "ENHANCED_FINAL": 4,
+        }
+        summaries = sleep_summaries.copy()
+        summaries["__validation_rank"] = summaries["validation"].map(validation_rank).fillna(0)
+        summaries = (
+            summaries.sort_values(
+                [id_col, "__validation_rank", constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
+            )
+            .groupby(id_col, as_index=False)
+            .tail(1)
+            .set_index(id_col)
+        )
+        stage_summary_cols = {
+            lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+        }
+
+        def normalized(snapshot):
+            return (
+                snapshot[record_cols]
+                .drop_duplicates()
+                .sort_values(record_cols)
+                .reset_index(drop=True)
+            )
+
+        def matches(snapshot, summary):
+            actual = snapshot.groupby(constants.SLEEP_STAGE_SLEEP_TYPE_COL)[
+                constants.SLEEP_STAGE_DURATION_IN_MS_COL
+            ].sum()
+            return all(
+                pd.notna(summary[column]) and int(actual.get(stage, 0)) == int(summary[column])
+                for stage, column in stage_summary_cols.items()
+            )
+
+        chosen = []
+        for summary_id, rows in sleep_stages.groupby(id_col, sort=False):
+            if summary_id not in summaries.index:
+                chosen.append(rows.drop_duplicates(subset=record_cols))
+                continue
+            summary = summaries.loc[summary_id]
+            candidates = []
+            for _, snapshot in rows.groupby(source_col, sort=False):
+                snapshot = snapshot.drop_duplicates(subset=record_cols)
+                if matches(snapshot, summary):
+                    candidates.append(snapshot)
+            if not candidates:
+                combined = rows.drop_duplicates(subset=record_cols)
+                if matches(combined, summary):
+                    candidates.append(combined)
+                else:
+                    raise ValueError(
+                        f"No coherent Labfront sleep-stage snapshot matches summary {summary_id}."
+                    )
+            reference = normalized(candidates[0])
+            if any(not reference.equals(normalized(snapshot)) for snapshot in candidates[1:]):
+                raise ValueError(
+                    f"Conflicting Labfront sleep-stage snapshots match summary {summary_id}."
+                )
+            chosen.append(candidates[0])
+        return (
+            pd.concat(chosen, ignore_index=True)
+            .drop(columns=source_col)
+            .sort_values(constants.ISODATE_COL)
+            .reset_index(drop=True)
+        )
+
+    def _load_sleep_summary_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
         end_date: Union[str, datetime.date, datetime.date] = None,
-        same_day_filter: bool = True,
+        drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         """Load Garmin Connect sleep summary data.
 
@@ -2532,7 +2644,7 @@ class LabfrontLoader(BaseLoader):
                 format="%Y-%m-%d",
             ).dt.date
 
-            if same_day_filter:
+            if drop_duplicates:
                 data["validationMap"] = data["validation"].map(
                     {
                         "AUTO_TENTATIVE": 1,
@@ -2571,6 +2683,20 @@ class LabfrontLoader(BaseLoader):
             return data.reset_index(drop=True)
         else:
             return pd.DataFrame()
+
+    def load_sleep_summary(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+        drop_duplicates: bool = True,
+    ) -> pd.DataFrame:
+        """Return Garmin sleep summaries in the shared snake_case schema."""
+        return sleep_schema.normalize_sleep_columns(
+            self._load_sleep_summary_raw(
+                user_id, start_date, end_date, drop_duplicates=drop_duplicates
+            )
+        )
 
     def load_stress(
         self,
@@ -2616,11 +2742,11 @@ class LabfrontLoader(BaseLoader):
         :class:`pd.DataFrame`
             Formatted :class:`pd.DataFrame` with recovery data.
         """
-        sleep_summary = self.load_sleep_summary(
+        sleep_summary = self._load_sleep_summary_raw(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            same_day_filter=True,
+            drop_duplicates=True,
         )
         if len(sleep_summary) > 0:
             # We need to get body battery data for each sleep
