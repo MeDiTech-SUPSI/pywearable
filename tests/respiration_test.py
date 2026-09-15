@@ -21,20 +21,20 @@ def pulse_ox():
     """
     pulse_ox_file = os.path.join(MOCK_VALUES_DIR, "pulse_ox.csv")
     pulse_ox = pd.read_csv(pulse_ox_file)
-    pulse_ox[pywearable.constants._ISODATE_COL] = pd.to_datetime(
-        pulse_ox[pywearable.constants._UNIXTIMESTAMP_IN_MS_COL]
-        + pulse_ox[pywearable.constants._TIMEZONEOFFSET_IN_MS_COL],
+    pulse_ox[pywearable.constants.ISODATE_COL] = pd.to_datetime(
+        pulse_ox[pywearable.constants.UNIXTIMESTAMP_IN_MS_COL]
+        + pulse_ox[pywearable.constants.TIMEZONEOFFSET_IN_MS_COL],
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    pulse_ox[pywearable.constants._CALENDAR_DATE_COL] = pd.to_datetime(
-        pulse_ox[pywearable.constants._CALENDAR_DATE_COL], format="%Y-%m-%d"
+    pulse_ox[pywearable.constants.CALENDAR_DATE_COL] = pd.to_datetime(
+        pulse_ox[pywearable.constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
     ).dt.date
     return pulse_ox
 
 
 @pytest.fixture()
-def base_loader(mocker, pulse_ox):
+def base_loader(monkeypatch, pulse_ox):
     """
     Fixture that returns a BaseLoader with mock values
     for the load_sleep_summary and load_sleep_stage
@@ -42,15 +42,10 @@ def base_loader(mocker, pulse_ox):
     are specified by the sleep_summary and
     sleep_stages fixtures.
     """
+    monkeypatch.setattr(pywearable.loader.BaseLoader, "__abstractmethods__", frozenset())
     loader = pywearable.loader.BaseLoader()
-    mocker.patch(
-        "pywearable.loader.BaseLoader.load_pulse_ox",
-        return_value=pulse_ox,
-    )
-    mocker.patch(
-        "pywearable.loader.BaseLoader.get_user_ids",
-        return_value=[PULSE_OX_USER_ID],
-    )
+    monkeypatch.setattr(loader, "load_pulse_ox", lambda **kwargs: pulse_ox.copy())
+    monkeypatch.setattr(loader, "get_user_ids", lambda: [PULSE_OX_USER_ID])
     return loader
 
 

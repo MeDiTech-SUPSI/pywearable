@@ -22,7 +22,7 @@ Repository = "https://github.com/MeDiTech-SUPSI/pywearable/"
 "Bug Tracker" = "https://github.com/MeDiTech-SUPSI/pywearable/issues"
 
 [project.optional-dependencies]
-dev = ["freezegun", "pytest", "pytest-mock", "sphinx", "sphinx-rtd-theme"]
+dev = ["freezegun", "pytest", "pytest-mock", "sphinx", "sphinx-rtd-theme", "nbsphinx"]
 
 [tool.setuptools.packages.find]
 where = ["src"] # ["."]

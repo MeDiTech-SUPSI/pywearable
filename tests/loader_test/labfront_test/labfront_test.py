@@ -9,7 +9,7 @@ import pywearable.loader
 
 @pytest.fixture
 def loader(scope="session"):
-    return pywearable.loader.LabfrontLoader(Path("sample_data"))
+    return pywearable.loader.LabfrontLoader(Path(__file__).parent / "sample_data")
 
 
 def test_get_user_ids(loader):
