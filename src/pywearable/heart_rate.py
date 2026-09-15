@@ -4,6 +4,7 @@ of heart rate data.
 """
 
 import datetime
+import warnings
 from typing import Union
 
 import pandas as pd
@@ -300,6 +301,10 @@ def _compute_hr_statistics(
             f"heart_rate must be a pd.DataFrame. {type(heart_rate)} is not a valid type."
         )
 
+    if "timestamp_conflict" in heart_rate.columns and heart_rate["timestamp_conflict"].any():
+        warnings.warn("Excluding ambiguous same-timestamp heart-rate readings from aggregation.")
+        heart_rate = heart_rate.loc[~heart_rate["timestamp_conflict"]].copy()
+
     heart_rate_stats = (
         heart_rate.drop_duplicates(subset="utc_time")
         .resample(rule=rule, on=time_col, label="left", closed="left")[
@@ -313,8 +318,6 @@ def _compute_hr_statistics(
     # TODO see how we can implement heart rate wearing time
     # given that we have different source resolutions
     # for heart rate
-    rule_seconds = pd.to_timedelta(rule).total_seconds()
-
     heart_rate_wearing_time = (
         heart_rate.drop_duplicates(subset="utc_time")
         .resample(rule="1min", on=time_col, label="left", closed="left")[
@@ -342,7 +345,7 @@ def _compute_hr_statistics(
     heart_rate_stats = pd.concat((heart_rate_stats, heart_rate_quantiles), axis=1)
 
     # Let's add back timezone info
-    if not calendar_based:
+    if not calendar_based and "timezone" in heart_rate.columns:
         tz_lookup = heart_rate[["utc_time", "timezone"]].sort_values("utc_time")
         heart_rate_stats = heart_rate_stats.reset_index()
 
@@ -773,10 +776,10 @@ def get_heart_rate_statistics(
     else:
         statistics = statistic
 
-    for statistic in statistics:
-        if statistic not in HEART_RATE_STATISTICS:
+    for requested_statistic in statistics:
+        if requested_statistic not in HEART_RATE_STATISTICS:
             raise ValueError(
-                f"statistic must be one among {HEART_RATE_STATISTICS}, not {statistic}"
+                f"statistic must be one among {HEART_RATE_STATISTICS}, not {requested_statistic}"
             )
     # Check args and kwargs
     if type(loader_kwargs) != dict:
@@ -823,52 +826,55 @@ def get_heart_rate_statistics(
 
         # Reindex based on start/end dates
         if not (start_date is None) or (not (end_date is None)):
+            grid_start = (
+                start_date.normalize() if calendar_based else start_date.floor(rule)
+            ) if start_date is not None else heart_rate_stats_df.index.get_level_values(level=1).min()
             new_idx = pd.date_range(
                 start=(
-                    heart_rate_stats_df.index.get_level_values(level=1).min()
-                    if start_date is None
-                    else start_date
+                    grid_start
                 ),
                 end=(
                     heart_rate_stats_df.index.get_level_values(level=1).max()
                     if end_date is None
                     else end_date
                 ),
-                normalize=True,
+                normalize=calendar_based,
                 inclusive="left" if not (end_date is None) else "both",
                 freq=rule,
             )
 
-            if not calendar_based:
+            index_time_name = time_col
+            has_timezone = "timezone" in heart_rate_stats_df.index.names
+            if not calendar_based and has_timezone:
                 tz = heart_rate_stats_df.reset_index(level="timezone").reindex(
                     pd.MultiIndex.from_product(
-                        [user_id, new_idx], names=["user_id", "utc_time"]
+                        [user_id, new_idx], names=["user_id", index_time_name]
                     )
                 )["timezone"]
                 heart_rate_stats_df = heart_rate_stats_df.droplevel(["timezone"])
 
             heart_rate_stats_df = heart_rate_stats_df.reindex(
                 pd.MultiIndex.from_product(
-                    [user_id, new_idx], names=["user_id", "utc_time"]
+                    [user_id, new_idx], names=["user_id", index_time_name]
                 )
             )
 
-            if not calendar_based:
+            if not calendar_based and has_timezone:
                 heart_rate_stats_df = pd.concat(
                     (heart_rate_stats_df, tz), axis=1
                 ).set_index("timezone", append=True)
 
         # Return series if only statistic
-        if len(statistic) == 1:
-            return heart_rate_stats_df[statistic]
+        if len(statistics) == 1:
+            return heart_rate_stats_df[statistics[0]]
         else:
-            return heart_rate_stats_df
+            return heart_rate_stats_df[list(statistics)]
     else:
         if (not (start_date is None)) and (not (end_date is None)):
-            new_idx = new_idx = pd.date_range(
-                start=start_date,
+            new_idx = pd.date_range(
+                start=start_date.normalize() if calendar_based else start_date.floor(rule),
                 end=end_date,
-                normalize=True,
+                normalize=calendar_based,
                 inclusive="left",
                 freq=rule,
             )
