@@ -137,6 +137,17 @@ def aggregate_sleep_statistics(
     operations = _resolve_operations(features, aggregation)
     spec = time_utils.get_resampling_spec(resolution, time_reference="local")
 
+    if frame.empty:
+        index = pd.MultiIndex.from_arrays(
+            [[], []], names=[sleep_schema.USER_COL, sleep_schema.CALENDAR_DATE_COL]
+        )
+        columns = ["period_end", "expected_nights"]
+        for feature in features:
+            columns.extend(
+                [feature, f"{feature}_count", f"{feature}_coverage"]
+            )
+        return pd.DataFrame(columns=columns, index=index)
+
     available_start = frame[sleep_schema.CALENDAR_DATE_COL].min()
     available_end = frame[sleep_schema.CALENDAR_DATE_COL].max() + pd.Timedelta(days=1)
     requested_start = (

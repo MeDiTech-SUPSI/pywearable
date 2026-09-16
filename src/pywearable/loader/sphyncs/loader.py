@@ -2,15 +2,22 @@ import os
 
 import pandas as pd
 
+from ... import heart_rate_schema
 from ..base import BaseLoader
 
 
 class SphyncsDataLoader(BaseLoader):
+    heart_rate_time_columns = ("local_time",)
+
     def __init__(self, root_folder: os.PathLike):
         self.root_folder = root_folder
 
     def load_heart_rate(
-        self, user_id: str, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
         """Load heart rate data for a specific user.
 
@@ -48,6 +55,13 @@ class SphyncsDataLoader(BaseLoader):
         The biometrics.parquet file should be located in the user's folder
         and must contain 'dateTime' and 'heart' columns.
         """
+        heart_rate_schema.validate_time_col(time_col)
+        if time_col == heart_rate_schema.UTC_TIME_COL:
+            raise ValueError(
+                "SPHYNCS heart-rate data does not provide UTC timestamps; "
+                "use time_col='local_time'."
+            )
+
         # Construct path to the user's biometrics.parquet file
         user_folder = os.path.join(self.root_folder, user_id)
         biometrics_file = os.path.join(user_folder, "biometrics.parquet")
@@ -71,26 +85,26 @@ class SphyncsDataLoader(BaseLoader):
                 f"Required columns 'dateTime' or 'heart' not found in {biometrics_file}"
             )
         
-        # Create the heart rate dataframe
-        heart_rate_df = pd.DataFrame({
-            'isoDate': pd.to_datetime(df['dateTime']),
-            'beatsPerMinute': df['heart']
-        })
-        
-        # Set isoDate as index
-        heart_rate_df = heart_rate_df.set_index('isoDate')
-        
-        # Filter by date range if provided
-        if start_date is not None:
-            heart_rate_df = heart_rate_df[heart_rate_df.index >= start_date]
-        if end_date is not None:
-            heart_rate_df = heart_rate_df[heart_rate_df.index < end_date]
-
-        
-        # Reset index to have isoDate as a column
-        heart_rate_df = heart_rate_df.reset_index()
-        
-        return heart_rate_df
+        heart_rate_df = pd.DataFrame(
+            {
+                "local_time": pd.to_datetime(df["dateTime"]),
+                "heart_rate": pd.to_numeric(df["heart"], errors="coerce"),
+            }
+        )
+        heart_rate_df = heart_rate_df[heart_rate_df["heart_rate"] > 0]
+        heart_rate_df["utc_time"] = pd.NaT
+        heart_rate_df["timezone"] = pd.NaT
+        heart_rate_df[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+            heart_rate_df.groupby("local_time")["heart_rate"].transform("nunique")
+            > 1
+        )
+        return (
+            heart_rate_schema.filter_by_time(
+                heart_rate_df, start_date, end_date, time_col
+            )
+            .sort_values("local_time")
+            .reset_index(drop=True)
+        )
 
     def load_daily_summary(self, user_id: str, start_date=None, end_date=None) -> pd.DataFrame:
         """Return empty DataFrame - not available in SPHYNCS dataset."""

@@ -88,3 +88,21 @@ def test_sleep_aggregation_supports_temporal_variability_in_minutes():
 def test_sleep_aggregation_rejects_non_calendar_resolution():
     with pytest.raises(ValueError, match="calendar based"):
         sleep.aggregate_sleep_statistics(_nightly_features(), resolution="6h")
+
+
+def test_sleep_aggregation_preserves_schema_for_empty_nightly_input():
+    index = pd.MultiIndex.from_arrays(
+        [[], []], names=["user_id", "calendar_date"]
+    )
+    result = sleep.aggregate_sleep_statistics(
+        pd.DataFrame(columns=["TST"], index=index)
+    )
+
+    assert result.empty
+    assert list(result) == [
+        "period_end",
+        "expected_nights",
+        "TST",
+        "TST_count",
+        "TST_coverage",
+    ]

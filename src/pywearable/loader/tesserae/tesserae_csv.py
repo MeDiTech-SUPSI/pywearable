@@ -85,8 +85,8 @@ class TesseraeCSVLoader(BaseLoader):
     def load_sleep_summary(
         self,
         user_id: str,
-        start_date: pd.Timestamp,
-        end_date: pd.Timestamp,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         if not user_id in self.user_ids:
@@ -97,7 +97,16 @@ class TesseraeCSVLoader(BaseLoader):
         pattern = os.path.join(sleep_summary_folder, "*Sleep*.csv")
         sleep_summary_files = glob.glob(pattern)
         if len(sleep_summary_files) == 0:
-            return pd.DataFrame()
+            return pd.DataFrame(
+                columns=[
+                    "sleep_summary_id",
+                    "calendar_date",
+                    "local_time",
+                    "utc_time",
+                    "duration_in_ms",
+                    "awake_duration_in_ms",
+                ]
+            )
         sleep_summary = pd.concat(
             [
                 pd.read_csv(f, parse_dates=["local_time"]).drop(
@@ -113,10 +122,16 @@ class TesseraeCSVLoader(BaseLoader):
             sleep_summary["ParticipantID"] + "-" + sleep_summary.index.astype(str)
         )
 
-        sleep_summary["timezoneOffsetInMs"] = sleep_summary["Timestamp"].apply(
-            lambda x: self._convert_timezone_offset(x)
+        sleep_summary["utc_time"] = pd.to_datetime(
+            sleep_summary["Timestamp"], utc=True
+        ).dt.tz_localize(None)
+        sleep_summary["timezoneOffsetInMs"] = (
+            (
+                pd.to_datetime(sleep_summary["local_time"])
+                - sleep_summary["utc_time"]
+            )
+            / pd.Timedelta(milliseconds=1)
         )
-        # print(sleep_summary["timezoneOffsetInMs"].apply(lambda x: ast.literal_eval(x)))
 
         sleep_summary = sleep_summary.rename(
             columns={
@@ -148,21 +163,20 @@ class TesseraeCSVLoader(BaseLoader):
             )
         ).dt.normalize()
 
-        # Let's create the unixTimestampInMs column
         sleep_summary["unixTimestampInMs"] = (
-            (
-                sleep_summary["isoDate"]
-                + pd.to_timedelta(sleep_summary["timezoneOffsetInMs"], unit="ms")
-            )
-            - pd.Timestamp("1970-01-01")
-        ) // pd.Timedelta("1s")
+            sleep_summary["utc_time"].astype("int64") // 1_000_000
+        )
 
         # Filter by calendarDate
-        sleep_summary = sleep_summary.loc[
-            (sleep_summary["calendarDate"] >= start_date)
-            & (sleep_summary["calendarDate"] < end_date),
-            :,
-        ]
+        if start_date is not None:
+            sleep_summary = sleep_summary.loc[
+                sleep_summary["calendarDate"]
+                >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            sleep_summary = sleep_summary.loc[
+                sleep_summary["calendarDate"] < pd.Timestamp(end_date).normalize()
+            ]
 
         if drop_duplicates:
             sleep_summary["validationMap"] = sleep_summary["validation"].astype(
@@ -186,7 +200,10 @@ class TesseraeCSVLoader(BaseLoader):
         return normalize_sleep_columns(sleep_summary)
 
     def load_sleep_stage(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
@@ -196,7 +213,15 @@ class TesseraeCSVLoader(BaseLoader):
         pattern = os.path.join(sleep_stage_folder, "*Sleep*.csv")
         sleep_stage_files = glob.glob(pattern)
         if len(sleep_stage_files) == 0:
-            return pd.DataFrame()
+            return pd.DataFrame(
+                columns=[
+                    "sleep_summary_id",
+                    "local_time",
+                    "utc_time",
+                    "duration_in_ms",
+                    "type",
+                ]
+            )
         sleep_stage = pd.concat(
             [pd.read_csv(f) for f in sleep_stage_files], ignore_index=True
         )
@@ -240,17 +265,6 @@ class TesseraeCSVLoader(BaseLoader):
         for col in ["startTime", "endTime"]:
             sleep_stage[col] = pd.to_datetime(sleep_stage[col])
 
-        sleep_stage["timezoneOffsetInMs"] = (
-            pd.to_timedelta(
-                sleep_stage["startTimeWithTimezone"]
-                .str[-3:]
-                .str.replace("0", "")
-                .apply(lambda x: ast.literal_eval(x)),
-                unit="hours",
-            ).dt.total_seconds()
-            * 1000
-        )
-
         sleep_stage = sleep_stage.rename(
             columns={"startTime": "isoDate", "startTimeTimestamp": "unixTimestampInMs"}
         ).drop(
@@ -271,15 +285,25 @@ class TesseraeCSVLoader(BaseLoader):
         sleep_stage = sleep_stage.drop(["endTime"], axis=1)
 
         sleep_stage["unixTimestampInMs"] = sleep_stage["unixTimestampInMs"] * 1000
+        sleep_stage["utc_time"] = pd.to_datetime(
+            sleep_stage["unixTimestampInMs"], unit="ms", utc=True
+        ).dt.tz_localize(None)
+        sleep_stage["timezoneOffsetInMs"] = (
+            (sleep_stage["isoDate"] - sleep_stage["utc_time"])
+            / pd.Timedelta(milliseconds=1)
+        )
 
         # sleep_stage["type"] = sleep_stage["type"].replace({"rem": "REM"})
 
         # Filter by isoDate
-        sleep_stage = sleep_stage.loc[
-            (sleep_stage["isoDate"] >= start_date)
-            & (sleep_stage["isoDate"] < end_date),
-            :,
-        ]
+        if start_date is not None:
+            sleep_stage = sleep_stage.loc[
+                sleep_stage["isoDate"] >= pd.Timestamp(start_date)
+            ]
+        if end_date is not None:
+            sleep_stage = sleep_stage.loc[
+                sleep_stage["isoDate"] < pd.Timestamp(end_date)
+            ]
         from ...sleep_schema import normalize_sleep_columns
 
         return normalize_sleep_columns(sleep_stage)
@@ -605,4 +629,4 @@ class TesseraeCSVLoader(BaseLoader):
         if x[0] == "-":
             return -delta.total_seconds() * 1000
         else:
-            return delta.total_seconds() * 100
+            return delta.total_seconds() * 1000

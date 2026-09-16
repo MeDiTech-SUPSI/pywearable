@@ -4,7 +4,55 @@ import pytest
 
 from pywearable import sleep
 from pywearable.loader import LifeSnapsParquetLoader
-from pywearable.loader.tesserae import TesseraeParquetLoader
+from pywearable.loader.tesserae import TesseraeCSVLoader, TesseraeParquetLoader
+
+
+def test_tesserae_csv_sleep_uses_optional_bounds_and_true_utc_milliseconds(
+    tmp_path, monkeypatch
+):
+    sleep_folder = tmp_path / "person-1" / "GarminHealthAPI"
+    sleep_folder.mkdir(parents=True)
+    sleep_file = sleep_folder / "Sleep.csv"
+    sleep_file.touch()
+    raw = pd.DataFrame(
+        {
+            "ParticipantID": ["person-1"],
+            "local_time": pd.to_datetime(["2024-01-01 23:00"]),
+            "Timestamp": ["2024-01-01T23:00:00+01:00"],
+            "sleep_levels_map": ["{}"],
+            "awake_seconds": [600],
+            "rem_sleep_seconds": [600],
+            "deep_sleep_seconds": [1200],
+            "unmeasurable_sleep_seconds": [0],
+            "light_sleep_seconds": [1800],
+            "duration_seconds": [3600],
+            "validation": ["ENHANCED_FINAL"],
+            "tz_source": ["test"],
+        }
+    )
+    monkeypatch.setattr(
+        "pywearable.loader.tesserae.tesserae_csv.glob.glob",
+        lambda _: [str(sleep_file)],
+    )
+    monkeypatch.setattr(pd, "read_csv", lambda *args, **kwargs: raw.copy())
+
+    loader = TesseraeCSVLoader(tmp_path)
+    result = loader.load_sleep_summary("person-1")
+
+    assert result.loc[0, "utc_time"] == pd.Timestamp("2024-01-01 22:00")
+    assert result.loc[0, "timezone_offset_in_ms"] == 3_600_000
+    assert result.loc[0, "unix_timestamp_in_ms"] == 1_704_146_400_000
+    assert loader._convert_timezone_offset("2024-01-01T23:00:00+0100") == 3_600_000
+
+
+def test_tesserae_csv_empty_stage_supports_omitted_bounds(tmp_path):
+    (tmp_path / "person-1").mkdir()
+
+    result = TesseraeCSVLoader(tmp_path).load_sleep_stage("person-1")
+
+    assert {"sleep_summary_id", "local_time", "duration_in_ms", "type"} <= set(
+        result
+    )
 
 
 def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatch):
@@ -101,9 +149,7 @@ def test_tesserae_sleep_uses_calendar_day_and_drops_empty_records(
 def test_tesserae_empty_sleep_stage_uses_shared_contract(tmp_path):
     (tmp_path / "person-1").mkdir()
 
-    result = TesseraeParquetLoader(tmp_path).load_sleep_stage(
-        "person-1", start_date=None, end_date=None
-    )
+    result = TesseraeParquetLoader(tmp_path).load_sleep_stage("person-1")
 
     assert {
         "sleep_summary_id",

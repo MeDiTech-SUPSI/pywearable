@@ -1,11 +1,37 @@
 import pandas as pd
 import pytest
 
-from pywearable.loader import LifeSnapsParquetLoader
+from pywearable.loader import LifeSnapsParquetLoader, SphyncsDataLoader
 from pywearable.loader.tesserae import TesseraeParquetLoader
 
 
 REQUIRED_COLUMNS = {"utc_time", "local_time", "timezone", "heart_rate"}
+
+
+def test_sphyncs_heart_rate_uses_local_only_shared_contract(tmp_path, monkeypatch):
+    user_folder = tmp_path / "person-1"
+    user_folder.mkdir()
+    (user_folder / "biometrics.parquet").touch()
+    raw = pd.DataFrame(
+        {
+            "dateTime": pd.to_datetime(
+                ["2024-01-01 00:00", "2024-01-01 00:30"]
+            ),
+            "heart": [60, 70],
+        }
+    )
+    monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
+    loader = SphyncsDataLoader(tmp_path)
+
+    result = loader.load_heart_rate(
+        "person-1", "2024-01-01 00:15", "2024-01-01 01:00"
+    )
+
+    assert REQUIRED_COLUMNS <= set(result)
+    assert result["heart_rate"].tolist() == [70]
+    assert result["utc_time"].isna().all()
+    with pytest.raises(ValueError, match="does not provide UTC"):
+        loader.load_heart_rate("person-1", time_col="utc_time")
 
 
 def test_lifesnaps_heart_rate_uses_shared_contract_and_selected_clock(

@@ -102,7 +102,10 @@ class TesseraeParquetLoader(BaseLoader):
         return stress
 
     def load_sleep_stage(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
         sleep_summary = self.load_sleep_summary(user_id=user_id)
         if len(sleep_summary) == 0:

@@ -348,21 +348,6 @@ def _compute_hr_statistics(
         .add_prefix("heart_rate_")
     )
 
-    # TODO see how we can implement heart rate wearing time
-    # given that we have different source resolutions
-    # for heart rate
-    heart_rate_wearing_time = (
-        heart_rate.resample(rule="1min", on=time_col, label="left", closed="left")[
-            heart_rate_schema.HEART_RATE_COL
-        ]
-        .count()
-        .gt(0)
-        .resample(rule=rule, label="left", closed="left")
-        .sum()
-        #  / rule_seconds
-        # * 5
-    )  # * pd.Timedelta(rule)
-
     heart_rate_quantiles = (
         heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
             heart_rate_schema.HEART_RATE_COL
