@@ -68,6 +68,10 @@ information the copied HR export does not reliably provide. Generic Oura
 activity-intensity and recovery mappings remain unfinished. Sleep loader
 columns use `snake_case`; existing non-camelCase sleep feature names such as
 `TIB`, `WASO`, and `SME` retain their original spelling and case.
+Sleep features form a night-level trajectory with a
+`(user_id, calendar_date)` MultiIndex. One requested feature returns a Series;
+multiple features return a DataFrame. Aggregation across nights is kept
+separate from feature extraction.
 With `sleep.get_sleep_statistics(..., statistic=None)`, the default result is
 the shared night-level feature set; `getup_latency`, `validation`, and
 `SRI` require explicit selection while their cross-loader

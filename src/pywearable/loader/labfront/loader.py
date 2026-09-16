@@ -38,6 +38,8 @@ _LABFRONT_METRICS_DICT = {
     },
 }
 
+# Temporary internal key used to keep export snapshots separate while their
+# rows are reconciled. Public loader output never retains this column.
 _LABFRONT_SOURCE_FILE_COL = "__labfront_source_file"
 
 LABFRONT_FILE_INDEX_NAME = ".pywearable_file_index.csv"
@@ -657,7 +659,6 @@ class LabfrontLoader(BaseLoader):
             Metric of interest is a todo, by default False
         task_name : str, optional
             Name of the questionnaire or of the todo, by default None
-
         Returns
         -------
         list
@@ -807,6 +808,18 @@ class LabfrontLoader(BaseLoader):
             Metric of interest is a todo, by default False
         task_name : str, optional
             Name of the questionnaire or of the todo, by default None
+        filter_on_calendar_date : bool, optional
+            Filter rows using their calendar-date column rather than their
+            timestamp column, by default False.
+        include_source_file : bool, optional
+            Add the source CSV path as a temporary internal column. Sleep-stage
+            reconciliation uses it to distinguish repeated export snapshots;
+            it is disabled by default and not part of public loader output.
+        filter_rows : bool, optional
+            Apply the requested bounds to individual rows after selecting the
+            overlapping files, by default True. Snapshot reconciliation sets
+            this to False so it can validate complete exports before clipping
+            the selected rows.
 
         Returns
         -------
@@ -1692,28 +1705,16 @@ class LabfrontLoader(BaseLoader):
             # Prepare columns for sleep information
             data[constants.IS_SLEEPING_COL] = False
             data[constants.CALENDAR_DATE_COL] = pd.NaT
-            if type(sleep_timestamps) == dict:
-                if user_id in sleep_timestamps.keys():
-                    sleep_timestamps = sleep_timestamps[user_id]
-                    if sleep_timestamps is not None:
-                        # We have a dict with user data
-                        for calendar_date in sleep_timestamps.keys():
-                            bedtime = sleep_timestamps[calendar_date][0]
-                            wakeup = sleep_timestamps[calendar_date][1]
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.CALENDAR_DATE_COL,
-                            ] = pd.Timestamp(
-                                calendar_date.year,
-                                calendar_date.month,
-                                calendar_date.day,
-                            )
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.IS_SLEEPING_COL,
-                            ] = True
+            for (_, calendar_date), row in sleep_timestamps.iterrows():
+                bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
+                wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
+                sleeping = (data[constants.ISODATE_COL] >= bedtime) & (
+                    data[constants.ISODATE_COL] <= wakeup
+                )
+                data.loc[sleeping, constants.CALENDAR_DATE_COL] = pd.Timestamp(
+                    calendar_date
+                )
+                data.loc[sleeping, constants.IS_SLEEPING_COL] = True
         return data
 
     def load_garmin_device_pulse_ox(
@@ -1810,28 +1811,16 @@ class LabfrontLoader(BaseLoader):
                 start_date=start_date,
                 end_date=end_date,
             )
-            if type(sleep_timestamps) == dict:
-                if user_id in sleep_timestamps.keys():
-                    sleep_timestamps = sleep_timestamps[user_id]
-                    # We have a dict with user data
-                    if not (sleep_timestamps is None):
-                        for calendar_date in sleep_timestamps.keys():
-                            bedtime = sleep_timestamps[calendar_date][0]
-                            wakeup = sleep_timestamps[calendar_date][1]
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.CALENDAR_DATE_COL,
-                            ] = pd.Timestamp(
-                                calendar_date.year,
-                                calendar_date.month,
-                                calendar_date.day,
-                            )
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.IS_SLEEPING_COL,
-                            ] = True
+            for (_, calendar_date), row in sleep_timestamps.iterrows():
+                bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
+                wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
+                sleeping = (data[constants.ISODATE_COL] >= bedtime) & (
+                    data[constants.ISODATE_COL] <= wakeup
+                )
+                data.loc[sleeping, constants.CALENDAR_DATE_COL] = pd.Timestamp(
+                    calendar_date
+                )
+                data.loc[sleeping, constants.IS_SLEEPING_COL] = True
         return data
 
     def load_garmin_device_respiration(
@@ -2524,7 +2513,16 @@ class LabfrontLoader(BaseLoader):
     def _reconcile_sleep_stage_snapshots(
         sleep_stages: pd.DataFrame, sleep_summaries: pd.DataFrame
     ) -> pd.DataFrame:
-        """Select one complete stage export matching each Garmin sleep summary."""
+        """Select one coherent stage export for each Garmin sleep summary.
+
+        Labfront exports can repeat the same Garmin sleep stages in several
+        CSV files, and a later file can contain a revised snapshot. File
+        boundaries are therefore preserved temporarily. Candidate snapshots
+        are matched to the selected summary by comparing the total duration of
+        every stage type. Identical matching snapshots collapse to one;
+        conflicting or incoherent snapshots raise instead of being combined
+        silently. The temporary source-file column is removed from the result.
+        """
         source_col = _LABFRONT_SOURCE_FILE_COL
         id_col = constants.SLEEP_SUMMARY_ID_COL
         record_cols = [col for col in sleep_stages if col != source_col]
@@ -2647,6 +2645,10 @@ class LabfrontLoader(BaseLoader):
             Start date from which data should be retrieved, by default None
         end_date : str or datetime.date or datetime.date, optional
             End date from which data should be retrieved, by default None
+        drop_duplicates : bool, optional
+            If true, retain the highest-ranked summary for each calendar day.
+            If false, retain all exported summaries so callers can reconcile
+            repeated or revised snapshots.
 
         Returns
         -------

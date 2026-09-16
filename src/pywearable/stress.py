@@ -562,26 +562,26 @@ def get_sleep_battery_recovery(
         data_dict[user] = {}
         sleep_timestamps = sleep.get_sleep_timestamps(
             loader=loader, user_id=user, start_date=start_date, end_date=end_date
-        )[user]
-        if not (sleep_timestamps is None):
-            for k, v in sleep_timestamps.items():
-                sleep_onset, awake_time = v[0], v[1]
+        )
+        for (_, calendar_date), row in sleep_timestamps.iterrows():
+            sleep_onset = row[sleep.SLEEP_STATISTIC_BEDTIME]
+            awake_time = row[sleep.SLEEP_STATISTIC_WAKEUP]
 
-                df = loader.load_stress(user, sleep_onset, awake_time)
-                if len(df) == 0:
-                    continue
+            df = loader.load_stress(user, sleep_onset, awake_time)
+            if len(df) == 0:
+                continue
 
-                df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
-                df = df.reset_index(drop=True)
-                if len(df) == 0:
-                    continue
-                df = (
-                    df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
-                    .mean()
-                    .sort_index()
-                )
-                recovery = int(df.iloc[-1] - df.iloc[0])
-                data_dict[user][k] = recovery
+            df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
+            df = df.reset_index(drop=True)
+            if len(df) == 0:
+                continue
+            df = (
+                df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
+                .mean()
+                .sort_index()
+            )
+            recovery = int(df.iloc[-1] - df.iloc[0])
+            data_dict[user][pd.Timestamp(calendar_date).date()] = recovery
 
     return data_dict
 
@@ -802,25 +802,25 @@ def get_waking_body_battery(
         data_dict[user] = {}
         sleep_timestamps = sleep.get_sleep_timestamps(
             loader, user, start_date, end_date
-        )[user]
-        if not (sleep_timestamps is None):
-            for k, v in sleep_timestamps.items():
-                sleep_onset, awake_time = v[0], v[1]
+        )
+        for (_, calendar_date), row in sleep_timestamps.iterrows():
+            sleep_onset = row[sleep.SLEEP_STATISTIC_BEDTIME]
+            awake_time = row[sleep.SLEEP_STATISTIC_WAKEUP]
 
-                df = loader.load_stress(user, sleep_onset, awake_time)
-                if len(df) == 0:
-                    continue
+            df = loader.load_stress(user, sleep_onset, awake_time)
+            if len(df) == 0:
+                continue
 
-                df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
-                if len(df) == 0:
-                    continue
-                df = (
-                    df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
-                    .mean()
-                    .sort_index()
-                )
+            df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
+            if len(df) == 0:
+                continue
+            df = (
+                df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
+                .mean()
+                .sort_index()
+            )
 
-                data_dict[user][k] = int(df.iloc[-1])
+            data_dict[user][pd.Timestamp(calendar_date).date()] = int(df.iloc[-1])
 
     return data_dict
 
@@ -839,25 +839,25 @@ def get_body_battery_starting_sleep(
         data_dict[user] = {}
         sleep_timestamps = sleep.get_sleep_timestamps(
             loader, user, start_date, end_date
-        )[user]
-        if not (sleep_timestamps is None):
-            for k, v in sleep_timestamps.items():
-                sleep_onset, awake_time = v[0], v[1]
+        )
+        for (_, calendar_date), row in sleep_timestamps.iterrows():
+            sleep_onset = row[sleep.SLEEP_STATISTIC_BEDTIME]
+            awake_time = row[sleep.SLEEP_STATISTIC_WAKEUP]
 
-                df = loader.load_stress(user, sleep_onset, awake_time)
-                if len(df) == 0:
-                    continue
+            df = loader.load_stress(user, sleep_onset, awake_time)
+            if len(df) == 0:
+                continue
 
-                df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
-                if len(df) == 0:
-                    continue
-                df = (
-                    df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
-                    .mean()
-                    .sort_index()
-                )
+            df = df[~df[constants.STRESS_BODY_BATTERY_COL].isna()]
+            if len(df) == 0:
+                continue
+            df = (
+                df.groupby(constants.ISODATE_COL)[constants.STRESS_BODY_BATTERY_COL]
+                .mean()
+                .sort_index()
+            )
 
-                data_dict[user][k] = int(df.iloc[0])
+            data_dict[user][pd.Timestamp(calendar_date).date()] = int(df.iloc[0])
 
     return data_dict
 
@@ -876,21 +876,23 @@ def get_night_average_stress(
         data_dict[user] = {}
         sleep_timestamps = sleep.get_sleep_timestamps(
             loader, user, start_date, end_date
-        )[user]
-        if not (sleep_timestamps is None):
-            for date, (start_hour, end_hour) in sleep_timestamps.items():
-                df = loader.load_stress(user, start_hour, end_hour)
-                if len(df) == 0:
-                    continue
+        )
+        for (_, calendar_date), row in sleep_timestamps.iterrows():
+            date = pd.Timestamp(calendar_date).date()
+            start_hour = row[sleep.SLEEP_STATISTIC_BEDTIME]
+            end_hour = row[sleep.SLEEP_STATISTIC_WAKEUP]
+            df = loader.load_stress(user, start_hour, end_hour)
+            if len(df) == 0:
+                continue
+            else:
+                df = df.drop_duplicates()
+                df = df.loc[~df.stressLevel.isin([-1, -2])]
+                df = utils.filter_out_awake(loader, user, df, date)
+                if len(df) > 0:
+                    data_dict[user][date] = round(
+                        df[constants.STRESS_STRESS_LEVEL_COL].mean(), 1
+                    )
                 else:
-                    df = df.drop_duplicates()
-                    df = df.loc[~df.stressLevel.isin([-1, -2])]
-                    df = utils.filter_out_awake(loader, user, df, date)
-                    if len(df) > 0:
-                        data_dict[user][date] = round(
-                            df[constants.STRESS_STRESS_LEVEL_COL].mean(), 1
-                        )
-                    else:
-                        continue
+                    continue
 
     return data_dict

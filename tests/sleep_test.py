@@ -148,20 +148,11 @@ SLEEP_STAGES_SERIES_INDEX = pd.Index(
 
 
 def test_get_sleep_score(base_loader):
-    # Check with default options
     sleep_score = pywearable.sleep.get_sleep_score(base_loader, user_id="1")
     assert type(sleep_score) is pd.Series
     assert sleep_score.name == pywearable.sleep.SLEEP_STATISTIC_SLEEP_SCORE
     assert len(sleep_score) == len(SLEEP_SERIES_INDEX)
-
-    # Check with dictionary
-    sleep_score = pywearable.sleep.get_sleep_score(
-        base_loader, user_id="1", return_df=False
-    )
-    assert type(sleep_score) is dict
-    assert "1" in sleep_score.keys()
-    for day in SLEEP_SERIES_INDEX:
-        assert day.date() in sleep_score["1"].keys()
+    assert sleep_score.index.names == ["user_id", "calendar_date"]
 
 
 def test_get_time_in_bed(base_loader):
@@ -170,11 +161,7 @@ def test_get_time_in_bed(base_loader):
     assert type(tib) is pd.Series
     assert tib.name == pywearable.sleep.SLEEP_STATISTIC_TIB
 
-    tib = pywearable.sleep.get_time_in_bed(base_loader, user_id="1", return_df=False)
-    assert type(tib) is dict
-    assert "1" in tib.keys()
-    for day in SLEEP_SERIES_INDEX:
-        assert day.date() in tib["1"].keys()
+    assert tib.index.names == ["user_id", "calendar_date"]
 
 
 def test_get_total_sleep_time(base_loader):
@@ -184,19 +171,10 @@ def test_get_total_sleep_time(base_loader):
     values.
     """
     # Test with default parameters
-    tst = pywearable.sleep.get_total_sleep_time(
-        base_loader, user_id="1", return_df=True, return_multi_index=True
-    )
+    tst = pywearable.sleep.get_total_sleep_time(base_loader, user_id="1")
     assert type(tst) is pd.Series
     assert tst.name == pywearable.sleep.SLEEP_STATISTIC_TST
-
-    tst = pywearable.sleep.get_total_sleep_time(
-        base_loader, user_id="1", return_df=False
-    )
-    assert type(tst) is dict
-    assert "1" in tst.keys()
-    for day in SLEEP_SERIES_INDEX:
-        assert day.date() in tst["1"].keys()
+    assert tst.index.names == ["user_id", "calendar_date"]
 
 
 def test_get_sleep_period_time(base_loader):
@@ -205,9 +183,7 @@ def test_get_sleep_period_time(base_loader):
     starting from a loader returns the proper
     values.
     """
-    spt = pywearable.sleep.get_sleep_period_time(
-        base_loader, user_id="1", return_df=True, return_multi_index=True
-    )
+    spt = pywearable.sleep.get_sleep_period_time(base_loader, user_id="1")
     spt_true = pd.Series(
         [449.0, np.nan, 446.0, 395],
         index=pd.MultiIndex.from_product(
@@ -227,7 +203,7 @@ def test_get_sleep_period_time(base_loader):
         ),
         name=pywearable.sleep.SLEEP_STATISTIC_SPT,
     )
-    pd.testing.assert_series_equal(spt, spt)
+    pd.testing.assert_series_equal(spt, spt_true)
 
 
 def test_get_sleep_efficiency(base_loader):

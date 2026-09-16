@@ -18,4 +18,9 @@ separately through ``load_sleep_sessions``. Oura also supplies
 ``local_end_time`` and UTC start/end instants. Daily/nightly records are
 assigned using Oura's ``day`` rather than a UTC-day conversion.
 
+Sleep feature extraction returns one row per night with a
+``(user_id, calendar_date)`` MultiIndex. A single requested feature produces a
+:class:`pandas.Series`; multiple features produce a :class:`pandas.DataFrame`.
+Across-night aggregation is handled separately from extraction.
+
 .. automethod:: pywearable.loader.BaseLoader.load_sleep_summary

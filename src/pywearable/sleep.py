@@ -49,120 +49,19 @@ SLEEP_STATISTIC_VALIDATION = "validation"
 SLEEP_STATISTIC_SRI = "SRI"
 SLEEP_STATISTIC_GETUP_LATENCY = "getup_latency"
 
-SLEEP_DATETIME_STATISTICS = [
-    SLEEP_STATISTIC_BEDTIME,
-    SLEEP_STATISTIC_MIDPOINT,
-    SLEEP_STATISTIC_WAKEUP,
-]
-
-SLEEP_KIND_MAPPING = {
-    "mean": {
-        SLEEP_STATISTIC_BEDTIME: "",  # utils.mean_time,
-        SLEEP_STATISTIC_WAKEUP: "",  # utils.mean_time,
-        SLEEP_STATISTIC_MIDPOINT: "",  # utils.mean_time,
-    },
-    "std": {
-        SLEEP_STATISTIC_BEDTIME: "",  # utils.std_time,
-        SLEEP_STATISTIC_WAKEUP: "",  # utils.std_time,
-        SLEEP_STATISTIC_MIDPOINT: "",  # utils.std_time,
-    },
-    "min": {
-        SLEEP_STATISTIC_BEDTIME: "",  # utils.get_earliest_bedtime,
-        SLEEP_STATISTIC_WAKEUP: "",  # utils.get_earliest_wakeup_time,
-        SLEEP_STATISTIC_MIDPOINT: "",  # utils.get_earliest_wakeup_time,
-    },
-    "max": {
-        SLEEP_STATISTIC_BEDTIME: "",  # utils.get_latest_bedtime,
-        SLEEP_STATISTIC_WAKEUP: "",  # utils.get_latest_wakeup_time,
-        SLEEP_STATISTIC_MIDPOINT: "",  # utils.get_latest_wakeup_time,
-    },
-}
-
 
 def get_time_in_bed(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get time in bed (TIB) sleep metric.
+) -> pd.Series:
+    """Return nightly time in bed.
 
-    This function computes time in bed (TIB) metric as the total duration
-    of the sleep, given by the sum of all sleep stages and unmeasurable sleep
-    as well. The value is reported in minutes.
-
-    Depending on the value of the ``kind`` parameter, this function
-    returns TIB for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_time_in_bed(loader, user_id, start_date, end_date, kind=None)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 501.0,
-            datetime.date(2023, 9, 10): 514.0,
-            datetime.date(2023, 9, 11): 455.0,
-            datetime.date(2023, 9, 12): 437.0,
-            datetime.date(2023, 9, 13): 437.0,
-            datetime.date(2023, 9, 14): 402.0,
-            datetime.date(2023, 9, 15): 469.0}
-
-        pywearable.sleep.get_time_in_bed(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'TIB': 463.14285714285717,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15']
-                    }
-            }
-
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which TIB must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform TIB over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and TIB as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `TIB`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -170,12 +69,7 @@ def get_time_in_bed(
         statistic=SLEEP_STATISTIC_TIB,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -184,82 +78,13 @@ def get_sleep_period_time(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> pd.DataFrame:
-    """Get sleep period time (SPT) sleep metric.
+) -> pd.Series:
+    """Return nightly sleep period time.
 
-    This function computes sleep period time (SPT) metric as the duration from the first to
-    the last period of sleep. Depending on the value of the ``kind`` parameter, this function
-    returns SPT for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_sleep_period_time(loader, user_id, start_date, end_date, kind=None)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 501.0,
-            datetime.date(2023, 9, 10): 514.0,
-            datetime.date(2023, 9, 11): 455.0,
-            datetime.date(2023, 9, 12): 437.0,
-            datetime.date(2023, 9, 13): 437.0,
-            datetime.date(2023, 9, 14): 402.0,
-            datetime.date(2023, 9, 15): 496.0}
-
-        pywearable.sleep.get_sleep_period_time(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'SPT': 463.14285714285717,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which SPT must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform SPT over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and SPT as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `SPT`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -267,12 +92,7 @@ def get_sleep_period_time(
         statistic=SLEEP_STATISTIC_SPT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -281,83 +101,13 @@ def get_total_sleep_time(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> pd.DataFrame:
-    """Get total sleep time (TST) sleep metric.
+) -> pd.Series:
+    """Return nightly total sleep time.
 
-    This function computes total sleep time (TST) metric as the total duration of
-    N1, N2, N3, and REM in SPT (see :func:`get_sleep_period_time`).
-    Depending on the value of the ``kind`` parameter, this function
-    returns TST for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_total_sleep_time(loader, user_id, start_date, end_date, kind=None)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 497.0,
-            datetime.date(2023, 9, 10): 512.0,
-            datetime.date(2023, 9, 11): 455.0,
-            datetime.date(2023, 9, 12): 435.0,
-            datetime.date(2023, 9, 13): 435.0,
-            datetime.date(2023, 9, 14): 402.0,
-            datetime.date(2023, 9, 15): 494.0}
-
-        pywearable.sleep.get_total_sleep_time(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'TST': 461.42857142857144,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which TST must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform TST over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and TST as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `TST`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -365,12 +115,7 @@ def get_total_sleep_time(
         statistic=SLEEP_STATISTIC_TST,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -379,84 +124,13 @@ def get_sleep_efficiency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> pd.DataFrame:
-    """Get sleep efficiency (SE) sleep metric.
+) -> pd.Series:
+    """Return nightly sleep efficiency.
 
-    This function computes sleep efficiency (SE) metric as the ratio
-    between TST (see :func:`get_total_sleep_time`) and TIB (see :func:`get_time_in_bed`).
-    .. math:: SE = TST / TIB
-    Depending on the value of the ``kind`` parameter, this function
-    returns SE for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_sleep_efficiency(loader, user_id, start_date, end_date, kind=None)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 99.20159680638723,
-            datetime.date(2023, 9, 10): 99.61089494163424,
-            datetime.date(2023, 9, 11): 100.0,
-            datetime.date(2023, 9, 12): 99.54233409610984,
-            datetime.date(2023, 9, 13): 99.54233409610984,
-            datetime.date(2023, 9, 14): 100.0,
-            datetime.date(2023, 9, 15): 99.59677419354838}
-
-        pywearable.sleep.get_sleep_efficiency(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'SE': 99.64199059054135,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which SE must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform SE over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and SE as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `SE`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -464,12 +138,7 @@ def get_sleep_efficiency(
         statistic=SLEEP_STATISTIC_SE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -478,86 +147,13 @@ def get_sleep_maintenance_efficiency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> pd.DataFrame:
-    """Get sleep maintenance efficiency (SME) sleep metric.
+) -> pd.Series:
+    """Return nightly sleep maintenance efficiency.
 
-    This function computes sleep maintenance efficiency (SME) metric as the ratio
-    between TST (see :func:`get_total_sleep_time`) and SPT (see :func:`get_sleep_period_time`).
-
-    .. math:: SME = \\frac{TST}{SPT}
-
-    Depending on the value of the ``kind`` parameter, this function
-    returns SME for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_sleep_maintenance_efficiency(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 99.20159680638723,
-            datetime.date(2023, 9, 10): 99.61089494163424,
-            datetime.date(2023, 9, 11): 100.0,
-            datetime.date(2023, 9, 12): 99.54233409610984,
-            datetime.date(2023, 9, 13): 99.54233409610984,
-            datetime.date(2023, 9, 14): 100.0,
-            datetime.date(2023, 9, 15): 99.59677419354838}
-
-        pywearable.sleep.get_sleep_maintenance_efficiency(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'SE': 99.64199059054135,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which SME must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform SME over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and SME as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `SME`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -565,12 +161,7 @@ def get_sleep_maintenance_efficiency(
         statistic=SLEEP_STATISTIC_SME,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -579,82 +170,13 @@ def get_deep_latency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
 ) -> pd.Series:
-    """Get N1 sleep latency.
+    """Return nightly deep latency.
 
-    This function computes the latency to the first stage of N1 sleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns N1 latency for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_n1_latency(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 0.0,
-            datetime.date(2023, 9, 10): 0.0,
-            datetime.date(2023, 9, 11): 0.0,
-            datetime.date(2023, 9, 12): 0.0,
-            datetime.date(2023, 9, 13): 0.0,
-            datetime.date(2023, 9, 14): 0.0,
-            datetime.date(2023, 9, 15): 0.0}
-
-        pywearable.sleep.get_n1_latency(loader, user_id, start_date, end_date, average=True)
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'Lat_N1': 0.0,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which N1 sleep latency must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform N1 latency over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and N1 latency as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `Lat_N1`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistics(
         loader=loader,
@@ -662,12 +184,7 @@ def get_deep_latency(
         statistic=SLEEP_STATISTIC_DEEP_LATENCY,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -676,12 +193,7 @@ def get_light_latency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
 ) -> pd.Series:
     return get_sleep_statistics(
         loader=loader,
@@ -689,12 +201,7 @@ def get_light_latency(
         statistic=SLEEP_STATISTIC_LIGHT_LATENCY,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -703,82 +210,13 @@ def get_rem_latency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get REM sleep latency.
+) -> pd.Series:
+    """Return nightly rem latency.
 
-    This function computes the latency to the first stage of REM sleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns REM latency for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_rem_latency(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 47.0,
-            datetime.date(2023, 9, 10): 119.0,
-            datetime.date(2023, 9, 11): 69.0,
-            datetime.date(2023, 9, 12): 57.0,
-            datetime.date(2023, 9, 13): 79.0,
-            datetime.date(2023, 9, 14): 167.0,
-            datetime.date(2023, 9, 15): 52.0}
-
-        pywearable.sleep.get_rem_latency(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'Lat_REM': 84.28571428571429,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which REM sleep latency must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform REM latency over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and REM latency as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `Lat_REM`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -786,12 +224,7 @@ def get_rem_latency(
         statistic=SLEEP_STATISTIC_REM_LATENCY,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -800,87 +233,13 @@ def get_light_sleep_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get light sleep duration.
+) -> pd.Series:
+    """Return nightly light sleep duration.
 
-    This function returns the absolute time spent in light sleep stage for
-    the given user(s). Duration is reported in minutes.
-    Depending on the value of the ``kind`` parameter, this function
-    returns N1 duration for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_light_sleep_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 280.0,
-            datetime.date(2023, 9, 10): 256.0,
-            datetime.date(2023, 9, 11): 333.0,
-            datetime.date(2023, 9, 12): 312.0,
-            datetime.date(2023, 9, 13): 288.0,
-            datetime.date(2023, 9, 14): 233.0,
-            datetime.date(2023, 9, 15): 295.0}
-
-        pywearable.sleep.get_n1_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'N1': 285.2857142857143,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which N1 sleep data have to be extracted, by default "all"
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform N1 duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and N1 duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `N1`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -888,12 +247,7 @@ def get_light_sleep_duration(
         statistic=SLEEP_STATISTIC_LIGHT_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -902,86 +256,13 @@ def get_deep_sleep_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get deep sleep duration.
+) -> pd.Series:
+    """Return nightly deep sleep duration.
 
-    This function returns the absolute time spent in deep sleep stage for
-    the given user(s). Depending on the value of the ``kind`` parameter, this function
-    returns N1 duration for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Example::
-
-        pywearable.sleep.get_n3_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 53.0,
-            datetime.date(2023, 9, 10): 112.0,
-            datetime.date(2023, 9, 11): 37.0,
-            datetime.date(2023, 9, 12): 49.0,
-            datetime.date(2023, 9, 13): 66.0,
-            datetime.date(2023, 9, 14): 76.0,
-            datetime.date(2023, 9, 15): 83.0}
-
-        pywearable.sleep.get_n3_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'N3': 68.0,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which N3 sleep data have to be extracted, by default "all"
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform N3 duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and N2 duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `N3`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -989,12 +270,7 @@ def get_deep_sleep_duration(
         statistic=SLEEP_STATISTIC_DEEP_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1003,88 +279,13 @@ def get_rem_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get REM sleep duration.
+) -> pd.Series:
+    """Return nightly rem duration.
 
-    This function returns the absolute time spent in REM sleep stage for
-    the given user(s). Depending on the value of the ``kind`` parameter, this function
-    returns REM duration for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Duration is reported in minutes.
-
-    Example::
-
-        pylabfront.sleep.get_rem_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 164.0,
-            datetime.date(2023, 9, 10): 144.0,
-            datetime.date(2023, 9, 11): 85.0,
-            datetime.date(2023, 9, 12): 74.0,
-            datetime.date(2023, 9, 13): 81.0,
-            datetime.date(2023, 9, 14): 93.0,
-            datetime.date(2023, 9, 15): 116.0}
-
-        pylabfront.sleep.get_rem_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'REM': 108.14285714285714,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which REM sleep data have to be extracted, by default "all"
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform REM duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and REM duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `REM`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1092,12 +293,7 @@ def get_rem_duration(
         statistic=SLEEP_STATISTIC_REM_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1106,88 +302,13 @@ def get_nrem_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get NREM sleep duration.
+) -> pd.Series:
+    """Return nightly nrem duration.
 
-    This function returns the absolute time spent in NREM sleep stage for
-    the given user(s). Depending on the value of the ``kind`` parameter, this function
-    returns N1 duration for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Duration is reported in minutes.
-
-    Example::
-
-        pywearable.sleep.get_nrem_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 333.0,
-            datetime.date(2023, 9, 10): 368.0,
-            datetime.date(2023, 9, 11): 370.0,
-            datetime.date(2023, 9, 12): 361.0,
-            datetime.date(2023, 9, 13): 354.0,
-            datetime.date(2023, 9, 14): 309.0,
-            datetime.date(2023, 9, 15): 433.0}
-
-        pywearable.sleep.get_nrem_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'NREM': 361.14285714285717,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which sleep data have to be extracted, by default "all".
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data.
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data.
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform NREM duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and NREM duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `NREM`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1195,12 +316,7 @@ def get_nrem_duration(
         statistic=SLEEP_STATISTIC_NREM_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1209,88 +325,13 @@ def get_awake_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get awake sleep duration.
+) -> pd.Series:
+    """Return nightly awake duration.
 
-    This function returns the absolute time spent in awake stage for
-    the given user(s). Depending on the value of the ``kind`` parameter, this function
-    returns awake duration for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Duration is reported in minutes.
-
-    Example::
-
-        pywearable.sleep.get_awake_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 4.0,
-            datetime.date(2023, 9, 10): 2.0,
-            datetime.date(2023, 9, 11): 0.0,
-            datetime.date(2023, 9, 12): 2.0,
-            datetime.date(2023, 9, 13): 2.0,
-            datetime.date(2023, 9, 14): 0.0,
-            datetime.date(2023, 9, 15): 5.0}
-
-        pywearable.sleep.get_awake_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'AWAKE': 2.142857142857143,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which sleep data have to be extracted, by default "all"
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform awake duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and awake duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `AWAKE`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1298,12 +339,7 @@ def get_awake_duration(
         statistic=SLEEP_STATISTIC_AWAKE_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1312,88 +348,13 @@ def get_unmeasurable_duration(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get unmeasurable sleep duration.
+) -> pd.Series:
+    """Return nightly unmeasurable duration.
 
-    This function returns the absolute time spent in unmeasurable sleep stage for
-    the given user(s). Depending on the value of the ``kind`` parameter, this function
-    returns unmeasurable sleep duration for each calendar day (``kind=None``)
-    from ``start_date`` to ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Duration is reported in minutes.
-
-    Example::
-
-        pywearable.sleep.get_unmeasurable_duration(loader, user_id, start_date, end_date)
-
-        >> {'f457c562-2159-431c-8866-dfa9a917d9b8':
-            datetime.date(2023, 9, 9): 0.0,
-            datetime.date(2023, 9, 10): 0.0,
-            datetime.date(2023, 9, 11): 0.0,
-            datetime.date(2023, 9, 12): 0.0,
-            datetime.date(2023, 9, 13): 0.0,
-            datetime.date(2023, 9, 14): 0.0,
-            datetime.date(2023, 9, 15): 0.0}
-
-        pywearable.sleep.get_unmeasurable_duration(loader, user_id, start_date, end_date, kind='mean')
-        >> {
-                'f457c562-2159-431c-8866-dfa9a917d9b8':
-                    {
-                        'UNMEASURABLE': 0.0,
-                        'days': ['2023-09-09',
-                                    '2023-09-10',
-                                    '2023-09-11',
-                                    '2023-09-12',
-                                    '2023-09-13',
-                                    '2023-09-14',
-                                    '2023-09-15'
-                                ]
-                    }
-            }
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of :class:`pywearable.loader.base.BaseLoader`, required in order to properly load data.
-    user_id : :class:`str` or :class:`list`, optional
-        IDs of the users for which sleep data have to be extracted, by default "all"
-    start_date : :class:`datetime.datetime`, optional
-        Start date from which sleep data should be extracted, by default None.
-        If None is used, then the ``start_date`` will be the first day with available sleep data
-        for the given ``user_id``, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date up to which sleep data should be extracted, by default None.
-        If None is used, then the ``end_date`` will be the last day with available sleep data
-        for the given ``user_id``, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform unmeasurable sleep duration over days, or to return the value for each day, by default None.
-        Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and unmeasurable sleep duration as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `UNMEASURABLE`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1401,12 +362,7 @@ def get_unmeasurable_duration(
         statistic=SLEEP_STATISTIC_UNMEASURABLE_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1415,25 +371,15 @@ def get_light_sleep_percentage(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_LIGHT_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1442,25 +388,15 @@ def get_deep_sleep_percentage(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_DEEP_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1469,25 +405,15 @@ def get_rem_percentage(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_REM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1496,25 +422,15 @@ def get_nrem_percentage(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_NREM_PERCENTAGE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1523,25 +439,15 @@ def get_wake_after_sleep_onset(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_WASO,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1550,25 +456,15 @@ def get_sleep_onset_latency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_SOL,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1577,25 +473,15 @@ def get_sleep_score(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
         statistic=SLEEP_STATISTIC_SLEEP_SCORE,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1604,11 +490,11 @@ def get_sleep_timestamps(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-) -> Union[dict, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get the timestamps of the beginning and the end of sleep occurrences.
 
-    Returns for every day, the time when the user fell asleep and when he woke up
-    The information is based on the sleep summaries of the user
+    Returns the bedtime and wake-up time for every night. The information is
+    based on the sleep summaries of the user.
 
     Parameters
     ----------
@@ -1623,30 +509,17 @@ def get_sleep_timestamps(
 
     Returns
     -------
-    :class:`dict`
-        Dictionary with user ids as primary keys, calendar dates as secondary keys,
-        and sleep timestamps (bedtime, wakeup_time) as values.
+    :class:`pandas.DataFrame`
+        Bedtime and wake-up columns, indexed by ``user_id`` and
+        ``calendar_date``.
     """
-    data_dict = {}
-
-    user_id = utils.get_user_ids(loader, user_id)
-
-    for user in user_id:
-        try:
-            bedtime_dict = get_bedtime(
-                loader, user, start_date, end_date, return_df=False
-            )[user]
-            wakeup_time_dict = get_wakeup_time(
-                loader, user, start_date, end_date, return_df=False
-            )[user]
-            data_dict[user] = {
-                k: (bedtime_dict.get(k, None), wakeup_time_dict.get(k, None))
-                for k in bedtime_dict.keys()
-            }
-        except:
-            data_dict[user] = {}
-            raise
-    return data_dict
+    return get_sleep_statistics(
+        loader=loader,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        statistic=[SLEEP_STATISTIC_BEDTIME, SLEEP_STATISTIC_WAKEUP],
+    )
 
 
 def get_bedtime(
@@ -1654,41 +527,13 @@ def get_bedtime(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get bedtime sleep metric.
+) -> pd.Series:
+    """Return nightly bedtime.
 
-    Depending on the value of the ``kind`` parameter, this function
-    returns bedtime for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which bedtime must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform bedtime over days, or to return the value for each day, by default None.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and bedtime as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `bedtime`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1696,12 +541,7 @@ def get_bedtime(
         statistic=SLEEP_STATISTIC_BEDTIME,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1710,44 +550,13 @@ def get_wakeup_time(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get wake-up time sleep metric.
+) -> pd.Series:
+    """Return nightly wakeup time.
 
-    This function computes the wake-up time metric.
-    The value is reported in a datetime.datetime format.
-
-    Depending on the value of the ``kind`` parameter, this function
-    returns wakeup time for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which wakeup time must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform wakeup time over days, or to return the value for each day, by default None.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and wakeup times as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `wakeupTime`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1755,12 +564,7 @@ def get_wakeup_time(
         statistic=SLEEP_STATISTIC_WAKEUP,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1769,45 +573,13 @@ def get_sleep_midpoint(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Get midpoint sleep metric.
+) -> pd.Series:
+    """Return nightly sleep midpoint.
 
-    This function computes the sleep midpoint metric.
-    For every night of sleep the midpoint between bedtime and wakeup time is computed.
-    The value is reported in a datetime.datetime format.
-
-    Depending on the value of the ``kind`` parameter, this function
-    returns midpoint for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which midpoints must be retrieved, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform midpoints over days, or to return the value for each day, by default None.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and midpoints as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `midpoint`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1815,12 +587,7 @@ def get_sleep_midpoint(
         statistic=SLEEP_STATISTIC_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1829,53 +596,13 @@ def get_awake_count(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get the number of awakenings
+) -> pd.Series:
+    """Return nightly awake count.
 
-    Returns the number of times the user(s) of interest woke up during the night.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the count of awake stages for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
-        Initialized instance of data loader.
-    user_id : :class:`str`, optional
-        ID of the user for which awakenings are computed, by default "all".
-    start_date : :class:`datetime.datetime`, optional
-        Start date for data retrieval, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform count of awake stages over days, or to return the value for each
-        day, by default None. Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and count of awake stages as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `countAwake`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
 
     return get_sleep_statistic(
@@ -1884,12 +611,7 @@ def get_awake_count(
         statistic=SLEEP_STATISTIC_AWAKE_COUNT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1898,37 +620,13 @@ def get_light_sleep_count(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get the number of light sleep stages.
+) -> pd.Series:
+    """Return nightly light sleep count.
 
-    Returns the number of light sleep stages for the user(s) of interest.
-    This is checked. If ``average`` is set to True, the average number of
-    awakenings per night during the period between ``start_date`` and ``end_date`` is returned.
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
-        Initialized instance of data loader.
-    user_id : :class:`str`, optional
-        ID of the user for which awakenings are computed, by default "all".
-    start_date : :class:`datetime.datetime`, optional
-        Start date for data retrieval, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date for data retrieval, by default None
-    average : :class:`bool`, optional
-        Whether to return only the average number of awakenings per night for the user, by default False
-
-    Returns
-    -------
-    :class:`dict`
-        Dictionary with user ids as primary keys, dates as secondary keys, and number of awakenings as values.
-        If `average` is set to True, the average and the dates used for its calculation are returned as values.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
 
     return get_sleep_statistic(
@@ -1937,12 +635,7 @@ def get_light_sleep_count(
         statistic=SLEEP_STATISTIC_LIGHT_COUNT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -1951,53 +644,13 @@ def get_deep_sleep_count(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get the number of N3 sleep stages.
+) -> pd.Series:
+    """Return nightly deep sleep count.
 
-    Returns the number of N3 sleep stages for the user(s) of interest.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the count of N3 stages for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
-        Initialized instance of data loader.
-    user_id : :class:`str`, optional
-        ID of the user for which awakenings are computed, by default "all".
-    start_date : :class:`datetime.datetime`, optional
-        Start date for data retrieval, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform count of N3 stages over days, or to return the value for each
-        day, by default None. Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and count of N3 stages as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `countN3`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
 
     return get_sleep_statistic(
@@ -2006,12 +659,7 @@ def get_deep_sleep_count(
         statistic=SLEEP_STATISTIC_DEEP_COUNT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -2020,53 +668,13 @@ def get_rem_count(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get the number of REM sleep stages.
+) -> pd.Series:
+    """Return nightly rem count.
 
-    Returns the number of REM sleep stages for the user(s) of interest.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the count of REM stages for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days. The applied
-    transformation depends on the value of the ``kind`` parameter:
-
-        - `mean`: computes the average across days
-        - `std`: computes the standard deviation across days
-        - `min`: computes the minimum value across days
-        - `max`: computes the maximum value across days
-
-    Parameters
-    ----------
-    loader : :class:`pylabfront.loader.Loader`
-        Initialized instance of data loader.
-    user_id : :class:`str`, optional
-        ID of the user for which awakenings are computed, by default "all".
-    start_date : :class:`datetime.datetime`, optional
-        Start date for data retrieval, by default None
-    end_date : :class:`datetime.datetime`, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to transform count of REM stages over days, or to return the value for each
-        day, by default None. Valid options are:
-
-            - `mean`
-            - `std`
-            - `min`
-            - `max`
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and count of REM stages as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `countREM`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
 
     return get_sleep_statistic(
@@ -2075,12 +683,7 @@ def get_rem_count(
         statistic=SLEEP_STATISTIC_REM_COUNT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -2090,43 +693,13 @@ def get_cpd_midpoint(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype_dict: dict = {},
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Computes composite phase deviation (CPD) with regard to sleep midpoints
+) -> pd.Series:
+    """Return nightly cpd midpoint.
 
-    Returns a measure of sleep regularity, in terms of stability of rest midpoints.
-    The measure is computed for the period between `start_date` and `end_date`
-    for every user_id of interest.
-
-    Parameters
-    ----------
-    loader : `pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default 'all'
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to compute a transformation of CPD over days, or to return the value for each
-        day, by default None.
-    chronotype_dict : :class:`dict`, optional
-        Dictionary specifying for every user his usual sleeping time and waking time in format HH:MM, as a tuple.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and CPD midpoints as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `CPD_midpoint`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -2134,13 +707,8 @@ def get_cpd_midpoint(
         statistic=SLEEP_STATISTIC_CPD_MIDPOINT,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        chronotype_dict=chronotype_dict,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
+        chronotype=chronotype_dict,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -2149,13 +717,8 @@ def get_sleep_regularity_index(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     """Get Sleep Regularity Index (SRI)."""
     return get_sleep_statistic(
         loader=loader,
@@ -2163,12 +726,7 @@ def get_sleep_regularity_index(
         statistic=SLEEP_STATISTIC_SRI,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -2177,13 +735,8 @@ def get_getup_latency(
     user_id: Union[str, list] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
+) -> pd.Series:
     """Get get-up latency sleep metric.
 
     This function computes the time spent in bed after the last actual
@@ -2195,12 +748,7 @@ def get_getup_latency(
         statistic=SLEEP_STATISTIC_GETUP_LATENCY,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -2210,43 +758,13 @@ def get_cpd_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype_dict: dict = {},
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs={},
     loader_kwargs={},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-) -> dict:
-    """Computes composite phase deviation (CPD) with regard to sleep duration
+) -> pd.Series:
+    """Return nightly cpd duration.
 
-    Returns a measure of sleep regularity, in terms of sleep duration.
-    The measure is computed for the period between `start_date` and `end_date`
-    for every user_id of interest.
-
-    Parameters
-    ----------
-    loader : `pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which CPD must be retrieved, by default 'all'
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to compute a transformation of CPD over days, or to return the value for each
-        day, by default None.
-    chronotype_dict : :class:`dict`, optional
-        Dictionary specifying for every user his usual sleeping time and waking time in format HH:MM, as a tuple.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and CPD midpoints as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `CPD_duration`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
+    The result is a :class:`pandas.Series` with one value per night,
+    indexed by ``user_id`` and ``calendar_date``. Aggregation across
+    nights is intentionally handled outside this extraction function.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -2254,13 +772,8 @@ def get_cpd_duration(
         statistic=SLEEP_STATISTIC_CPD_DURATION,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        chronotype_dict=chronotype_dict,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
+        chronotype=chronotype_dict,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
     )
 
 
@@ -3894,77 +2407,14 @@ def get_sleep_statistic(
     statistic: str,
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args: Union[list, tuple] = [],
-    kind_kwargs: dict = {},
+    chronotype: Union[dict, None] = None,
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-    **kwargs,
-) -> dict:
-    """Get sleep statistic from sleep data.
+) -> pd.Series:
+    """Return one sleep feature at one-row-per-night resolution.
 
-    This function is used by several functions of the module to get a single
-    sleep statistic starting from sleep data.
-    If multiple statistics are required, then it is more efficient to
-    use the :func:`get_sleep_statistics` function that computes all the
-    statistics by loading only once sleep data. The following statistics
-    can be computed:
-
-        - Time in Bed (``statistic="TIB"``)
-        - Total Sleep Time (``statistic="TST"``)
-        - Wake After Sleep Onset (``statistic="WASO"``)
-        - Sleep Onset Latency (``statistic="SOL"``)
-        - Sleep Period Time (``statistic="SPT"``)
-        - N1 Sleep Duration (``statistic="N1"``)
-        - N2 Sleep Duration (``statistic="N2"``)
-        - N3 Sleep Duration (``statistic="N3"``)
-        - REM Sleep Duration (``statistic="REM"``)
-        - NREM Sleep Duration (``statistic="NREM"``)
-        - Awake Duration (``statistic="AWAKE"``)
-        - Unmeasurable Sleep Duration (``statistic="UNMEASURABLE"``)
-        - N1 Sleep Latency (``statistic="Lat_N1"``)
-        - N2 Sleep Latency (``statistic="Lat_N2"``)
-        - N3 Sleep Latency (``statistic="Lat_N3"``)
-        - REM Sleep Latency (``statistic="Lat_REM"``)
-        - N1 Sleep Percentage (``statistic="%N1"``)
-        - N2 Sleep Percentage (``statistic="%N2"``)
-        - N3 Sleep Percentage (``statistic="%N3"``)
-        - Sleep Efficiency (``statistic="SE"``)
-        - Sleep Maintenance Efficiency (``statistic="SME"``)
-        - Sleep Score (``statistic="SCORE"``)
-        - Number of Awakenings (``statistic="Awakenings"``)
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`
-        The id(s) for which the sleep statistic must be computed.
-    metric : :class:`str`
-        The name of the sleep statistic which must be computed.
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None
-    kind : :class:`str` or None, optional
-        Whether to perform a transform of the sleep statistic over days, by default None.
-        If `None`, then the sleep statistic is returned with a value for each day, otherwise
-        a transformation is applied. Valid options are:
-
-            - 'mean'
-            - 'min'
-            - 'max'
-            - 'std'
-
-    Returns
-    -------
-    dict
-        If ``average==False``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (as :class:`datetime.date`) as keys and sleep statistic as values.
-        If ``average==True``, dictionary with ``user_id`` as key, and a nested dictionary with the
-        name of the sleep statistic as key and its value, and an additional `days` keys that contains an array of all
-        calendar days over which the average was computed.
+    This convenience wrapper delegates to :func:`get_sleep_statistics` and
+    returns a :class:`pandas.Series` indexed by ``user_id`` and
+    ``calendar_date``. Aggregation across nights is not performed here.
     """
     return get_sleep_statistics(
         loader=loader,
@@ -3972,13 +2422,8 @@ def get_sleep_statistic(
         statistic=statistic,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
+        chronotype=chronotype,
         loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-        **kwargs,
     )
 
 
@@ -3988,15 +2433,21 @@ def get_sleep_statistics(
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
     statistic: Union[str, list, tuple, None] = None,
-    chronotype: Union[dict, None] = {},
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
+    chronotype: Union[dict, None] = None,
     loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-    **kwargs,
-) -> Union[pd.DataFrame, dict]:
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return sleep features at their natural one-row-per-night resolution.
+
+    A single requested feature is returned as a :class:`pandas.Series`;
+    multiple features are returned as a :class:`pandas.DataFrame`. Both use a
+    ``(user_id, calendar_date)`` MultiIndex. Missing feature values remain
+    missing while the corresponding night stays in the trajectory.
+
+    Aggregation across nights is deliberately outside this function. Set
+    ``statistic`` to ``None`` for the shared feature set, excluding optional
+    features whose definitions or availability are not yet consistent across
+    loaders.
+    """
 
     # Get user id from the loader
     user_id = utils.get_user_ids(loader, user_id)
@@ -4015,13 +2466,17 @@ def get_sleep_statistics(
     elif type(statistic) == str:
         statistics = [statistic]
     else:
-        statistics = statistic
+        statistics = list(statistic)
 
-    # Check args and kwargs
-    if type(kind_args) != list:
-        raise ValueError(f"kind_args must be an iterable, not {type(kind_args)}")
-    if type(kind_kwargs) != dict:
-        raise ValueError(f"kind_kwargs must be of type dict, not {type(kind_kwargs)}")
+    if not statistics:
+        raise ValueError("statistic must contain at least one sleep feature")
+    for requested_statistic in statistics:
+        if requested_statistic not in SLEEP_STATISTICS_DICT:
+            raise ValueError(
+                "statistic must be one among "
+                f"{list(SLEEP_STATISTICS_DICT)}, not {requested_statistic}"
+            )
+
     if type(loader_kwargs) != dict:
         raise ValueError(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
@@ -4079,65 +2534,19 @@ def get_sleep_statistics(
                     sleep_summary=sleep_summary,
                     sleep_stages=sleep_stages,
                     chronotype=user_chronotype,
-                )
+                ).reindex(sleep_summary.index)
 
                 user_statistics_list.append(ser.rename(statistic))
             user_frames[user] = pd.concat(user_statistics_list, axis=1)
     if not user_frames:
-        return {} if not return_df else pd.DataFrame(columns=statistics)
+        empty_index = pd.MultiIndex.from_arrays(
+            [[], []], names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
+        )
+        empty = pd.DataFrame(columns=statistics, index=empty_index)
+        return empty[statistics[0]] if len(statistics) == 1 else empty
     sleep_stats_df = pd.concat(
         user_frames, names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
     )
-
-    # Perform kind operation by user
-    if not (kind is None):
-        # For bedtime, wakeup, and midpoint columns we need to use a different
-        # approach
-        aggregated_sleep_stats_df = (
-            sleep_stats_df.drop(
-                columns=SLEEP_DATETIME_STATISTICS + ["validation"], errors="ignore"
-            )
-            .groupby(level=constants.USER_COL)
-            .agg(kind, *kind_args, **kind_kwargs)
-        )
-        for statistic in SLEEP_DATETIME_STATISTICS:
-            if statistic in sleep_stats_df:
-                if kind in SLEEP_KIND_MAPPING.keys():
-                    mapping_function = SLEEP_KIND_MAPPING[kind][statistic]
-                    # We need to check that we have a valid kind operation
-                else:
-                    warnings.warn(
-                        f"Kind operation {kind} is not supported for datetime values. Please choose one among {[x for x in SLEEP_KIND_MAPPING.keys()]}"
-                    )
-                    mapping_function = lambda x: np.nan
-                temp_col = (
-                    sleep_stats_df[statistic]
-                    .groupby(level=constants.USER_COL)
-                    .apply(mapping_function)
-                )
-
-                aggregated_sleep_stats_df = pd.concat(
-                    (aggregated_sleep_stats_df, temp_col), axis=1
-                )
-        return aggregated_sleep_stats_df if return_df else aggregated_sleep_stats_df.to_dict(orient="index")
-
-    if not return_df:
-        result = {}
-        for user, frame in user_frames.items():
-            if len(statistics) == 1:
-                result[user] = {
-                    pd.Timestamp(date).date(): value
-                    for date, value in frame[statistics[0]].items()
-                }
-            else:
-                result[user] = {
-                    pd.Timestamp(date).date(): values
-                    for date, values in frame.to_dict(orient="index").items()
-                }
-        return result
-
-    if not return_multi_index:
-        return sleep_stats_df.reset_index()
 
     # Return series if only statistic
     if len(statistics) == 1:

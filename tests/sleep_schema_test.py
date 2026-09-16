@@ -1,6 +1,7 @@
 from types import SimpleNamespace
 
 import pandas as pd
+import pytest
 
 from pywearable import sleep, sleep_schema
 
@@ -55,10 +56,22 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TIB"] == 60
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TST"] == 60
     assert pd.isna(result.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_score"])
-    flat = sleep.get_sleep_statistics(loader, "person-1", None, None, statistic=["sleep_score"], return_multi_index=False)
-    assert list(flat) == ["user", "calendar_date", "sleep_score"]
-    as_dict = sleep.get_sleep_statistics(loader, "person-1", None, None, statistic="sleep_score", return_df=False)
-    assert as_dict["person-1"][pd.Timestamp("2024-01-02").date()] == 80
+    score = sleep.get_sleep_statistics(
+        loader, "person-1", None, None, statistic="sleep_score"
+    )
+    assert isinstance(score, pd.Series)
+    assert score.index.names == ["user_id", "calendar_date"]
+    assert score.loc[("person-1", pd.Timestamp("2024-01-02"))] == 80
+
+    timestamps = sleep.get_sleep_timestamps(loader, "person-1")
+    assert isinstance(timestamps, pd.DataFrame)
+    assert timestamps.index.names == ["user_id", "calendar_date"]
+    assert list(timestamps) == ["bedtime", "wakeup"]
+
+    with pytest.raises(ValueError, match="statistic must be one among"):
+        sleep.get_sleep_statistics(
+            loader, "person-1", None, None, statistic="unknown_feature"
+        )
 
 
 def test_cpd_is_undefined_on_first_night_and_after_gap():

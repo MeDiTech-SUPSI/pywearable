@@ -1316,20 +1316,22 @@ def get_sleep_summary_graph(
     # check chronotype and infer it from data if missing
     if consistency_metric is not None or show_chronotype is not None:
         if chronotype_sleep_start is None or chronotype_sleep_end is None:
-            chronotype_sleep_start = sleep.get_bedtime(
-                loader=loader,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-                kind="mean",
-            )["bedtime"].iloc[0]
-            chronotype_sleep_end = sleep.get_wakeup_time(
-                loader=loader,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-                kind="mean",
-            )["wakeup"].iloc[0]
+            chronotype_sleep_start = utils.mean_time(
+                sleep.get_bedtime(
+                    loader=loader,
+                    user_id=user_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
+            chronotype_sleep_end = utils.mean_time(
+                sleep.get_wakeup_time(
+                    loader=loader,
+                    user_id=user_id,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+            )
         else:
             assertion_msg = "Must specify chronotype in format 'HH:MM' when plotting circadian measures"
             assert (
@@ -1624,13 +1626,15 @@ def get_sleep_summary_graph(
                 user_id,
                 start_date - datetime.timedelta(days=30),
                 end_date,
-                kind=None,
                 chronotype_dict={
                     user_id: (chronotype_sleep_start, chronotype_sleep_end)
                 },
-            )[user_id]
+            ).xs(user_id, level="user_id")
             cpd_trend = utils.trend_analysis(
-                cpd_dict,
+                {
+                    pd.Timestamp(calendar_date).date(): value
+                    for calendar_date, value in cpd_dict.items()
+                },
                 **kwargs_trend_analysis,
             )
             # filter out to keep appropriate period
