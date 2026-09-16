@@ -277,3 +277,35 @@ def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
     assert loader.load_steps_summary("person-1", "2024-01-03", "2024-01-04").empty
     with pytest.raises(NotImplementedError, match="vendor-specific"):
         loader.load_recovery("person-1")
+
+
+def test_oura_zero_steps_and_spo2_are_missing(tmp_path):
+    _page(
+        tmp_path,
+        "daily_activity",
+        "data.json",
+        [{"id": "activity-1", "day": "2024-01-02", "steps": 0}],
+    )
+    _page(
+        tmp_path,
+        "daily_spo2",
+        "data.json",
+        [
+            {
+                "id": "spo2-1",
+                "day": "2024-01-02",
+                "spo2_percentage": {"average": 0.0},
+            }
+        ],
+    )
+    loader = OuraLoader(tmp_path)
+
+    steps = loader.load_steps_summary("person-1")
+    pulse_ox = loader.load_pulse_ox_summary("person-1")
+
+    assert pd.isna(steps.loc[0, "steps"])
+    assert str(steps["steps"].dtype) == "Int64"
+    assert pd.isna(
+        pulse_ox.loc[0, "oura_daily_spo2_percentage"]
+    )
+    assert str(pulse_ox["oura_daily_spo2_percentage"].dtype) == "Float64"

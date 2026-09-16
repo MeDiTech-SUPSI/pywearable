@@ -280,7 +280,11 @@ class OuraLoader(BaseLoader):
         return frame.reset_index(drop=True)
 
     def load_sleep_stage(self, user_id, start_date=None, end_date=None):
-        """Decode Oura's five-minute phase string into coherent stage runs."""
+        """Decode five-minute phases into contiguous stage runs.
+
+        Run durations follow Oura's five-minute grid and can differ by seconds
+        from the session's exact ``time_in_bed`` interval.
+        """
         stage_map = {"1": "deep", "2": "light", "3": "rem", "4": "awake"}
         columns = [
             "sleep_summary_id", "utc_time", "local_time", "timezone_offset_in_ms",
@@ -475,26 +479,40 @@ class OuraLoader(BaseLoader):
         rows = [
             {
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                "steps": record.get("steps"),
+                "steps": (
+                    pd.NA if record.get("steps") == 0 else record.get("steps")
+                ),
             }
             for record in self._day_filter(
                 self._read_records(user_id, "daily_activity"), start_date, end_date
             )
         ]
-        return pd.DataFrame(rows, columns=["calendar_date", "steps"])
+        frame = pd.DataFrame(rows, columns=["calendar_date", "steps"])
+        frame["steps"] = frame["steps"].astype("Int64")
+        return frame
 
     def load_pulse_ox_summary(self, user_id, start_date=None, end_date=None):
         """Return Oura's provider daily SpO2 percentage, not raw pulse-ox samples."""
         rows = [
             {
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                "oura_daily_spo2_percentage": (record.get("spo2_percentage") or {}).get("average"),
+                "oura_daily_spo2_percentage": (
+                    pd.NA
+                    if (record.get("spo2_percentage") or {}).get("average") == 0
+                    else (record.get("spo2_percentage") or {}).get("average")
+                ),
             }
             for record in self._day_filter(
                 self._read_records(user_id, "daily_spo2"), start_date, end_date
             )
         ]
-        return pd.DataFrame(rows, columns=["calendar_date", "oura_daily_spo2_percentage"])
+        frame = pd.DataFrame(
+            rows, columns=["calendar_date", "oura_daily_spo2_percentage"]
+        )
+        frame["oura_daily_spo2_percentage"] = frame[
+            "oura_daily_spo2_percentage"
+        ].astype("Float64")
+        return frame
 
     def load_readiness(self, user_id, start_date=None, end_date=None):
         """Return Oura's daily readiness score and vendor contributor scores."""
