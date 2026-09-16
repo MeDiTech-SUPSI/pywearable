@@ -82,7 +82,13 @@ def test_oura_sleep_maps_long_sleep_and_keeps_naps_separate(tmp_path):
     assert summaries.loc[0, "local_time"] == pd.Timestamp("2024-01-01 23:00")
     assert pd.isna(summaries.loc[0, "overall_sleep_score"])
     assert len(loader.load_sleep_sessions("person-1")) == 2
+    assert loader.load_sleep_sessions("person-1")["main_sleep"].tolist() == [True, False]
     assert len(loader.load_sleep_sessions("person-1", sleep_type="sleep")) == 1
+    assert set(loader.load_sleep_stage("person-1")["sleep_summary_id"]) == {"sleep-1"}
+    assert set(loader.load_sleep_session_stages("person-1")["sleep_summary_id"]) == {
+        "sleep-1",
+        "nap-1",
+    }
     assert loader.load_sleep_summary("person-1", "2024-01-03", "2024-01-04").empty
 
 

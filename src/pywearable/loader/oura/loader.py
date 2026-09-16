@@ -206,12 +206,16 @@ class OuraLoader(BaseLoader):
         records = self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
         if sleep_type is not None:
             records = [record for record in records if record.get("type") == sleep_type]
-        columns = ["id", "calendar_date", "type", "local_time", "local_end_time", "time_in_bed_seconds"]
+        columns = [
+            "id", "calendar_date", "type", "main_sleep", "local_time",
+            "local_end_time", "time_in_bed_seconds",
+        ]
         rows = [
             {
                 "id": record["id"],
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
                 "type": record.get("type"),
+                "main_sleep": record.get("type") == "long_sleep",
                 "local_time": self._local_time(record["bedtime_start"]),
                 "local_end_time": self._local_time(record["bedtime_end"]),
                 "time_in_bed_seconds": record.get("time_in_bed"),
@@ -279,7 +283,9 @@ class OuraLoader(BaseLoader):
             )
         return frame.reset_index(drop=True)
 
-    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+    def _load_sleep_stages(
+        self, user_id, start_date=None, end_date=None, main_sleep_only=True
+    ):
         """Decode five-minute phases into contiguous stage runs.
 
         Run durations follow Oura's five-minute grid and can differ by seconds
@@ -295,7 +301,7 @@ class OuraLoader(BaseLoader):
         requested_start = pd.Timestamp(start_date) if start_date is not None else None
         requested_end = pd.Timestamp(end_date) if end_date is not None else None
         for record in self._read_records(user_id, "sleep"):
-            if record.get("type") != "long_sleep":
+            if main_sleep_only and record.get("type") != "long_sleep":
                 continue
             phases = record.get("sleep_phase_5_min") or ""
             if not phases:
@@ -342,6 +348,18 @@ class OuraLoader(BaseLoader):
             | frame["sleep_summary_id"].isin(uncertain_sessions_in_window)
         ]
         return frame.sort_values("local_time").reset_index(drop=True)
+
+    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+        """Return the stage trajectory for nightly ``long_sleep`` sessions."""
+        return self._load_sleep_stages(
+            user_id, start_date, end_date, main_sleep_only=True
+        )
+
+    def load_sleep_session_stages(self, user_id, start_date=None, end_date=None):
+        """Return staged Oura sleep sessions, including naps and rests."""
+        return self._load_sleep_stages(
+            user_id, start_date, end_date, main_sleep_only=False
+        )
 
     def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="local_time"):
         """Return Oura HR with UTC instants and conservatively inferred local time.

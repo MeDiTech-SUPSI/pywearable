@@ -254,6 +254,8 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
 
     loaded_stages = loader.load_sleep_stage("person-1")
     assert "nap" not in set(loaded_stages["sleep_summary_id"])
+    all_session_stages = loader.load_sleep_session_stages("person-1")
+    assert "nap" in set(all_session_stages["sleep_summary_id"])
     assert set(loaded_stages["type"]) == {
         "awake",
         "asleep",

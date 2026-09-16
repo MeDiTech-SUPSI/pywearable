@@ -4,7 +4,7 @@ from typing import Union
 
 import pandas as pd
 
-from .. import constants
+from .. import constants, sleep_schema
 
 
 class BaseLoader(ABC):
@@ -42,6 +42,87 @@ class BaseLoader(ABC):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         pass
+
+    def load_sleep_sessions(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Return known sleep sessions in the shared session schema.
+
+        Loaders without a separate all-session source expose their nightly
+        summaries as main-sleep sessions. Provider implementations can
+        override this method to include naps and other non-main sessions.
+        """
+        summaries = self.load_sleep_summary(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            drop_duplicates=True,
+        )
+        columns = [
+            "id",
+            "calendar_date",
+            "type",
+            "main_sleep",
+            "local_time",
+            "local_end_time",
+            "time_in_bed_seconds",
+        ]
+        if summaries.empty:
+            return pd.DataFrame(columns=columns)
+
+        summaries = sleep_schema.prepare_sleep_summary(summaries)
+        reconstructed_end = pd.to_datetime(
+            summaries[sleep_schema.ISODATE_COL]
+        ) + pd.to_timedelta(
+            pd.to_numeric(
+                summaries[sleep_schema.SLEEP_SUMMARY_DURATION_IN_MS_COL],
+                errors="coerce",
+            ).fillna(0)
+            + pd.to_numeric(
+                summaries[sleep_schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+                errors="coerce",
+            ).fillna(0),
+            unit="ms",
+        )
+        if sleep_schema.LOCAL_END_TIME_COL in summaries:
+            local_end = pd.to_datetime(
+                summaries[sleep_schema.LOCAL_END_TIME_COL]
+            ).fillna(reconstructed_end)
+        else:
+            local_end = reconstructed_end
+        result = pd.DataFrame(
+            {
+                "id": summaries[sleep_schema.SLEEP_SUMMARY_ID_COL],
+                "calendar_date": pd.to_datetime(
+                    summaries[sleep_schema.CALENDAR_DATE_COL]
+                ).dt.normalize(),
+                "type": "main_sleep",
+                "main_sleep": True,
+                "local_time": pd.to_datetime(summaries[sleep_schema.ISODATE_COL]),
+                "local_end_time": local_end,
+                "time_in_bed_seconds": (
+                    local_end
+                    - pd.to_datetime(summaries[sleep_schema.ISODATE_COL])
+                ).dt.total_seconds(),
+            }
+        )
+        return result[columns].sort_values("local_time").reset_index(drop=True)
+
+    def load_sleep_session_stages(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Return stages for all available sessions.
+
+        The default is the loader's main-sleep stage trajectory. Loaders with
+        staged naps or other non-main sessions override this method.
+        """
+        return self.load_sleep_stage(user_id, start_date, end_date)
 
     @abstractmethod
     def load_heart_rate(

@@ -343,12 +343,13 @@ class LifeSnapsParquetLoader(BaseLoader):
         else:
             return pd.DataFrame(columns=["isoDate", "calories"])
 
-    def load_sleep_stage(
+    def _load_sleep_stages(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
         drop_duplicates: bool = True,
+        main_sleep_only: bool = True,
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "sleep_stages.parquet"
         if file_path.exists():
@@ -390,11 +391,12 @@ class LifeSnapsParquetLoader(BaseLoader):
                     "unknown": "unmeasurable",
                 }
             )
-            sessions = self.load_sleep_sessions(user_id)
-            main_sleep_ids = sessions.loc[sessions["main_sleep"], "id"]
-            sleep_stages = sleep_stages[
-                sleep_stages["sleep_summary_id"].isin(main_sleep_ids)
-            ]
+            if main_sleep_only:
+                sessions = self.load_sleep_sessions(user_id)
+                main_sleep_ids = sessions.loc[sessions["main_sleep"], "id"]
+                sleep_stages = sleep_stages[
+                    sleep_stages["sleep_summary_id"].isin(main_sleep_ids)
+                ]
             if drop_duplicates:
                 sleep_stages = sleep_stages.drop_duplicates(
                     subset=["sleep_summary_id", "local_time", "type"]
@@ -422,6 +424,29 @@ class LifeSnapsParquetLoader(BaseLoader):
             return pd.DataFrame(
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
             )
+
+    def load_sleep_stage(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+        drop_duplicates: bool = True,
+    ) -> pd.DataFrame:
+        """Return main-sleep stages used by nightly feature extraction."""
+        return self._load_sleep_stages(
+            user_id, start_date, end_date, drop_duplicates, main_sleep_only=True
+        )
+
+    def load_sleep_session_stages(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return Fitbit stages for main sleep and non-main sessions."""
+        return self._load_sleep_stages(
+            user_id, start_date, end_date, main_sleep_only=False
+        )
 
     @staticmethod
     def _overlay_short_sleep_stages(
