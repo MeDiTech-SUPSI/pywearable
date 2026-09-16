@@ -378,8 +378,11 @@ class LifeSnapsParquetLoader(BaseLoader):
                     sleep_stages, read_stages(short_stages_path)
                 )
 
+            # LifeSnaps timestamps were converted to participant-local time
+            # before release, while the corresponding UTC offsets were withheld.
             sleep_stages["local_time"] = sleep_stages["utc_time"]
-            sleep_stages["timezone_offset"] = pd.Timedelta(0)
+            sleep_stages["utc_time"] = pd.NaT
+            sleep_stages["timezone_offset_in_ms"] = pd.NA
             sleep_stages["type"] = sleep_stages["type"].replace(
                 {
                     "wake": "awake",
@@ -394,7 +397,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             ]
             if drop_duplicates:
                 sleep_stages = sleep_stages.drop_duplicates(
-                    subset=["sleep_summary_id", "utc_time", "type"]
+                    subset=["sleep_summary_id", "local_time", "type"]
                 )
 
             sleep_stages = self._drop_incoherent_sleep_stages(user_id, sleep_stages)
@@ -407,9 +410,14 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep_stages = sleep_stages[
                     sleep_stages["local_time"] < pd.Timestamp(end_date)
                 ]
-            from ..sleep_schema import normalize_sleep_columns
+            from ..sleep_schema import (
+                coalesce_sleep_stage_runs,
+                normalize_sleep_columns,
+            )
 
-            return normalize_sleep_columns(sleep_stages)
+            return coalesce_sleep_stage_runs(
+                normalize_sleep_columns(sleep_stages)
+            )
         else:
             return pd.DataFrame(
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
@@ -655,10 +663,11 @@ class LifeSnapsParquetLoader(BaseLoader):
             for col in ["calendar_date", "utc_time", "utc_end_time"]:
                 sleep[col] = pd.to_datetime(sleep[col])
 
-            sleep["utc_time"] = pd.to_datetime(sleep["utc_time"])
-            sleep["local_time"] = sleep["utc_time"]
-            sleep["local_end_time"] = sleep["utc_end_time"]
-            sleep["timezone_offset"] = pd.Timedelta(0)
+            sleep["local_time"] = pd.to_datetime(sleep["utc_time"])
+            sleep["local_end_time"] = pd.to_datetime(sleep["utc_end_time"])
+            sleep["utc_time"] = pd.NaT
+            sleep["utc_end_time"] = pd.NaT
+            sleep["timezone_offset_in_ms"] = pd.NA
 
             if "mainSleep" in sleep.columns:
                 sleep = sleep[sleep["mainSleep"].eq(True)]

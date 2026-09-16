@@ -106,7 +106,7 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
     assert night["SPT"] == 80
     assert night["WASO"] == 5
     assert night["SOL"] == 0
-    assert night["SME"] == 81.25
+    assert night["SME"] == 93.75
     assert night["lat_deep"] == 10
     assert night["lat_light"] == 0
     assert night["lat_REM"] == 25

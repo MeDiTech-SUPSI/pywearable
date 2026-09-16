@@ -119,12 +119,6 @@ class TesseraeParquetLoader(BaseLoader):
         sleep_summary["timezone_offset"] = (
             sleep_summary["local_time"] - sleep_summary["utc_time"]
         )
-        sleep_summary["local_end_time"] = sleep_summary["local_time"] + pd.to_timedelta(
-            sleep_summary["duration_seconds"].fillna(0)
-            + sleep_summary["awake_seconds"].fillna(0),
-            unit="seconds",
-        )
-
         # Let's create the same sleep summary identifier
         sleep_summary["local_end_time"] = sleep_summary["local_time"] + pd.to_timedelta(
             sleep_summary["duration_seconds"].fillna(0)
@@ -253,6 +247,46 @@ class TesseraeParquetLoader(BaseLoader):
             "light_sleep_seconds",
         ]:
             sleep[col] = pd.to_numeric(sleep[col], errors="coerce")
+        if "unmeasurable_sleep_seconds" in sleep.columns:
+            sleep["unmeasurable_sleep_seconds"] = pd.to_numeric(
+                sleep["unmeasurable_sleep_seconds"], errors="coerce"
+            )
+        else:
+            sleep["unmeasurable_sleep_seconds"] = 0.0
+
+        classified_sleep_seconds = sleep[
+            [
+                "deep_sleep_seconds",
+                "light_sleep_seconds",
+                "rem_sleep_seconds",
+            ]
+        ].sum(axis=1, min_count=1)
+        staged_sleep_seconds = (
+            classified_sleep_seconds
+            + sleep["unmeasurable_sleep_seconds"].fillna(0)
+        )
+        # Older AUTO_TENTATIVE Tesserae rows use duration_seconds for the
+        # complete interval, including awake time. Normalize only rows whose
+        # detailed stages demonstrate that exact legacy convention.
+        duration_includes_awake = (
+            classified_sleep_seconds.notna()
+            & sleep["awake_seconds"].fillna(0).gt(0)
+            & np.isclose(
+                sleep["duration_seconds"],
+                staged_sleep_seconds + sleep["awake_seconds"].fillna(0),
+                rtol=0,
+                atol=1e-6,
+            )
+        )
+        sleep.loc[duration_includes_awake, "duration_seconds"] = (
+            staged_sleep_seconds.loc[duration_includes_awake]
+        )
+
+        sleep = sleep[
+            sleep["duration_seconds"].fillna(0)
+            + sleep["awake_seconds"].fillna(0)
+            > 0
+        ].copy()
 
         sleep["calendar_date"] = (
             sleep["local_time"]
@@ -295,6 +329,16 @@ class TesseraeParquetLoader(BaseLoader):
             (sleep["local_time"] - sleep["utc_time"]) / pd.Timedelta(milliseconds=1)
         )
         sleep["unix_timestamp_in_ms"] = sleep["utc_time"].astype("int64") // 1_000_000
+        sleep["local_end_time"] = sleep["local_time"] + pd.to_timedelta(
+            sleep["duration_seconds"].fillna(0)
+            + sleep["awake_seconds"].fillna(0),
+            unit="seconds",
+        )
+        sleep["utc_end_time"] = sleep["utc_time"] + pd.to_timedelta(
+            sleep["duration_seconds"].fillna(0)
+            + sleep["awake_seconds"].fillna(0),
+            unit="seconds",
+        )
         for source, target in (
             ("duration_seconds", "duration_in_ms"),
             ("awake_seconds", "awake_duration_in_ms"),
@@ -303,16 +347,18 @@ class TesseraeParquetLoader(BaseLoader):
             ("rem_sleep_seconds", "rem_sleep_duration_in_ms"),
         ):
             sleep[target] = sleep[source].fillna(0) * 1000
-        sleep["unmeasurable_sleep_duration_in_ms"] = 0
-        # Filter by isoDate
+        sleep["unmeasurable_sleep_duration_in_ms"] = (
+            sleep["unmeasurable_sleep_seconds"].fillna(0) * 1000
+        )
+        # Nightly bounds apply to the local calendar day assigned to the sleep.
         if not (start_date is None):
             sleep = sleep.loc[
-                (sleep["local_time"] >= start_date),
+                (sleep["calendar_date"] >= pd.Timestamp(start_date).normalize()),
                 :,
             ]
         if not (end_date is None):
             sleep = sleep.loc[
-                (sleep["local_time"] < end_date),
+                (sleep["calendar_date"] < pd.Timestamp(end_date).normalize()),
                 :,
             ]
 

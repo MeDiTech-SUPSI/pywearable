@@ -27,6 +27,14 @@ SLEEP_STAGE_LIGHT_STAGE_VALUE = "light"
 SLEEP_STAGE_DEEP_STAGE_VALUE = "deep"
 SLEEP_STAGE_AWAKE_STAGE_VALUE = "awake"
 SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE = "unmeasurable"
+SLEEP_STAGE_ALLOWED_VALUES = {
+    SLEEP_STAGE_REM_STAGE_VALUE,
+    SLEEP_STAGE_LIGHT_STAGE_VALUE,
+    SLEEP_STAGE_DEEP_STAGE_VALUE,
+    SLEEP_STAGE_AWAKE_STAGE_VALUE,
+    SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+    "asleep",
+}
 
 SLEEP_SUMMARY_REQUIRED_COLUMNS = (
     SLEEP_SUMMARY_ID_COL,
@@ -99,6 +107,14 @@ def prepare_sleep_summary(frame):
         frame[CALENDAR_DATE_COL], errors="coerce"
     ).dt.normalize()
     frame[ISODATE_COL] = pd.to_datetime(frame[ISODATE_COL], errors="coerce")
+    if UTC_TIME_COL in frame.columns:
+        frame[UTC_TIME_COL] = pd.to_datetime(
+            frame[UTC_TIME_COL], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+    elif UNIXTIMESTAMP_IN_MS_COL in frame.columns:
+        frame[UTC_TIME_COL] = pd.to_datetime(
+            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
+        ).dt.tz_localize(None)
     if "local_end_time" in frame.columns:
         frame["local_end_time"] = pd.to_datetime(
             frame["local_end_time"], errors="coerce"
@@ -145,16 +161,76 @@ def prepare_sleep_stages(frame):
 
     frame[ISODATE_COL] = pd.to_datetime(frame[ISODATE_COL], errors="coerce")
     if UTC_TIME_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(frame[UTC_TIME_COL], errors="coerce")
+        frame[UTC_TIME_COL] = pd.to_datetime(
+            frame[UTC_TIME_COL], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+    elif UNIXTIMESTAMP_IN_MS_COL in frame.columns:
+        frame[UTC_TIME_COL] = pd.to_datetime(
+            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
+        ).dt.tz_localize(None)
     frame[SLEEP_STAGE_DURATION_IN_MS_COL] = pd.to_numeric(
         frame[SLEEP_STAGE_DURATION_IN_MS_COL], errors="coerce"
     )
-    if frame[[SLEEP_STAGE_SLEEP_SUMMARY_ID_COL, ISODATE_COL]].isna().any().any():
+    if frame[
+        [
+            SLEEP_STAGE_SLEEP_SUMMARY_ID_COL,
+            ISODATE_COL,
+            SLEEP_STAGE_DURATION_IN_MS_COL,
+            SLEEP_STAGE_SLEEP_TYPE_COL,
+        ]
+    ].isna().any().any():
         raise ValueError(
-            "sleep stage data requires a valid sleep_summary_id and local_time "
-            "for every stage"
+            "sleep stage data requires a valid sleep_summary_id, local_time, "
+            "duration_in_ms, and type for every stage"
+        )
+    if frame[SLEEP_STAGE_DURATION_IN_MS_COL].le(0).any():
+        raise ValueError("sleep stage duration_in_ms must be positive")
+    unknown_types = set(frame[SLEEP_STAGE_SLEEP_TYPE_COL].unique()).difference(
+        SLEEP_STAGE_ALLOWED_VALUES
+    )
+    if unknown_types:
+        raise ValueError(
+            "sleep stage type contains unsupported values: "
+            + ", ".join(sorted(map(str, unknown_types)))
         )
 
-    return frame.sort_values(
+    frame = frame.sort_values(
         [SLEEP_STAGE_SLEEP_SUMMARY_ID_COL, ISODATE_COL], kind="stable"
     ).reset_index(drop=True)
+    return coalesce_sleep_stage_runs(frame)
+
+
+def coalesce_sleep_stage_runs(frame):
+    """Merge exactly adjacent intervals with the same stage label."""
+    if frame.empty:
+        return frame
+
+    frame = frame.copy()
+    order_time = frame[ISODATE_COL].copy()
+    if UTC_TIME_COL in frame.columns:
+        complete_utc = frame[UTC_TIME_COL].notna().groupby(
+            frame[SLEEP_STAGE_SLEEP_SUMMARY_ID_COL]
+        ).transform("all")
+        order_time.loc[complete_utc] = frame.loc[complete_utc, UTC_TIME_COL]
+    frame["__sleep_order_time"] = order_time
+    frame = frame.sort_values(
+        [SLEEP_STAGE_SLEEP_SUMMARY_ID_COL, "__sleep_order_time"], kind="stable"
+    )
+    end_time = frame["__sleep_order_time"] + pd.to_timedelta(
+        frame[SLEEP_STAGE_DURATION_IN_MS_COL], unit="ms"
+    )
+    starts_new_run = (
+        frame[SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].ne(
+            frame[SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].shift()
+        )
+        | frame[SLEEP_STAGE_SLEEP_TYPE_COL].ne(
+            frame[SLEEP_STAGE_SLEEP_TYPE_COL].shift()
+        )
+        | frame["__sleep_order_time"].ne(end_time.shift())
+    )
+    run_id = starts_new_run.cumsum()
+    result = frame.loc[starts_new_run].copy()
+    result[SLEEP_STAGE_DURATION_IN_MS_COL] = frame.groupby(run_id, sort=False)[
+        SLEEP_STAGE_DURATION_IN_MS_COL
+    ].sum().to_numpy()
+    return result.drop(columns="__sleep_order_time").reset_index(drop=True)

@@ -19,7 +19,8 @@ def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatc
             "rem_sleep_seconds": ["NULL"],
             "deep_sleep_seconds": ["1200"],
             "awake_seconds": ["0"],
-            "light_sleep_seconds": ["2400"],
+            "light_sleep_seconds": ["1800"],
+            "unmeasurable_sleep_seconds": ["600"],
             "validation": ["AUTO_FINAL"],
             "sleep_levels_map": ["{}"],
         }
@@ -30,6 +31,71 @@ def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatc
 
     assert result.loc[0, "duration_in_ms"] == 3_600_000
     assert result.loc[0, "rem_sleep_duration_in_ms"] == 0
+    assert result.loc[0, "unmeasurable_sleep_duration_in_ms"] == 600_000
+
+
+def test_tesserae_normalizes_legacy_duration_that_includes_awake_time(
+    tmp_path, monkeypatch
+):
+    sleep_folder = tmp_path / "person-1" / "GarminHealthAPI"
+    sleep_folder.mkdir(parents=True)
+    (sleep_folder / "Sleep.parquet").touch()
+    raw = pd.DataFrame(
+        {
+            "Timestamp": pd.to_datetime(["2024-01-01T22:00:00Z"], utc=True),
+            "local_time": pd.to_datetime(["2024-01-01 23:00"]),
+            "duration_seconds": [3600],
+            "rem_sleep_seconds": [0],
+            "deep_sleep_seconds": [1200],
+            "awake_seconds": [600],
+            "light_sleep_seconds": [1800],
+            "unmeasurable_sleep_seconds": [0],
+            "validation": ["AUTO_TENTATIVE"],
+            "sleep_levels_map": ["{}"],
+        }
+    )
+    monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
+
+    result = TesseraeParquetLoader(tmp_path).load_sleep_summary("person-1")
+
+    assert result.loc[0, "duration_in_ms"] == 3_000_000
+    assert result.loc[0, "awake_duration_in_ms"] == 600_000
+    assert result.loc[0, "local_end_time"] == pd.Timestamp("2024-01-02 00:00")
+
+
+def test_tesserae_sleep_uses_calendar_day_and_drops_empty_records(
+    tmp_path, monkeypatch
+):
+    sleep_folder = tmp_path / "person-1" / "GarminHealthAPI"
+    sleep_folder.mkdir(parents=True)
+    (sleep_folder / "Sleep.parquet").touch()
+    raw = pd.DataFrame(
+        {
+            "Timestamp": pd.to_datetime(
+                ["2024-01-01T22:00:00Z", "2024-01-02T22:00:00Z"], utc=True
+            ),
+            "local_time": pd.to_datetime(
+                ["2024-01-01 23:00", "2024-01-02 23:00"]
+            ),
+            "duration_seconds": [3600, 0],
+            "rem_sleep_seconds": [600, 0],
+            "deep_sleep_seconds": [1200, 0],
+            "awake_seconds": [600, 0],
+            "light_sleep_seconds": [1800, 0],
+            "unmeasurable_sleep_seconds": [0, 0],
+            "validation": ["AUTO_FINAL", "ENHANCED_TENTATIVE"],
+            "sleep_levels_map": ["{}", "{}"],
+        }
+    )
+    monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
+
+    result = TesseraeParquetLoader(tmp_path).load_sleep_summary(
+        "person-1", start_date="2024-01-02", end_date="2024-01-03"
+    )
+
+    assert len(result) == 1
+    assert result.loc[0, "local_time"] == pd.Timestamp("2024-01-01 23:00")
+    assert result.loc[0, "calendar_date"] == pd.Timestamp("2024-01-02")
 
 
 def test_tesserae_empty_sleep_stage_uses_shared_contract(tmp_path):
@@ -183,6 +249,8 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
     assert loaded_summaries["local_end_time"].tolist() == pd.to_datetime(
         ["2024-01-01 23:15", "2024-01-02 23:10"]
     ).tolist()
+    assert loaded_summaries["utc_time"].isna().all()
+    assert loaded_summaries["timezone_offset_in_ms"].isna().all()
 
     loaded_stages = loader.load_sleep_stage("person-1")
     assert "nap" not in set(loaded_stages["sleep_summary_id"])
@@ -193,6 +261,8 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
         "deep",
         "rem",
     }
+    assert loaded_stages["utc_time"].isna().all()
+    assert loaded_stages["timezone_offset_in_ms"].isna().all()
 
     features = sleep.get_sleep_statistics(loader, user_id="person-1")
     np.testing.assert_allclose(features["TIB"], [75, 70])

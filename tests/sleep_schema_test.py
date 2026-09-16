@@ -153,6 +153,111 @@ def test_sleep_period_time_uses_datetimes_without_unix_milliseconds():
     assert result.loc[pd.Timestamp("2024-03-31")] == 60
 
 
+def test_stage_features_use_sleep_boundaries_bouts_and_utc_elapsed_time():
+    summaries = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1"],
+            "local_time": pd.to_datetime(["2024-03-31 01:30"]),
+            "utc_time": pd.to_datetime(["2024-03-31 00:30"]),
+        },
+        index=pd.DatetimeIndex(["2024-03-31"], name="calendar_date"),
+    )
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1"] * 8,
+            "local_time": pd.to_datetime(
+                [
+                    "2024-03-31 01:30",
+                    "2024-03-31 01:40",
+                    "2024-03-31 03:00",
+                    "2024-03-31 03:20",
+                    "2024-03-31 03:25",
+                    "2024-03-31 03:30",
+                    "2024-03-31 03:50",
+                    "2024-03-31 04:00",
+                ]
+            ),
+            "utc_time": pd.to_datetime(
+                [
+                    "2024-03-31 00:30",
+                    "2024-03-31 00:40",
+                    "2024-03-31 01:00",
+                    "2024-03-31 01:20",
+                    "2024-03-31 01:25",
+                    "2024-03-31 01:30",
+                    "2024-03-31 01:50",
+                    "2024-03-31 02:00",
+                ]
+            ),
+            "duration_in_ms": [10, 20, 20, 5, 5, 20, 10, 10],
+            "type": [
+                "unmeasurable",
+                "awake",
+                "light",
+                "awake",
+                "awake",
+                "deep",
+                "unmeasurable",
+                "awake",
+            ],
+        }
+    )
+    stages["duration_in_ms"] *= 60_000
+
+    spt = sleep._compute_sleep_period_time(summaries, stages)
+    waso = sleep._compute_wake_after_sleep_onset(summaries, stages)
+    sol = sleep._compute_sleep_onset_latency(summaries, stages)
+    latencies = sleep._compute_latencies(summaries, stages)
+    counts = sleep._compute_stage_count(summaries, stages)
+    sme = sleep._compute_sleep_maintenance_efficiency(summaries, stages)
+
+    assert spt.iloc[0] == 50
+    assert waso.iloc[0] == 10
+    assert sol.iloc[0] == 30
+    assert latencies.iloc[0]["light"] == 30
+    assert latencies.iloc[0]["deep"] == 60
+    assert counts.iloc[0]["awake"] == 3
+    assert sme.iloc[0] == 80
+
+
+def test_sleep_maintenance_efficiency_uses_one_stage_trajectory():
+    summaries = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1"],
+            # The exact provider summary and its five-minute stage grid differ.
+            "duration_in_ms": [63 * 60_000],
+            "unmeasurable_sleep_duration_in_ms": [0],
+        },
+        index=pd.DatetimeIndex(["2024-01-02"], name="calendar_date"),
+    )
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1", "night-1"],
+            "local_time": pd.to_datetime(["2024-01-01 23:00", "2024-01-02 00:00"]),
+            "duration_in_ms": [60 * 60_000, 5 * 60_000],
+            "type": ["light", "awake"],
+        }
+    )
+
+    result = sleep._compute_sleep_maintenance_efficiency(summaries, stages)
+
+    assert result.iloc[0] == 100
+
+
+def test_sleep_stage_contract_rejects_unknown_stage_labels():
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1"],
+            "local_time": pd.to_datetime(["2024-01-01 23:00"]),
+            "duration_in_ms": [60_000],
+            "type": ["mystery"],
+        }
+    )
+
+    with pytest.raises(ValueError, match="unsupported values: mystery"):
+        sleep_schema.prepare_sleep_stages(stages)
+
+
 def test_cpd_is_undefined_on_first_night_and_after_gap():
     summaries = pd.DataFrame(
         {
