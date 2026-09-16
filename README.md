@@ -42,41 +42,6 @@ labfront_loader = pywearable.loader.LabfrontLoader(BASE_FOLDER)
 sleep_summaries = labfront_loader.load_sleep_summary("user-01")
 ```
 
-For a local copy of Oura API v2 JSON files in
-`participant/metric/*.json` directories:
-
-```python
-from pywearable.loader import OuraLoader
-from pywearable import sleep, heart_rate
-
-loader = OuraLoader("/path/to/oura-export")
-user = loader.get_user_ids()[0]
-nights = loader.load_sleep_summary(user)  # long_sleep only; local calendar day
-sessions = loader.load_sleep_sessions(user)  # includes naps
-night_features = sleep.get_sleep_statistics(
-    loader, user_id=user, start_date=None, end_date=None,
-    statistic=["TST", "WASO"],
-)
-hourly_hr = heart_rate.get_heart_rate_statistics(
-    loader, user_id=user, resolution="1h", statistic="heart_rate_mean",
-)  # UTC windows
-```
-
-Oura nightly/five-minute HRV and nightly respiration are provider estimates,
-not continuous sensor signals. Local-day HR statistics require timezone
-information the copied HR export does not reliably provide. Generic Oura
-activity-intensity and recovery mappings remain unfinished. Sleep loader
-columns use `snake_case`; existing non-camelCase sleep feature names such as
-`TIB`, `WASO`, and `SME` retain their original spelling and case.
-Sleep features form a night-level trajectory with a
-`(user_id, calendar_date)` MultiIndex. One requested feature returns a Series;
-multiple features return a DataFrame. Aggregation across nights is kept
-separate from feature extraction.
-With `sleep.get_sleep_statistics(..., statistic=None)`, the default result is
-the shared night-level feature set; `getup_latency`, `validation`, and
-`SRI` require explicit selection while their cross-loader
-definitions are assessed.
-
 ## Contributing
 
 Do you want to contribute to the development of pywearable? Then drop me an email at davide.marzorati@supsi.ch!
