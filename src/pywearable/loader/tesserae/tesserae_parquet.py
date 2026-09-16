@@ -106,7 +106,15 @@ class TesseraeParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         sleep_summary = self.load_sleep_summary(user_id=user_id)
         if len(sleep_summary) == 0:
-            return pd.DataFrame(columns=["utc_time", "local_time", "type"])
+            return pd.DataFrame(
+                columns=[
+                    "sleep_summary_id",
+                    "utc_time",
+                    "local_time",
+                    "duration_in_ms",
+                    "type",
+                ]
+            )
 
         sleep_summary["timezone_offset"] = (
             sleep_summary["local_time"] - sleep_summary["utc_time"]
@@ -244,7 +252,7 @@ class TesseraeParquetLoader(BaseLoader):
             "awake_seconds",
             "light_sleep_seconds",
         ]:
-            sleep[col] = sleep[col].replace("NULL", pd.NA).astype(float)
+            sleep[col] = pd.to_numeric(sleep[col], errors="coerce")
 
         sleep["calendar_date"] = (
             sleep["local_time"]
