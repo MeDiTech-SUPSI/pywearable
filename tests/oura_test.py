@@ -100,6 +100,22 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
         "bedtime", "wakeup", "midpoint", "cpd_midpoint", "cpd_duration",
     }
     assert not {"getup_latency", "validation", "SRI"} & set(result)
+    night = result.iloc[0]
+    assert night["TIB"] == 80
+    assert night["TST"] == 65
+    assert night["SPT"] == 80
+    assert night["WASO"] == 5
+    assert night["SOL"] == 0
+    assert night["SME"] == 81.25
+    assert night["lat_deep"] == 10
+    assert night["lat_light"] == 0
+    assert night["lat_REM"] == 25
+    assert night["count_awake"] == 1
+    assert night["count_deep"] == 1
+    assert night["count_light"] == 1
+    assert night["count_REM"] == 1
+    assert night["bedtime"] == pd.Timestamp("2024-01-01 23:00")
+    assert night["wakeup"] == pd.Timestamp("2024-01-02 00:20")
 
 
 def test_oura_stages_decode_runs_and_filter_by_local_instant(tmp_path):

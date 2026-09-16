@@ -538,6 +538,26 @@ def test_compute_stage_count(
     )
 
 
+def test_compute_stage_count_distinguishes_zero_from_unavailable(sleep_summary):
+    sleep_summary = sleep_summary.iloc[:2].set_index(
+        pywearable.sleep_schema.CALENDAR_DATE_COL
+    )
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": [sleep_summary.iloc[0]["sleep_summary_id"]],
+            "local_time": [pd.Timestamp("2023-05-08 22:02")],
+            "duration_in_ms": [60_000],
+            "type": ["deep"],
+        }
+    )
+
+    counts = pywearable.sleep._compute_stage_count(sleep_summary, stages)
+
+    assert counts.loc[pd.Timestamp("2023-05-09"), "deep"] == 1
+    assert counts.loc[pd.Timestamp("2023-05-09"), "rem"] == 0
+    assert pd.Timestamp("2023-05-10") not in counts.index
+
+
 def test_compute_rem_count(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
