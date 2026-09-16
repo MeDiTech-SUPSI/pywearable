@@ -8,7 +8,8 @@ awake time), ``awake_duration_in_ms``, ``deep_sleep_duration_in_ms``,
 ``light_sleep_duration_in_ms``, ``rem_sleep_duration_in_ms``, and
 ``unmeasurable_sleep_duration_in_ms``. ``overall_sleep_score`` is optional;
 an absent provider score is represented by a missing value, not by dropping
-the night. All loader output and extracted feature names use ``snake_case``.
+the night. Loader columns use ``snake_case``; existing non-camelCase feature
+names such as ``TIB``, ``WASO``, and ``SME`` retain their spelling and case.
 
 ``drop_duplicates=True`` selects one night per local calendar date where a
 provider has repeated summaries. Provider-specific fields can remain in the

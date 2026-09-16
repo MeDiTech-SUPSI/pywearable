@@ -92,8 +92,14 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
         OuraLoader(tmp_path), user_id="person-1", start_date=None, end_date=None
     )
     assert result.shape == (1, 30)
-    assert {"total_sleep_time", "wake_after_sleep_onset", "sleep_score"} <= set(result)
-    assert not {"getup_latency", "validation", "sleep_regularity_index"} & set(result)
+    assert set(result) == {
+        "TIB", "TST", "SE", "SME", "SPT", "WASO", "SOL", "deep", "light",
+        "REM", "NREM", "awake", "unmeasurable", "%_deep", "%_light",
+        "%_REM", "%_NREM", "lat_deep", "lat_light", "lat_REM",
+        "sleep_score", "count_awake", "count_deep", "count_light", "count_REM",
+        "bedtime", "wakeup", "midpoint", "cpd_midpoint", "cpd_duration",
+    }
+    assert not {"getup_latency", "validation", "SRI"} & set(result)
 
 
 def test_oura_stages_decode_runs_and_filter_by_local_instant(tmp_path):

@@ -1,9 +1,6 @@
 """Canonical sleep columns returned by loaders and consumed by sleep features."""
 
-import re
-
-from .constants import *
-
+USER_COL = "user_id"
 ISODATE_COL = "local_time"
 UNIXTIMESTAMP_IN_MS_COL = "unix_timestamp_in_ms"
 TIMEZONEOFFSET_IN_MS_COL = "timezone_offset_in_ms"
@@ -22,6 +19,11 @@ SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL = "sleep_summary_id"
 SLEEP_STAGE_SLEEP_TYPE_COL = "type"
 SLEEP_STAGE_DURATION_IN_MS_COL = "duration_in_ms"
 SLEEP_STAGE_SLEEP_SUMMARY_ID_COL = "sleep_summary_id"
+SLEEP_STAGE_REM_STAGE_VALUE = "rem"
+SLEEP_STAGE_LIGHT_STAGE_VALUE = "light"
+SLEEP_STAGE_DEEP_STAGE_VALUE = "deep"
+SLEEP_STAGE_AWAKE_STAGE_VALUE = "awake"
+SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE = "unmeasurable"
 
 _COLUMN_MAP = {
     "isoDate": ISODATE_COL,
@@ -42,10 +44,6 @@ _COLUMN_MAP = {
 
 def normalize_sleep_columns(frame):
     """Normalize a provider's sleep output without altering its source data."""
-    names = {}
-    for name in frame.columns:
-        if name in _COLUMN_MAP:
-            names[name] = _COLUMN_MAP[name]
-        elif isinstance(name, str):
-            names[name] = re.sub(r"(?<!^)(?=[A-Z])", "_", name).lower()
-    return frame.rename(columns=names)
+    return frame.rename(
+        columns={name: _COLUMN_MAP[name] for name in frame.columns if name in _COLUMN_MAP}
+    )

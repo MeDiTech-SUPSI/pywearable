@@ -9,7 +9,33 @@ from ..base import BaseLoader
 
 
 class OuraLoader(BaseLoader):
-    """Load participant/metric/data*.json exports produced from Oura API v2."""
+    """Load a local directory of participant-level Oura API v2 responses.
+
+    The root directory must contain one directory per participant. Each
+    participant directory contains one directory per Oura endpoint, and each
+    endpoint directory contains one or more JSON response pages::
+
+        data_dir/
+            participant_id/
+                sleep/
+                    data.json
+                    data_2.json
+                daily_sleep/
+                    data.json
+                heartrate/
+                    data.json
+
+    Every JSON file must contain an object with a ``data`` list, matching the
+    Oura API v2 response envelope. Pagination files are merged in filename
+    order. Identical repeated records are collapsed; records with the same
+    provider identifier but different content raise an error rather than being
+    overwritten silently. Missing endpoint directories produce empty tables.
+
+    Daily and nightly loaders use Oura's ``day`` as ``calendar_date``.
+    Subdaily loaders expose offset-aware instants as timezone-naive UTC in
+    ``utc_time``. Sleep loaders additionally expose participant-local clock
+    times derived from the offsets included in each sleep record.
+    """
 
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)

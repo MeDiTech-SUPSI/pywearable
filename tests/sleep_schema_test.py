@@ -7,14 +7,24 @@ from pywearable import sleep, sleep_schema
 
 def test_legacy_sleep_columns_are_normalized():
     raw = pd.DataFrame(
-        {"calendarDate": ["2024-01-02"], "sleepSummaryId": ["night-1"], "durationInMs": [1]}
+        {
+            "calendarDate": ["2024-01-02"],
+            "sleepSummaryId": ["night-1"],
+            "durationInMs": [1],
+            "REMValue": [2],
+        }
     )
     result = sleep_schema.normalize_sleep_columns(raw)
-    assert list(result) == ["calendar_date", "sleep_summary_id", "duration_in_ms"]
-    assert list(raw) == ["calendarDate", "sleepSummaryId", "durationInMs"]
+    assert list(result) == [
+        "calendar_date",
+        "sleep_summary_id",
+        "duration_in_ms",
+        "REMValue",
+    ]
+    assert list(raw) == ["calendarDate", "sleepSummaryId", "durationInMs", "REMValue"]
 
 
-def test_sleep_trajectory_uses_snake_case_and_keeps_missing_score():
+def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     summaries = pd.DataFrame(
         {
             "sleep_summary_id": ["night-1", "night-2"],
@@ -39,11 +49,11 @@ def test_sleep_trajectory_uses_snake_case_and_keeps_missing_score():
         user_id="person-1",
         start_date=None,
         end_date=None,
-        statistic=["sleep_score", "time_in_bed", "total_sleep_time"],
+        statistic=["sleep_score", "TIB", "TST"],
     )
-    assert list(result) == ["sleep_score", "time_in_bed", "total_sleep_time"]
-    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "time_in_bed"] == 60
-    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "total_sleep_time"] == 60
+    assert list(result) == ["sleep_score", "TIB", "TST"]
+    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TIB"] == 60
+    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TST"] == 60
     assert pd.isna(result.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_score"])
     flat = sleep.get_sleep_statistics(loader, "person-1", None, None, statistic=["sleep_score"], return_multi_index=False)
     assert list(flat) == ["user", "calendar_date", "sleep_score"]

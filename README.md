@@ -55,7 +55,7 @@ nights = loader.load_sleep_summary(user)  # long_sleep only; local calendar day
 sessions = loader.load_sleep_sessions(user)  # includes naps
 night_features = sleep.get_sleep_statistics(
     loader, user_id=user, start_date=None, end_date=None,
-    statistic=["total_sleep_time", "wake_after_sleep_onset"],
+    statistic=["TST", "WASO"],
 )
 hourly_hr = heart_rate.get_heart_rate_statistics(
     loader, user_id=user, resolution="1h", statistic="heart_rate_mean",
@@ -66,10 +66,11 @@ Oura nightly/five-minute HRV and nightly respiration are provider estimates,
 not continuous sensor signals. Local-day HR statistics require timezone
 information the copied HR export does not reliably provide. Generic Oura
 activity-intensity and recovery mappings remain unfinished. Sleep loader
-columns and extracted feature names now use `snake_case`.
+columns use `snake_case`; existing non-camelCase sleep feature names such as
+`TIB`, `WASO`, and `SME` retain their original spelling and case.
 With `sleep.get_sleep_statistics(..., statistic=None)`, the default result is
 the shared night-level feature set; `getup_latency`, `validation`, and
-`sleep_regularity_index` require explicit selection while their cross-loader
+`SRI` require explicit selection while their cross-loader
 definitions are assessed.
 
 ## Contributing
