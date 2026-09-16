@@ -1,4 +1,5 @@
 import os
+import warnings
 from pathlib import Path
 from typing import Union
 
@@ -351,22 +352,52 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "sleep_stages.parquet"
         if file_path.exists():
-            sleep_stages = pd.read_parquet(file_path).rename(
-                columns={
-                    "logId": "sleep_summary_id",
-                    "dateTime": "utc_time",
-                    "seconds": "duration_in_ms",
-                    "level": "type",
-                }
+            def read_stages(path):
+                stages = pd.read_parquet(path).rename(
+                    columns={
+                        "logId": "sleep_summary_id",
+                        "dateTime": "utc_time",
+                        "seconds": "duration_in_ms",
+                        "level": "type",
+                    }
+                )
+                stages["duration_in_ms"] = (
+                    pd.to_numeric(stages["duration_in_ms"], errors="coerce") * 1000
+                )
+                stages["utc_time"] = pd.to_datetime(stages["utc_time"])
+                return stages.drop_duplicates(
+                    subset=["sleep_summary_id", "utc_time", "type"]
+                )
+
+            sleep_stages = read_stages(file_path)
+            short_stages_path = (
+                self.root_folder / user_id / "sleep_short_stages.parquet"
             )
-            sleep_stages["duration_in_ms"] = sleep_stages["duration_in_ms"] * 1000
-            sleep_stages["utc_time"] = pd.to_datetime(sleep_stages["utc_time"])
+            if short_stages_path.exists():
+                sleep_stages = self._overlay_short_sleep_stages(
+                    sleep_stages, read_stages(short_stages_path)
+                )
+
             sleep_stages["local_time"] = sleep_stages["utc_time"]
             sleep_stages["timezone_offset"] = pd.Timedelta(0)
+            sleep_stages["type"] = sleep_stages["type"].replace(
+                {
+                    "wake": "awake",
+                    "restless": "awake",
+                    "unknown": "unmeasurable",
+                }
+            )
+            sessions = self.load_sleep_sessions(user_id)
+            main_sleep_ids = sessions.loc[sessions["main_sleep"], "id"]
+            sleep_stages = sleep_stages[
+                sleep_stages["sleep_summary_id"].isin(main_sleep_ids)
+            ]
             if drop_duplicates:
                 sleep_stages = sleep_stages.drop_duplicates(
                     subset=["sleep_summary_id", "utc_time", "type"]
                 )
+
+            sleep_stages = self._drop_incoherent_sleep_stages(user_id, sleep_stages)
 
             if not (start_date is None):
                 sleep_stages = sleep_stages[
@@ -383,6 +414,131 @@ class LifeSnapsParquetLoader(BaseLoader):
             return pd.DataFrame(
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
             )
+
+    @staticmethod
+    def _overlay_short_sleep_stages(
+        sleep_stages: pd.DataFrame, short_sleep_stages: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Overlay Fitbit short wake intervals and return non-overlapping runs."""
+        if short_sleep_stages.empty:
+            return sleep_stages
+
+        overlay_groups = {
+            summary_id: LifeSnapsParquetLoader._stage_intervals(group)
+            for summary_id, group in short_sleep_stages.groupby(
+                "sleep_summary_id", sort=False
+            )
+        }
+        rows = []
+        for summary_id, group in sleep_stages.groupby("sleep_summary_id", sort=False):
+            base_intervals = LifeSnapsParquetLoader._stage_intervals(group)
+            overlay_intervals = overlay_groups.get(summary_id, [])
+            boundaries = sorted(
+                {
+                    boundary
+                    for start, end, _ in base_intervals + overlay_intervals
+                    for boundary in (start, end)
+                }
+            )
+            base_index = 0
+            overlay_index = 0
+            combined = []
+            for segment_start, segment_end in zip(boundaries, boundaries[1:]):
+                while (
+                    base_index < len(base_intervals)
+                    and base_intervals[base_index][1] <= segment_start
+                ):
+                    base_index += 1
+                if base_index == len(base_intervals):
+                    continue
+                base_start, base_end, stage_type = base_intervals[base_index]
+                if not (base_start <= segment_start < base_end):
+                    continue
+
+                while (
+                    overlay_index < len(overlay_intervals)
+                    and overlay_intervals[overlay_index][1] <= segment_start
+                ):
+                    overlay_index += 1
+                if overlay_index < len(overlay_intervals):
+                    overlay_start, overlay_end, overlay_type = overlay_intervals[
+                        overlay_index
+                    ]
+                    if overlay_start <= segment_start < overlay_end:
+                        stage_type = overlay_type
+
+                if (
+                    combined
+                    and combined[-1][2] == stage_type
+                    and combined[-1][1] == segment_start
+                ):
+                    combined[-1] = (combined[-1][0], segment_end, stage_type)
+                else:
+                    combined.append((segment_start, segment_end, stage_type))
+
+            rows.extend(
+                {
+                    "sleep_summary_id": summary_id,
+                    "utc_time": start,
+                    "duration_in_ms": (end - start).total_seconds() * 1000,
+                    "type": stage_type,
+                }
+                for start, end, stage_type in combined
+            )
+        return pd.DataFrame(
+            rows,
+            columns=["sleep_summary_id", "utc_time", "duration_in_ms", "type"],
+        )
+
+    @staticmethod
+    def _stage_intervals(stages: pd.DataFrame) -> list:
+        stages = stages.sort_values("utc_time", kind="stable")
+        return [
+            (
+                row.utc_time,
+                row.utc_time + pd.to_timedelta(row.duration_in_ms, unit="ms"),
+                row.type,
+            )
+            for row in stages.itertuples()
+        ]
+
+    def _drop_incoherent_sleep_stages(
+        self, user_id: str, sleep_stages: pd.DataFrame
+    ) -> pd.DataFrame:
+        """Drop stages when known sleep differs from the Fitbit summary by over 5 min."""
+        summary_path = self.root_folder / user_id / "sleep.parquet"
+        if not summary_path.exists():
+            return sleep_stages
+
+        summaries = pd.read_parquet(summary_path).drop_duplicates("logId", keep="last")
+        expected_sleep = pd.to_numeric(
+            summaries.set_index("logId")["minutesAsleep"], errors="coerce"
+        )
+        known_sleep = sleep_stages[
+            ~sleep_stages["type"].isin(["awake", "unmeasurable"])
+        ]
+        observed_sleep = (
+            known_sleep.groupby("sleep_summary_id")["duration_in_ms"].sum() / 60_000
+        )
+        difference = observed_sleep.sub(
+            expected_sleep.reindex(observed_sleep.index)
+        ).abs()
+        conflicting_ids = difference[difference > 5].index.tolist()
+        if len(conflicting_ids) > 0:
+            displayed_ids = ", ".join(map(str, conflicting_ids[:10]))
+            if len(conflicting_ids) > 10:
+                displayed_ids += ", ..."
+            warnings.warn(
+                "Dropped LifeSnaps sleep stages for "
+                f"{len(conflicting_ids)} session(s) whose stage durations conflict "
+                f"with their sleep summaries: {displayed_ids}.",
+                UserWarning,
+                stacklevel=2,
+            )
+            sleep_stages = sleep_stages[
+                ~sleep_stages["sleep_summary_id"].isin(conflicting_ids)
+            ]
+        return sleep_stages.reset_index(drop=True)
 
     def load_hrv_features(
         self,
@@ -432,6 +588,53 @@ class LifeSnapsParquetLoader(BaseLoader):
                 ]
             )
 
+    def load_sleep_sessions(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return all Fitbit sleep sessions, including non-main sessions."""
+        columns = [
+            "id",
+            "calendar_date",
+            "type",
+            "main_sleep",
+            "local_time",
+            "local_end_time",
+            "time_in_bed_seconds",
+        ]
+        file_path = self.root_folder / user_id / "sleep.parquet"
+        if not file_path.exists():
+            return pd.DataFrame(columns=columns)
+
+        sessions = pd.read_parquet(file_path)
+        sessions["calendar_date"] = pd.to_datetime(
+            sessions["dateOfSleep"]
+        ).dt.normalize()
+        sessions["local_time"] = pd.to_datetime(sessions["startTime"])
+        sessions["local_end_time"] = pd.to_datetime(sessions["endTime"])
+        sessions["time_in_bed_seconds"] = (
+            pd.to_numeric(sessions["timeInBed"], errors="coerce") * 60
+        )
+        sessions = sessions.rename(
+            columns={"logId": "id", "mainSleep": "main_sleep"}
+        )
+        if start_date is not None:
+            sessions = sessions[
+                sessions["calendar_date"] >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            sessions = sessions[
+                sessions["calendar_date"] < pd.Timestamp(end_date).normalize()
+            ]
+        return (
+            sessions[columns]
+            .drop_duplicates(subset="id", keep="last")
+            .sort_values("local_time", kind="stable")
+            .reset_index(drop=True)
+        )
+
     def load_sleep_summary(
         self,
         user_id: str,
@@ -454,28 +657,41 @@ class LifeSnapsParquetLoader(BaseLoader):
 
             sleep["utc_time"] = pd.to_datetime(sleep["utc_time"])
             sleep["local_time"] = sleep["utc_time"]
+            sleep["local_end_time"] = sleep["utc_end_time"]
             sleep["timezone_offset"] = pd.Timedelta(0)
 
-            if "deep_minutes" in sleep.columns:
-                sleep["duration_in_ms"] = (
-                    (
-                        sleep[["deep_minutes", "light_minutes", "rem_minutes"]]
-                        .fillna(0)
-                        .sum(axis=1)
-                    )
-                    * 60
-                    * 1000
-                )
-            if "wake_minutes" in sleep.columns:
-                sleep["awake_duration_in_ms"] = (
-                    sleep["wake_minutes"].fillna(0) * 60 * 1000
-                )
+            if "mainSleep" in sleep.columns:
+                sleep = sleep[sleep["mainSleep"].eq(True)]
+
+            minutes_asleep = pd.to_numeric(
+                sleep.get("minutesAsleep"), errors="coerce"
+            )
+            time_in_bed = pd.to_numeric(sleep.get("timeInBed"), errors="coerce")
+            wake_source = (
+                sleep["wake_minutes"]
+                if "wake_minutes" in sleep.columns
+                else sleep["minutesAwake"]
+            )
+            wake_minutes = pd.to_numeric(wake_source, errors="coerce")
+            staged_sleep = sleep["type"].eq("stages")
+            unmeasurable = pd.Series(0.0, index=sleep.index)
+            unmeasurable.loc[staged_sleep] = (
+                time_in_bed - minutes_asleep - wake_minutes
+            ).loc[staged_sleep].clip(lower=0)
+            minutes_awake = time_in_bed - minutes_asleep - unmeasurable
+            sleep["duration_in_ms"] = (
+                minutes_asleep + unmeasurable
+            ) * 60_000
+            sleep["awake_duration_in_ms"] = minutes_awake * 60_000
             for stage in ("deep", "light", "rem"):
                 if f"{stage}_minutes" in sleep.columns:
                     sleep[f"{stage}_sleep_duration_in_ms"] = (
-                        sleep[f"{stage}_minutes"].fillna(0) * 60 * 1000
+                        pd.to_numeric(
+                            sleep[f"{stage}_minutes"], errors="coerce"
+                        )
+                        * 60_000
                     )
-            sleep["unmeasurable_sleep_duration_in_ms"] = 0
+            sleep["unmeasurable_sleep_duration_in_ms"] = unmeasurable * 60_000
 
             if not (start_date is None):
                 sleep = sleep[
