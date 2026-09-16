@@ -7,4 +7,3 @@ Loader
    _loader/base
    _loader/labfront
    _loader/lifesnaps
-   _loader/oura

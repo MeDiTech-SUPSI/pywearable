@@ -1,21 +1,109 @@
+.. include:: ../macros.rst
+
 sleep-stage
 ===========
 
-``load_sleep_stage`` returns rows keyed by ``sleep_summary_id`` with
-``local_time`` (stage start), ``duration_in_ms``, and ``type``. Stage labels
-used by sleep feature calculations are ``deep``, ``light``, ``rem``,
-``awake``, and ``unmeasurable``. Timestamps and column names use
-``snake_case``. Where available, loaders also return ``utc_time`` and
-``timezone_offset_in_ms``.
+The sleep stage metric contains information about sleep stages and
+their duration. Each row of the returned |dataframe| represents a single
+sleep stage, with its duration and type. For example, if `n1` sleep stage
+occurred from `2023-09-06T01:23:00.000+02:00` to `2023-09-06T01:26:00.000+02:00`,
+so with a total duration of 3 minutes (180000 milliseconds),
+then the corresponding row in the |dataframe| would look like this:
 
-Oura's ``sleep_phase_5_min`` is decoded into runs of five-minute bins; it is
-not a finer-grained continuous signal. If a night's recorded start and end
-offsets differ, the stage UTC instants remain valid but the local stage
-clock inside the night cannot be established from the export alone. Those
-rows carry ``local_time_uncertain=True`` and their ``local_time`` is an
-approximation based on the start offset. Night-level wake-up time uses the
-recorded end time instead. Local-clock date filtering retains the complete
-uncertain session when its recorded start/end overlap the requested interval;
-it does not discard individual runs using that approximate clock.
+.. list-table:: Example N1 sleep stage entry
+    :header-rows: 1
 
-.. automethod:: pywearable.loader.BaseLoader.load_sleep_stage
+   * - sleepSummaryId
+     - timezoneOffsetInMs
+     - unixTimestampInMs
+     - isoDate
+     - durationInMs
+     - type
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693949100000
+     - 2023-09-06T01:23:00.000+02:00
+     - 180000
+     - n1
+
+The required fields for this metric are the following ones:
+
+.. list-table:: Sleep stage fields
+    :header-rows: 1
+
+    * - Name
+      - Description
+      - Constant
+    * - sleepSummaryId
+      - Unique identifier for the sleep summary to which sleep stages refer to
+      - ``pywearable.constants._SLEEP_SUMMARY_ID_COL``
+    * - timezoneOffsetInMs
+      - Timezone offset in milliseconds of the sleep stage start time
+      - ``pywearable.constants._TIMEZONEOFFSET_IN_MS_COL``
+    * - unixTimestampInMs
+      - Unix timestamp in milliseconds of the sleep stage start time
+      - ``pywearable.constants._UNIXTIMESTAMP_IN_MS_COL``
+    * - isoDate
+      - Sleep start time in `ISO <https://en.wikipedia.org/wiki/ISO_8601>`_ format
+      - ``pywearable.constants._ISODATE_COL``
+    * - durationInMs
+      - Duration in milliseconds of the sleep stage
+      - ``pywearable.constants._DURATION_IN_MS_COL``
+    * - type
+      - Type of sleep stages. Available options are:
+
+        - n1 (``pywearable.constants._SLEEP_STAGE_N1_STAGE_COL``)
+        - n2 (``pywearable.constants._SLEEP_STAGE_N2_STAGE_COL``)
+        - n3 (``pywearable.constants._SLEEP_STAGE_N3_STAGE_COL``)
+        - rem (``pywearable.constants._SLEEP_STAGE_REM_STAGE_COL``)
+        - awake (``pywearable.constants._SLEEP_STAGE_AWAKE_STAGE_COL``)
+        - unmeasurable (``pywearable.constants._SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE``)
+      - ``pywearable.constants._SLEEP_STAGE_SLEEP_TYPE_COL``
+
+An example of a sleep-stage is shown in the table below.
+
+.. list-table:: Example of sleep stage
+   :header-rows: 1
+
+   * - sleepSummaryId
+     - timezoneOffsetInMs
+     - unixTimestampInMs
+     - isoDate
+     - durationInMs
+     - type
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693949100000
+     - 2023-09-05T23:25:00.000+02:00
+     - 420000
+     - rem
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693949520000
+     - 2023-09-05T23:32:00.000+02:00
+     - 240000
+     - n1
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693949760000
+     - 2023-09-05T23:36:00.000+02:00
+     - 420000
+     - rem
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693950180000
+     - 2023-09-05T23:43:00.000+02:00
+     - 5520000
+     - n1
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693955700000
+     - 2023-09-06T01:15:00.000+02:00
+     - 480000
+     - rem
+   * - x35bda69-64f79cac-6888
+     - 7200000
+     - 1693956180000
+     - 2023-09-06T01:23:00.000+02:00
+     - 4560000
+     - n1

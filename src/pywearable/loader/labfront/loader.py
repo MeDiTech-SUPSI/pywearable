@@ -6,6 +6,7 @@ This module contains all the functions related to the loading of data from Labfr
 import datetime
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Tuple, Union
 
@@ -41,6 +42,7 @@ _LABFRONT_METRICS_DICT = {
 # Temporary internal key used to keep export snapshots separate while their
 # rows are reconciled. Public loader output never retains this column.
 _LABFRONT_SOURCE_FILE_COL = "__labfront_source_file"
+_SLEEP_STAGE_CONFLICT_POLICIES = ("drop_night", "raise", "last")
 
 LABFRONT_FILE_INDEX_NAME = ".pywearable_file_index.csv"
 
@@ -53,13 +55,38 @@ class LabfrontLoader(BaseLoader):
 
     Parameters
     ----------
-        data_path: str or Path
-            Path to folder containing Labfront data.
+    data_paths : str, Path, or list
+        Path or paths to folders containing Labfront data.
+    reindex_files : bool, optional
+        Rebuild the local Labfront file index, by default False.
+    sleep_stage_on_conflict : {"drop_night", "raise", "last"}, optional
+        How to handle repeated sleep-stage snapshots that cannot be resolved
+        against a sleep summary. ``"drop_night"`` keeps the summary but omits
+        the ambiguous stage rows, ``"raise"`` stops loading, and ``"last"``
+        uses the last snapshot in Labfront file-index order. By default
+        ``"drop_night"``.
     """
 
-    def __init__(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
+    def __init__(
+        self,
+        data_paths: Union[str, Path, list],
+        reindex_files: bool = False,
+        sleep_stage_on_conflict: str = "drop_night",
+    ):
         """Constructor method"""
+        self.sleep_stage_on_conflict = self._validate_sleep_stage_conflict_policy(
+            sleep_stage_on_conflict
+        )
         self.set_path(data_paths, reindex_files=reindex_files)
+
+    @staticmethod
+    def _validate_sleep_stage_conflict_policy(on_conflict: str) -> str:
+        if on_conflict not in _SLEEP_STAGE_CONFLICT_POLICIES:
+            raise ValueError(
+                "on_conflict must be one of "
+                f"{_SLEEP_STAGE_CONFLICT_POLICIES}, not {on_conflict}"
+            )
+        return on_conflict
 
     def set_path(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
         """Set path to folder containing Labfront data.
@@ -2444,6 +2471,7 @@ class LabfrontLoader(BaseLoader):
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date, None] = None,
         end_date: Union[str, datetime.date, datetime.date, None] = None,
+        on_conflict: Union[str, None] = None,
     ) -> pd.DataFrame:
         """Load Garmin Connect sleep stage data.
 
@@ -2464,6 +2492,11 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe with sleep stages data.
         """
+        conflict_policy = (
+            self.sleep_stage_on_conflict
+            if on_conflict is None
+            else self._validate_sleep_stage_conflict_policy(on_conflict)
+        )
         requested_start = pd.Timestamp(start_date) if start_date is not None else None
         requested_end = pd.Timestamp(end_date) if end_date is not None else None
         data = self.get_data_from_datetime(
@@ -2482,7 +2515,11 @@ class LabfrontLoader(BaseLoader):
             summaries = self._load_sleep_summary_raw(
                 user_id, summary_start, summary_end, drop_duplicates=False
             )
-            data = self._reconcile_sleep_stage_snapshots(data, summaries)
+            data = self._reconcile_sleep_stage_snapshots(
+                data,
+                summaries,
+                on_conflict=conflict_policy,
+            )
             # Change sleep stage values
             data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
                 constants.SLEEP_STAGE_SLEEP_TYPE_COL
@@ -2503,15 +2540,33 @@ class LabfrontLoader(BaseLoader):
 
         return data.reset_index(drop=True)
 
-    def load_sleep_stage(self, user_id: str, start_date=None, end_date=None) -> pd.DataFrame:
-        """Return Garmin sleep stages in the shared snake_case schema."""
+    def load_sleep_stage(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+        on_conflict: Union[str, None] = None,
+    ) -> pd.DataFrame:
+        """Return Garmin sleep stages in the shared snake_case schema.
+
+        ``on_conflict`` overrides the loader-level policy for unresolved
+        repeated export snapshots. Valid values are ``"drop_night"``,
+        ``"raise"``, and ``"last"``. ``"drop_night"`` removes only the
+        ambiguous stage rows; the separate sleep-summary row remains
+        available. ``"last"`` means the last snapshot in the deterministic
+        Labfront file-index order (first timestamp, then last-edit timestamp).
+        """
         return sleep_schema.normalize_sleep_columns(
-            self._load_sleep_stage_raw(user_id, start_date, end_date)
+            self._load_sleep_stage_raw(
+                user_id, start_date, end_date, on_conflict=on_conflict
+            )
         )
 
     @staticmethod
     def _reconcile_sleep_stage_snapshots(
-        sleep_stages: pd.DataFrame, sleep_summaries: pd.DataFrame
+        sleep_stages: pd.DataFrame,
+        sleep_summaries: pd.DataFrame,
+        on_conflict: str = "drop_night",
     ) -> pd.DataFrame:
         """Select one coherent stage export for each Garmin sleep summary.
 
@@ -2520,14 +2575,20 @@ class LabfrontLoader(BaseLoader):
         boundaries are therefore preserved temporarily. Candidate snapshots
         are matched to the selected summary by comparing the total duration of
         every stage type. Identical matching snapshots collapse to one;
-        conflicting or incoherent snapshots raise instead of being combined
-        silently. The temporary source-file column is removed from the result.
+        unresolved conflicts follow ``on_conflict``: drop their stage rows,
+        raise an error, or retain the last loaded source snapshot. The
+        temporary source-file column is removed from the result.
         """
+        on_conflict = LabfrontLoader._validate_sleep_stage_conflict_policy(
+            on_conflict
+        )
         source_col = _LABFRONT_SOURCE_FILE_COL
         id_col = constants.SLEEP_SUMMARY_ID_COL
         record_cols = [col for col in sleep_stages if col != source_col]
         if sleep_stages.empty:
-            return sleep_stages.drop(columns=source_col)
+            return sleep_stages.drop(columns=source_col, errors="ignore")
+
+        dropped_ids = []
 
         def normalized(snapshot):
             return (
@@ -2537,45 +2598,57 @@ class LabfrontLoader(BaseLoader):
                 .reset_index(drop=True)
             )
 
-        def identical_snapshot(rows):
-            snapshots = [
+        def source_snapshots(rows):
+            return [
                 snapshot.drop_duplicates(subset=record_cols)
                 for _, snapshot in rows.groupby(source_col, sort=False)
             ]
+
+        def resolve_conflict(summary_id, snapshots, message):
+            if on_conflict == "raise":
+                raise ValueError(message)
+            if on_conflict == "last":
+                return snapshots[-1]
+            dropped_ids.append(summary_id)
+            return None
+
+        def select_without_summary(summary_id, rows):
+            snapshots = source_snapshots(rows)
             reference = normalized(snapshots[0])
             if any(not reference.equals(normalized(item)) for item in snapshots[1:]):
-                raise ValueError(
-                    f"Conflicting Labfront sleep-stage snapshots without summary {rows[id_col].iloc[0]}."
+                return resolve_conflict(
+                    summary_id,
+                    snapshots,
+                    "Conflicting Labfront sleep-stage snapshots without "
+                    f"summary {summary_id}.",
                 )
             return snapshots[0]
 
         if sleep_summaries.empty:
-            return (
-                pd.concat(
-                    [identical_snapshot(rows) for _, rows in sleep_stages.groupby(id_col, sort=False)],
-                    ignore_index=True,
+            summaries = None
+        else:
+            validation_rank = {
+                "AUTO_TENTATIVE": 1,
+                "AUTO_FINAL": 2,
+                "ENHANCED_TENTATIVE": 3,
+                "ENHANCED_FINAL": 4,
+            }
+            summaries = sleep_summaries.copy()
+            summaries["__validation_rank"] = (
+                summaries["validation"].map(validation_rank).fillna(0)
+            )
+            summaries = (
+                summaries.sort_values(
+                    [
+                        id_col,
+                        "__validation_rank",
+                        constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                    ]
                 )
-                .drop(columns=source_col)
-                .sort_values(constants.ISODATE_COL)
-                .reset_index(drop=True)
+                .groupby(id_col, as_index=False)
+                .tail(1)
+                .set_index(id_col)
             )
-
-        validation_rank = {
-            "AUTO_TENTATIVE": 1,
-            "AUTO_FINAL": 2,
-            "ENHANCED_TENTATIVE": 3,
-            "ENHANCED_FINAL": 4,
-        }
-        summaries = sleep_summaries.copy()
-        summaries["__validation_rank"] = summaries["validation"].map(validation_rank).fillna(0)
-        summaries = (
-            summaries.sort_values(
-                [id_col, "__validation_rank", constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-            )
-            .groupby(id_col, as_index=False)
-            .tail(1)
-            .set_index(id_col)
-        )
         stage_summary_cols = {
             lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
             lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
@@ -2595,29 +2668,58 @@ class LabfrontLoader(BaseLoader):
 
         chosen = []
         for summary_id, rows in sleep_stages.groupby(id_col, sort=False):
-            if summary_id not in summaries.index:
-                chosen.append(identical_snapshot(rows))
+            if summaries is None or summary_id not in summaries.index:
+                selected = select_without_summary(summary_id, rows)
+                if selected is not None:
+                    chosen.append(selected)
                 continue
             summary = summaries.loc[summary_id]
             candidates = []
-            for _, snapshot in rows.groupby(source_col, sort=False):
-                snapshot = snapshot.drop_duplicates(subset=record_cols)
+            snapshots = source_snapshots(rows)
+            for snapshot in snapshots:
                 if matches(snapshot, summary):
                     candidates.append(snapshot)
             if not candidates:
                 combined = rows.drop_duplicates(subset=record_cols)
                 if matches(combined, summary):
-                    candidates.append(combined)
+                    selected = combined
                 else:
-                    raise ValueError(
-                        f"No coherent Labfront sleep-stage snapshot matches summary {summary_id}."
+                    selected = resolve_conflict(
+                        summary_id,
+                        snapshots,
+                        "No coherent Labfront sleep-stage snapshot matches "
+                        f"summary {summary_id}.",
                     )
-            reference = normalized(candidates[0])
-            if any(not reference.equals(normalized(snapshot)) for snapshot in candidates[1:]):
-                raise ValueError(
-                    f"Conflicting Labfront sleep-stage snapshots match summary {summary_id}."
-                )
-            chosen.append(candidates[0])
+            else:
+                reference = normalized(candidates[0])
+                if any(
+                    not reference.equals(normalized(snapshot))
+                    for snapshot in candidates[1:]
+                ):
+                    selected = resolve_conflict(
+                        summary_id,
+                        candidates,
+                        "Conflicting Labfront sleep-stage snapshots match "
+                        f"summary {summary_id}.",
+                    )
+                else:
+                    selected = candidates[0]
+            if selected is not None:
+                chosen.append(selected)
+
+        if dropped_ids:
+            displayed_ids = ", ".join(map(str, dropped_ids[:10]))
+            if len(dropped_ids) > 10:
+                displayed_ids += ", ..."
+            warnings.warn(
+                "Dropped ambiguous Labfront sleep-stage snapshots for "
+                f"{len(dropped_ids)} sleep summaries: {displayed_ids}.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if not chosen:
+            return sleep_stages.iloc[0:0].drop(columns=source_col).reset_index(drop=True)
         return (
             pd.concat(chosen, ignore_index=True)
             .drop(columns=source_col)

@@ -1,26 +1,127 @@
 sleep-summary
 =============
+The sleep summary metric contains summary data for sleep.
+The required fields for this metric are the following ones:
 
-``load_sleep_summary`` returns one row per night, keyed by
-``sleep_summary_id`` and the participant-local ``calendar_date``. The common
-columns are ``local_time`` (bedtime), ``duration_in_ms`` (sleep, excluding
-awake time), ``awake_duration_in_ms``, ``deep_sleep_duration_in_ms``,
-``light_sleep_duration_in_ms``, ``rem_sleep_duration_in_ms``, and
-``unmeasurable_sleep_duration_in_ms``. ``overall_sleep_score`` is optional;
-an absent provider score is represented by a missing value, not by dropping
-the night. Loader columns use ``snake_case``; existing non-camelCase feature
-names such as ``TIB``, ``WASO``, and ``SME`` retain their spelling and case.
+.. list-table:: Sleep summary fields
+    :header-rows: 1
 
-``drop_duplicates=True`` selects one night per local calendar date where a
-provider has repeated summaries. Provider-specific fields can remain in the
-table. In Oura, nightly features use ``long_sleep`` only; naps are available
-separately through ``load_sleep_sessions``. Oura also supplies
-``local_end_time`` and UTC start/end instants. Daily/nightly records are
-assigned using Oura's ``day`` rather than a UTC-day conversion.
+    * - Name
+      - Description
+      - Constant
+      - Type
+    * - sleepSummaryId
+      - Unique identifier for a single sleep summary
+      - ``pywearable.constants._SLEEP_SUMMARY_ID_COL``
+      - :class:`str` or :class:`int`
+    * - calendarDate
+      - Calendar date to which the sleep summary refers to. Date format is 'yyyy-mm-dd'
+      - ``pywearable.constants._CALENDAR_DATE_COL``
+      - :class:`datetime.date`
+    * - timezoneOffsetInMs
+      - Timezone offset in milliseconds of the sleep start time
+      - ``pywearable.constants._TIMEZONEOFFSET_IN_MS_COL``
+      - :class:`int`
+    * - unixTimestampInMs
+      - Unix timestamp in milliseconds of the sleep start time
+      - ``pywearable.constants._UNIXTIMESTAMP_IN_MS_COL``
+      - :class:`int`
+    * - isoDate
+      - Sleep start time in `ISO <https://en.wikipedia.org/wiki/ISO_8601>`__ format
+      - ``pywearable.constants._ISODATE_COL``
+      - :class:`datetime.datetime`
+    * - durationInMs
+      - Overall sleep duration in milliseconds, **without** counting awake stages
+      - ``pywearable.constants._DURATION_IN_MS_COL``
+      - :class:`int`
+    * - deepSleepDurationInMs
+      - Duration of deep sleep stage in milliseconds
+      - ``pywearable.constants._SLEEP_SUMMARY_N1_SLEEP_DURATION_IN_MS_COL``
+      - :class:`int`
+    * - lightSleepDurationInMs
+      - Duration of light sleep stage in milliseconds
+      - ``pywearable.constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL``
+      - :class:`int`
+    * - remSleepDurationInMs
+      - Duration of REM sleep stage in milliseconds
+      - ``pywearable.constants._SLEEP_SUMMARY_N3_SLEEP_DURATION_IN_MS_COL``
+      - :class:`int`
+    * - unmeasurableSleepDurationInMs
+      - Duration of unmeasurable (i.e., artifacts, movements, ...) in milliseconds
+      - ``pywearable.constants._SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL``
+      - :class:`int`
+    * - awakeDurationInMs
+      - Duration of awake stages in milliseconds
+      - ``pywearable.constants._SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL``
+      - :class:`int`
+    * - overallSleepScore
+      - Overall sleep score (0-100)
+      - ``pywearable.constants._SLEEP_SUMMARY_SLEEP_SCORE_COL``
+      - :class:`int`
 
-Sleep feature extraction returns one row per night with a
-``(user_id, calendar_date)`` MultiIndex. A single requested feature produces a
-:class:`pandas.Series`; multiple features produce a :class:`pandas.DataFrame`.
-Across-night aggregation is handled separately from extraction.
+If one of the sleep metrics is not available for a given loader, the column must
+still be present in the returned :class:`pandas.DataFrame` but empty (i.e.,
+`NaN`) values must be set on the rows.
 
-.. automethod:: pywearable.loader.BaseLoader.load_sleep_summary
+It is possible to have multiple sleep summaries for each calendar date. For example it
+could be possible to have both a night sleep and an afternoon nap with the same ``calendarDate``,
+or multiple summaries for a single night sleep in case of updated sleep data.
+For this reason, it is necessary to accept the ``same_day_filter`` parameter in the
+:meth:`pywearable.loader.BaseLoader.load_sleep_summary` that, when set to ``True``
+will only return a single sleep summary for each ``calendarDate``, representing
+the most updated night sleep.
+
+An example of a sleep-summary is shown in the table below.
+
+.. list-table:: Example of sleep summary
+   :widths: 25 25 25 25 25 25 25 25 25 25 25 25
+   :header-rows: 1
+
+   * - sleepSummaryId
+     - calendarDate
+     - timezoneOffsetInMs
+     - unixTimestampInMs
+     - isoDate
+     - durationInMs
+     - lightSleepDurationInMs
+     - deepSleepDurationInMs
+     - remSleepDurationInMs
+     - unmeasurableSleepDurationInMs
+     - awakeDurationInMs
+     - overallSleepScore
+   * - x35bda69-64f79cac-6888
+     - 2023-09-06
+     - 7200000
+     - 1693949100000
+     - 2023-09-05T23:25:00.000+02:00
+     - 26760000
+     - 19740000
+     - 1620000
+     - 4560000
+     - 840000
+     - 120000
+     - 80
+   * - x35bda69-64f8eae4-6630
+     - 2023-09-07
+     - 7200000
+     - 1694034660000
+     - 2023-09-06T23:11:00.000+02:00
+     - 26160000
+     - 19980000
+     - 2280000
+     - 3900000
+     - 0
+     - 12000
+     - 75
+   * - x35bda69-64f8eae4-666c
+     - 2023-09-07
+     - 7200000
+     - 1694034660000
+     - 2023-09-06T23:11:00.000+02:00
+     - 26220000
+     - 20160000
+     - 2340000
+     - 3720000
+     - 0
+     - 6000
+     - 85

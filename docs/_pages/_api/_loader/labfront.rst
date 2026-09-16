@@ -12,11 +12,5 @@ unzipped to the loader::
    data_path = "~/Users/user.name/Downloads/labfront_data/"
    loader = LabfrontLoader(data_path)
 
-Repeated Garmin sleep-stage export snapshots are reconciled against the
-corresponding sleep summary before stages are returned. A revised export is
-not concatenated with an older snapshot. If snapshots disagree and there is
-no matching summary to choose between them, loading raises an error instead
-of returning an inflated stage trajectory.
-
 .. autoclass:: pywearable.loader.LabfrontLoader
    :members:

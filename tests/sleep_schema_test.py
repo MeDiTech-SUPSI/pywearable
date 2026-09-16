@@ -50,11 +50,14 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
         user_id="person-1",
         start_date=None,
         end_date=None,
-        statistic=["sleep_score", "TIB", "TST"],
+        statistic=["sleep_score", "TIB", "TST", "count_awake"],
     )
-    assert list(result) == ["sleep_score", "TIB", "TST"]
+    assert list(result) == ["sleep_score", "TIB", "TST", "count_awake"]
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TIB"] == 60
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TST"] == 60
+    assert pd.isna(
+        result.loc[("person-1", pd.Timestamp("2024-01-02")), "count_awake"]
+    )
     assert pd.isna(result.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_score"])
     score = sleep.get_sleep_statistics(
         loader, "person-1", None, None, statistic="sleep_score"
