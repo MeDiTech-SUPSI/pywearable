@@ -6,6 +6,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
+from ... import heart_rate_schema
 from ..base import BaseLoader
 
 
@@ -35,10 +36,14 @@ class TesseraeParquetLoader(BaseLoader):
     def load_heart_rate(
         self,
         user_id: str,
-        start_date: pd.Timestamp,
-        end_date: pd.Timestamp,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
         backend="health_api",
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
+        if user_id not in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        heart_rate_schema.validate_time_col(time_col)
         if backend == "health_api":
             path_to_file = self.root_folder / user_id / "GarminHealthAPI" / "HR.parquet"
         elif backend == "pa":
@@ -47,34 +52,27 @@ class TesseraeParquetLoader(BaseLoader):
             raise ValueError(f"Backend of type {backend} is not supported")
 
         if not path_to_file.exists():
-            return pd.DataFrame(
-                columns=[
-                    "local_time",
-                    "beats_per_minute",
-                    "utc_time",
-                    "timezone_offset",
-                ]
+            return heart_rate_schema.empty_frame(
+                ["timezone_offset", "tz_source", "beats_per_minute"]
             )
 
-        filters = []
-        if not (start_date is None):
-            filters.append((("local_time", ">=", pd.Timestamp(start_date))))
-        if not (end_date is None):
-            filters.append((("local_time", "<", pd.Timestamp(end_date))))
-        try:
-            hr = pd.read_parquet(
-                path_to_file,
-                # filters=[filters],
-            ).rename(columns={"Timestamp": "utc_time", "hr": "beats_per_minute"})
-            hr["utc_time"] = hr["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
-            hr["timezone_offset"] = hr["local_time"] - hr["utc_time"]
-
-            hr = hr.drop_duplicates(subset="utc_time", keep="last")
-            hr = hr[hr["beats_per_minute"] > 0]
-        except:
-            print(f"WARNING: Error reading file from {user_id}")
-            return pd.DataFrame()
-        return hr
+        hr = pd.read_parquet(path_to_file).rename(
+            columns={"Timestamp": "utc_time", "hr": "beats_per_minute"}
+        )
+        hr["utc_time"] = pd.to_datetime(hr["utc_time"], utc=True).dt.tz_localize(None)
+        hr["local_time"] = pd.to_datetime(hr["local_time"])
+        hr["timezone"] = hr["local_time"] - hr["utc_time"]
+        hr["timezone_offset"] = hr["timezone"]
+        hr["heart_rate"] = pd.to_numeric(hr["beats_per_minute"], errors="coerce")
+        hr = hr[hr["heart_rate"] > 0]
+        # Preserve the loader's established latest-record policy for repeated
+        # Tesserae export timestamps.
+        hr = hr.drop_duplicates(subset="utc_time", keep="last")
+        return (
+            heart_rate_schema.filter_by_time(hr, start_date, end_date, time_col)
+            .sort_values("utc_time")
+            .reset_index(drop=True)
+        )
 
     def load_stress(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp

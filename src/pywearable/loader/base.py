@@ -47,7 +47,16 @@ class BaseLoader(ABC):
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
+        """Load heart-rate samples in the shared heart-rate schema.
+
+        Implementations return ``utc_time``, ``local_time``, ``timezone``
+        (a UTC offset as :class:`pandas.Timedelta`), and ``heart_rate``. Bounds
+        are inclusive/exclusive and are applied to ``time_col``. Direct calls
+        default to local time. Feature extraction uses UTC for subdaily windows
+        and local time for calendar windows unless explicitly overridden.
+        """
         pass
 
     @abstractmethod

@@ -6,6 +6,7 @@ from typing import Literal, Union
 
 import pandas as pd
 
+from ... import heart_rate_schema
 from ..base import BaseLoader
 
 
@@ -529,6 +530,7 @@ class TesseraeCSVLoader(BaseLoader):
     ):
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
+        heart_rate_schema.validate_time_col(time_col)
         # Load all files
         heart_rate_folder = self.root_folder / user_id / "GarminHealthAPI"
 
@@ -548,18 +550,24 @@ class TesseraeCSVLoader(BaseLoader):
                 ignore_index=True,
             ).rename(columns={"Timestamp": "utc_time", "hr": "beats_per_minute"})
 
-            hr["utc_time"] = hr["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
-            hr["timezone_offset"] = hr["local_time"] - hr["utc_time"]
-
-            # Filter by local_time
-            hr = hr.loc[
-                (hr[time_col] >= pd.Timestamp(start_date))
-                & (hr[time_col] < pd.Timestamp(end_date)),
-                :,
-            ]
-            return hr
+            hr["utc_time"] = pd.to_datetime(hr["utc_time"], utc=True).dt.tz_localize(None)
+            hr["local_time"] = pd.to_datetime(hr["local_time"])
+            hr["timezone"] = hr["local_time"] - hr["utc_time"]
+            hr["timezone_offset"] = hr["timezone"]
+            hr["heart_rate"] = pd.to_numeric(hr["beats_per_minute"], errors="coerce")
+            hr = hr[hr["heart_rate"] > 0]
+            hr = hr.drop_duplicates(subset="utc_time", keep="last")
+            return (
+                heart_rate_schema.filter_by_time(
+                    hr, start_date, end_date, time_col
+                )
+                .sort_values("utc_time")
+                .reset_index(drop=True)
+            )
         else:
-            return pd.DataFrame()
+            return heart_rate_schema.empty_frame(
+                ["timezone_offset", "tz_source", "beats_per_minute"]
+            )
 
     def load_stress(self, user_id, start_date, end_date):
         raise

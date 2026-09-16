@@ -123,12 +123,20 @@ def test_oura_hr_preserves_source_conflict_but_excludes_it_from_aggregation(tmp_
             {"timestamp": "2024-01-01T00:30:00+00:00", "bpm": 60, "source": "rest"},
         ],
     )
+    _page(
+        tmp_path,
+        "daily_activity",
+        "data.json",
+        [{"id": "activity-1", "day": "2024-01-01", "timestamp": "2024-01-01T04:00:00+01:00"}],
+    )
     loader = OuraLoader(tmp_path)
     samples = loader.load_heart_rate("person-1")
     assert len(samples) == 3
     assert samples["timestamp_conflict"].sum() == 2
-    with pytest.raises(NotImplementedError, match="local_time"):
-        loader.load_heart_rate("person-1", time_col="local_time")
+    local_samples = loader.load_heart_rate("person-1", time_col="local_time")
+    assert local_samples.loc[0, "local_time"] == pd.Timestamp("2024-01-01 01:00")
+    assert local_samples.loc[0, "timezone"] == pd.Timedelta(hours=1)
+    assert set(local_samples["local_time_source"]) == {"daily_activity"}
     with pytest.warns(UserWarning, match="ambiguous"):
         trajectory = heart_rate.get_heart_rate_statistics(
             loader, user_id="person-1", resolution="1h",
@@ -137,6 +145,53 @@ def test_oura_hr_preserves_source_conflict_but_excludes_it_from_aggregation(tmp_
         )
     assert trajectory.iloc[0]["heart_rate_mean"] == 60
     assert trajectory.iloc[0]["heart_rate_count"] == 1
+
+
+def test_oura_hr_does_not_fill_days_without_an_offset_anchor(tmp_path):
+    _page(
+        tmp_path,
+        "heartrate",
+        "data.json",
+        [
+            {"timestamp": "2024-01-01T12:00:00+00:00", "bpm": 60},
+            {"timestamp": "2024-01-03T12:00:00+00:00", "bpm": 70},
+        ],
+    )
+    _page(
+        tmp_path,
+        "daily_activity",
+        "data.json",
+        [{"id": "activity-1", "day": "2024-01-01", "timestamp": "2024-01-01T04:00:00+01:00"}],
+    )
+    with pytest.warns(UserWarning, match="no unambiguous local offset"):
+        samples = OuraLoader(tmp_path).load_heart_rate(
+            "person-1", time_col="local_time"
+        )
+    assert samples["local_time"].notna().sum() == 1
+    assert samples.loc[1, "local_time_uncertain"]
+
+
+def test_oura_hr_uses_exact_event_offset_before_daily_activity(tmp_path):
+    _page(
+        tmp_path,
+        "heartrate",
+        "data.json",
+        [{"timestamp": "2024-01-01T22:30:00+00:00", "bpm": 60}],
+    )
+    _page(
+        tmp_path,
+        "daily_activity",
+        "data.json",
+        [{"id": "activity-1", "day": "2024-01-02", "timestamp": "2024-01-02T04:00:00+01:00"}],
+    )
+    record = _sleep_record()
+    record["bedtime_start"] = "2024-01-01T23:00:00+02:00"
+    record["bedtime_end"] = "2024-01-02T01:00:00+02:00"
+    _page(tmp_path, "sleep", "data.json", [record])
+    sample = OuraLoader(tmp_path).load_heart_rate("person-1").iloc[0]
+    assert sample["local_time"] == pd.Timestamp("2024-01-02 00:30")
+    assert sample["timezone"] == pd.Timedelta(hours=2)
+    assert sample["local_time_source"] == "sleep"
 
 
 def test_hourly_hr_uses_utc_hour_boundaries_and_requested_columns(tmp_path):

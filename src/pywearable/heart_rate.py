@@ -9,7 +9,7 @@ from typing import Union
 
 import pandas as pd
 
-from . import constants
+from . import heart_rate_schema
 from .loader.base import BaseLoader
 from .utils import time as time_utils
 
@@ -40,6 +40,7 @@ def get_daily_rest_heart_rate(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> pd.Series:
     """Get daily rest heart rate (RHR).
 
@@ -91,6 +92,7 @@ def get_daily_rest_heart_rate(
         end_date=end_date,
         loader_kwargs=loader_kwargs,
         resolution="daily",
+        time_reference=time_reference,
     )
 
 
@@ -100,6 +102,7 @@ def get_daily_max_heart_rate(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> pd.Series:
     """Get daily maximum heart rate.
 
@@ -152,6 +155,7 @@ def get_daily_max_heart_rate(
         end_date=end_date,
         loader_kwargs=loader_kwargs,
         resolution="daily",
+        time_reference=time_reference,
     )
 
 
@@ -161,6 +165,7 @@ def get_daily_min_heart_rate(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
+    time_reference: str = "auto",
 ) -> pd.Series:
     """Get daily minimum heart rate.
 
@@ -212,6 +217,7 @@ def get_daily_min_heart_rate(
         start_date=start_date,
         end_date=end_date,
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -221,6 +227,7 @@ def get_daily_mean_heart_rate(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
+    time_reference: str = "auto",
 ) -> pd.Series:
     """Get daily mean heart rate.
 
@@ -272,11 +279,12 @@ def get_daily_mean_heart_rate(
         start_date=start_date,
         end_date=end_date,
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
 def _compute_hr_statistics(
-    heart_rate: pd.DataFrame, rule: str, time_col: str, calendar_based: str
+    heart_rate: pd.DataFrame, rule: str, time_col: str, calendar_based: bool
 ) -> pd.Series:
     """Computes a heart rate statistics on a daily basis.
 
@@ -301,14 +309,33 @@ def _compute_hr_statistics(
             f"heart_rate must be a pd.DataFrame. {type(heart_rate)} is not a valid type."
         )
 
-    if "timestamp_conflict" in heart_rate.columns and heart_rate["timestamp_conflict"].any():
+    required_columns = {
+        heart_rate_schema.UTC_TIME_COL,
+        time_col,
+        heart_rate_schema.HEART_RATE_COL,
+    }
+    missing_columns = required_columns.difference(heart_rate.columns)
+    if missing_columns:
+        raise ValueError(
+            "heart_rate is missing required columns: "
+            f"{sorted(missing_columns)}"
+        )
+
+    heart_rate = heart_rate.dropna(subset=list(required_columns)).copy()
+    if heart_rate.empty:
+        return pd.DataFrame()
+
+    conflict_col = heart_rate_schema.TIMESTAMP_CONFLICT_COL
+    if conflict_col in heart_rate.columns and heart_rate[conflict_col].any():
         warnings.warn("Excluding ambiguous same-timestamp heart-rate readings from aggregation.")
-        heart_rate = heart_rate.loc[~heart_rate["timestamp_conflict"]].copy()
+        heart_rate = heart_rate.loc[~heart_rate[conflict_col]].copy()
+    if heart_rate.empty:
+        return pd.DataFrame()
 
     heart_rate_stats = (
-        heart_rate.drop_duplicates(subset="utc_time")
+        heart_rate.drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL)
         .resample(rule=rule, on=time_col, label="left", closed="left")[
-            constants.HR_COLUMN
+            heart_rate_schema.HEART_RATE_COL
         ]
         .agg(["count", "max", "min", "mean", "median", "std"])
         .astype("float")
@@ -319,9 +346,9 @@ def _compute_hr_statistics(
     # given that we have different source resolutions
     # for heart rate
     heart_rate_wearing_time = (
-        heart_rate.drop_duplicates(subset="utc_time")
+        heart_rate.drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL)
         .resample(rule="1min", on=time_col, label="left", closed="left")[
-            constants.HR_COLUMN
+            heart_rate_schema.HEART_RATE_COL
         ]
         .count()
         .gt(0)
@@ -333,7 +360,7 @@ def _compute_hr_statistics(
 
     heart_rate_quantiles = (
         heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
-            constants.HR_COLUMN
+            heart_rate_schema.HEART_RATE_COL
         ]
         .quantile([0.1, 0.9])
         .unstack(level=-1)
@@ -345,25 +372,39 @@ def _compute_hr_statistics(
     heart_rate_stats = pd.concat((heart_rate_stats, heart_rate_quantiles), axis=1)
 
     # Let's add back timezone info
-    if not calendar_based and "timezone" in heart_rate.columns:
-        tz_lookup = heart_rate[["utc_time", "timezone"]].sort_values("utc_time")
+    if (
+        not calendar_based
+        and time_col == heart_rate_schema.UTC_TIME_COL
+        and heart_rate_schema.TIMEZONE_COL in heart_rate.columns
+    ):
+        tz_lookup = (
+            heart_rate[
+                [heart_rate_schema.UTC_TIME_COL, heart_rate_schema.TIMEZONE_COL]
+            ]
+            .sort_values(heart_rate_schema.UTC_TIME_COL)
+            .drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL, keep="last")
+        )
         heart_rate_stats = heart_rate_stats.reset_index()
 
         heart_rate_stats = pd.merge_asof(
             heart_rate_stats.sort_values("utc_time"),
             tz_lookup,
-            on="utc_time",
+            on=heart_rate_schema.UTC_TIME_COL,
             direction="nearest",
         )
-        heart_rate_stats = heart_rate_stats.set_index(["utc_time", "timezone"])
+        heart_rate_stats = heart_rate_stats.set_index(
+            [heart_rate_schema.UTC_TIME_COL, heart_rate_schema.TIMEZONE_COL]
+        )
 
     # We can extract rest heart rate only if resolution is at
     # daily level, otherwise it doesn't have any sense
     if rule == "d":
         hr_one_min_agg = (
-            heart_rate.sort_values("local_time")
-            .set_index("local_time")
-            .resample("1min", closed="left", label="left")[constants.HR_COLUMN]
+            heart_rate.sort_values(time_col)
+            .set_index(time_col)
+            .resample("1min", closed="left", label="left")[
+                heart_rate_schema.HEART_RATE_COL
+            ]
             .mean()
         )
         # Perform 30-minute average and get the minimum by day
@@ -385,6 +426,7 @@ def get_minute_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a minute level.
 
@@ -434,6 +476,7 @@ def get_minute_heart_rate_statistics(
         end_date=end_date,
         resolution="60s",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -444,6 +487,7 @@ def get_hourly_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a hourly level.
 
@@ -493,6 +537,7 @@ def get_hourly_heart_rate_statistics(
         end_date=end_date,
         resolution="1h",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -503,6 +548,7 @@ def get_daily_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a daily level.
 
@@ -551,6 +597,7 @@ def get_daily_heart_rate_statistics(
         end_date=end_date,
         resolution="daily",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -561,6 +608,7 @@ def get_weekly_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a weekly level.
 
@@ -609,6 +657,7 @@ def get_weekly_heart_rate_statistics(
         end_date=end_date,
         resolution="weekly",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -619,6 +668,7 @@ def get_monthly_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a minute level.
 
@@ -669,6 +719,7 @@ def get_monthly_heart_rate_statistics(
         end_date=end_date,
         resolution="monthly",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -679,6 +730,7 @@ def get_yearly_heart_rate_statistics(
     start_date: Union[pd.Timestamp, None] = None,
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     return get_heart_rate_statistics(
         loader=loader,
@@ -688,6 +740,7 @@ def get_yearly_heart_rate_statistics(
         end_date=end_date,
         resolution="yearly",
         loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
     )
 
 
@@ -699,6 +752,7 @@ def get_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     resolution: Union[pd.Timedelta, str] = "day",
     loader_kwargs: dict = {},
+    time_reference: str = "auto",
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get all the available statistics based on heart rate.
 
@@ -751,6 +805,10 @@ def get_heart_rate_statistics(
         can be accepted by :fun:`pandas.resample` works. For daily, weekly,
         monthly, or yearly resolutions, the resolution must be
         specified as ``"daily"``, ``"weekly"``, ``"monthly"`` or ``"yearly"``.
+    time_reference: :class:`str`
+        Clock used to construct windows. ``"auto"`` uses UTC for fixed-duration
+        subdaily windows and local time for calendar resolutions. ``"utc"`` and
+        ``"local"`` override that default.
 
     Returns
     -------
@@ -767,10 +825,21 @@ def get_heart_rate_statistics(
     start_date = None if start_date is None else pd.Timestamp(start_date)
     end_date = None if end_date is None else pd.Timestamp(end_date)
 
+    # Get specification for resampling strategy
+    resampling_spec = time_utils.get_resampling_spec(
+        resolution=resolution, time_reference=time_reference
+    )
+    time_col = resampling_spec.time_col
+    rule = resampling_spec.rule
+    calendar_based = resampling_spec.calendar_based
+
     # Check statistic
     if statistic is None:
-        # Consider all statistics
-        statistics = HEART_RATE_STATISTICS
+        statistics = [
+            requested_statistic
+            for requested_statistic in HEART_RATE_STATISTICS
+            if requested_statistic != HEART_RATE_STATISTIC_REST or rule == "d"
+        ]
     elif type(statistic) == str:
         statistics = [statistic]
     else:
@@ -781,22 +850,18 @@ def get_heart_rate_statistics(
             raise ValueError(
                 f"statistic must be one among {HEART_RATE_STATISTICS}, not {requested_statistic}"
             )
+        if requested_statistic == HEART_RATE_STATISTIC_REST and rule != "d":
+            raise ValueError(
+                "heart_rate_rest is available only at daily resolution"
+            )
     # Check args and kwargs
     if type(loader_kwargs) != dict:
         raise ValueError(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
 
-    # Get specification for resampling strategy
-    resampling_spec = time_utils.get_resampling_spec(resolution=resolution)
-    time_col = resampling_spec.time_col
-    rule = resampling_spec.rule
-    calendar_based = resampling_spec.calendar_based
-    if not calendar_based:
-        if start_date is not None and start_date.tzinfo is not None:
-            start_date = start_date.tz_convert("UTC").tz_localize(None)
-        if end_date is not None and end_date.tzinfo is not None:
-            end_date = end_date.tz_convert("UTC").tz_localize(None)
+    start_date = heart_rate_schema.normalize_time_bound(start_date, time_col)
+    end_date = heart_rate_schema.normalize_time_bound(end_date, time_col)
 
     heart_rate_stats_df_list: list[pd.DataFrame] = []
     for user in user_id:

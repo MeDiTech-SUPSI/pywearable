@@ -1,10 +1,12 @@
 """Read Oura API v2 JSON exports without changing the source files."""
 
 import json
+import warnings
 from pathlib import Path
 
 import pandas as pd
 
+from ... import heart_rate_schema
 from ..base import BaseLoader
 
 
@@ -102,6 +104,102 @@ class OuraLoader(BaseLoader):
         if timestamp.tzinfo is None:
             raise ValueError(f"Oura sleep timestamp lacks an offset: {value}")
         return timestamp.tz_localize(None)
+
+    @staticmethod
+    def _timestamp_offset(value):
+        if value is None:
+            return None
+        timestamp = pd.Timestamp(value)
+        if timestamp.tzinfo is None:
+            return None
+        return pd.Timedelta(timestamp.utcoffset())
+
+    @staticmethod
+    def _day_offsets(records, timestamp_field):
+        offsets = {}
+        for record in records:
+            if "day" not in record:
+                continue
+            offset = OuraLoader._timestamp_offset(record.get(timestamp_field))
+            if offset is None:
+                continue
+            day = pd.Timestamp(record["day"]).date()
+            offsets.setdefault(day, set()).add(offset)
+        return {
+            day: next(iter(values))
+            for day, values in offsets.items()
+            if len(values) == 1
+        }
+
+    def _heart_rate_local_context(self, user_id, utc_time):
+        """Infer local offsets from offset-bearing Oura records without interpolation."""
+        offsets = pd.Series(pd.NaT, index=utc_time.index, dtype="timedelta64[ns]")
+        offset_source = pd.Series(pd.NA, index=utc_time.index, dtype="object")
+        blocked = pd.Series(False, index=utc_time.index)
+
+        # An offset carried by an event is the strongest evidence while that
+        # event is in progress. If its endpoints disagree, the transition time
+        # is unknowable without an IANA timezone and the interval stays local-unknown.
+        intervals = (
+            ("sleep", "bedtime_start", "bedtime_end"),
+            ("workout", "start_datetime", "end_datetime"),
+            ("session", "start_datetime", "end_datetime"),
+        )
+        for metric, start_field, end_field in intervals:
+            for record in self._read_records(user_id, metric):
+                if start_field not in record or end_field not in record:
+                    continue
+                start = pd.Timestamp(record[start_field])
+                end = pd.Timestamp(record[end_field])
+                if start.tzinfo is None or end.tzinfo is None:
+                    continue
+                start_utc = start.tz_convert("UTC").tz_localize(None)
+                end_utc = end.tz_convert("UTC").tz_localize(None)
+                in_interval = (utc_time >= start_utc) & (utc_time < end_utc)
+                if start.utcoffset() != end.utcoffset():
+                    blocked |= in_interval
+                    offsets.loc[in_interval] = pd.NaT
+                    offset_source.loc[in_interval] = pd.NA
+                    continue
+
+                candidate = pd.Timedelta(start.utcoffset())
+                conflict = in_interval & offsets.notna() & offsets.ne(candidate)
+                blocked |= conflict
+                offsets.loc[conflict] = pd.NaT
+                offset_source.loc[conflict] = pd.NA
+                assign = in_interval & offsets.isna() & ~blocked
+                offsets.loc[assign] = candidate
+                offset_source.loc[assign] = metric
+
+        def assign_days(day_offsets, source_name):
+            candidates = pd.Series(
+                pd.NaT, index=utc_time.index, dtype="timedelta64[ns]"
+            )
+            ambiguous = pd.Series(False, index=utc_time.index)
+            eligible = offsets.isna() & ~blocked
+            for day, candidate in day_offsets.items():
+                matches_day = (utc_time + candidate).dt.date == day
+                matches_day &= eligible
+                conflict = matches_day & candidates.notna() & candidates.ne(candidate)
+                ambiguous |= conflict
+                candidates.loc[matches_day & candidates.isna()] = candidate
+            assign = candidates.notna() & ~ambiguous & eligible
+            offsets.loc[assign] = candidates.loc[assign]
+            offset_source.loc[assign] = source_name
+            blocked.loc[ambiguous] = True
+
+        activity_records = self._read_records(user_id, "daily_activity")
+        assign_days(self._day_offsets(activity_records, "timestamp"), "daily_activity")
+
+        # Sleep is a fallback day anchor where daily activity is absent. Its
+        # explicit interval above still takes precedence for overnight samples.
+        sleep_records = [
+            record
+            for record in self._read_records(user_id, "sleep")
+            if record.get("type") == "long_sleep"
+        ]
+        assign_days(self._day_offsets(sleep_records, "bedtime_end"), "sleep_day")
+        return offsets, offset_source
 
     def load_sleep_sessions(self, user_id, start_date=None, end_date=None, sleep_type=None):
         """Return Oura sessions, including naps, without making them nightly features."""
@@ -241,11 +339,19 @@ class OuraLoader(BaseLoader):
         ]
         return frame.sort_values("local_time").reset_index(drop=True)
 
-    def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="utc_time"):
-        """Return Oura heart-rate instants in UTC; local-day time is unavailable."""
-        if time_col != "utc_time":
-            raise NotImplementedError("Oura HR has no reliable per-sample local_time mapping")
-        columns = ["utc_time", "heart_rate", "source", "timestamp_conflict"]
+    def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="local_time"):
+        """Return Oura HR with UTC instants and conservatively inferred local time.
+
+        ``daily_activity.timestamp`` supplies the primary local-day offset.
+        Offset-bearing sleep, workout, and session intervals take precedence,
+        and long-sleep offsets provide a fallback when activity is absent.
+        Offsets are never interpolated across missing days or offset changes.
+        """
+        heart_rate_schema.validate_time_col(time_col)
+        columns = [
+            "utc_time", "local_time", "timezone", "heart_rate", "source",
+            "timestamp_conflict", "local_time_source", "local_time_uncertain",
+        ]
         rows = [
             {
                 "utc_time": self._utc_time(record["timestamp"]),
@@ -254,21 +360,49 @@ class OuraLoader(BaseLoader):
             }
             for record in self._read_records(user_id, "heartrate")
         ]
-        frame = pd.DataFrame(rows, columns=columns[:-1])
+        frame = pd.DataFrame(rows, columns=["utc_time", "heart_rate", "source"])
         if frame.empty:
             return pd.DataFrame(columns=columns)
-        start = pd.Timestamp(start_date) if start_date is not None else None
-        end = pd.Timestamp(end_date) if end_date is not None else None
-        if start is not None and start.tzinfo is not None:
-            start = start.tz_convert("UTC").tz_localize(None)
-        if end is not None and end.tzinfo is not None:
-            end = end.tz_convert("UTC").tz_localize(None)
-        if start is not None:
-            frame = frame[frame["utc_time"] >= start]
-        if end is not None:
-            frame = frame[frame["utc_time"] < end]
+
+        # Local bounds cannot be converted exactly before offsets are known.
+        # A one-day UTC margin safely narrows the records that need enrichment.
+        if time_col == "utc_time":
+            frame = heart_rate_schema.filter_by_time(
+                frame, start_date, end_date, time_col
+            )
+        else:
+            broad_start = heart_rate_schema.normalize_time_bound(
+                start_date, time_col
+            )
+            broad_end = heart_rate_schema.normalize_time_bound(end_date, time_col)
+            if broad_start is not None:
+                frame = frame[
+                    frame["utc_time"] >= broad_start - pd.Timedelta(days=1)
+                ]
+            if broad_end is not None:
+                frame = frame[frame["utc_time"] < broad_end + pd.Timedelta(days=1)]
+        if frame.empty:
+            return pd.DataFrame(columns=columns)
+
+        frame["timezone"], frame["local_time_source"] = (
+            self._heart_rate_local_context(user_id, frame["utc_time"])
+        )
+        frame["local_time"] = frame["utc_time"] + frame["timezone"]
+        frame["local_time_uncertain"] = frame["local_time"].isna()
         frame["timestamp_conflict"] = frame.duplicated("utc_time", keep=False)
-        return frame.sort_values(["utc_time", "source"]).reset_index(drop=True)
+        if time_col == "local_time" and frame["local_time_uncertain"].any():
+            unresolved = int(frame["local_time_uncertain"].sum())
+            warnings.warn(
+                f"{unresolved} Oura heart-rate samples have no unambiguous local "
+                "offset; they remain available only through utc_time."
+            )
+        return (
+            heart_rate_schema.filter_by_time(
+                frame, start_date, end_date, time_col
+            )
+            .sort_values(["utc_time", "source"])
+            .reset_index(drop=True)
+        )[columns]
 
     def load_hrv_summary(self, user_id, start_date=None, end_date=None):
         """Return Oura-provided average nightly rMSSD (milliseconds)."""

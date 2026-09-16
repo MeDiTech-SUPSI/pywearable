@@ -12,31 +12,39 @@ class ResamplingSpec:
 
 def get_resampling_spec(
     resolution: str,
+    time_reference: str = "auto",
 ) -> ResamplingSpec:
 
+    if time_reference not in {"auto", "utc", "local"}:
+        raise ValueError(
+            "time_reference must be one of ('auto', 'utc', 'local'), "
+            f"not {time_reference}"
+        )
+
     if resolution == "day" or resolution == "daily":
-        return ResamplingSpec(
-            rule="d",
-            time_col="local_time",
-            calendar_based=True,
-        )
+        rule = "d"
+        calendar_based = True
     elif resolution == "week" or resolution == "weekly":
-        return ResamplingSpec(
-            rule="W",
-            time_col="local_time",
-            calendar_based=True,
-        )
+        rule = "W"
+        calendar_based = True
     elif resolution == "month" or resolution == "monthly":
-        return ResamplingSpec(rule="MS", time_col="local_time", calendar_based=True)
+        rule = "MS"
+        calendar_based = True
     elif resolution == "year" or resolution == "yearly":
-        return ResamplingSpec(rule="YS", time_col="local_time", calendar_based=True)
+        rule = "YS"
+        calendar_based = True
     else:
         try:
             pd.Timedelta(resolution)
         except ValueError:
             raise ValueError(f"Resolution {resolution} is not a valid choice.")
-        return ResamplingSpec(
-            rule=resolution,
-            time_col="utc_time",
-            calendar_based=False,
-        )
+        rule = resolution
+        calendar_based = False
+
+    if time_reference == "auto":
+        time_reference = "local" if calendar_based else "utc"
+    return ResamplingSpec(
+        rule=rule,
+        time_col=f"{time_reference}_time",
+        calendar_based=calendar_based,
+    )

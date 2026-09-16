@@ -14,7 +14,7 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import constants, sleep, sleep_schema, utils
+from ... import constants, heart_rate_schema, sleep, sleep_schema, utils
 from ..base import BaseLoader
 from . import constants as lf_constants
 
@@ -2334,14 +2334,57 @@ class LabfrontLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
-        return self.load_garmin_metric(
+        heart_rate_schema.validate_time_col(time_col)
+        requested_start = heart_rate_schema.normalize_time_bound(start_date, time_col)
+        requested_end = heart_rate_schema.normalize_time_bound(end_date, time_col)
+        data = self.load_garmin_metric(
             metric=constants.METRIC_HEART_RATE,
             user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
+            # Labfront's file index and row filter use local ISO timestamps.
+            # Read a wider interval, then apply the requested clock exactly.
+            start_date=(
+                None
+                if requested_start is None
+                else requested_start - pd.Timedelta(days=1)
+            ),
+            end_date=(
+                None if requested_end is None else requested_end + pd.Timedelta(days=1)
+            ),
             source=source,
             filter_on_calendar_date=False,
+        )
+        if data.empty:
+            return heart_rate_schema.empty_frame(
+                ["source", heart_rate_schema.TIMESTAMP_CONFLICT_COL]
+            )
+
+        data = data.copy()
+        data["local_time"] = pd.to_datetime(data[constants.ISODATE_COL])
+        data["utc_time"] = pd.to_datetime(
+            data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+        ).dt.tz_localize(None)
+        if "timezone" in data.columns:
+            data = data.rename(columns={"timezone": "timezone_name"})
+        data["timezone"] = data["local_time"] - data["utc_time"]
+        data["heart_rate"] = pd.to_numeric(
+            data["beatsPerMinute"], errors="coerce"
+        )
+        data = data[data["heart_rate"] > 0]
+        data["source"] = source
+        data[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+            data.groupby("utc_time")["heart_rate"].transform("nunique") > 1
+        )
+        data = data.drop_duplicates(
+            subset=["utc_time", "heart_rate"], keep="last"
+        )
+        return (
+            heart_rate_schema.filter_by_time(
+                data, requested_start, requested_end, time_col
+            )
+            .sort_values("utc_time")
+            .reset_index(drop=True)
         )
 
     def load_pulse_ox(

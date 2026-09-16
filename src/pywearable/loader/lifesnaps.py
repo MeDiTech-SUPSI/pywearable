@@ -5,6 +5,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
+from .. import heart_rate_schema
 from .base import BaseLoader
 
 
@@ -194,7 +195,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
-        time_col: str = "utc_time",
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
         """Load heart rate data.
 
@@ -213,26 +214,26 @@ class LifeSnapsParquetLoader(BaseLoader):
             Empty dataframe.
         """
         self._check_user_id(user_id)
+        heart_rate_schema.validate_time_col(time_col)
         file_path = self.root_folder / user_id / "heart_rate.parquet"
         if file_path.exists():
             heart_rate = pd.read_parquet(file_path).rename(
                 columns={"dateTime": "utc_time", "bpm": "heart_rate"}
             )
-            heart_rate["utc_time"] = pd.to_datetime(heart_rate["utc_time"])
+            heart_rate["utc_time"] = pd.to_datetime(
+                heart_rate["utc_time"], utc=True
+            ).dt.tz_localize(None)
             heart_rate["local_time"] = heart_rate["utc_time"]
             heart_rate["timezone"] = pd.Timedelta(0)
-
-            if not (start_date is None):
-                heart_rate = heart_rate[
-                    heart_rate[time_col] >= pd.Timestamp(start_date)
-                ]
-            if not (end_date is None):
-                heart_rate = heart_rate[heart_rate[time_col] < pd.Timestamp(end_date)]
-            return heart_rate
-        else:
-            return pd.DataFrame(
-                columns=["local_time", "utc_time", "timezone", "heart_rate"],
+            return (
+                heart_rate_schema.filter_by_time(
+                    heart_rate, start_date, end_date, time_col
+                )
+                .sort_values("utc_time")
+                .reset_index(drop=True)
             )
+        else:
+            return heart_rate_schema.empty_frame()
 
     def load_respiration_summary(
         self,

@@ -170,3 +170,6 @@ playground/
 AGENTS.md
 .agents/
 .codex/
+
+# Generated locally by LabfrontLoader
+**/.pywearable_file_index.csv
