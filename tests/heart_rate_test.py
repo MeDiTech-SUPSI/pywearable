@@ -19,6 +19,10 @@ class HeartRateLoader:
         return self.samples.copy()
 
 
+class LocalOnlyHeartRateLoader(HeartRateLoader):
+    heart_rate_time_columns = ("local_time",)
+
+
 def _samples():
     utc_time = pd.to_datetime(
         ["2024-01-01 22:30", "2024-01-01 23:30", "2024-01-02 00:30"]
@@ -78,6 +82,38 @@ def test_subdaily_statistics_can_use_local_clock_windows():
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
     assert result.tolist() == [60, 70, 80]
+
+
+def test_auto_subdaily_statistics_warn_and_fall_back_to_available_local_time():
+    samples = _samples().assign(utc_time=pd.NaT, timezone=pd.NaT)
+    loader = LocalOnlyHeartRateLoader(samples)
+
+    with pytest.warns(UserWarning, match="using local-time windows"):
+        result = heart_rate.get_heart_rate_statistics(
+            loader,
+            user_id="person-1",
+            resolution="1h",
+            statistic="heart_rate_mean",
+        )
+
+    assert loader.requested_time_cols == ["local_time"]
+    assert result.index.names == ["user_id", "local_time"]
+    assert result.tolist() == [60, 70, 80]
+
+
+def test_explicit_utc_statistics_reject_local_only_loader():
+    loader = LocalOnlyHeartRateLoader(_samples())
+
+    with pytest.raises(ValueError, match="does not provide.*utc_time"):
+        heart_rate.get_heart_rate_statistics(
+            loader,
+            user_id="person-1",
+            resolution="1h",
+            statistic="heart_rate_mean",
+            time_reference="utc",
+        )
+
+    assert loader.requested_time_cols == []
 
 
 def test_calendar_statistics_can_use_utc_days():

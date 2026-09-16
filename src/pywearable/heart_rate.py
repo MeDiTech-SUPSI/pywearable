@@ -309,11 +309,7 @@ def _compute_hr_statistics(
             f"heart_rate must be a pd.DataFrame. {type(heart_rate)} is not a valid type."
         )
 
-    required_columns = {
-        heart_rate_schema.UTC_TIME_COL,
-        time_col,
-        heart_rate_schema.HEART_RATE_COL,
-    }
+    required_columns = {time_col, heart_rate_schema.HEART_RATE_COL}
     missing_columns = required_columns.difference(heart_rate.columns)
     if missing_columns:
         raise ValueError(
@@ -335,9 +331,13 @@ def _compute_hr_statistics(
     # Every statistic must use the same set of physical instants. Loaders may
     # retain repeated, identical exports, so collapse those timestamps once
     # before computing both ordinary statistics and quantiles.
-    heart_rate = heart_rate.drop_duplicates(
-        subset=heart_rate_schema.UTC_TIME_COL
+    duplicate_time_col = (
+        heart_rate_schema.UTC_TIME_COL
+        if heart_rate_schema.UTC_TIME_COL in heart_rate.columns
+        and heart_rate[heart_rate_schema.UTC_TIME_COL].notna().any()
+        else time_col
     )
+    heart_rate = heart_rate.drop_duplicates(subset=duplicate_time_col)
 
     heart_rate_stats = (
         heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
@@ -837,6 +837,24 @@ def get_heart_rate_statistics(
     time_col = resampling_spec.time_col
     rule = resampling_spec.rule
     calendar_based = resampling_spec.calendar_based
+
+    available_time_columns = getattr(
+        loader, "heart_rate_time_columns", heart_rate_schema.TIME_COLUMNS
+    )
+    if time_col not in available_time_columns:
+        if (
+            time_reference == "auto"
+            and heart_rate_schema.LOCAL_TIME_COL in available_time_columns
+        ):
+            warnings.warn(
+                "UTC heart-rate timestamps are unavailable; using local-time "
+                "windows instead."
+            )
+            time_col = heart_rate_schema.LOCAL_TIME_COL
+        else:
+            raise ValueError(
+                f"The loader does not provide heart-rate timestamps in {time_col}."
+            )
 
     # Check statistic
     if statistic is None:

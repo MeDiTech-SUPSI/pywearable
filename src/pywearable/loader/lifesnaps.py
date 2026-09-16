@@ -31,6 +31,8 @@ class LifeSnapsParquetLoader(BaseLoader):
         parquet format.
     """
 
+    heart_rate_time_columns = ("local_time",)
+
     def __init__(self, root_folder: os.PathLike):
         root_folder = Path(root_folder)
         if not root_folder.exists():
@@ -208,28 +210,41 @@ class LifeSnapsParquetLoader(BaseLoader):
         end_date : :class:`pandas.Timestamp` or ``None``, optional
             End date for heart rate data retrieval, by default ``None``
 
+        Notes
+        -----
+        LifeSnaps heart-rate timestamps are local clock values. The public
+        dataset does not provide their UTC offsets, so ``utc_time`` and
+        ``timezone`` are returned as missing and UTC filtering is unavailable.
+
         Returns
         -------
         :class:`pandas.DataFrame`
-            Empty dataframe.
+            Heart-rate samples in the shared schema.
         """
         self._check_user_id(user_id)
         heart_rate_schema.validate_time_col(time_col)
+        if time_col == heart_rate_schema.UTC_TIME_COL:
+            raise ValueError(
+                "LifeSnaps heart-rate data does not provide UTC timestamps; "
+                "use time_col='local_time'."
+            )
         file_path = self.root_folder / user_id / "heart_rate.parquet"
         if file_path.exists():
             heart_rate = pd.read_parquet(file_path).rename(
-                columns={"dateTime": "utc_time", "bpm": "heart_rate"}
+                columns={"dateTime": "local_time", "bpm": "heart_rate"}
             )
-            heart_rate["utc_time"] = pd.to_datetime(
-                heart_rate["utc_time"], utc=True
-            ).dt.tz_localize(None)
-            heart_rate["local_time"] = heart_rate["utc_time"]
-            heart_rate["timezone"] = pd.Timedelta(0)
+            heart_rate["local_time"] = pd.to_datetime(heart_rate["local_time"])
+            heart_rate["utc_time"] = pd.NaT
+            heart_rate["timezone"] = pd.NaT
+            heart_rate[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+                heart_rate.groupby("local_time")["heart_rate"].transform("nunique")
+                > 1
+            )
             return (
                 heart_rate_schema.filter_by_time(
                     heart_rate, start_date, end_date, time_col
                 )
-                .sort_values("utc_time")
+                .sort_values("local_time")
                 .reset_index(drop=True)
             )
         else:

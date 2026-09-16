@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from pywearable.loader import LifeSnapsParquetLoader
 from pywearable.loader.tesserae import TesseraeParquetLoader
@@ -29,7 +30,13 @@ def test_lifesnaps_heart_rate_uses_shared_contract_and_selected_clock(
     )
     assert REQUIRED_COLUMNS <= set(result)
     assert result["heart_rate"].tolist() == [70]
-    assert result.loc[0, "timezone"] == pd.Timedelta(0)
+    assert result["utc_time"].isna().all()
+    assert result["timezone"].isna().all()
+
+    with pytest.raises(ValueError, match="does not provide UTC"):
+        LifeSnapsParquetLoader(tmp_path).load_heart_rate(
+            "person-1", time_col="utc_time"
+        )
 
 
 def test_tesserae_heart_rate_keeps_latest_duplicate_and_filters_selected_clock(

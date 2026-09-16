@@ -10,6 +10,8 @@ from .. import constants
 class BaseLoader(ABC):
     """Abstract class for the implementation of loader classes."""
 
+    heart_rate_time_columns = ("utc_time", "local_time")
+
     def __init__(self):
         pass
 
@@ -52,10 +54,13 @@ class BaseLoader(ABC):
         """Load heart-rate samples in the shared heart-rate schema.
 
         Implementations return ``utc_time``, ``local_time``, ``timezone``
-        (a UTC offset as :class:`pandas.Timedelta`), and ``heart_rate``. Bounds
-        are inclusive/exclusive and are applied to ``time_col``. Direct calls
-        default to local time. Feature extraction uses UTC for subdaily windows
-        and local time for calendar windows unless explicitly overridden.
+        (a UTC offset as :class:`pandas.Timedelta`), and ``heart_rate``. A
+        loader can advertise unavailable clocks through
+        ``heart_rate_time_columns``; their canonical columns are retained but
+        contain missing values. Bounds are inclusive/exclusive and are applied
+        to ``time_col``. Direct calls default to local time. Feature extraction
+        uses UTC for subdaily windows and local time for calendar windows unless
+        explicitly overridden.
         """
         pass
 
