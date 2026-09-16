@@ -44,16 +44,31 @@ def base_loader(monkeypatch, pulse_ox):
     """
     monkeypatch.setattr(pywearable.loader.BaseLoader, "__abstractmethods__", frozenset())
     loader = pywearable.loader.BaseLoader()
-    monkeypatch.setattr(loader, "load_pulse_ox", lambda **kwargs: pulse_ox.copy())
+    monkeypatch.setattr(
+        loader, "load_sleep_pulse_ox", lambda **kwargs: pulse_ox.copy()
+    )
     monkeypatch.setattr(loader, "get_user_ids", lambda: [PULSE_OX_USER_ID])
     return loader
 
 
-def test_mean_rest_pulse_ox(base_loader):
+def test_mean_rest_pulse_ox(base_loader, pulse_ox):
     mean_rest_pulse_ox = pywearable.respiration.get_mean_rest_pulse_ox(base_loader)
-    assert type(mean_rest_pulse_ox) == dict
-    assert PULSE_OX_USER_ID in mean_rest_pulse_ox.keys()
-    assert (
-        pywearable.respiration._RESPIRATION_METRIC_MEAN_PULSE_OX
-        in mean_rest_pulse_ox[PULSE_OX_USER_ID].keys()
+    metric = pywearable.respiration._RESPIRATION_METRIC_MEAN_PULSE_OX
+    expected = pulse_ox.groupby(pywearable.constants.CALENDAR_DATE_COL)[
+        pywearable.constants.SPO2_SPO2_COL
+    ].mean()
+    expected.index = pd.to_datetime(expected.index)
+    expected.name = metric
+
+    assert isinstance(mean_rest_pulse_ox, pd.DataFrame)
+    assert mean_rest_pulse_ox.index.names == [
+        pywearable.constants.USER_COL,
+        pywearable.constants.CALENDAR_DATE_COL,
+    ]
+    pd.testing.assert_series_equal(
+        mean_rest_pulse_ox.xs(
+            PULSE_OX_USER_ID, level=pywearable.constants.USER_COL
+        )[metric],
+        expected,
+        check_freq=False,
     )
