@@ -77,6 +77,82 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
         )
 
 
+def test_sleep_trajectory_is_sorted_and_accepts_omitted_bounds():
+    summaries = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-2", "night-1"],
+            "calendar_date": ["2024-01-03 12:00", "2024-01-02 12:00"],
+            "local_time": ["2024-01-02 23:00", "2024-01-01 23:00"],
+            "duration_in_ms": [60 * 60_000, 60 * 60_000],
+            "awake_duration_in_ms": [0, 0],
+            "deep_sleep_duration_in_ms": [20 * 60_000, 20 * 60_000],
+            "light_sleep_duration_in_ms": [30 * 60_000, 30 * 60_000],
+            "rem_sleep_duration_in_ms": [10 * 60_000, 10 * 60_000],
+            "unmeasurable_sleep_duration_in_ms": [0, 0],
+        }
+    )
+    loader = SimpleNamespace(
+        get_user_ids=lambda: ["person-1"],
+        load_sleep_summary=lambda **kwargs: summaries.copy(),
+        load_sleep_stage=lambda **kwargs: pd.DataFrame(),
+    )
+
+    result = sleep.get_sleep_statistics(
+        loader, user_id="person-1", statistic=["TIB", "SPT"]
+    )
+
+    assert result.index.tolist() == [
+        ("person-1", pd.Timestamp("2024-01-02")),
+        ("person-1", pd.Timestamp("2024-01-03")),
+    ]
+    assert result["TIB"].tolist() == [60, 60]
+    assert result["SPT"].isna().all()
+
+
+def test_sleep_trajectory_rejects_more_than_one_summary_per_night():
+    summaries = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1", "night-2"],
+            "calendar_date": ["2024-01-02", "2024-01-02"],
+            "local_time": ["2024-01-01 22:00", "2024-01-01 23:00"],
+            "duration_in_ms": [60_000, 60_000],
+            "awake_duration_in_ms": [0, 0],
+            "deep_sleep_duration_in_ms": [60_000, 60_000],
+            "light_sleep_duration_in_ms": [0, 0],
+            "rem_sleep_duration_in_ms": [0, 0],
+            "unmeasurable_sleep_duration_in_ms": [0, 0],
+        }
+    )
+    loader = SimpleNamespace(
+        get_user_ids=lambda: ["person-1"],
+        load_sleep_summary=lambda **kwargs: summaries.copy(),
+        load_sleep_stage=lambda **kwargs: pd.DataFrame(),
+    )
+
+    with pytest.raises(ValueError, match="one row per calendar_date"):
+        sleep.get_sleep_statistics(loader, user_id="person-1", statistic="TIB")
+
+
+def test_sleep_period_time_uses_datetimes_without_unix_milliseconds():
+    summaries = pd.DataFrame(
+        {"sleep_summary_id": ["night-1"]},
+        index=pd.DatetimeIndex(["2024-03-31"], name="calendar_date"),
+    )
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1", "night-1"],
+            "local_time": pd.to_datetime(["2024-03-31 03:00", "2024-03-31 01:30"]),
+            "utc_time": pd.to_datetime(["2024-03-31 01:00", "2024-03-31 00:30"]),
+            "duration_in_ms": [30 * 60_000, 30 * 60_000],
+            "type": ["light", "deep"],
+        }
+    )
+
+    result = sleep._compute_sleep_period_time(summaries, stages)
+
+    assert result.loc[pd.Timestamp("2024-03-31")] == 60
+
+
 def test_cpd_is_undefined_on_first_night_and_after_gap():
     summaries = pd.DataFrame(
         {

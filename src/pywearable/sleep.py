@@ -1326,9 +1326,17 @@ def _compute_sleep_period_time(
         return pd.Series(index=sleep_summary.index)
 
     def sleep_diff(group):
-        start = group[constants.UNIXTIMESTAMP_IN_MS_COL]
-        duration = group[constants.SLEEP_STAGE_DURATION_IN_MS_COL]
-        return (start.iloc[-1] + duration.iloc[-1] - start.iloc[0]) / (1000 * 60)
+        time_col = constants.ISODATE_COL
+        if (
+            constants.UTC_TIME_COL in group.columns
+            and group[constants.UTC_TIME_COL].notna().all()
+        ):
+            time_col = constants.UTC_TIME_COL
+        start = group[time_col]
+        end = start + pd.to_timedelta(
+            group[constants.SLEEP_STAGE_DURATION_IN_MS_COL], unit="ms"
+        )
+        return (end.max() - start.min()).total_seconds() / 60
 
     # Get only sleep stages of interest
     filtered_sleep_stages = sleep_stages[
@@ -1336,15 +1344,19 @@ def _compute_sleep_period_time(
             sleep_summary[constants.SLEEP_SUMMARY_ID_COL].unique()
         )
     ].reset_index(drop=True)
+    sleeping_stages = filtered_sleep_stages[
+        filtered_sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+        != constants.SLEEP_STAGE_AWAKE_STAGE_VALUE
+    ].reset_index(drop=True)
     spt = pd.Series(
-        filtered_sleep_stages[
-            filtered_sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
-            != constants.SLEEP_STAGE_AWAKE_STAGE_VALUE
-        ]
-        .reset_index(drop=True)
-        .groupby(constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL)
-        .apply(sleep_diff),
+        {
+            summary_id: sleep_diff(group)
+            for summary_id, group in sleeping_stages.groupby(
+                constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL, sort=False
+            )
+        },
         name=SLEEP_STATISTIC_SPT,
+        dtype=float,
     )
     spt = pd.merge(
         left=spt,
@@ -2408,7 +2420,7 @@ def get_sleep_statistic(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype: Union[dict, None] = None,
-    loader_kwargs: dict = {},
+    loader_kwargs: Union[dict, None] = None,
 ) -> pd.Series:
     """Return one sleep feature at one-row-per-night resolution.
 
@@ -2429,12 +2441,12 @@ def get_sleep_statistic(
 
 def get_sleep_statistics(
     loader: BaseLoader,
-    user_id: Union[str, list, None],
-    start_date: pd.Timestamp,
-    end_date: pd.Timestamp,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     statistic: Union[str, list, tuple, None] = None,
     chronotype: Union[dict, None] = None,
-    loader_kwargs: dict = {},
+    loader_kwargs: Union[dict, None] = None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return sleep features at their natural one-row-per-night resolution.
 
@@ -2477,6 +2489,8 @@ def get_sleep_statistics(
                 f"{list(SLEEP_STATISTICS_DICT)}, not {requested_statistic}"
             )
 
+    if loader_kwargs is None:
+        loader_kwargs = {}
     if type(loader_kwargs) != dict:
         raise ValueError(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
@@ -2492,6 +2506,7 @@ def get_sleep_statistics(
             drop_duplicates=True,
             **loader_kwargs,
         )
+        sleep_summary = constants.prepare_sleep_summary(sleep_summary)
         if len(sleep_summary) > 0:
             # Check if we have a chronotype for the user
             user_chronotype = None
@@ -2521,6 +2536,7 @@ def get_sleep_statistics(
                 start_date=sleep_summary_start_date,
                 end_date=sleep_summary_end_date,
             )
+            sleep_stages = constants.prepare_sleep_stages(sleep_stages)
             # Keep only those belonging to sleep summaries
             sleep_stages = sleep_stages[
                 sleep_stages[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
@@ -2546,7 +2562,7 @@ def get_sleep_statistics(
         return empty[statistics[0]] if len(statistics) == 1 else empty
     sleep_stats_df = pd.concat(
         user_frames, names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
-    )
+    ).sort_index()
 
     # Return series if only statistic
     if len(statistics) == 1:
