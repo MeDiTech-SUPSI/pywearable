@@ -263,3 +263,94 @@ def test_resting_heart_rate_uses_local_days_and_twenty_valid_minutes():
         ("person-1", pd.Timestamp("2024-01-01")): 50.0,
         ("person-1", pd.Timestamp("2024-01-02")): 70.0,
     }
+
+
+def test_weekly_statistics_use_monday_boundaries_and_partial_edge_periods():
+    local_time = pd.to_datetime(
+        [
+            "2024-01-15 12:00",
+            "2024-01-20 12:00",
+            "2024-01-22 12:00",
+            "2024-01-25 00:00",
+        ]
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [20, 60, 100, 200],
+        }
+    )
+
+    result = heart_rate.get_weekly_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        start_date="2024-01-16",
+        end_date="2024-01-25",
+        statistic="heart_rate_mean",
+    )
+
+    assert result.to_dict() == {
+        ("person-1", pd.Timestamp("2024-01-16")): 60.0,
+        ("person-1", pd.Timestamp("2024-01-22")): 100.0,
+    }
+
+
+def test_monthly_statistics_keep_both_partial_months_and_exact_bounds():
+    local_time = pd.to_datetime(
+        ["2024-01-01", "2024-01-20", "2024-02-10", "2024-02-15"]
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [20, 60, 100, 200],
+        }
+    )
+
+    result = heart_rate.get_monthly_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        start_date="2024-01-15",
+        end_date="2024-02-15",
+        statistic="heart_rate_mean",
+    )
+
+    assert result.to_dict() == {
+        ("person-1", pd.Timestamp("2024-01-15")): 60.0,
+        ("person-1", pd.Timestamp("2024-02-01")): 100.0,
+    }
+
+
+def test_daily_statistics_respect_datetime_bounds_on_partial_days():
+    local_time = pd.to_datetime(
+        [
+            "2024-01-01 11:00",
+            "2024-01-01 13:00",
+            "2024-01-02 01:00",
+            "2024-01-02 12:00",
+        ]
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [20, 60, 100, 200],
+        }
+    )
+
+    result = heart_rate.get_daily_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        start_date="2024-01-01 12:00",
+        end_date="2024-01-02 12:00",
+        statistic="heart_rate_mean",
+    )
+
+    assert result.to_dict() == {
+        ("person-1", pd.Timestamp("2024-01-01 12:00")): 60.0,
+        ("person-1", pd.Timestamp("2024-01-02 00:00")): 100.0,
+    }

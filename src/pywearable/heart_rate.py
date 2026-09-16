@@ -901,11 +901,25 @@ def get_heart_rate_statistics(
             **loader_kwargs,
         )
         if len(heart_rate) > 0:
+            heart_rate = heart_rate_schema.filter_by_time(
+                heart_rate,
+                start_date=start_date,
+                end_date=end_date,
+                time_col=time_col,
+            )
 
             user_heart_rate_stats = _compute_hr_statistics(
                 heart_rate, rule=rule, time_col=time_col, calendar_based=calendar_based
             )
             if len(user_heart_rate_stats) > 0:
+                if calendar_based and start_date is not None:
+                    canonical_start = time_utils.get_calendar_period_start(
+                        start_date, rule
+                    )
+                    if canonical_start != start_date:
+                        user_heart_rate_stats = user_heart_rate_stats.rename(
+                            index={canonical_start: start_date}
+                        )
                 heart_rate_stats_df_list.append(
                     user_heart_rate_stats.assign(user_id=user)
                 )
@@ -920,21 +934,29 @@ def get_heart_rate_statistics(
         # Reindex based on start/end dates
         if not (start_date is None) or (not (end_date is None)):
             grid_start = (
-                start_date.normalize() if calendar_based else start_date.floor(rule)
-            ) if start_date is not None else heart_rate_stats_df.index.get_level_values(level=1).min()
-            new_idx = pd.date_range(
-                start=(
-                    grid_start
-                ),
-                end=(
-                    heart_rate_stats_df.index.get_level_values(level=1).max()
-                    if end_date is None
-                    else end_date
-                ),
-                normalize=calendar_based,
-                inclusive="left" if not (end_date is None) else "both",
-                freq=rule,
+                start_date
+                if start_date is not None
+                else heart_rate_stats_df.index.get_level_values(level=1).min()
             )
+            grid_end = (
+                heart_rate_stats_df.index.get_level_values(level=1).max()
+                if end_date is None
+                else end_date
+            )
+            if calendar_based:
+                new_idx = time_utils.get_calendar_window_starts(
+                    start=grid_start,
+                    end=grid_end,
+                    rule=rule,
+                    include_end=end_date is None,
+                )
+            else:
+                new_idx = pd.date_range(
+                    start=grid_start.floor(rule),
+                    end=grid_end,
+                    inclusive="left" if end_date is not None else "both",
+                    freq=rule,
+                )
 
             index_time_name = time_col
             has_timezone = "timezone" in heart_rate_stats_df.index.names
@@ -964,13 +986,19 @@ def get_heart_rate_statistics(
             return heart_rate_stats_df[list(statistics)]
     else:
         if (not (start_date is None)) and (not (end_date is None)):
-            new_idx = pd.date_range(
-                start=start_date.normalize() if calendar_based else start_date.floor(rule),
-                end=end_date,
-                normalize=calendar_based,
-                inclusive="left",
-                freq=rule,
-            )
+            if calendar_based:
+                new_idx = time_utils.get_calendar_window_starts(
+                    start=start_date,
+                    end=end_date,
+                    rule=rule,
+                )
+            else:
+                new_idx = pd.date_range(
+                    start=start_date.floor(rule),
+                    end=end_date,
+                    inclusive="left",
+                    freq=rule,
+                )
             return pd.DataFrame(
                 columns=statistics,
                 index=pd.MultiIndex.from_product([user_id, new_idx]),
