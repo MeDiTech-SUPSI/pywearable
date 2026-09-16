@@ -332,9 +332,15 @@ def _compute_hr_statistics(
     if heart_rate.empty:
         return pd.DataFrame()
 
+    # Every statistic must use the same set of physical instants. Loaders may
+    # retain repeated, identical exports, so collapse those timestamps once
+    # before computing both ordinary statistics and quantiles.
+    heart_rate = heart_rate.drop_duplicates(
+        subset=heart_rate_schema.UTC_TIME_COL
+    )
+
     heart_rate_stats = (
-        heart_rate.drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL)
-        .resample(rule=rule, on=time_col, label="left", closed="left")[
+        heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
             heart_rate_schema.HEART_RATE_COL
         ]
         .agg(["count", "max", "min", "mean", "median", "std"])
@@ -346,8 +352,7 @@ def _compute_hr_statistics(
     # given that we have different source resolutions
     # for heart rate
     heart_rate_wearing_time = (
-        heart_rate.drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL)
-        .resample(rule="1min", on=time_col, label="left", closed="left")[
+        heart_rate.resample(rule="1min", on=time_col, label="left", closed="left")[
             heart_rate_schema.HEART_RATE_COL
         ]
         .count()

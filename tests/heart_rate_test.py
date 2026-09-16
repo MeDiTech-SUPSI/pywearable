@@ -180,3 +180,50 @@ def test_conflicting_timestamps_are_excluded():
             statistic="heart_rate_count",
         )
     assert result.sum() == 2
+
+
+def test_identical_duplicate_timestamps_are_removed_for_every_statistic():
+    utc_time = pd.to_datetime(
+        ["2024-01-01 00:00", "2024-01-01 00:00", "2024-01-01 00:30"]
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": utc_time,
+            "local_time": utc_time + pd.Timedelta(hours=1),
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [60, 60, 100],
+        }
+    )
+
+    result = heart_rate.get_hourly_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        statistic=["heart_rate_count", "heart_rate_mean", "heart_rate_p90"],
+    ).iloc[0]
+
+    assert result["heart_rate_count"] == 2
+    assert result["heart_rate_mean"] == 80
+    assert result["heart_rate_p90"] == pytest.approx(96)
+
+
+def test_resting_heart_rate_uses_local_days_and_twenty_valid_minutes():
+    first_day_local = pd.date_range("2024-01-01 00:00", periods=21, freq="1min")
+    second_day_local = pd.date_range("2024-01-02 00:00", periods=21, freq="1min")
+    local_time = first_day_local.append(second_day_local)
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [50] * len(first_day_local) + [70] * len(second_day_local),
+        }
+    )
+
+    result = heart_rate.get_daily_rest_heart_rate(
+        HeartRateLoader(samples), user_id="person-1"
+    )
+
+    assert result.to_dict() == {
+        ("person-1", pd.Timestamp("2024-01-01")): 50.0,
+        ("person-1", pd.Timestamp("2024-01-02")): 70.0,
+    }
