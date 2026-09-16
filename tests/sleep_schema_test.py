@@ -69,7 +69,8 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     timestamps = sleep.get_sleep_timestamps(loader, "person-1")
     assert isinstance(timestamps, pd.DataFrame)
     assert timestamps.index.names == ["user_id", "calendar_date"]
-    assert list(timestamps) == ["bedtime", "wakeup"]
+    assert list(timestamps) == ["bedtime", "sleep_onset", "wakeup", "getup"]
+    assert timestamps[["sleep_onset", "wakeup"]].isna().all().all()
 
     with pytest.raises(ValueError, match="statistic must be one among"):
         sleep.get_sleep_statistics(
@@ -261,6 +262,7 @@ def test_sleep_stage_contract_rejects_unknown_stage_labels():
 def test_cpd_is_undefined_on_first_night_and_after_gap():
     summaries = pd.DataFrame(
         {
+            "sleep_summary_id": ["gap", "first", "second"],
             "calendar_date": pd.to_datetime(["2024-01-04", "2024-01-01", "2024-01-02"]),
             "local_time": pd.to_datetime(
                 ["2024-01-03 23:00", "2023-12-31 23:00", "2024-01-01 23:00"]
@@ -273,8 +275,21 @@ def test_cpd_is_undefined_on_first_night_and_after_gap():
         },
         index=["gap", "first", "second"],
     )
-    for compute in (sleep._compute_cpd_midpoint, sleep._compute_cpd_duration):
-        result = compute(summaries, chronotype=("23:00", "00:00"))
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["gap", "first", "second"],
+            "local_time": summaries["local_time"].to_numpy(),
+            "duration_in_ms": [60 * 60_000] * 3,
+            "type": ["light"] * 3,
+        }
+    )
+    results = (
+        sleep._compute_cpd_midpoint(
+            summaries, chronotype=("23:00", "00:00"), sleep_stages=stages
+        ),
+        sleep._compute_cpd_duration(summaries, chronotype=("23:00", "00:00")),
+    )
+    for result in results:
         assert pd.isna(result.loc["first"])
         assert pd.notna(result.loc["second"])
         assert pd.isna(result.loc["gap"])

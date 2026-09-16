@@ -41,13 +41,21 @@ SLEEP_STATISTIC_DEEP_COUNT = "count_deep"
 SLEEP_STATISTIC_LIGHT_COUNT = "count_light"
 SLEEP_STATISTIC_REM_COUNT = "count_REM"
 SLEEP_STATISTIC_BEDTIME = "bedtime"
+SLEEP_STATISTIC_SLEEP_ONSET = "sleep_onset"
 SLEEP_STATISTIC_WAKEUP = "wakeup"
+SLEEP_STATISTIC_GETUP = "getup"
 SLEEP_STATISTIC_MIDPOINT = "midpoint"
 SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
 SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
 SLEEP_STATISTIC_VALIDATION = "validation"
 SLEEP_STATISTIC_SRI = "SRI"
 SLEEP_STATISTIC_GETUP_LATENCY = "getup_latency"
+SLEEP_STATISTIC_AWAKENING_COUNT = "awakening_count"
+SLEEP_STATISTIC_AWAKENING_INDEX = "awakening_index"
+SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION = "median_awakening_duration"
+SLEEP_STATISTIC_STAGE_TRANSITION_COUNT = "stage_transition_count"
+SLEEP_STATISTIC_STAGE_TRANSITION_INDEX = "stage_transition_index"
+SLEEP_STATISTIC_STAGE_COVERAGE = "stage_coverage"
 
 
 def get_time_in_bed(
@@ -491,10 +499,10 @@ def get_sleep_timestamps(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
 ) -> pd.DataFrame:
-    """Get the timestamps of the beginning and the end of sleep occurrences.
+    """Return the main nightly sleep timestamps.
 
-    Returns the bedtime and wake-up time for every night. The information is
-    based on the sleep summaries of the user.
+    ``bedtime`` and ``getup`` delimit the provider-recorded sleep session.
+    ``sleep_onset`` and ``wakeup`` delimit observed sleep within that session.
 
     Parameters
     ----------
@@ -510,15 +518,20 @@ def get_sleep_timestamps(
     Returns
     -------
     :class:`pandas.DataFrame`
-        Bedtime and wake-up columns, indexed by ``user_id`` and
-        ``calendar_date``.
+        Bedtime, sleep-onset, wake-up, and get-up columns, indexed by
+        ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistics(
         loader=loader,
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
-        statistic=[SLEEP_STATISTIC_BEDTIME, SLEEP_STATISTIC_WAKEUP],
+        statistic=[
+            SLEEP_STATISTIC_BEDTIME,
+            SLEEP_STATISTIC_SLEEP_ONSET,
+            SLEEP_STATISTIC_WAKEUP,
+            SLEEP_STATISTIC_GETUP,
+        ],
     )
 
 
@@ -730,6 +743,150 @@ def get_sleep_regularity_index(
     )
 
 
+def get_awakening_count(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return the number of internal awake bouts for each night."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_AWAKENING_COUNT,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_awakening_index(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return internal awakenings per hour of total sleep time."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_AWAKENING_INDEX,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_median_awakening_duration(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return the median duration in minutes of internal awake bouts."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_stage_transition_count(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return direct transitions between detailed sleep stages."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_STAGE_TRANSITION_COUNT,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_stage_transition_index(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return direct detailed-stage transitions per hour of total sleep time."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_STAGE_TRANSITION_INDEX,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_stage_coverage(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return the percentage of time in bed with a measurable stage label."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_STAGE_COVERAGE,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_sleep_onset(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return the start of the first observed sleep stage for each night."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_SLEEP_ONSET,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
+def get_getup_time(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: dict = {},
+) -> pd.Series:
+    """Return the provider-recorded sleep-session end for each night."""
+    return get_sleep_statistic(
+        loader=loader,
+        user_id=user_id,
+        statistic=SLEEP_STATISTIC_GETUP,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+    )
+
+
 def get_getup_latency(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -737,11 +894,7 @@ def get_getup_latency(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
 ) -> pd.Series:
-    """Get get-up latency sleep metric.
-
-    This function computes the time spent in bed after the last actual
-    sleep stage until the final wakeup time.
-    """
+    """Return minutes from final observed sleep offset to session end."""
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -1825,6 +1978,164 @@ def _compute_stage_count(
     return count_df
 
 
+def _get_sleep_summary_ids(sleep_summary: pd.DataFrame) -> pd.Series:
+    if constants.SLEEP_SUMMARY_ID_COL in sleep_summary.columns:
+        return sleep_summary[constants.SLEEP_SUMMARY_ID_COL]
+    if sleep_summary.index.name == constants.SLEEP_SUMMARY_ID_COL:
+        return pd.Series(sleep_summary.index, index=sleep_summary.index)
+    raise ValueError("sleep summary data requires sleep_summary_id")
+
+
+def _compute_summary_end_time(
+    sleep_summary: pd.DataFrame, time_col: str
+) -> pd.Series:
+    """Return the provider sleep-session end in the requested clock."""
+    end_col = (
+        constants.LOCAL_END_TIME_COL
+        if time_col == constants.ISODATE_COL
+        else constants.UTC_END_TIME_COL
+    )
+    if end_col in sleep_summary.columns:
+        end_time = pd.to_datetime(sleep_summary[end_col], errors="coerce")
+    else:
+        end_time = pd.Series(pd.NaT, index=sleep_summary.index, dtype="datetime64[ns]")
+
+    if time_col not in sleep_summary.columns:
+        return end_time
+    duration = (
+        sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
+        + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(0)
+    )
+    reconstructed = pd.to_datetime(
+        sleep_summary[time_col], errors="coerce"
+    ) + pd.to_timedelta(duration, unit="ms")
+    return end_time.fillna(reconstructed)
+
+
+def _compute_sleep_boundaries(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
+) -> pd.DataFrame:
+    """Derive observed sleep onset/offset while retaining session boundaries."""
+    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    boundaries = pd.DataFrame(index=sleep_summary.index)
+    for column in [
+        "sleep_onset",
+        "wakeup",
+        "__sleep_onset_elapsed",
+        "__wakeup_elapsed",
+        "__getup_elapsed",
+    ]:
+        boundaries[column] = pd.NaT
+    boundaries["__uses_utc"] = False
+    if sleep_summary.empty or sleep_stages.empty:
+        return boundaries
+
+    summary_ids = _get_sleep_summary_ids(sleep_summary)
+    stages = constants.coalesce_sleep_stage_runs(
+        sleep_stages[
+            sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
+                summary_ids.unique()
+            )
+        ].reset_index(drop=True)
+    )
+    groups = {
+        summary_id: group.reset_index(drop=True)
+        for summary_id, group in stages.groupby(
+            constants.SLEEP_SUMMARY_ID_COL, sort=False
+        )
+    }
+    local_getup = _compute_summary_end_time(sleep_summary, constants.ISODATE_COL)
+    utc_getup = _compute_summary_end_time(sleep_summary, constants.UTC_TIME_COL)
+    sleep_labels = {
+        constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+        constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+        constants.SLEEP_STAGE_REM_STAGE_VALUE,
+        "asleep",
+    }
+    grid_tolerance = pd.Timedelta(minutes=5)
+
+    for calendar_date, summary in sleep_summary.iterrows():
+        group = groups.get(summary_ids.loc[calendar_date])
+        if group is None or group.empty:
+            continue
+        use_utc = (
+            constants.UTC_TIME_COL in group.columns
+            and group[constants.UTC_TIME_COL].notna().all()
+            and pd.notna(utc_getup.loc[calendar_date])
+        )
+        time_col = constants.UTC_TIME_COL if use_utc else constants.ISODATE_COL
+        group = group.sort_values(time_col, kind="stable").reset_index(drop=True)
+        durations = pd.to_timedelta(
+            group[constants.SLEEP_STAGE_DURATION_IN_MS_COL], unit="ms"
+        )
+        ends = group[time_col] + durations
+        is_sleep = group[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(sleep_labels)
+        if not is_sleep.any():
+            continue
+
+        onset_position = group.loc[is_sleep, time_col].idxmin()
+        last_sleep_position = ends.where(is_sleep).idxmax()
+        last_sleep_end = ends.loc[last_sleep_position]
+        getup_elapsed = (
+            utc_getup.loc[calendar_date] if use_utc else local_getup.loc[calendar_date]
+        )
+        boundaries.loc[calendar_date, "sleep_onset"] = group.loc[
+            onset_position, constants.ISODATE_COL
+        ]
+        boundaries.loc[calendar_date, "__sleep_onset_elapsed"] = group.loc[
+            onset_position, time_col
+        ]
+        boundaries.loc[calendar_date, "__getup_elapsed"] = getup_elapsed
+        boundaries.loc[calendar_date, "__uses_utc"] = use_utc
+
+        tail = group.iloc[last_sleep_position + 1 :]
+        wakeup_elapsed = pd.NaT
+        wakeup_local = pd.NaT
+        if tail.empty:
+            # Provider stage grids can differ from the exact session end by up
+            # to one epoch. Larger unexplained gaps are left unresolved.
+            if pd.isna(getup_elapsed):
+                wakeup_elapsed = last_sleep_end
+                wakeup_local = (
+                    group.loc[last_sleep_position, constants.ISODATE_COL]
+                    + durations.loc[last_sleep_position]
+                )
+            elif abs(getup_elapsed - last_sleep_end) <= grid_tolerance:
+                wakeup_elapsed = getup_elapsed
+                wakeup_local = local_getup.loc[calendar_date]
+        else:
+            expected_start = last_sleep_end
+            terminal_awake = True
+            for position, stage in tail.iterrows():
+                if (
+                    stage[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+                    != constants.SLEEP_STAGE_AWAKE_STAGE_VALUE
+                    or stage[time_col] != expected_start
+                ):
+                    terminal_awake = False
+                    break
+                expected_start = ends.loc[position]
+            if terminal_awake:
+                wakeup_elapsed = last_sleep_end
+                local_uncertain = (
+                    "local_time_uncertain" in group.columns
+                    and group.loc[
+                        last_sleep_position:, "local_time_uncertain"
+                    ].fillna(False).any()
+                )
+                if not local_uncertain:
+                    wakeup_local = (
+                        group.loc[last_sleep_position, constants.ISODATE_COL]
+                        + durations.loc[last_sleep_position]
+                    )
+
+        boundaries.loc[calendar_date, "wakeup"] = wakeup_local
+        boundaries.loc[calendar_date, "__wakeup_elapsed"] = wakeup_elapsed
+
+    return boundaries
+
+
 def _compute_bedtime(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     """Retrieves bedtimes from a sleep summary
 
@@ -1854,81 +2165,50 @@ def _compute_bedtime(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     return bedtime
 
 
-def _compute_wakeup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
-    """Retrieves wake up time from a sleep summary
+def _compute_sleep_onset(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Return the first observed sleep-stage timestamp for each night."""
+    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["sleep_onset"]
 
-    This function retrieves, if available, the wake up time from
-    given sleep summary data.
 
-    Parameters
-    ----------
-    sleep_summary : :class:`pandas.DataFrame`
-        Sleep summary data.
+def _compute_wakeup_time(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Return the final observed sleep offset for each night.
 
-    Returns
-    -------
-    :class:`pandas.Series`
-        Series of wake up time data in :class:`pandas.Timestamp` dtype.
-
-    Raises
-    ------
-    ValueError
-        If `sleep_summary` is not a :class:`pandas.DataFrame` .
+    A trailing unmeasurable interval or an unexplained stage gap makes this
+    timestamp unavailable rather than treating the session end as wake-up.
     """
+    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["wakeup"]
 
+
+def _compute_getup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
+    """Return the provider sleep-session end as a proxy for get-up time."""
     sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-
-    if "local_end_time" in sleep_summary.columns:
-        return sleep_summary["local_end_time"]
-
-    if np.all(
-        [
-            constants.ISODATE_COL in sleep_summary.columns,
-            constants.SLEEP_SUMMARY_DURATION_IN_MS_COL in sleep_summary.columns,
-            constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL in sleep_summary.columns,
-        ]
-    ):
-        wakeup_time = sleep_summary[constants.ISODATE_COL] + pd.to_timedelta(
-            sleep_summary[constants.DURATION_IN_MS_COL]
-            + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(0),
-            unit="ms",
-        )
-    else:
-        wakeup_time = pd.Series()
-    return wakeup_time
+    getup = _compute_summary_end_time(sleep_summary, constants.ISODATE_COL)
+    getup.name = SLEEP_STATISTIC_GETUP
+    return getup
 
 
-def _compute_sleep_midpoint(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
-    """Retrieves midpoints from a sleep summary
-
-    This function retrieves, if available, the midpoint
-    of sleep occurrences from given sleep summary data.
-
-    Parameters
-    ----------
-    sleep_summary : :class:`pandas.DataFrame`
-        Sleep summary data.
-
-    Returns
-    -------
-    :class:`pandas.Series`
-        Series of sleep midpoints data in :class:`pandas.Timestamp` dtype.
-
-    Raises
-    ------
-    ValueError
-        If `sleep_summary` is not a :class:`pandas.DataFrame` .
-    """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    wakeup_time = _compute_wakeup_time(sleep_summary=sleep_summary, **kwargs)
-    bedtime = _compute_bedtime(sleep_summary=sleep_summary, **kwargs)
-    if len(wakeup_time) == len(bedtime) and len(wakeup_time) != 0:
-        midpoints = pd.Series(
-            data=[bed + (wake - bed) / 2 for bed, wake in zip(bedtime, wakeup_time)],
-            index=wakeup_time.index,
-        )
-    else:
-        midpoints = pd.Series()
+def _compute_sleep_midpoint(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Return the elapsed-time midpoint between sleep onset and wake-up."""
+    boundaries = _compute_sleep_boundaries(sleep_summary, sleep_stages)
+    midpoints = pd.Series(pd.NaT, index=sleep_summary.index, dtype="datetime64[ns]")
+    for calendar_date, boundary in boundaries.iterrows():
+        if pd.isna(boundary["sleep_onset"]) or pd.isna(boundary["wakeup"]):
+            continue
+        elapsed = boundary["__wakeup_elapsed"] - boundary["__sleep_onset_elapsed"]
+        if boundary["__uses_utc"]:
+            local_elapsed = boundary["wakeup"] - boundary["sleep_onset"]
+            if local_elapsed != elapsed:
+                # Without a timezone identifier, a local midpoint across an
+                # offset change cannot be reconstructed unambiguously.
+                continue
+        midpoints.loc[calendar_date] = boundary["sleep_onset"] + elapsed / 2
+    midpoints.name = SLEEP_STATISTIC_MIDPOINT
     return midpoints
 
 
@@ -1980,6 +2260,8 @@ def _compute_cpd_midpoint(
         sleep_summary=sleep_summary, **kwargs
     ).reindex(chronological_index)
 
+    if chronotype is None and midpoints.notna().sum() == 0:
+        return pd.Series(np.nan, index=sleep_summary.index, dtype=float)
     if (
         chronotype is None
     ):  # if chronotype isn't explicitely given, calculate the midpoint from the available data
@@ -2223,7 +2505,7 @@ def _compute_sleep_regularity_index(
     max_date = sleep_summary.index.max()
 
     if first_avg_wakeup:
-        mean_wakeup = utils.mean_time(_compute_wakeup_time(sleep_summary=sleep_summary))
+        mean_wakeup = utils.mean_time(_compute_getup_time(sleep_summary=sleep_summary))
         mean_wakeup = pd.Timedelta(
             hours=int(mean_wakeup.split(":")[0]),
             minutes=int(mean_wakeup.split(":")[1]),
@@ -2332,76 +2614,223 @@ def _compute_sleep_regularity_index(
 def _compute_getup_latency(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
 ) -> pd.Series:
-    """Compute get-up latency.
+    """Return minutes from final observed sleep offset to session end."""
+    boundaries = _compute_sleep_boundaries(sleep_summary, sleep_stages)
+    latency = (
+        boundaries["__getup_elapsed"] - boundaries["__wakeup_elapsed"]
+    ).dt.total_seconds() / 60
+    latency = latency.where(latency >= 0)
+    latency.name = SLEEP_STATISTIC_GETUP_LATENCY
+    return latency
 
-    Parameters
-    ----------
-    sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries data.
-    sleep_stages : :class:`pd.DataFrame`
-        Sleep stages data.
 
-    Returns
-    -------
-    :class:`pd.Series`
-        Get-up latency in minutes.
-    """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
-
-    if len(sleep_summary) == 0:
-        return pd.Series()
-    if len(sleep_stages) == 0:
-        return pd.Series(index=sleep_summary.index)
-
-    wakeup_times = _compute_wakeup_time(sleep_summary)
-    awake_labels = [constants.SLEEP_STAGE_AWAKE_STAGE_VALUE, "awake", "wake"]
-
-    stages_with_date = pd.merge(
-        left=sleep_stages,
-        right=sleep_summary.reset_index(names=[constants.CALENDAR_DATE_COL])[
-            [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+def _compute_awakening_metrics(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
+) -> pd.DataFrame:
+    """Return count and median duration of internal awake bouts."""
+    metrics = pd.DataFrame(
+        np.nan,
+        index=sleep_summary.index,
+        columns=[
+            SLEEP_STATISTIC_AWAKENING_COUNT,
+            SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION,
         ],
-        on=constants.SLEEP_SUMMARY_ID_COL,
-        how="inner",
     )
+    if sleep_summary.empty or sleep_stages.empty:
+        return metrics
 
-    stages_with_date["end_time"] = stages_with_date[
-        constants.ISODATE_COL
-    ] + pd.to_timedelta(stages_with_date[constants.DURATION_IN_MS_COL], unit="ms")
-
-    # Identify the last recorded stage for each night to check validity
-    last_stages = (
-        stages_with_date.sort_values(by=constants.ISODATE_COL)
-        .groupby(constants.CALENDAR_DATE_COL)
-        .last()
+    summary_ids = _get_sleep_summary_ids(sleep_summary)
+    stages = constants.coalesce_sleep_stage_runs(
+        sleep_stages[
+            sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
+                summary_ids.unique()
+            )
+        ].reset_index(drop=True)
     )
-    valid_mask = last_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(awake_labels)
+    summary_index_by_id = dict(zip(summary_ids, sleep_summary.index))
+    for summary_id, group in stages.groupby(constants.SLEEP_SUMMARY_ID_COL, sort=False):
+        time_col = constants.ISODATE_COL
+        if (
+            constants.UTC_TIME_COL in group.columns
+            and group[constants.UTC_TIME_COL].notna().all()
+        ):
+            time_col = constants.UTC_TIME_COL
+        group = group.sort_values(time_col, kind="stable")
+        durations = pd.to_timedelta(
+            group[constants.SLEEP_STAGE_DURATION_IN_MS_COL], unit="ms"
+        )
+        ends = group[time_col] + durations
+        is_sleep = ~group[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
+            [
+                constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+            ]
+        )
+        if not is_sleep.any():
+            continue
+        onset = group.loc[is_sleep, time_col].min()
+        offset = ends.loc[is_sleep].max()
+        awake = group[
+            group[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+            == constants.SLEEP_STAGE_AWAKE_STAGE_VALUE
+        ]
+        awake_start = awake[time_col].clip(lower=onset)
+        awake_end = (
+            awake[time_col]
+            + pd.to_timedelta(
+                awake[constants.SLEEP_STAGE_DURATION_IN_MS_COL], unit="ms"
+            )
+        ).clip(upper=offset)
+        bout_durations = (
+            (awake_end - awake_start).dt.total_seconds() / 60
+        ).loc[lambda values: values > 0]
+        calendar_date = summary_index_by_id[summary_id]
+        metrics.loc[calendar_date, SLEEP_STATISTIC_AWAKENING_COUNT] = len(
+            bout_durations
+        )
+        if len(bout_durations):
+            metrics.loc[
+                calendar_date, SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION
+            ] = bout_durations.median()
+    return metrics
 
-    # Filter for true sleep stages to find the final sleep offset
-    sleep_mask = ~stages_with_date[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
-        awake_labels + [constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE]
+
+def _compute_awakening_count(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    return _compute_awakening_metrics(sleep_summary, sleep_stages)[
+        SLEEP_STATISTIC_AWAKENING_COUNT
+    ]
+
+
+def _compute_median_awakening_duration(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    return _compute_awakening_metrics(sleep_summary, sleep_stages)[
+        SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION
+    ]
+
+
+def _compute_awakening_index(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    count = _compute_awakening_count(sleep_summary, sleep_stages)
+    tst_hours = _compute_total_sleep_time(sleep_summary) / 60
+    result = count / tst_hours.where(tst_hours > 0)
+    result.name = SLEEP_STATISTIC_AWAKENING_INDEX
+    return result
+
+
+def _compute_stage_transition_count(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Count direct transitions among light, deep, and REM sleep.
+
+    Awake, unmeasurable, gaps, and generic ``asleep`` intervals break the
+    sequence and are not bridged.
+    """
+    result = pd.Series(np.nan, index=sleep_summary.index, dtype=float)
+    if sleep_summary.empty or sleep_stages.empty:
+        return result
+    summary_ids = _get_sleep_summary_ids(sleep_summary)
+    stages = constants.coalesce_sleep_stage_runs(
+        sleep_stages[
+            sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
+                summary_ids.unique()
+            )
+        ].reset_index(drop=True)
     )
-    last_sleep_end = (
-        stages_with_date[sleep_mask]
-        .groupby(constants.CALENDAR_DATE_COL)["end_time"]
-        .max()
+    summary_index_by_id = dict(zip(summary_ids, sleep_summary.index))
+    detailed_stages = {
+        constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+        constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+        constants.SLEEP_STAGE_REM_STAGE_VALUE,
+    }
+    for summary_id, group in stages.groupby(constants.SLEEP_SUMMARY_ID_COL, sort=False):
+        if "asleep" in set(group[constants.SLEEP_STAGE_SLEEP_TYPE_COL]):
+            continue
+        time_col = constants.ISODATE_COL
+        if (
+            constants.UTC_TIME_COL in group.columns
+            and group[constants.UTC_TIME_COL].notna().all()
+        ):
+            time_col = constants.UTC_TIME_COL
+        group = group.sort_values(time_col, kind="stable").reset_index(drop=True)
+        if not group[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(detailed_stages).any():
+            continue
+        previous_end = group[time_col].shift() + pd.to_timedelta(
+            group[constants.SLEEP_STAGE_DURATION_IN_MS_COL].shift(), unit="ms"
+        )
+        previous_type = group[constants.SLEEP_STAGE_SLEEP_TYPE_COL].shift()
+        current_type = group[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+        transitions = (
+            current_type.isin(detailed_stages)
+            & previous_type.isin(detailed_stages)
+            & current_type.ne(previous_type)
+            & group[time_col].eq(previous_end)
+        )
+        result.loc[summary_index_by_id[summary_id]] = int(transitions.sum())
+    result.name = SLEEP_STATISTIC_STAGE_TRANSITION_COUNT
+    return result
+
+
+def _compute_stage_transition_index(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    count = _compute_stage_transition_count(sleep_summary, sleep_stages)
+    tst_hours = _compute_total_sleep_time(sleep_summary) / 60
+    result = count / tst_hours.where(tst_hours > 0)
+    result.name = SLEEP_STATISTIC_STAGE_TRANSITION_INDEX
+    return result
+
+
+def _compute_stage_coverage(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
+) -> pd.Series:
+    """Return measurable stage duration as a percentage of time in bed."""
+    result = pd.Series(np.nan, index=sleep_summary.index, dtype=float)
+    if sleep_summary.empty or sleep_stages.empty:
+        return result
+    summary_ids = _get_sleep_summary_ids(sleep_summary)
+    stages = constants.coalesce_sleep_stage_runs(
+        sleep_stages[
+            sleep_stages[constants.SLEEP_SUMMARY_ID_COL].isin(
+                summary_ids.unique()
+            )
+        ].reset_index(drop=True)
     )
-
-    # Calculate latency and apply NaN if the night didn't end with a wake stage
-    getup_latency = (wakeup_times - last_sleep_end).dt.total_seconds() / 60.0
-    getup_latency = getup_latency.where(valid_mask, np.nan)
-
-    # Ensure the index matches the original summary and handle nights with zero valid stages
-    getup_latency = getup_latency.reindex(sleep_summary.index)
-
-    return getup_latency
+    measurable = stages[
+        stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL]
+        != constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE
+    ]
+    measurable_ms = measurable.groupby(constants.SLEEP_SUMMARY_ID_COL)[
+        constants.SLEEP_STAGE_DURATION_IN_MS_COL
+    ].sum()
+    has_stages = summary_ids.isin(stages[constants.SLEEP_SUMMARY_ID_COL].unique())
+    tib_ms = (
+        sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
+        + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(0)
+    )
+    coverage_by_id = (
+        summary_ids.map(measurable_ms).fillna(0).where(has_stages)
+        / tib_ms.where(tib_ms > 0)
+        * 100
+    ).clip(upper=100)
+    result.loc[:] = coverage_by_id.to_numpy()
+    result.name = SLEEP_STATISTIC_STAGE_COVERAGE
+    return result
 
 
 SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_TIB: _compute_time_in_bed,
     SLEEP_STATISTIC_TST: _compute_total_sleep_time,
     SLEEP_STATISTIC_GETUP_LATENCY: _compute_getup_latency,
+    SLEEP_STATISTIC_AWAKENING_COUNT: _compute_awakening_count,
+    SLEEP_STATISTIC_AWAKENING_INDEX: _compute_awakening_index,
+    SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION: _compute_median_awakening_duration,
+    SLEEP_STATISTIC_STAGE_TRANSITION_COUNT: _compute_stage_transition_count,
+    SLEEP_STATISTIC_STAGE_TRANSITION_INDEX: _compute_stage_transition_index,
+    SLEEP_STATISTIC_STAGE_COVERAGE: _compute_stage_coverage,
     SLEEP_STATISTIC_SE: _compute_sleep_efficiency,
     SLEEP_STATISTIC_SME: _compute_sleep_maintenance_efficiency,
     SLEEP_STATISTIC_SPT: _compute_sleep_period_time,
@@ -2426,7 +2855,9 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_LIGHT_COUNT: _compute_light_count,
     SLEEP_STATISTIC_REM_COUNT: _compute_rem_count,
     SLEEP_STATISTIC_BEDTIME: _compute_bedtime,
+    SLEEP_STATISTIC_SLEEP_ONSET: _compute_sleep_onset,
     SLEEP_STATISTIC_WAKEUP: _compute_wakeup_time,
+    SLEEP_STATISTIC_GETUP: _compute_getup_time,
     SLEEP_STATISTIC_MIDPOINT: _compute_sleep_midpoint,
     SLEEP_STATISTIC_CPD_MIDPOINT: _compute_cpd_midpoint,
     SLEEP_STATISTIC_CPD_DURATION: _compute_cpd_duration,
@@ -2499,7 +2930,7 @@ def get_sleep_statistics(
         # explicit request and may not be available for every loader.
         statistics = [
             name for name in SLEEP_STATISTICS_DICT
-            if name not in (SLEEP_STATISTIC_GETUP_LATENCY, SLEEP_STATISTIC_VALIDATION, SLEEP_STATISTIC_SRI)
+            if name not in (SLEEP_STATISTIC_VALIDATION, SLEEP_STATISTIC_SRI)
         ]
     elif type(statistic) == str:
         statistics = [statistic]

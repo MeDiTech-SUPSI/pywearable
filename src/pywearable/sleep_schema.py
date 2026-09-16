@@ -5,6 +5,8 @@ import pandas as pd
 USER_COL = "user_id"
 ISODATE_COL = "local_time"
 UTC_TIME_COL = "utc_time"
+LOCAL_END_TIME_COL = "local_end_time"
+UTC_END_TIME_COL = "utc_end_time"
 UNIXTIMESTAMP_IN_MS_COL = "unix_timestamp_in_ms"
 TIMEZONEOFFSET_IN_MS_COL = "timezone_offset_in_ms"
 CALENDAR_DATE_COL = "calendar_date"
@@ -115,10 +117,14 @@ def prepare_sleep_summary(frame):
         frame[UTC_TIME_COL] = pd.to_datetime(
             frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
         ).dt.tz_localize(None)
-    if "local_end_time" in frame.columns:
-        frame["local_end_time"] = pd.to_datetime(
-            frame["local_end_time"], errors="coerce"
+    if LOCAL_END_TIME_COL in frame.columns:
+        frame[LOCAL_END_TIME_COL] = pd.to_datetime(
+            frame[LOCAL_END_TIME_COL], errors="coerce"
         )
+    if UTC_END_TIME_COL in frame.columns:
+        frame[UTC_END_TIME_COL] = pd.to_datetime(
+            frame[UTC_END_TIME_COL], errors="coerce", utc=True
+        ).dt.tz_localize(None)
 
     if frame[[CALENDAR_DATE_COL, ISODATE_COL, SLEEP_SUMMARY_ID_COL]].isna().any().any():
         raise ValueError(

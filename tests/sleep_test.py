@@ -278,12 +278,12 @@ def test_compute_bedtime(sleep_summary: pd.DataFrame):
     )
 
 
-def test_compute_wakeup_time(sleep_summary: pd.DataFrame):
+def test_compute_getup_time(sleep_summary: pd.DataFrame):
     sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
-    wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary)
-    assert type(wakeup_time) == pd.Series
+    getup_time = pywearable.sleep._compute_getup_time(sleep_summary)
+    assert type(getup_time) == pd.Series
     pandas.testing.assert_series_equal(
-        wakeup_time,
+        getup_time,
         pd.Series(
             [
                 pd.Timestamp(2023, 5, 9, 5, 31),
@@ -292,7 +292,7 @@ def test_compute_wakeup_time(sleep_summary: pd.DataFrame):
                 pd.Timestamp(2023, 5, 12, 6, 39),
             ],
             index=SLEEP_SERIES_INDEX,
-            name=pywearable.sleep.SLEEP_STATISTIC_WAKEUP,
+            name=pywearable.sleep.SLEEP_STATISTIC_GETUP,
         ),
         check_names=False,
         check_dtype=True,
@@ -454,6 +454,27 @@ def test_compute_sleep_onset_latency(
     assert sol.loc[pd.Timestamp("2023-05-12")] == 10.0
     # Check onset latency for sleep summary with no sleep stages
     assert np.isnan(sol.loc[pd.Timestamp("2023-05-10")])
+
+
+def test_compute_wakeup_time(
+    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
+):
+    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary, sleep_stages)
+    pandas.testing.assert_series_equal(
+        wakeup_time,
+        pd.Series(
+            [
+                pd.Timestamp(2023, 5, 9, 5, 31),
+                pd.NaT,
+                pd.Timestamp(2023, 5, 11, 5, 22),
+                pd.Timestamp(2023, 5, 12, 6, 39),
+            ],
+            index=SLEEP_SERIES_INDEX,
+            name=pywearable.sleep.SLEEP_STATISTIC_WAKEUP,
+        ),
+        check_dtype=True,
+    )
 
 
 def test_compute_sleep_period_time(
@@ -643,16 +664,20 @@ def test_compute_rem_duration(
     )
 
 
-def test_compute_cpd_midpoint(sleep_summary_id_as_idx: pd.DataFrame):
+def test_compute_cpd_midpoint(
+    sleep_summary_id_as_idx: pd.DataFrame, sleep_stages: pd.DataFrame
+):
     # sleep_summary.calendarDate = sleep_summary.calendarDate.apply(lambda x: pd.to_datetime(x)).dt.date
     sol = pywearable.sleep._compute_cpd_midpoint(
-        sleep_summary=sleep_summary_id_as_idx, chronotype=("22:30", "06:00")
+        sleep_summary=sleep_summary_id_as_idx,
+        chronotype=("22:30", "06:00"),
+        sleep_stages=sleep_stages,
     )
     assert type(sol) == pd.Series
     pandas.testing.assert_series_equal(
         sol,
         pd.Series(
-            [np.nan, 0.683, 0.987, 1.921],
+            [np.nan, np.nan, np.nan, 2.036],
             index=[
                 "x4c64722-64595538-6630",
                 "x4c64722-645ab9b4-55c8",
@@ -666,13 +691,15 @@ def test_compute_cpd_midpoint(sleep_summary_id_as_idx: pd.DataFrame):
         atol=0.01,
     )
     sol2 = pywearable.sleep._compute_cpd_midpoint(
-        sleep_summary=sleep_summary_id_as_idx, chronotype=("23:30", "07:00")
+        sleep_summary=sleep_summary_id_as_idx,
+        chronotype=("23:30", "07:00"),
+        sleep_stages=sleep_stages,
     )
     assert type(sol2) == pd.Series
     pandas.testing.assert_series_equal(
         sol2,
         pd.Series(
-            [np.nan, 1.049, 1.781, 1.625],
+            [np.nan, np.nan, np.nan, 1.712],
             index=[
                 "x4c64722-64595538-6630",
                 "x4c64722-645ab9b4-55c8",
@@ -686,13 +713,15 @@ def test_compute_cpd_midpoint(sleep_summary_id_as_idx: pd.DataFrame):
         atol=0.01,
     )
     sol3 = pywearable.sleep._compute_cpd_midpoint(
-        sleep_summary=sleep_summary_id_as_idx, chronotype=None
+        sleep_summary=sleep_summary_id_as_idx,
+        chronotype=None,
+        sleep_stages=sleep_stages,
     )
     assert type(sol3) == pd.Series
     pandas.testing.assert_series_equal(
         sol3,
         pd.Series(
-            [np.nan, 0.679, 0.997, 1.912],
+            [np.nan, np.nan, np.nan, 2.036],
             index=[
                 "x4c64722-64595538-6630",
                 "x4c64722-645ab9b4-55c8",

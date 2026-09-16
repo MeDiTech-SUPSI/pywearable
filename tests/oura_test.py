@@ -91,15 +91,18 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
     result = sleep.get_sleep_statistics(
         OuraLoader(tmp_path), user_id="person-1", start_date=None, end_date=None
     )
-    assert result.shape == (1, 30)
+    assert result.shape == (1, 39)
     assert set(result) == {
         "TIB", "TST", "SE", "SME", "SPT", "WASO", "SOL", "deep", "light",
         "REM", "NREM", "awake", "unmeasurable", "%_deep", "%_light",
         "%_REM", "%_NREM", "lat_deep", "lat_light", "lat_REM",
         "sleep_score", "count_awake", "count_deep", "count_light", "count_REM",
-        "bedtime", "wakeup", "midpoint", "cpd_midpoint", "cpd_duration",
+        "awakening_count", "awakening_index", "median_awakening_duration",
+        "stage_transition_count", "stage_transition_index", "stage_coverage",
+        "bedtime", "sleep_onset", "wakeup", "getup", "getup_latency",
+        "midpoint", "cpd_midpoint", "cpd_duration",
     }
-    assert not {"getup_latency", "validation", "SRI"} & set(result)
+    assert not {"validation", "SRI"} & set(result)
     night = result.iloc[0]
     assert night["TIB"] == 80
     assert night["TST"] == 65
@@ -115,7 +118,17 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
     assert night["count_light"] == 1
     assert night["count_REM"] == 1
     assert night["bedtime"] == pd.Timestamp("2024-01-01 23:00")
+    assert night["sleep_onset"] == pd.Timestamp("2024-01-01 23:00")
     assert night["wakeup"] == pd.Timestamp("2024-01-02 00:20")
+    assert night["getup"] == pd.Timestamp("2024-01-02 00:20")
+    assert night["getup_latency"] == 0
+    assert night["midpoint"] == pd.Timestamp("2024-01-01 23:40")
+    assert night["awakening_count"] == 1
+    assert night["awakening_index"] == pytest.approx(60 / 65)
+    assert night["median_awakening_duration"] == 5
+    assert night["stage_transition_count"] == 1
+    assert night["stage_transition_index"] == pytest.approx(60 / 65)
+    assert night["stage_coverage"] == 100
 
 
 def test_oura_stages_decode_runs_and_filter_by_local_instant(tmp_path):
@@ -246,7 +259,12 @@ def test_oura_sleep_stage_flags_unknown_local_clock_across_offset_change(tmp_pat
     assert list(stage["timezone_offset_in_ms"]) == [3_600_000, 3_600_000]
     summary = loader.load_sleep_summary("person-1")
     assert summary.loc[0, "local_end_time"] == pd.Timestamp("2024-03-31 03:10")
-    assert sleep._compute_wakeup_time(summary).loc[0] == pd.Timestamp("2024-03-31 03:10")
+    assert pd.isna(sleep._compute_wakeup_time(summary, stage).loc[0])
+    assert sleep._compute_getup_time(summary).loc[0] == pd.Timestamp(
+        "2024-03-31 03:10"
+    )
+    assert sleep._compute_getup_latency(summary, stage).loc[0] == 10
+    assert pd.isna(sleep._compute_sleep_midpoint(summary, stage).loc[0])
 
 
 def test_offset_change_does_not_truncate_autumn_sleep_stages(tmp_path):
