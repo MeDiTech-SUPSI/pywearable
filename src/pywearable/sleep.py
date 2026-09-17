@@ -3351,15 +3351,111 @@ def get_sleep_statistic(
     )
 
 
-def get_sleep_statistics(
+def get_daily_sleep_statistics(
     loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
     user_id: Union[str, list, None] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    statistic: Union[str, list, tuple, None] = None,
-    chronotype: Union[dict, None] = None,
     loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
+    aggregation=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return sleep statistics aggregated across local calendar days."""
+    return get_sleep_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution="daily",
+        loader_kwargs=loader_kwargs,
+        chronotype=chronotype,
+        aggregation=aggregation,
+    )
+
+
+def get_weekly_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
+    aggregation=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return sleep statistics aggregated across local calendar weeks."""
+    return get_sleep_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution="weekly",
+        loader_kwargs=loader_kwargs,
+        chronotype=chronotype,
+        aggregation=aggregation,
+    )
+
+
+def get_monthly_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
+    aggregation=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return sleep statistics aggregated across local calendar months."""
+    return get_sleep_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution="monthly",
+        loader_kwargs=loader_kwargs,
+        chronotype=chronotype,
+        aggregation=aggregation,
+    )
+
+
+def get_yearly_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
+    aggregation=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return sleep statistics aggregated across local calendar years."""
+    return get_sleep_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution="yearly",
+        loader_kwargs=loader_kwargs,
+        chronotype=chronotype,
+        aggregation=aggregation,
+    )
+
+
+def get_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     resolution: str = "nightly",
+    loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
     aggregation=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return sleep features at nightly or calendar resolution.

@@ -1,4 +1,5 @@
 import datetime
+import inspect
 from types import SimpleNamespace
 
 import numpy as np
@@ -75,6 +76,41 @@ def test_weekly_sleep_statistics_keep_partial_periods_and_coverage():
     assert result.iloc[0]["TST_count"] == 2
     assert result.iloc[0]["TST_coverage"] == pytest.approx(2 / 6 * 100)
     assert result.iloc[0]["bedtime_mean"] == datetime.time(0, 0)
+
+
+def test_sleep_statistics_parameter_order_matches_domain_statistics_api():
+    assert list(inspect.signature(sleep.get_sleep_statistics).parameters)[:6] == [
+        "loader",
+        "statistic",
+        "user_id",
+        "start_date",
+        "end_date",
+        "resolution",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("wrapper", "resolution"),
+    [
+        (sleep.get_daily_sleep_statistics, "daily"),
+        (sleep.get_weekly_sleep_statistics, "weekly"),
+        (sleep.get_monthly_sleep_statistics, "monthly"),
+        (sleep.get_yearly_sleep_statistics, "yearly"),
+    ],
+)
+def test_calendar_sleep_wrappers_match_generic_extraction(wrapper, resolution):
+    kwargs = {
+        "loader": _sleep_loader(),
+        "statistic": "TST",
+        "user_id": "person-1",
+        "start_date": "2024-01-16",
+        "end_date": "2024-01-25",
+        "aggregation": ["mean", "p90"],
+    }
+    expected = sleep.get_sleep_statistics(resolution=resolution, **kwargs)
+    result = wrapper(**kwargs)
+
+    pd.testing.assert_frame_equal(result, expected)
 
 
 def test_sleep_statistics_support_multiple_operations_and_percentiles():

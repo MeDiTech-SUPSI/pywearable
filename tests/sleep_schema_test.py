@@ -60,7 +60,7 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     )
     assert pd.isna(result.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_score"])
     score = sleep.get_sleep_statistics(
-        loader, "person-1", None, None, statistic="sleep_score"
+        loader, statistic="sleep_score", user_id="person-1"
     )
     assert isinstance(score, pd.Series)
     assert score.index.names == ["user_id", "calendar_date"]
@@ -74,7 +74,7 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
 
     with pytest.raises(ValueError, match="statistic must be one among"):
         sleep.get_sleep_statistics(
-            loader, "person-1", None, None, statistic="unknown_feature"
+            loader, statistic="unknown_feature", user_id="person-1"
         )
 
 
