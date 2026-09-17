@@ -132,6 +132,17 @@ def test_sleep_statistics_support_multiple_operations_and_percentiles():
     assert result.iloc[0]["TST_p90"] == 438
 
 
+def test_sleep_statistics_reject_sum_aggregation():
+    with pytest.raises(ValueError, match="unsupported sleep aggregation"):
+        sleep.get_sleep_statistics(
+            _sleep_loader(),
+            statistic="TST",
+            user_id="person-1",
+            resolution="weekly",
+            aggregation="sum",
+        )
+
+
 def test_ordered_sleep_times_use_sleep_day_not_calendar_dates():
     result = sleep.get_sleep_statistics(
         _sleep_loader(),

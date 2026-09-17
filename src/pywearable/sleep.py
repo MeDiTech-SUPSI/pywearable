@@ -56,6 +56,16 @@ SLEEP_STATISTIC_STAGE_TRANSITION_COUNT = "stage_transition_count"
 SLEEP_STATISTIC_STAGE_TRANSITION_INDEX = "stage_transition_index"
 SLEEP_STATISTIC_STAGE_COVERAGE = "stage_coverage"
 
+SLEEP_TEMPORAL_STATISTICS = {
+    SLEEP_STATISTIC_BEDTIME,
+    SLEEP_STATISTIC_SLEEP_ONSET,
+    SLEEP_STATISTIC_WAKEUP,
+    SLEEP_STATISTIC_GETUP,
+    SLEEP_STATISTIC_MIDPOINT,
+}
+SLEEP_NIGHTLY_RESOLUTIONS = {"night", "nightly", "natural"}
+SLEEP_NUMERIC_AGGREGATIONS = {"mean", "median", "min", "max", "std"}
+
 
 def get_time_in_bed(
     loader: BaseLoader,
@@ -3058,18 +3068,6 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_VALIDATION: compute_sleep_validation,
 }
 
-SLEEP_TEMPORAL_STATISTICS = {
-    SLEEP_STATISTIC_BEDTIME,
-    SLEEP_STATISTIC_SLEEP_ONSET,
-    SLEEP_STATISTIC_WAKEUP,
-    SLEEP_STATISTIC_GETUP,
-    SLEEP_STATISTIC_MIDPOINT,
-}
-SLEEP_NIGHTLY_RESOLUTIONS = {"night", "nightly", "natural"}
-SLEEP_NUMERIC_AGGREGATIONS = {"mean", "median", "min", "max", "std", "sum"}
-SLEEP_TEMPORAL_AGGREGATIONS = {"mean", "median", "min", "max", "std"}
-
-
 def _is_percentile_aggregation(operation: str) -> bool:
     if not operation.startswith("p") or not operation[1:].isdigit():
         return False
@@ -3118,10 +3116,8 @@ def _normalize_sleep_aggregations(statistics, aggregation):
         ):
             raise ValueError(
                 "unsupported sleep aggregation; use mean, median, min, max, "
-                "std, sum, or an integer percentile such as p10 or p90"
+                "std, or an integer percentile such as p10 or p90"
             )
-        if statistic in SLEEP_TEMPORAL_STATISTICS and "sum" in operations:
-            raise ValueError("sum is not defined for sleep clock-time statistics")
         normalized[statistic] = list(dict.fromkeys(operations))
     return normalized
 
