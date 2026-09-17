@@ -38,6 +38,17 @@ SLEEP_STAGE_ALLOWED_VALUES = {
     "asleep",
 }
 
+SLEEP_SESSION_COLUMNS = (
+    "id",
+    CALENDAR_DATE_COL,
+    "type",
+    "main_sleep",
+    ISODATE_COL,
+    LOCAL_END_TIME_COL,
+    "time_in_bed_seconds",
+)
+SLEEP_SESSION_REQUIRED_COLUMNS = SLEEP_SESSION_COLUMNS[:-1]
+
 SLEEP_SUMMARY_REQUIRED_COLUMNS = (
     SLEEP_SUMMARY_ID_COL,
     CALENDAR_DATE_COL,
@@ -204,6 +215,63 @@ def prepare_sleep_stages(frame):
         [SLEEP_STAGE_SLEEP_SUMMARY_ID_COL, ISODATE_COL], kind="stable"
     ).reset_index(drop=True)
     return coalesce_sleep_stage_runs(frame)
+
+
+def prepare_sleep_sessions(frame):
+    """Validate and order sleep sessions used by full-day trajectories."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("sleep session data must be a pandas DataFrame")
+
+    frame = frame.copy()
+    if frame.empty:
+        for column in SLEEP_SESSION_COLUMNS:
+            if column not in frame.columns:
+                frame[column] = pd.Series(dtype="object")
+        return frame[list(SLEEP_SESSION_COLUMNS)]
+
+    missing = [
+        column for column in SLEEP_SESSION_REQUIRED_COLUMNS if column not in frame.columns
+    ]
+    if missing:
+        raise ValueError(
+            "sleep session data is missing required columns: " + ", ".join(missing)
+        )
+
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce"
+    ).dt.normalize()
+    frame[ISODATE_COL] = pd.to_datetime(frame[ISODATE_COL], errors="coerce")
+    frame[LOCAL_END_TIME_COL] = pd.to_datetime(
+        frame[LOCAL_END_TIME_COL], errors="coerce"
+    )
+    required_values = ["id", CALENDAR_DATE_COL, ISODATE_COL, LOCAL_END_TIME_COL]
+    if frame[required_values].isna().any().any():
+        raise ValueError(
+            "sleep sessions require valid identifiers, calendar dates, and local boundaries"
+        )
+    if frame[LOCAL_END_TIME_COL].le(frame[ISODATE_COL]).any():
+        raise ValueError("sleep session end times must follow their start times")
+    if frame["id"].duplicated().any():
+        raise ValueError("sleep session ids must be unique")
+    if not frame["main_sleep"].isin([True, False]).all():
+        raise ValueError("sleep session main_sleep values must be boolean")
+    frame["main_sleep"] = frame["main_sleep"].astype(bool)
+
+    reconstructed_time_in_bed = (
+        frame[LOCAL_END_TIME_COL] - frame[ISODATE_COL]
+    ).dt.total_seconds()
+    if "time_in_bed_seconds" not in frame.columns:
+        frame["time_in_bed_seconds"] = reconstructed_time_in_bed
+    else:
+        frame["time_in_bed_seconds"] = pd.to_numeric(
+            frame["time_in_bed_seconds"], errors="coerce"
+        ).fillna(reconstructed_time_in_bed)
+
+    return (
+        frame[list(SLEEP_SESSION_COLUMNS)]
+        .sort_values(ISODATE_COL, kind="stable")
+        .reset_index(drop=True)
+    )
 
 
 def coalesce_sleep_stage_runs(frame):
