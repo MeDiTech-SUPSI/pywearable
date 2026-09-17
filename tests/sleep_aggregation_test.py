@@ -223,6 +223,36 @@ def test_monthly_sleep_statistics_return_both_requested_partial_months():
     assert result.iloc[1]["TST_coverage"] == 0
 
 
+def test_sleep_statistics_without_bounds_use_each_users_observed_span():
+    nightly = pd.DataFrame(
+        {"TST": [420, 480]},
+        index=pd.MultiIndex.from_tuples(
+            [
+                ("person-1", pd.Timestamp("2024-01-16")),
+                ("person-2", pd.Timestamp("2024-03-20")),
+            ],
+            names=["user_id", "calendar_date"],
+        ),
+    )
+
+    result = sleep._aggregate_sleep_statistics(
+        nightly,
+        users=["person-1", "person-2"],
+        statistics=["TST"],
+        resolution="monthly",
+        aggregation="mean",
+    )
+
+    assert result.index.tolist() == [
+        ("person-1", pd.Timestamp("2024-01-16")),
+        ("person-2", pd.Timestamp("2024-03-20")),
+    ]
+    assert result["period_end"].tolist() == pd.to_datetime(
+        ["2024-01-17", "2024-03-21"]
+    ).tolist()
+    assert result["TST_mean"].tolist() == [420, 480]
+
+
 def test_sleep_statistics_reject_noncalendar_aggregation_resolution():
     with pytest.raises(ValueError, match="resolution must be nightly"):
         sleep.get_sleep_statistics(

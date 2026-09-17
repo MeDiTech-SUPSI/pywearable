@@ -3255,14 +3255,24 @@ def _aggregate_sleep_statistics(
             frame[constants.CALENDAR_DATE_COL].ge(requested_start)
             & frame[constants.CALENDAR_DATE_COL].lt(requested_end)
         ]
-    window_starts = time_utils.get_calendar_window_starts(
-        requested_start, requested_end, spec.rule
-    )
-    window_ends = list(window_starts[1:]) + [requested_end]
-
     records = []
     for user in users:
         user_frame = frame[frame[constants.USER_COL] == user]
+        if start_date is None and end_date is None:
+            if user_frame.empty:
+                continue
+            user_start = user_frame[constants.CALENDAR_DATE_COL].min().normalize()
+            user_end = (
+                user_frame[constants.CALENDAR_DATE_COL].max().normalize()
+                + pd.Timedelta(days=1)
+            )
+        else:
+            user_start = requested_start
+            user_end = requested_end
+        window_starts = time_utils.get_calendar_window_starts(
+            user_start, user_end, spec.rule
+        )
+        window_ends = list(window_starts[1:]) + [user_end]
         for period_start, period_end in zip(window_starts, window_ends):
             nights = user_frame[
                 user_frame[constants.CALENDAR_DATE_COL].ge(period_start)
