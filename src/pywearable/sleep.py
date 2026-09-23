@@ -10,9 +10,8 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from . import sleep_schema as constants, utils
+from . import hierarchy, sleep_schema as constants, utils
 from .loader.base import BaseLoader
-from .utils import time as time_utils
 
 SLEEP_STATISTIC_TIB = "TIB"
 SLEEP_STATISTIC_TST = "TST"
@@ -64,7 +63,6 @@ SLEEP_TEMPORAL_STATISTICS = {
     SLEEP_STATISTIC_MIDPOINT,
 }
 SLEEP_NIGHTLY_RESOLUTIONS = {"night", "nightly", "natural"}
-SLEEP_NUMERIC_AGGREGATIONS = {"mean", "median", "min", "max", "std"}
 
 
 def get_time_in_bed(
@@ -2528,6 +2526,12 @@ def _compute_sleep_boundaries(
                     terminal_awake = False
                     break
                 expected_start = ends.loc[position]
+            if (
+                terminal_awake
+                and pd.notna(getup_elapsed)
+                and abs(getup_elapsed - expected_start) > grid_tolerance
+            ):
+                terminal_awake = False
             if terminal_awake:
                 wakeup_elapsed = last_sleep_end
                 local_uncertain = (
@@ -3068,259 +3072,26 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_VALIDATION: compute_sleep_validation,
 }
 
-def _is_percentile_aggregation(operation: str) -> bool:
-    if not operation.startswith("p") or not operation[1:].isdigit():
-        return False
-    percentile = int(operation[1:])
-    return 0 <= percentile <= 100
 
-
-def _normalize_sleep_aggregations(statistics, aggregation):
-    if aggregation is None:
-        aggregation = "mean"
-    if isinstance(aggregation, dict):
-        unknown = set(aggregation).difference(statistics)
-        if unknown:
-            raise ValueError(
-                "aggregation contains unknown sleep statistics: "
-                + ", ".join(sorted(unknown))
-            )
-        requested = {
-            statistic: aggregation.get(statistic, "mean")
-            for statistic in statistics
-        }
-    else:
-        requested = {statistic: aggregation for statistic in statistics}
-
-    normalized = {}
-    for statistic, operations in requested.items():
-        if isinstance(operations, str):
-            operations = [operations]
-        elif isinstance(operations, (list, tuple)):
-            operations = list(operations)
-        else:
-            raise ValueError(
-                "aggregation operations must be strings or lists of strings"
-            )
-        if not operations:
-            raise ValueError(f"aggregation for {statistic} must not be empty")
-        if any(not isinstance(operation, str) for operation in operations):
-            raise ValueError("aggregation operations must be strings")
-        operations = [operation.lower() for operation in operations]
-        if any(
-            (
-                operation not in SLEEP_NUMERIC_AGGREGATIONS
-                and not _is_percentile_aggregation(operation)
-            )
-            for operation in operations
-        ):
-            raise ValueError(
-                "unsupported sleep aggregation; use mean, median, min, max, "
-                "std, or an integer percentile such as p10 or p90"
-            )
-        normalized[statistic] = list(dict.fromkeys(operations))
-    return normalized
-
-
-def _clock_time_from_seconds(seconds):
-    if seconds is None or pd.isna(seconds):
-        return None
-    total_seconds = int(round(float(seconds))) % (24 * 60 * 60)
-    hours, remainder = divmod(total_seconds, 60 * 60)
-    minutes, seconds = divmod(remainder, 60)
-    return datetime.time(hour=hours, minute=minutes, second=seconds)
-
-
-def _aggregate_numeric_sleep_statistic(values: pd.Series, operation: str):
-    numeric = pd.to_numeric(values, errors="coerce")
-    if values.notna().any() and numeric.notna().sum() == 0:
-        raise ValueError(f"sleep statistic {values.name!r} is not numeric")
-    numeric = numeric.dropna()
-    if numeric.empty:
-        return np.nan
-    if _is_percentile_aggregation(operation):
-        return numeric.quantile(int(operation[1:]) / 100)
-    return getattr(numeric, operation)()
-
-
-def _aggregate_temporal_sleep_statistic(
-    values: pd.Series,
-    calendar_dates: pd.Series,
-    operation: str,
-):
-    timestamps = pd.to_datetime(values, errors="coerce")
-    calendar_dates = pd.to_datetime(calendar_dates, errors="coerce")
-    valid = timestamps.notna() & calendar_dates.notna()
-    if not valid.any():
-        return np.nan if operation == "std" else None
-
-    timestamps = timestamps[valid]
-    calendar_dates = calendar_dates[valid]
-    clock_seconds = (
-        timestamps.dt.hour * 3600
-        + timestamps.dt.minute * 60
-        + timestamps.dt.second
-        + timestamps.dt.microsecond / 1_000_000
-    ).to_numpy(dtype=float)
-
-    if operation in {"mean", "std"}:
-        angles = clock_seconds / (24 * 60 * 60) * 2 * np.pi
-        mean_sine = np.sin(angles).mean()
-        mean_cosine = np.cos(angles).mean()
-        resultant = np.hypot(mean_sine, mean_cosine)
-        if resultant < 1e-12:
-            return np.nan if operation == "std" else None
-        if operation == "std":
-            circular_std_radians = np.sqrt(-2 * np.log(resultant))
-            return circular_std_radians * (24 * 60) / (2 * np.pi)
-        mean_angle = np.arctan2(mean_sine, mean_cosine) % (2 * np.pi)
-        return _clock_time_from_seconds(mean_angle / (2 * np.pi) * 24 * 60 * 60)
-
-    # Ordered operations use each event's position relative to its assigned
-    # sleep day. This keeps 23:50 on the preceding evening immediately before
-    # 00:10 while ensuring that calendar dates themselves do not determine the
-    # result. The selected value is returned as a clock time.
-    offsets = (timestamps - calendar_dates).dt.total_seconds().to_numpy()
-    if operation == "median":
-        seconds = np.median(offsets)
-    elif operation == "min":
-        seconds = np.min(offsets)
-    elif operation == "max":
-        seconds = np.max(offsets)
-    elif _is_percentile_aggregation(operation):
-        seconds = np.percentile(offsets, int(operation[1:]))
-    else:
-        raise ValueError(f"unsupported temporal sleep aggregation {operation!r}")
-    return _clock_time_from_seconds(seconds)
-
-
-def _sleep_aggregation_columns(statistics, operations):
-    columns = ["period_end", "expected_nights"]
-    for statistic in statistics:
-        columns.extend(
-            f"{statistic}_{operation}" for operation in operations[statistic]
-        )
-        columns.extend([f"{statistic}_count", f"{statistic}_coverage"])
-    return columns
-
-
-def _aggregate_sleep_statistics(
-    nightly_statistics: pd.DataFrame,
-    users,
-    statistics,
-    resolution: str,
-    aggregation,
-    start_date=None,
-    end_date=None,
-) -> pd.DataFrame:
-    spec = time_utils.get_resampling_spec(resolution, time_reference="local")
-    if not spec.calendar_based:
-        raise ValueError(
-            "sleep statistics can be aggregated only at daily, weekly, monthly, "
-            "or yearly resolution"
-        )
-    operations = _normalize_sleep_aggregations(statistics, aggregation)
-    columns = _sleep_aggregation_columns(statistics, operations)
-
-    frame = nightly_statistics.reset_index()
-    available_start = (
-        None
-        if frame.empty
-        else frame[constants.CALENDAR_DATE_COL].min().normalize()
-    )
-    available_end = (
-        None
-        if frame.empty
-        else frame[constants.CALENDAR_DATE_COL].max().normalize()
-        + pd.Timedelta(days=1)
-    )
-    requested_start = (
-        available_start
-        if start_date is None
-        else pd.Timestamp(start_date).normalize()
-    )
-    requested_end = (
-        available_end if end_date is None else pd.Timestamp(end_date).normalize()
-    )
-    empty_index = pd.MultiIndex.from_arrays(
-        [[], []], names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
-    )
-    if requested_start is None or requested_end is None:
-        return pd.DataFrame(columns=columns, index=empty_index)
-    if requested_end <= requested_start:
-        raise ValueError("end_date must be after start_date")
-
-    if not frame.empty:
-        frame = frame[
-            frame[constants.CALENDAR_DATE_COL].ge(requested_start)
-            & frame[constants.CALENDAR_DATE_COL].lt(requested_end)
+def _sleep_statistics_list(statistic):
+    if statistic is None:
+        statistics = [
+            name
+            for name in SLEEP_STATISTICS_DICT
+            if name != SLEEP_STATISTIC_VALIDATION
         ]
-    records = []
-    for user in users:
-        user_frame = frame[frame[constants.USER_COL] == user]
-        if start_date is None and end_date is None:
-            if user_frame.empty:
-                continue
-            user_start = user_frame[constants.CALENDAR_DATE_COL].min().normalize()
-            user_end = (
-                user_frame[constants.CALENDAR_DATE_COL].max().normalize()
-                + pd.Timedelta(days=1)
-            )
-        else:
-            user_start = requested_start
-            user_end = requested_end
-        window_starts = time_utils.get_calendar_window_starts(
-            user_start, user_end, spec.rule
+    else:
+        statistics = [statistic] if isinstance(statistic, str) else list(statistic)
+    if not statistics:
+        raise ValueError("statistic must contain at least one sleep feature")
+    unknown = set(statistics).difference(SLEEP_STATISTICS_DICT)
+    if unknown:
+        raise ValueError(
+            "statistic must be one among "
+            f"{list(SLEEP_STATISTICS_DICT)}, not {sorted(unknown)}"
         )
-        window_ends = list(window_starts[1:]) + [user_end]
-        for period_start, period_end in zip(window_starts, window_ends):
-            nights = user_frame[
-                user_frame[constants.CALENDAR_DATE_COL].ge(period_start)
-                & user_frame[constants.CALENDAR_DATE_COL].lt(period_end)
-            ]
-            expected_nights = len(
-                pd.date_range(
-                    period_start.normalize(),
-                    period_end,
-                    freq="D",
-                    inclusive="left",
-                )
-            )
-            record = {
-                constants.USER_COL: user,
-                constants.CALENDAR_DATE_COL: period_start,
-                "period_end": period_end,
-                "expected_nights": expected_nights,
-            }
-            for statistic in statistics:
-                values = nights[statistic]
-                valid_count = int(values.notna().sum())
-                for operation in operations[statistic]:
-                    output_column = f"{statistic}_{operation}"
-                    if statistic in SLEEP_TEMPORAL_STATISTICS:
-                        record[output_column] = _aggregate_temporal_sleep_statistic(
-                            values,
-                            nights[constants.CALENDAR_DATE_COL],
-                            operation,
-                        )
-                    else:
-                        record[output_column] = _aggregate_numeric_sleep_statistic(
-                            values, operation
-                        )
-                record[f"{statistic}_count"] = valid_count
-                record[f"{statistic}_coverage"] = (
-                    valid_count / expected_nights * 100 if expected_nights else np.nan
-                )
-            records.append(record)
+    return statistics
 
-    if not records:
-        return pd.DataFrame(columns=columns, index=empty_index)
-    return (
-        pd.DataFrame(records)
-        .set_index([constants.USER_COL, constants.CALENDAR_DATE_COL])
-        .reindex(columns=columns)
-        .sort_index()
-    )
 
 # TODO reduce number of function calls
 # TODO work by calendarDate and not by sleepSummaryId
@@ -3337,6 +3108,8 @@ def get_sleep_statistic(
     loader_kwargs: Union[dict, None] = None,
     resolution: str = "nightly",
     aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return one sleep feature at nightly or calendar resolution.
 
@@ -3354,6 +3127,8 @@ def get_sleep_statistic(
         loader_kwargs=loader_kwargs,
         resolution=resolution,
         aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
     )
 
 
@@ -3366,8 +3141,10 @@ def get_daily_sleep_statistics(
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
     aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
-    """Return sleep statistics aggregated across local calendar days."""
+    """Return the nightly main-sleep trajectory keyed by local calendar day."""
     return get_sleep_statistics(
         loader=loader,
         statistic=statistic,
@@ -3378,6 +3155,8 @@ def get_daily_sleep_statistics(
         loader_kwargs=loader_kwargs,
         chronotype=chronotype,
         aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
     )
 
 
@@ -3390,6 +3169,8 @@ def get_weekly_sleep_statistics(
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
     aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return sleep statistics aggregated across local calendar weeks."""
     return get_sleep_statistics(
@@ -3402,6 +3183,8 @@ def get_weekly_sleep_statistics(
         loader_kwargs=loader_kwargs,
         chronotype=chronotype,
         aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
     )
 
 
@@ -3414,6 +3197,8 @@ def get_monthly_sleep_statistics(
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
     aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return sleep statistics aggregated across local calendar months."""
     return get_sleep_statistics(
@@ -3426,6 +3211,8 @@ def get_monthly_sleep_statistics(
         loader_kwargs=loader_kwargs,
         chronotype=chronotype,
         aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
     )
 
 
@@ -3438,6 +3225,8 @@ def get_yearly_sleep_statistics(
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
     aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return sleep statistics aggregated across local calendar years."""
     return get_sleep_statistics(
@@ -3450,29 +3239,21 @@ def get_yearly_sleep_statistics(
         loader_kwargs=loader_kwargs,
         chronotype=chronotype,
         aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
     )
 
 
-def get_sleep_statistics(
+def _nightly_sleep_statistics(
     loader: BaseLoader,
     statistic: Union[str, list, tuple, None] = None,
     user_id: Union[str, list, None] = "all",
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    resolution: str = "nightly",
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
-    aggregation=None,
 ) -> Union[pd.Series, pd.DataFrame]:
-    """Return sleep features at nightly or calendar resolution.
-
-    ``resolution="nightly"`` returns one main-sleep value per calendar date.
-    Daily, weekly, monthly, and yearly resolutions first extract that nightly
-    trajectory and then aggregate it, retaining counts and coverage. Multiple
-    named operations can be requested per feature. Set ``statistic`` to
-    ``None`` for the shared feature set, excluding optional features whose
-    definitions or availability are not consistent across loaders.
-    """
+    """Return one main-sleep feature row per participant calendar date."""
 
     # Get user id from the loader
     users = utils.get_user_ids(loader, user_id)
@@ -3480,27 +3261,7 @@ def get_sleep_statistics(
     start_date = None if start_date is None else pd.Timestamp(start_date)
     end_date = None if end_date is None else pd.Timestamp(end_date)
 
-    # Check metrics
-    if statistic is None:
-        # Return the shared night-level features; optional metrics need an
-        # explicit request and may not be available for every loader.
-        statistics = [
-            name for name in SLEEP_STATISTICS_DICT
-            if name != SLEEP_STATISTIC_VALIDATION
-        ]
-    elif type(statistic) == str:
-        statistics = [statistic]
-    else:
-        statistics = list(statistic)
-
-    if not statistics:
-        raise ValueError("statistic must contain at least one sleep feature")
-    for requested_statistic in statistics:
-        if requested_statistic not in SLEEP_STATISTICS_DICT:
-            raise ValueError(
-                "statistic must be one among "
-                f"{list(SLEEP_STATISTICS_DICT)}, not {requested_statistic}"
-            )
+    statistics = _sleep_statistics_list(statistic)
 
     if loader_kwargs is None:
         loader_kwargs = {}
@@ -3508,20 +3269,6 @@ def get_sleep_statistics(
         raise ValueError(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
-    nightly_resolution = resolution in SLEEP_NIGHTLY_RESOLUTIONS
-    if nightly_resolution and aggregation is not None:
-        raise ValueError(
-            "aggregation is available only for daily, weekly, monthly, or "
-            "yearly sleep statistics"
-        )
-    if not nightly_resolution:
-        spec = time_utils.get_resampling_spec(resolution, time_reference="local")
-        if not spec.calendar_based:
-            raise ValueError(
-                "sleep statistics resolution must be nightly, daily, weekly, "
-                "monthly, or yearly"
-            )
-
     user_frames = {}
     for user in users:
         # Load sleep summary data
@@ -3585,34 +3332,215 @@ def get_sleep_statistics(
             [[], []], names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
         )
         empty = pd.DataFrame(columns=statistics, index=empty_index)
-        if nightly_resolution:
-            return empty[statistics[0]] if len(statistics) == 1 else empty
-        return _aggregate_sleep_statistics(
-            empty,
-            users=users,
-            statistics=statistics,
-            resolution=resolution,
-            aggregation=aggregation,
-            start_date=start_date,
-            end_date=end_date,
-        )
+        return empty[statistics[0]] if len(statistics) == 1 else empty
     sleep_stats_df = pd.concat(
         user_frames, names=[constants.USER_COL, constants.CALENDAR_DATE_COL]
     ).sort_index()
 
-    if not nightly_resolution:
-        return _aggregate_sleep_statistics(
-            sleep_stats_df,
-            users=users,
-            statistics=statistics,
-            resolution=resolution,
-            aggregation=aggregation,
-            start_date=start_date,
-            end_date=end_date,
-        )
-
-    # Return series if only statistic
     if len(statistics) == 1:
         return sleep_stats_df[statistics[0]]
-    else:
-        return sleep_stats_df
+    return sleep_stats_df
+
+
+def _hierarchical_sleep_statistics(
+    loader,
+    statistics,
+    users,
+    start_date,
+    end_date,
+    chain,
+    loader_kwargs,
+    chronotype,
+    aggregation,
+    min_coverage,
+    min_valid_children,
+):
+    if chain[0] != "nightly":
+        raise ValueError("sleep hierarchies must start with nightly resolution")
+    if any(target not in {"weekly", "monthly", "yearly"} for target in chain[1:]):
+        raise ValueError(
+            "nightly sleep features can be aggregated to weekly, monthly, or yearly"
+        )
+    aggregation_levels = hierarchy.normalize_aggregation_levels(
+        aggregation, len(chain) - 1
+    )
+    coverage_thresholds = hierarchy.normalize_coverage_thresholds(
+        min_coverage, len(chain)
+    )
+    valid_child_thresholds = hierarchy.normalize_valid_child_thresholds(
+        min_valid_children, len(chain)
+    )
+    if coverage_thresholds[0] is not None:
+        raise ValueError(
+            "primary nightly coverage is not defined; use None for the nightly level"
+        )
+    hierarchy.warn_if_wide(statistics, aggregation_levels)
+    nightly = _nightly_sleep_statistics(
+        loader=loader,
+        statistic=statistics,
+        user_id=users,
+        start_date=start_date,
+        end_date=end_date,
+        loader_kwargs=loader_kwargs,
+        chronotype=chronotype,
+    )
+    if isinstance(nightly, pd.Series):
+        nightly = nightly.to_frame()
+
+    frames = {}
+    bounds = {}
+    for user in users:
+        if user in nightly.index.get_level_values(constants.USER_COL):
+            user_frame = nightly.xs(user).copy()
+        else:
+            user_frame = pd.DataFrame(columns=statistics)
+        if start_date is None:
+            if user_frame.empty:
+                continue
+            user_start = user_frame.index.min().normalize()
+        else:
+            user_start = pd.Timestamp(start_date).normalize()
+        if end_date is None:
+            if user_frame.empty:
+                continue
+            user_end = user_frame.index.max().normalize() + pd.Timedelta(days=1)
+        else:
+            user_end = pd.Timestamp(end_date).normalize()
+        expected = pd.date_range(user_start, user_end, freq="D", inclusive="left")
+        user_frame = user_frame.reindex(expected)
+        user_frame.index.name = "window_start"
+        user_frame.insert(0, "period_start", expected)
+        user_frame.insert(1, "period_end", expected + pd.Timedelta(days=1))
+        frames[user] = user_frame
+        bounds[user] = (user_start, user_end)
+
+    if not frames:
+        index = pd.MultiIndex.from_arrays(
+            [[], []], names=["user_id", constants.CALENDAR_DATE_COL]
+        )
+        return pd.DataFrame(index=index)
+    trajectory = pd.concat(frames, names=["user_id", "window_start"])
+    active_users = list(frames)
+    rename = {feature: f"{feature}__nightly" for feature in statistics}
+    trajectory = trajectory.rename(columns=rename)
+    temporal = {
+        rename[feature]
+        for feature in SLEEP_TEMPORAL_STATISTICS
+        if feature in rename
+    }
+
+    for level_index, target in enumerate(chain[1:]):
+        specification = aggregation_levels[level_index]
+        parent = hierarchy.calendar_windows(active_users, target, bounds)
+        trajectory, temporal = hierarchy.aggregate_level(
+            trajectory,
+            parent,
+            target_resolution=target,
+            aggregation=specification,
+            temporal_features=temporal,
+            membership="label",
+            min_coverage=coverage_thresholds[level_index + 1],
+            min_valid_children=valid_child_thresholds[level_index + 1],
+        )
+    return trajectory.rename_axis(
+        index={"window_start": constants.CALENDAR_DATE_COL}
+    )
+
+
+def get_sleep_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    resolution: Union[str, list, tuple] = "nightly",
+    loader_kwargs: Union[dict, None] = None,
+    chronotype: Union[dict, None] = None,
+    aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return main-sleep features at night level or along a hierarchy.
+
+    A scalar weekly, monthly, or yearly resolution is shorthand for a
+    ``nightly`` hierarchy ending at that calendar resolution. Resolution
+    sequences explicitly define each increasingly larger level, for example
+    ``["nightly", "weekly", "monthly"]``. Upper levels give each valid child
+    row equal weight and return immediate ``valid / expected`` coverage in
+    ``[0, 1]``.
+
+    ``aggregation`` selects the operation or branching operations at each
+    upper level; ``None`` uses the shared standard operations. A
+    ``min_coverage`` sequence supplies one threshold per resolution. Primary
+    nightly adherence has no generic denominator yet, so its entry must be
+    ``None``. A scalar threshold on a scalar calendar request applies to that
+    calendar level. ``min_valid_children`` independently requires an absolute
+    number of valid child windows at each upper level; a scalar applies to
+    every upper level, while a sequence uses ``None`` for the nightly level.
+    """
+    chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
+    if start_date is not None and end_date is not None:
+        if (
+            pd.Timestamp(end_date).normalize()
+            <= pd.Timestamp(start_date).normalize()
+        ):
+            raise ValueError("end_date must be after start_date")
+    if not hierarchical:
+        target = chain[0]
+        if target in SLEEP_NIGHTLY_RESOLUTIONS or target == "daily":
+            if aggregation is not None:
+                raise ValueError("aggregation requires an upper sleep resolution")
+            if min_coverage is not None:
+                raise ValueError("primary nightly coverage is not defined")
+            if min_valid_children is not None:
+                raise ValueError("min_valid_children requires an upper resolution")
+            return _nightly_sleep_statistics(
+                loader=loader,
+                statistic=statistic,
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+                loader_kwargs=loader_kwargs,
+                chronotype=chronotype,
+            )
+        if target not in {"weekly", "monthly", "yearly"}:
+            raise ValueError(
+                "sleep statistics resolution must be nightly, daily, weekly, "
+                "monthly, or yearly"
+            )
+        chain = ["nightly", target]
+        if min_coverage is None:
+            min_coverage = [None, None]
+        elif isinstance(min_coverage, (list, tuple)):
+            if len(min_coverage) != 2:
+                raise ValueError(
+                    "calendar sleep coverage requires nightly and calendar thresholds"
+                )
+        else:
+            min_coverage = [None, min_coverage]
+        if min_valid_children is None:
+            min_valid_children = [None, None]
+        elif isinstance(min_valid_children, (list, tuple)):
+            if len(min_valid_children) != 2:
+                raise ValueError(
+                    "calendar sleep valid-child thresholds require nightly and "
+                    "calendar values"
+                )
+        else:
+            min_valid_children = [None, min_valid_children]
+
+    users = utils.get_user_ids(loader, user_id)
+    statistics = _sleep_statistics_list(statistic)
+    return _hierarchical_sleep_statistics(
+        loader,
+        statistics,
+        users,
+        start_date,
+        end_date,
+        chain,
+        loader_kwargs,
+        chronotype,
+        aggregation,
+        min_coverage,
+        min_valid_children,
+    )

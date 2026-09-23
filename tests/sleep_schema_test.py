@@ -245,6 +245,33 @@ def test_sleep_maintenance_efficiency_uses_one_stage_trajectory():
     assert result.iloc[0] == 100
 
 
+def test_wakeup_is_missing_after_an_unexplained_terminal_stage_gap():
+    summaries = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1"],
+            "local_time": pd.to_datetime(["2024-01-01 23:00"]),
+            "local_end_time": pd.to_datetime(["2024-01-02 07:00"]),
+            "duration_in_ms": [8 * 60 * 60_000],
+            "awake_duration_in_ms": [0],
+        },
+        index=pd.DatetimeIndex(["2024-01-02"], name="calendar_date"),
+    )
+    stages = pd.DataFrame(
+        {
+            "sleep_summary_id": ["night-1", "night-1"],
+            "local_time": pd.to_datetime(
+                ["2024-01-01 23:00", "2024-01-02 06:00"]
+            ),
+            "duration_in_ms": [7 * 60 * 60_000, 10 * 60_000],
+            "type": ["light", "awake"],
+        }
+    )
+
+    wakeup = sleep._compute_wakeup_time(summaries, stages)
+
+    assert pd.isna(wakeup.iloc[0])
+
+
 def test_sleep_stage_contract_rejects_unknown_stage_labels():
     stages = pd.DataFrame(
         {

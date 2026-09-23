@@ -60,7 +60,7 @@ def test_weekly_sleep_statistics_keep_partial_periods_and_coverage():
         user_id="person-1",
         statistic=["TST", "bedtime"],
         resolution="weekly",
-        aggregation={"TST": "mean", "bedtime": "mean"},
+        aggregation="mean",
         start_date="2024-01-16",
         end_date="2024-01-25",
     )
@@ -71,11 +71,11 @@ def test_weekly_sleep_statistics_keep_partial_periods_and_coverage():
     assert result["period_end"].tolist() == pd.to_datetime(
         ["2024-01-22", "2024-01-25"]
     ).tolist()
-    assert result["expected_nights"].tolist() == [6, 3]
-    assert result.iloc[0]["TST_mean"] == 430
-    assert result.iloc[0]["TST_count"] == 2
-    assert result.iloc[0]["TST_coverage"] == pytest.approx(2 / 6 * 100)
-    assert result.iloc[0]["bedtime_mean"] == datetime.time(0, 0)
+    assert result.iloc[0]["TST__nightly__weekly_mean"] == 430
+    assert result.iloc[0]["TST__nightly__weekly_mean__coverage"] == pytest.approx(
+        2 / 6
+    )
+    assert result.iloc[0]["bedtime__nightly__weekly_mean"] == datetime.time(0, 0)
 
 
 def test_sleep_statistics_parameter_order_matches_domain_statistics_api():
@@ -89,10 +89,192 @@ def test_sleep_statistics_parameter_order_matches_domain_statistics_api():
     ]
 
 
+def test_explicit_sleep_hierarchy_uses_equal_weighted_levels():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        resolution=["nightly", "weekly", "monthly"],
+        aggregation=[["mean"], ["mean"]],
+        start_date="2024-01-16",
+        end_date="2024-01-24",
+    )
+
+    column = "TST__nightly__weekly_mean__monthly_mean"
+    # Weekly means are 430 and 460. The monthly level gives each week one
+    # vote (445), rather than pooling the three valid nights (440).
+    assert result.iloc[0][column] == 445
+    assert result.iloc[0][f"{column}__coverage"] == 1
+
+
+def test_explicit_sleep_hierarchy_uses_feature_metadata_for_clock_times():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="bedtime",
+        resolution=["nightly", "weekly"],
+        aggregation=["mean", "min", "max"],
+        start_date="2024-01-16",
+        end_date="2024-01-22",
+    )
+
+    assert result.iloc[0]["bedtime__nightly__weekly_mean"] == datetime.time(0, 0)
+    assert result.iloc[0]["bedtime__nightly__weekly_min"] == datetime.time(23, 30)
+    assert result.iloc[0]["bedtime__nightly__weekly_max"] == datetime.time(0, 30)
+
+
+def test_sleep_hierarchy_reindexes_missing_expected_nights_for_coverage():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
+        start_date="2024-01-16",
+        end_date="2024-01-22",
+    )
+
+    assert result.iloc[0]["TST__nightly__weekly_mean__coverage"] == pytest.approx(
+        2 / 6
+    )
+
+
+def test_sleep_hierarchy_coverage_threshold_propagates_to_the_next_level():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        resolution=["nightly", "weekly", "monthly"],
+        aggregation=[["mean"], ["mean"]],
+        min_coverage=[None, 0.5, 0.75],
+        start_date="2024-01-16",
+        end_date="2024-01-25",
+    )
+
+    weekly = "TST__nightly__weekly_mean"
+    monthly = f"{weekly}__monthly_mean"
+    # The first partial week has 2/6 valid nights and is rejected; the second
+    # has 2/3. One of two weekly children survives, so monthly coverage is 1/2
+    # and the final 75% threshold rejects the monthly value.
+    assert result.iloc[0][f"{monthly}__coverage"] == 0.5
+    assert pd.isna(result.iloc[0][monthly])
+
+
+def test_scalar_calendar_coverage_threshold_applies_to_calendar_level():
+    result = sleep.get_weekly_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        aggregation="mean",
+        min_coverage=0.5,
+        start_date="2024-01-16",
+        end_date="2024-01-22",
+    )
+
+    assert result.iloc[0]["TST__nightly__weekly_mean__coverage"] == pytest.approx(
+        2 / 6
+    )
+    assert pd.isna(result.iloc[0]["TST__nightly__weekly_mean"])
+
+
+def test_absolute_valid_night_threshold_is_distinct_from_coverage_ratio():
+    kwargs = {
+        "loader": _sleep_loader(),
+        "user_id": "person-1",
+        "statistic": "TST",
+        "aggregation": "mean",
+        "start_date": "2024-01-16",
+        "end_date": "2024-01-20",
+    }
+    ratio_only = sleep.get_weekly_sleep_statistics(
+        min_coverage=3 / 7,
+        **kwargs,
+    )
+    count_required = sleep.get_weekly_sleep_statistics(
+        min_coverage=3 / 7,
+        min_valid_children=3,
+        **kwargs,
+    )
+
+    feature = "TST__nightly__weekly_mean"
+    coverage = f"{feature}__coverage"
+    assert ratio_only.iloc[0][feature] == 430
+    assert ratio_only.iloc[0][coverage] == 0.5
+    assert pd.isna(count_required.iloc[0][feature])
+    assert count_required.iloc[0][coverage] == 0.5
+
+
+def test_valid_child_threshold_propagates_to_the_next_sleep_level():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        resolution=["nightly", "weekly", "monthly"],
+        aggregation=[["mean"], ["mean"]],
+        min_valid_children=[None, 3, 1],
+        start_date="2024-01-16",
+        end_date="2024-01-25",
+    )
+
+    monthly = "TST__nightly__weekly_mean__monthly_mean"
+    assert pd.isna(result.iloc[0][monthly])
+    assert result.iloc[0][f"{monthly}__coverage"] == 0
+
+
+def test_sleep_hierarchy_rejects_primary_nightly_coverage_threshold():
+    with pytest.raises(ValueError, match="primary nightly coverage is not defined"):
+        sleep.get_sleep_statistics(
+            _sleep_loader(),
+            user_id="person-1",
+            statistic="TST",
+            resolution=["nightly", "weekly"],
+            aggregation="mean",
+            min_coverage=[0.7, None],
+        )
+
+
+def test_unbounded_empty_sleep_hierarchy_preserves_index_contract():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(empty=True),
+        user_id="person-1",
+        statistic="TST",
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
+    )
+
+    assert result.empty
+    assert result.index.names == ["user_id", "calendar_date"]
+
+
+def test_unbounded_sleep_hierarchy_skips_users_without_observed_nights():
+    source = _sleep_loader()
+
+    def load_sleep_summary(user_id, **kwargs):
+        if user_id == "person-2":
+            return source.load_sleep_summary(user_id, **kwargs).iloc[0:0]
+        return source.load_sleep_summary(user_id, **kwargs)
+
+    loader = SimpleNamespace(
+        get_user_ids=lambda: ["person-1", "person-2"],
+        load_sleep_summary=load_sleep_summary,
+        load_sleep_stage=source.load_sleep_stage,
+    )
+    result = sleep.get_sleep_statistics(
+        loader,
+        user_id="all",
+        statistic="TST",
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
+    )
+
+    assert result.index.get_level_values("user_id").unique().tolist() == [
+        "person-1"
+    ]
+
+
 @pytest.mark.parametrize(
     ("wrapper", "resolution"),
     [
-        (sleep.get_daily_sleep_statistics, "daily"),
         (sleep.get_weekly_sleep_statistics, "weekly"),
         (sleep.get_monthly_sleep_statistics, "monthly"),
         (sleep.get_yearly_sleep_statistics, "yearly"),
@@ -124,16 +306,17 @@ def test_sleep_statistics_support_multiple_operations_and_percentiles():
         end_date="2024-01-22",
     )
 
-    assert result.iloc[0]["TST_mean"] == 430
-    assert result.iloc[0]["TST_median"] == 430
-    assert result.iloc[0]["TST_min"] == 420
-    assert result.iloc[0]["TST_max"] == 440
-    assert result.iloc[0]["TST_p10"] == 422
-    assert result.iloc[0]["TST_p90"] == 438
+    prefix = "TST__nightly__weekly_"
+    assert result.iloc[0][f"{prefix}mean"] == 430
+    assert result.iloc[0][f"{prefix}median"] == 430
+    assert result.iloc[0][f"{prefix}min"] == 420
+    assert result.iloc[0][f"{prefix}max"] == 440
+    assert result.iloc[0][f"{prefix}p10"] == 422
+    assert result.iloc[0][f"{prefix}p90"] == 438
 
 
 def test_sleep_statistics_reject_sum_aggregation():
-    with pytest.raises(ValueError, match="unsupported sleep aggregation"):
+    with pytest.raises(ValueError, match="aggregation operations must be"):
         sleep.get_sleep_statistics(
             _sleep_loader(),
             statistic="TST",
@@ -154,9 +337,10 @@ def test_ordered_sleep_times_use_sleep_day_not_calendar_dates():
         end_date="2024-01-18",
     )
 
-    assert result.iloc[0]["bedtime_min"] == datetime.time(23, 30)
-    assert result.iloc[0]["bedtime_median"] == datetime.time(0, 0)
-    assert result.iloc[0]["bedtime_max"] == datetime.time(0, 30)
+    prefix = "bedtime__nightly__weekly_"
+    assert result.iloc[0][f"{prefix}min"] == datetime.time(23, 30)
+    assert result.iloc[0][f"{prefix}median"] == datetime.time(0, 0)
+    assert result.iloc[0][f"{prefix}max"] == datetime.time(0, 30)
 
 
 def test_temporal_mean_is_circular_and_variability_is_minutes():
@@ -170,24 +354,14 @@ def test_temporal_mean_is_circular_and_variability_is_minutes():
         end_date="2024-01-18",
     )
 
-    assert result.iloc[0]["bedtime_mean"] == datetime.time(0, 0)
-    assert result.iloc[0]["bedtime_std"] == pytest.approx(30.043, abs=0.01)
-
-
-def test_opposite_clock_times_have_no_unique_circular_mean():
-    values = pd.Series(pd.to_datetime(["2024-01-01 00:00", "2024-01-01 12:00"]))
-    calendar_dates = pd.Series(pd.to_datetime(["2024-01-01", "2024-01-01"]))
-
-    assert sleep._aggregate_temporal_sleep_statistic(
-        values, calendar_dates, "mean"
-    ) is None
-    assert pd.isna(
-        sleep._aggregate_temporal_sleep_statistic(values, calendar_dates, "std")
+    assert result.iloc[0]["bedtime__nightly__weekly_mean"] == datetime.time(0, 0)
+    assert result.iloc[0]["bedtime__nightly__weekly_std"] == pytest.approx(
+        30.043, abs=0.01
     )
 
 
-def test_daily_sleep_statistics_preserve_nightly_values_and_missing_days():
-    result = sleep.get_sleep_statistics(
+def test_daily_sleep_statistics_are_the_nightly_trajectory():
+    daily = sleep.get_sleep_statistics(
         _sleep_loader(),
         user_id="person-1",
         statistic="TST",
@@ -195,11 +369,16 @@ def test_daily_sleep_statistics_preserve_nightly_values_and_missing_days():
         start_date="2024-01-16",
         end_date="2024-01-19",
     )
+    nightly = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="TST",
+        resolution="nightly",
+        start_date="2024-01-16",
+        end_date="2024-01-19",
+    )
 
-    assert result["TST_mean"].tolist()[:2] == [420, 440]
-    assert pd.isna(result.iloc[2]["TST_mean"])
-    assert result["TST_count"].tolist() == [1, 1, 0]
-    assert result["TST_coverage"].tolist() == [100, 100, 0]
+    pd.testing.assert_series_equal(daily, nightly)
 
 
 def test_monthly_sleep_statistics_return_both_requested_partial_months():
@@ -218,45 +397,25 @@ def test_monthly_sleep_statistics_return_both_requested_partial_months():
     assert result["period_end"].tolist() == pd.to_datetime(
         ["2024-02-01", "2024-02-15"]
     ).tolist()
-    assert result["expected_nights"].tolist() == [17, 14]
-    assert pd.isna(result.iloc[1]["TST_mean"])
-    assert result.iloc[1]["TST_coverage"] == 0
-
-
-def test_sleep_statistics_without_bounds_use_each_users_observed_span():
-    nightly = pd.DataFrame(
-        {"TST": [420, 480]},
-        index=pd.MultiIndex.from_tuples(
-            [
-                ("person-1", pd.Timestamp("2024-01-16")),
-                ("person-2", pd.Timestamp("2024-03-20")),
-            ],
-            names=["user_id", "calendar_date"],
-        ),
-    )
-
-    result = sleep._aggregate_sleep_statistics(
-        nightly,
-        users=["person-1", "person-2"],
-        statistics=["TST"],
-        resolution="monthly",
-        aggregation="mean",
-    )
-
-    assert result.index.tolist() == [
-        ("person-1", pd.Timestamp("2024-01-16")),
-        ("person-2", pd.Timestamp("2024-03-20")),
-    ]
-    assert result["period_end"].tolist() == pd.to_datetime(
-        ["2024-01-17", "2024-03-21"]
-    ).tolist()
-    assert result["TST_mean"].tolist() == [420, 480]
+    column = "TST__nightly__monthly_mean"
+    assert pd.isna(result.iloc[1][column])
+    assert result.iloc[1][f"{column}__coverage"] == 0
 
 
 def test_sleep_statistics_reject_noncalendar_aggregation_resolution():
     with pytest.raises(ValueError, match="resolution must be nightly"):
         sleep.get_sleep_statistics(
             _sleep_loader(), statistic="TST", resolution="6h"
+        )
+
+
+def test_sleep_statistics_reject_empty_calendar_date_interval():
+    with pytest.raises(ValueError, match="end_date must be after start_date"):
+        sleep.get_sleep_statistics(
+            _sleep_loader(),
+            statistic="TST",
+            start_date="2024-01-16 08:00",
+            end_date="2024-01-16 20:00",
         )
 
 
@@ -272,12 +431,22 @@ def test_aggregated_empty_sleep_statistics_preserve_schema_and_requested_periods
 
     assert len(result) == 1
     assert list(result) == [
+        "period_start",
         "period_end",
-        "expected_nights",
-        "TST_mean",
-        "TST_count",
-        "TST_coverage",
+        "TST__nightly__weekly_mean",
+        "TST__nightly__weekly_mean__coverage",
+        "TST__nightly__weekly_std",
+        "TST__nightly__weekly_std__coverage",
+        "TST__nightly__weekly_median",
+        "TST__nightly__weekly_median__coverage",
+        "TST__nightly__weekly_min",
+        "TST__nightly__weekly_min__coverage",
+        "TST__nightly__weekly_max",
+        "TST__nightly__weekly_max__coverage",
+        "TST__nightly__weekly_p10",
+        "TST__nightly__weekly_p10__coverage",
+        "TST__nightly__weekly_p90",
+        "TST__nightly__weekly_p90__coverage",
     ]
-    assert pd.isna(result.iloc[0]["TST_mean"])
-    assert result.iloc[0]["TST_count"] == 0
-    assert result.iloc[0]["TST_coverage"] == 0
+    assert pd.isna(result.iloc[0]["TST__nightly__weekly_mean"])
+    assert result.iloc[0]["TST__nightly__weekly_mean__coverage"] == 0

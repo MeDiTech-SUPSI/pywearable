@@ -12,7 +12,7 @@ from __future__ import annotations
 import datetime
 import warnings
 from collections.abc import Sequence
-from numbers import Real
+from numbers import Integral, Real
 
 import numpy as np
 import pandas as pd
@@ -201,6 +201,53 @@ def normalize_coverage_thresholds(min_coverage, level_count: int):
         ):
             raise ValueError("coverage thresholds must be between 0 and 1")
     return [None if value is None else float(value) for value in thresholds]
+
+
+def normalize_valid_child_thresholds(min_valid_children, level_count: int):
+    """Return one optional minimum valid-child count per processing level.
+
+    The primary level has no child windows and therefore always uses ``None``.
+    A scalar integer applies to every upper level. A sequence must contain one
+    value per resolution, including ``None`` for the primary level.
+    """
+    if min_valid_children is None:
+        return [None] * level_count
+    if isinstance(min_valid_children, Integral) and not isinstance(
+        min_valid_children, bool
+    ):
+        if level_count == 1:
+            raise ValueError("min_valid_children requires an upper resolution")
+        thresholds = [None] + [int(min_valid_children)] * (level_count - 1)
+    elif isinstance(min_valid_children, Sequence) and not isinstance(
+        min_valid_children, str
+    ):
+        if len(min_valid_children) != level_count:
+            raise ValueError(
+                "min_valid_children must provide one value per resolution"
+            )
+        thresholds = list(min_valid_children)
+    else:
+        raise ValueError(
+            "min_valid_children must be None, an integer, or a sequence of integers"
+        )
+
+    if thresholds[0] is not None:
+        raise ValueError(
+            "the primary resolution has no child windows; its "
+            "min_valid_children value must be None"
+        )
+    for threshold in thresholds[1:]:
+        if threshold is None:
+            continue
+        if (
+            not isinstance(threshold, Integral)
+            or isinstance(threshold, bool)
+            or threshold < 0
+        ):
+            raise ValueError(
+                "min_valid_children thresholds must be non-negative integers"
+            )
+    return [None if value is None else int(value) for value in thresholds]
 
 
 def resolve_feature_operations(features, specification):
@@ -455,6 +502,7 @@ def aggregate_level(
     temporal_features=frozenset(),
     membership: str = "label",
     min_coverage: float | None = None,
+    min_valid_children: int | None = None,
 ):
     """Aggregate one child trajectory into one larger resolution.
 
@@ -466,10 +514,10 @@ def aggregate_level(
     expected children, while feature missingness determines which are valid.
     Each valid child has equal weight. Output names append
     ``__{target_resolution}_{operation}``, and each output currently receives
-    immediate ``valid / expected`` coverage. When ``min_coverage`` is set, an
-    output below that threshold is missing while its measured coverage remains
-    available. This missing value then propagates as an invalid child at the
-    next hierarchy level.
+    immediate ``valid / expected`` coverage. When ``min_coverage`` or
+    ``min_valid_children`` is set, an output failing either threshold is
+    missing while its measured coverage remains available. This missing value
+    then propagates as an invalid child at the next hierarchy level.
 
     Returns the aggregated trajectory and the names of outputs that remain
     temporal for a possible next level.
@@ -479,6 +527,12 @@ def aggregate_level(
             "membership must be 'label', 'physical', or 'majority_overlap'"
         )
     min_coverage = normalize_coverage_thresholds(min_coverage, 1)[0]
+    if min_valid_children is not None and (
+        not isinstance(min_valid_children, Integral)
+        or isinstance(min_valid_children, bool)
+        or min_valid_children < 0
+    ):
+        raise ValueError("min_valid_children must be a non-negative integer")
     metadata = {"period_start", "period_end", "interval_valid", "end_source"}
     features = [
         column
@@ -532,7 +586,12 @@ def aggregate_level(
                 value = aggregate_values(
                     selected[feature], operation, temporal=is_temporal
                 )
-                if min_coverage is not None and coverage < min_coverage:
+                if (
+                    min_coverage is not None and coverage < min_coverage
+                ) or (
+                    min_valid_children is not None
+                    and valid_count < min_valid_children
+                ):
                     value = np.nan
                 record[output] = value
                 record[f"{output}__coverage"] = coverage

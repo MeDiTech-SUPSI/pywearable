@@ -95,6 +95,31 @@ def test_min_coverage_filters_value_but_preserves_measured_coverage():
     assert row["value__monthly_mean__coverage"] == pytest.approx(1 / 3)
 
 
+def test_min_valid_children_filters_value_but_preserves_measured_coverage():
+    trajectory = _trajectory(
+        [10.0, 20.0, np.nan],
+        ["2024-01-01", "2024-01-08", "2024-01-15"],
+        ["2024-01-08", "2024-01-15", "2024-01-22"],
+    )
+    windows = hierarchy.calendar_windows(
+        ["user-1"],
+        "monthly",
+        {"user-1": (pd.Timestamp("2024-01-01"), pd.Timestamp("2024-02-01"))},
+    )
+
+    result, _ = hierarchy.aggregate_level(
+        trajectory,
+        windows,
+        target_resolution="monthly",
+        aggregation="mean",
+        min_valid_children=3,
+    )
+
+    row = result.iloc[0]
+    assert pd.isna(row["value__monthly_mean"])
+    assert row["value__monthly_mean__coverage"] == pytest.approx(2 / 3)
+
+
 def test_coverage_thresholds_can_be_global_or_per_level():
     assert hierarchy.normalize_coverage_thresholds(0.7, 2) == [0.7, 0.7]
     assert hierarchy.normalize_coverage_thresholds([0.5, None], 2) == [0.5, None]
@@ -103,6 +128,22 @@ def test_coverage_thresholds_can_be_global_or_per_level():
         hierarchy.normalize_coverage_thresholds([0.5], 2)
     with pytest.raises(ValueError, match="between 0 and 1"):
         hierarchy.normalize_coverage_thresholds(1.1, 2)
+
+
+def test_valid_child_thresholds_can_be_global_or_per_level():
+    assert hierarchy.normalize_valid_child_thresholds(3, 3) == [None, 3, 3]
+    assert hierarchy.normalize_valid_child_thresholds(
+        [None, 3, 2], 3
+    ) == [None, 3, 2]
+
+    with pytest.raises(ValueError, match="one value per resolution"):
+        hierarchy.normalize_valid_child_thresholds([None, 3], 3)
+    with pytest.raises(ValueError, match="primary resolution"):
+        hierarchy.normalize_valid_child_thresholds([1, 3], 2)
+    with pytest.raises(ValueError, match="non-negative integers"):
+        hierarchy.normalize_valid_child_thresholds([None, 2.5], 2)
+    with pytest.raises(ValueError, match="requires an upper resolution"):
+        hierarchy.normalize_valid_child_thresholds(1, 1)
 
 
 def test_physical_membership_requires_complete_child_windows():

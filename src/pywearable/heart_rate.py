@@ -1594,6 +1594,7 @@ def _hierarchical_heart_rate_statistics(
     chain,
     aggregation,
     min_coverage,
+    min_valid_children,
     loader_kwargs,
     time_reference,
     cycle_kwargs,
@@ -1603,6 +1604,9 @@ def _hierarchical_heart_rate_statistics(
     )
     coverage_thresholds = hierarchy.normalize_coverage_thresholds(
         min_coverage, len(chain)
+    )
+    valid_child_thresholds = hierarchy.normalize_valid_child_thresholds(
+        min_valid_children, len(chain)
     )
     hierarchy.warn_if_wide(statistics, aggregation_levels)
     primary = chain[0]
@@ -1746,6 +1750,7 @@ def _hierarchical_heart_rate_statistics(
             aggregation=specification,
             membership=membership,
             min_coverage=coverage_thresholds[level_index + 1],
+            min_valid_children=valid_child_thresholds[level_index + 1],
         )
     if chain[-1] in cycle.CYCLE_TYPES or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS:
         index_name = "calendar_date"
@@ -1773,6 +1778,7 @@ def get_heart_rate_statistics(
     aggregation=None,
     min_coverage=None,
     cycle_kwargs=None,
+    min_valid_children=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return heart-rate features at one resolution or along a hierarchy.
 
@@ -1821,6 +1827,11 @@ def get_heart_rate_statistics(
     cycle_kwargs : dict or None
         Options forwarded to :func:`pywearable.cycle.get_intervals`, such as
         ``missing_end="midnight"``.
+    min_valid_children : int, sequence of int or None
+        Minimum valid child windows required at each upper resolution. A
+        scalar applies to every upper level. A sequence supplies one value per
+        resolution and must use ``None`` for the primary level. When both
+        count and coverage thresholds are set, both must pass.
 
     Returns
     -------
@@ -1845,6 +1856,7 @@ def get_heart_rate_statistics(
             resolution=["1h", "cycle_night", "monthly"],
             aggregation=[["mean"], ["mean", "p90"]],
             min_coverage=[0.5, 0.7, 0.8],
+            min_valid_children=[None, 3, 2],
         )
     """
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
@@ -1857,6 +1869,8 @@ def get_heart_rate_statistics(
         raise ValueError("sleep-defined heart-rate cycles require local time")
     if not hierarchical and aggregation is not None:
         raise ValueError("aggregation requires a resolution hierarchy")
+    if not hierarchical and min_valid_children is not None:
+        raise ValueError("min_valid_children requires a resolution hierarchy")
     if not hierarchical and chain[0] not in cycle.CYCLE_TYPES:
         threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
         unresolved_streams = set()
@@ -1926,6 +1940,7 @@ def get_heart_rate_statistics(
         chain,
         aggregation,
         min_coverage,
+        min_valid_children,
         loader_kwargs,
         time_reference,
         cycle_kwargs,

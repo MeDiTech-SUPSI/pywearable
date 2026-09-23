@@ -249,6 +249,42 @@ def test_per_level_coverage_thresholds_cascade_through_the_hierarchy():
     assert result.iloc[0][f"{feature}__coverage"] == pytest.approx(1 / 3)
 
 
+def test_valid_child_threshold_filters_heart_rate_hierarchy():
+    kwargs = {
+        "loader": HeartRateCycleLoader(),
+        "statistic": "heart_rate_mean",
+        "user_id": "user-1",
+        "start_date": "2024-01-10",
+        "end_date": "2024-01-13",
+        "resolution": ["cycle_night", "monthly"],
+        "aggregation": "mean",
+    }
+    accepted = heart_rate.get_heart_rate_statistics(
+        min_valid_children=2,
+        **kwargs,
+    )
+    rejected = heart_rate.get_heart_rate_statistics(
+        min_valid_children=3,
+        **kwargs,
+    )
+
+    feature = "heart_rate_mean__cycle_night__monthly_mean"
+    assert accepted.iloc[0][feature] == 85
+    assert pd.isna(rejected.iloc[0][feature])
+    assert rejected.iloc[0][f"{feature}__coverage"] == pytest.approx(2 / 3)
+
+
+def test_single_resolution_heart_rate_rejects_valid_child_threshold():
+    with pytest.raises(ValueError, match="requires a resolution hierarchy"):
+        heart_rate.get_heart_rate_statistics(
+            HeartRateCycleLoader(),
+            statistic="heart_rate_mean",
+            user_id="user-1",
+            resolution="daily",
+            min_valid_children=3,
+        )
+
+
 def test_coverage_threshold_count_matches_every_resolution():
     with pytest.raises(ValueError, match="one value per resolution"):
         heart_rate.get_heart_rate_statistics(
