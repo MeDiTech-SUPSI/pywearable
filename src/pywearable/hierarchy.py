@@ -326,6 +326,77 @@ def windows_for_resolution(users, resolution: str, user_bounds: dict) -> pd.Data
     return fixed_windows(users, resolution, user_bounds)
 
 
+def _majority_overlap_assignments(
+    trajectory: pd.DataFrame, parent_windows: pd.DataFrame
+) -> pd.Series:
+    """Assign each child once when at least half overlaps a parent window."""
+    assignments = pd.Series(index=trajectory.index, dtype="object")
+    parents_by_user = {
+        user: rows for user, rows in parent_windows.groupby(level=0, sort=False)
+    }
+
+    for user, children in trajectory.groupby(level=0, sort=False):
+        parents = parents_by_user.get(user)
+        if parents is None:
+            continue
+        parents = parents.droplevel(0).dropna(subset=["start_time", "end_time"])
+        parents = parents[parents["end_time"] > parents["start_time"]].sort_values(
+            "start_time", kind="stable"
+        )
+        if parents.empty:
+            continue
+
+        parent_rows = list(parents.itertuples())
+        cursor = 0
+        ordered_children = children.sort_values("period_start", kind="stable")
+        for child_index, child in ordered_children.iterrows():
+            child_start = child["period_start"]
+            child_end = child["period_end"]
+            if pd.isna(child_start) or pd.isna(child_end) or child_end <= child_start:
+                continue
+
+            while (
+                cursor < len(parent_rows)
+                and parent_rows[cursor].end_time <= child_start
+            ):
+                cursor += 1
+
+            candidates = []
+            position = cursor
+            child_duration = child_end - child_start
+            midpoint = child_start + child_duration / 2
+            while (
+                position < len(parent_rows)
+                and parent_rows[position].start_time < child_end
+            ):
+                parent = parent_rows[position]
+                overlap = min(child_end, parent.end_time) - max(
+                    child_start, parent.start_time
+                )
+                if overlap > pd.Timedelta(0) and overlap * 2 >= child_duration:
+                    contains_midpoint = (
+                        parent.start_time <= midpoint < parent.end_time
+                    )
+                    candidates.append((overlap, contains_midpoint, position, parent))
+                position += 1
+
+            if not candidates:
+                continue
+            maximum_overlap = max(candidate[0] for candidate in candidates)
+            candidates = [
+                candidate
+                for candidate in candidates
+                if candidate[0] == maximum_overlap
+            ]
+            midpoint_candidates = [
+                candidate for candidate in candidates if candidate[1]
+            ]
+            chosen = (midpoint_candidates or candidates)[0]
+            assignments.at[child_index] = chosen[3].Index
+
+    return assignments
+
+
 def aggregate_level(
     trajectory: pd.DataFrame,
     parent_windows: pd.DataFrame,
@@ -337,16 +408,22 @@ def aggregate_level(
     """Aggregate one child trajectory into one larger resolution.
 
     With ``membership='label'``, child labels select their parent window. With
-    ``membership='physical'``, only children fully contained between the
-    parent's physical boundaries are selected. Each valid child has equal
-    weight. Output names append ``__{target_resolution}_{operation}``, and each
-    output currently receives immediate ``valid / expected`` coverage.
+    ``membership='physical'``, only fully contained children are selected.
+    ``membership='majority_overlap'`` assigns each child once when at least
+    half of its duration overlaps a parent; exact ties use the parent containing
+    the child's midpoint under half-open boundaries. Membership determines the
+    expected children, while feature missingness determines which are valid.
+    Each valid child has equal weight. Output names append
+    ``__{target_resolution}_{operation}``, and each output currently receives
+    immediate ``valid / expected`` coverage.
 
     Returns the aggregated trajectory and the names of outputs that remain
     temporal for a possible next level.
     """
-    if membership not in {"label", "physical"}:
-        raise ValueError("membership must be either 'label' or 'physical'")
+    if membership not in {"label", "physical", "majority_overlap"}:
+        raise ValueError(
+            "membership must be 'label', 'physical', or 'majority_overlap'"
+        )
     metadata = {"period_start", "period_end", "interval_valid", "end_source"}
     features = [
         column
@@ -360,6 +437,11 @@ def aggregate_level(
     children_by_user = {
         user: rows for user, rows in trajectory.groupby(level=0, sort=False)
     }
+    overlap_assignments = (
+        _majority_overlap_assignments(trajectory, parent_windows)
+        if membership == "majority_overlap"
+        else None
+    )
 
     for (user, label), parent in parent_windows.iterrows():
         children = children_by_user.get(user, empty_children)
@@ -368,6 +450,9 @@ def aggregate_level(
                 children["period_start"].ge(parent["start_time"])
                 & children["period_end"].le(parent["end_time"])
             ]
+        elif membership == "majority_overlap":
+            assigned = overlap_assignments.reindex(children.index)
+            selected = children[assigned.eq(label).to_numpy()]
         else:
             child_labels = children.index.get_level_values(1)
             selected = children[

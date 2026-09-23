@@ -9,7 +9,7 @@ from typing import Union
 
 import pandas as pd
 
-from . import heart_rate_schema
+from . import cycle, heart_rate_schema, hierarchy
 from .loader.base import BaseLoader
 from .utils import time as time_utils
 
@@ -20,6 +20,7 @@ HEART_RATE_STATISTIC_MEDIAN = "heart_rate_median"
 HEART_RATE_STATISTIC_MIN = "heart_rate_min"
 HEART_RATE_STATISTIC_P10 = "heart_rate_p10"
 HEART_RATE_STATISTIC_P90 = "heart_rate_p90"
+HEART_RATE_STATISTIC_STD = "heart_rate_std"
 HEART_RATE_STATISTIC_REST = "heart_rate_rest"
 
 HEART_RATE_STATISTICS = [
@@ -30,6 +31,7 @@ HEART_RATE_STATISTICS = [
     HEART_RATE_STATISTIC_MIN,
     HEART_RATE_STATISTIC_P10,
     HEART_RATE_STATISTIC_P90,
+    HEART_RATE_STATISTIC_STD,
     HEART_RATE_STATISTIC_REST,
 ]
 
@@ -283,30 +285,14 @@ def get_daily_mean_heart_rate(
     )
 
 
-def _compute_hr_statistics(
-    heart_rate: pd.DataFrame, rule: str, time_col: str, calendar_based: bool
-) -> pd.Series:
-    """Computes a heart rate statistics on a daily basis.
-
-    This function computes a specific statistic for
-    the heart rate data available at a daily basis.
-
-    Parameters
-    ----------
-    heart_rate : :class:`pandas.DataFrame`
-        Heart rate data.
-    statistic : :class:`str`
-        Name of the statistic to be computed
-
-    Returns
-    -------
-    :class:`pandas.DataFrame`
-        Dataframe with time (utc and local) as index, and statistics as columns
-    """
-
+def _prepare_heart_rate_samples(
+    heart_rate: pd.DataFrame, time_col: str
+) -> pd.DataFrame:
+    """Validate and deduplicate samples before any heart-rate calculation."""
     if not isinstance(heart_rate, pd.DataFrame):
         raise ValueError(
-            f"heart_rate must be a pd.DataFrame. {type(heart_rate)} is not a valid type."
+            "heart_rate must be a pd.DataFrame. "
+            f"{type(heart_rate)} is not a valid type."
         )
 
     required_columns = {time_col, heart_rate_schema.HEART_RATE_COL}
@@ -319,14 +305,16 @@ def _compute_hr_statistics(
 
     heart_rate = heart_rate.dropna(subset=list(required_columns)).copy()
     if heart_rate.empty:
-        return pd.DataFrame()
+        return heart_rate
 
     conflict_col = heart_rate_schema.TIMESTAMP_CONFLICT_COL
     if conflict_col in heart_rate.columns and heart_rate[conflict_col].any():
-        warnings.warn("Excluding ambiguous same-timestamp heart-rate readings from aggregation.")
+        warnings.warn(
+            "Excluding ambiguous same-timestamp heart-rate readings from aggregation."
+        )
         heart_rate = heart_rate.loc[~heart_rate[conflict_col]].copy()
     if heart_rate.empty:
-        return pd.DataFrame()
+        return heart_rate
 
     # Every statistic must use the same set of physical instants. Loaders may
     # retain repeated, identical exports, so collapse those timestamps once
@@ -337,7 +325,16 @@ def _compute_hr_statistics(
         and heart_rate[heart_rate_schema.UTC_TIME_COL].notna().any()
         else time_col
     )
-    heart_rate = heart_rate.drop_duplicates(subset=duplicate_time_col)
+    return heart_rate.drop_duplicates(subset=duplicate_time_col)
+
+
+def _compute_hr_statistics(
+    heart_rate: pd.DataFrame, rule: str, time_col: str, calendar_based: bool
+) -> pd.Series:
+    """Compute heart-rate statistics over one resampling rule."""
+    heart_rate = _prepare_heart_rate_samples(heart_rate, time_col)
+    if heart_rate.empty:
+        return pd.DataFrame()
 
     heart_rate_stats = (
         heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
@@ -734,7 +731,28 @@ def get_yearly_heart_rate_statistics(
     )
 
 
-def get_heart_rate_statistics(
+def _heart_rate_statistics_list(statistic, allow_rest: bool):
+    if statistic is None:
+        return [
+            value
+            for value in HEART_RATE_STATISTICS
+            if allow_rest or value != HEART_RATE_STATISTIC_REST
+        ]
+    statistics = [statistic] if isinstance(statistic, str) else list(statistic)
+    unknown = set(statistics).difference(HEART_RATE_STATISTICS)
+    if unknown:
+        raise ValueError(
+            f"statistic must be one among {HEART_RATE_STATISTICS}, "
+            f"not {sorted(unknown)}"
+        )
+    if HEART_RATE_STATISTIC_REST in statistics and not allow_rest:
+        raise ValueError(
+            "heart_rate_rest is available only at daily resolution or cycle resolution"
+        )
+    return statistics
+
+
+def _get_heart_rate_statistics_single_resolution(
     loader: BaseLoader,
     statistic: Union[str, list, tuple, None] = None,
     user_id: Union[str, list] = "all",
@@ -841,27 +859,7 @@ def get_heart_rate_statistics(
                 f"The loader does not provide heart-rate timestamps in {time_col}."
             )
 
-    # Check statistic
-    if statistic is None:
-        statistics = [
-            requested_statistic
-            for requested_statistic in HEART_RATE_STATISTICS
-            if requested_statistic != HEART_RATE_STATISTIC_REST or rule == "d"
-        ]
-    elif type(statistic) == str:
-        statistics = [statistic]
-    else:
-        statistics = statistic
-
-    for requested_statistic in statistics:
-        if requested_statistic not in HEART_RATE_STATISTICS:
-            raise ValueError(
-                f"statistic must be one among {HEART_RATE_STATISTICS}, not {requested_statistic}"
-            )
-        if requested_statistic == HEART_RATE_STATISTIC_REST and rule != "d":
-            raise ValueError(
-                "heart_rate_rest is available only at daily resolution"
-            )
+    statistics = _heart_rate_statistics_list(statistic, allow_rest=rule == "d")
     # Check args and kwargs
     if type(loader_kwargs) != dict:
         raise ValueError(
@@ -995,3 +993,485 @@ def get_heart_rate_statistics(
             )[
                 statistics
             ].squeeze(axis=1)
+
+
+def _interval_heart_rate_statistics(heart_rate, start, end):
+    data = heart_rate[
+        heart_rate[heart_rate_schema.LOCAL_TIME_COL].ge(start)
+        & heart_rate[heart_rate_schema.LOCAL_TIME_COL].lt(end)
+    ]
+    values = pd.to_numeric(
+        data[heart_rate_schema.HEART_RATE_COL], errors="coerce"
+    ).dropna()
+    result = {
+        HEART_RATE_STATISTIC_COUNT: float(values.count()),
+        HEART_RATE_STATISTIC_MAX: values.max(),
+        HEART_RATE_STATISTIC_MEAN: values.mean(),
+        HEART_RATE_STATISTIC_MEDIAN: values.median(),
+        HEART_RATE_STATISTIC_MIN: values.min(),
+        HEART_RATE_STATISTIC_P10: values.quantile(0.1),
+        HEART_RATE_STATISTIC_P90: values.quantile(0.9),
+        HEART_RATE_STATISTIC_STD: values.std(),
+        HEART_RATE_STATISTIC_REST: float("nan"),
+    }
+    if not values.empty:
+        minute = (
+            data.sort_values(heart_rate_schema.LOCAL_TIME_COL)
+            .set_index(heart_rate_schema.LOCAL_TIME_COL)[
+                heart_rate_schema.HEART_RATE_COL
+            ]
+            .resample("1min", closed="left", label="left")
+            .mean()
+        )
+        result[HEART_RATE_STATISTIC_REST] = (
+            minute.rolling("30min", min_periods=20, closed="left").mean().min()
+        )
+    return result
+
+
+def _cycle_heart_rate_trajectory(
+    loader,
+    users,
+    statistics,
+    cycle_type,
+    start_date,
+    end_date,
+    loader_kwargs,
+    cycle_kwargs,
+):
+    intervals = cycle.get_intervals(
+        loader,
+        cycle_type=cycle_type,
+        user_id=users,
+        start_date=start_date,
+        end_date=end_date,
+        **cycle_kwargs,
+    )
+    records = []
+    for user in users:
+        if user not in intervals.index.get_level_values(0):
+            continue
+        user_intervals = intervals.xs(user)
+        valid = user_intervals[user_intervals["interval_valid"]]
+        heart_rate = pd.DataFrame(
+            columns=[
+                heart_rate_schema.LOCAL_TIME_COL,
+                heart_rate_schema.HEART_RATE_COL,
+            ]
+        )
+        if not valid.empty:
+            heart_rate = loader.load_heart_rate(
+                user_id=user,
+                start_date=valid["start_time"].min(),
+                end_date=valid["end_time"].max(),
+                time_col=heart_rate_schema.LOCAL_TIME_COL,
+                **loader_kwargs,
+            )
+            heart_rate = _prepare_heart_rate_samples(
+                heart_rate, heart_rate_schema.LOCAL_TIME_COL
+            )
+        for label, interval in user_intervals.iterrows():
+            values = {statistic: float("nan") for statistic in statistics}
+            if interval["interval_valid"]:
+                computed = _interval_heart_rate_statistics(
+                    heart_rate, interval["start_time"], interval["end_time"]
+                )
+                values = {statistic: computed[statistic] for statistic in statistics}
+            records.append(
+                {
+                    "user_id": user,
+                    "window_start": label,
+                    "period_start": interval["start_time"],
+                    "period_end": interval["end_time"],
+                    "interval_valid": bool(interval["interval_valid"]),
+                    "end_source": interval["end_source"],
+                    **values,
+                }
+            )
+    if not records:
+        index = pd.MultiIndex.from_arrays(
+            [[], []], names=["user_id", "window_start"]
+        )
+        return pd.DataFrame(
+            columns=["period_start", "period_end", *statistics], index=index
+        )
+    return pd.DataFrame(records).set_index(["user_id", "window_start"]).sort_index()
+
+
+def _single_resolution_hr_trajectory(
+    loader,
+    users,
+    statistics,
+    start_date,
+    end_date,
+    resolution,
+    loader_kwargs,
+    time_reference,
+):
+    result = _get_heart_rate_statistics_single_resolution(
+        loader=loader,
+        statistic=statistics,
+        user_id=users,
+        start_date=start_date,
+        end_date=end_date,
+        resolution=resolution,
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+    )
+    if isinstance(result, pd.Series):
+        result = result.to_frame()
+    result = result.copy()
+    if not isinstance(result.index, pd.MultiIndex) or result.index.nlevels < 2:
+        index = pd.MultiIndex.from_arrays(
+            [[], []], names=["user_id", "window_start"]
+        )
+        return pd.DataFrame(
+            columns=["period_start", "period_end", *statistics], index=index
+        )
+    while result.index.nlevels > 2:
+        result = result.droplevel(-1)
+    result.index = result.index.set_names(["user_id", "window_start"])
+
+    starts = pd.Series(
+        result.index.get_level_values("window_start"), index=result.index
+    )
+    canonical = hierarchy.canonical_resolution(resolution)
+    if canonical in hierarchy.CALENDAR_RESOLUTIONS:
+        spec = time_utils.get_resampling_spec(canonical, time_reference="local")
+        if spec.rule == "d":
+            ends = starts + pd.Timedelta(days=1)
+        else:
+            canonical_starts = starts.map(
+                lambda value: time_utils.get_calendar_period_start(value, spec.rule)
+            )
+            ends = canonical_starts.map(
+                lambda value: pd.date_range(value, periods=2, freq=spec.rule)[1]
+            )
+    else:
+        ends = starts + pd.Timedelta(canonical)
+    result.insert(0, "period_start", starts.to_numpy())
+    result.insert(1, "period_end", pd.to_datetime(ends).to_numpy())
+    return result
+
+
+def _primary_heart_rate_trajectory_for_cycle_hierarchy(
+    loader,
+    users,
+    statistics,
+    resolution,
+    parent_intervals,
+    loader_kwargs,
+    time_reference,
+):
+    """Calculate the primary windows within each user's valid cycle span."""
+    trajectories = []
+    interval_users = parent_intervals.index.get_level_values(0)
+    for user in users:
+        if user not in interval_users:
+            continue
+        user_intervals = parent_intervals.xs(user)
+        valid = user_intervals[user_intervals["interval_valid"]]
+        if valid.empty:
+            continue
+        trajectory = _single_resolution_hr_trajectory(
+            loader,
+            [user],
+            statistics,
+            valid["start_time"].min(),
+            valid["end_time"].max(),
+            resolution,
+            loader_kwargs,
+            time_reference,
+        )
+        if not trajectory.empty:
+            trajectories.append(trajectory)
+    if trajectories:
+        return pd.concat(trajectories).sort_index()
+    index = pd.MultiIndex.from_arrays(
+        [[], []], names=["user_id", "window_start"]
+    )
+    return pd.DataFrame(
+        columns=["period_start", "period_end", *statistics], index=index
+    )
+
+
+def _hierarchical_heart_rate_statistics(
+    loader,
+    statistics,
+    users,
+    start_date,
+    end_date,
+    chain,
+    aggregation,
+    loader_kwargs,
+    time_reference,
+    cycle_kwargs,
+):
+    aggregation_levels = hierarchy.normalize_aggregation_levels(
+        aggregation, len(chain) - 1
+    )
+    hierarchy.warn_if_wide(statistics, aggregation_levels)
+    primary = chain[0]
+    primary_reference = time_reference
+    if time_reference == "auto" and any(
+        value in cycle.CYCLE_TYPES or value in hierarchy.CALENDAR_RESOLUTIONS
+        for value in chain[1:]
+    ):
+        # A hierarchy must use one coherent clock. Local calendar and sleep
+        # intervals therefore make their lower fixed windows local as well.
+        primary_reference = "local"
+    cycle_target = next(
+        (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
+    )
+    cycle_parent = None
+    if cycle_target is not None:
+        cycle_parent = cycle.get_intervals(
+            loader,
+            cycle_type=cycle_target,
+            user_id=users,
+            start_date=start_date,
+            end_date=end_date,
+            **cycle_kwargs,
+        )
+    if primary in cycle.CYCLE_TYPES:
+        trajectory = _cycle_heart_rate_trajectory(
+            loader,
+            users,
+            statistics,
+            primary,
+            start_date,
+            end_date,
+            loader_kwargs,
+            cycle_kwargs,
+        )
+    elif cycle_parent is not None:
+        trajectory = _primary_heart_rate_trajectory_for_cycle_hierarchy(
+            loader,
+            users,
+            statistics,
+            primary,
+            cycle_parent,
+            loader_kwargs,
+            primary_reference,
+        )
+    else:
+        trajectory = _single_resolution_hr_trajectory(
+            loader,
+            users,
+            statistics,
+            start_date,
+            end_date,
+            primary,
+            loader_kwargs,
+            primary_reference,
+        )
+
+    rename = {feature: f"{feature}__{primary}" for feature in statistics}
+    trajectory = trajectory.rename(columns=rename)
+    for level_index, target in enumerate(chain[1:]):
+        specification = aggregation_levels[level_index]
+        if target in cycle.CYCLE_TYPES:
+            parent = cycle_parent if target == cycle_target else None
+            if parent is None:
+                parent = cycle.get_intervals(
+                    loader,
+                    cycle_type=target,
+                    user_id=users,
+                    start_date=start_date,
+                    end_date=end_date,
+                    **cycle_kwargs,
+                )
+            parent = parent.rename_axis(index={"calendar_date": "window_start"})
+            membership = "majority_overlap"
+        else:
+            bounds = {}
+            active_users = []
+            for user in users:
+                user_rows = (
+                    trajectory.xs(user)
+                    if user in trajectory.index.get_level_values(0)
+                    else trajectory.iloc[0:0]
+                )
+                if user_rows.empty and (start_date is None or end_date is None):
+                    continue
+                if start_date is None:
+                    if chain[level_index] in cycle.CYCLE_TYPES:
+                        lower = pd.Timestamp(user_rows.index.min()).normalize()
+                    else:
+                        lower = user_rows["period_start"].min()
+                else:
+                    lower = pd.Timestamp(start_date)
+                if end_date is None:
+                    if chain[level_index] in cycle.CYCLE_TYPES:
+                        upper = (
+                            pd.Timestamp(user_rows.index.max()).normalize()
+                            + pd.Timedelta(days=1)
+                        )
+                    else:
+                        upper = user_rows["period_end"].max()
+                else:
+                    upper = pd.Timestamp(end_date)
+                if pd.isna(lower) or pd.isna(upper):
+                    continue
+                bounds[user] = (lower, upper)
+                active_users.append(user)
+            if not active_users:
+                return trajectory.iloc[0:0].rename_axis(
+                    index={"window_start": "calendar_date"}
+                )
+            parent = hierarchy.windows_for_resolution(
+                active_users, target, bounds
+            )
+            membership = "label"
+        trajectory, _ = hierarchy.aggregate_level(
+            trajectory,
+            parent,
+            target_resolution=target,
+            aggregation=specification,
+            membership=membership,
+        )
+    if chain[-1] in cycle.CYCLE_TYPES or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS:
+        index_name = "calendar_date"
+    else:
+        index_name = time_utils.get_resampling_spec(
+            chain[-1], time_reference=primary_reference
+        ).time_col
+        available = getattr(
+            loader, "heart_rate_time_columns", heart_rate_schema.TIME_COLUMNS
+        )
+        if index_name not in available and primary_reference == "auto":
+            index_name = heart_rate_schema.LOCAL_TIME_COL
+    return trajectory.rename_axis(index={"window_start": index_name})
+
+
+def get_heart_rate_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list] = "all",
+    start_date: Union[pd.Timestamp, None] = None,
+    end_date: Union[pd.Timestamp, None] = None,
+    resolution: Union[pd.Timedelta, str, list, tuple] = "day",
+    loader_kwargs: dict = {},
+    time_reference: str = "auto",
+    aggregation=None,
+    cycle_kwargs=None,
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return heart-rate features at one resolution or along a hierarchy.
+
+    A scalar ``resolution`` preserves the ordinary heart-rate extraction API.
+    A resolution sequence defines increasingly larger windows: features are
+    first calculated from samples at the first resolution, then each upper
+    level aggregates the preceding rows with equal child weighting.
+
+    Parameters
+    ----------
+    loader : BaseLoader
+        Loader providing heart-rate samples and, for cycles, sleep sessions.
+    statistic : str, sequence of str, or None
+        Primary heart-rate features. ``None`` requests every registered
+        feature; resting heart rate is available for daily or cycle windows.
+    user_id : str or list, default "all"
+        Participant identifiers.
+    start_date, end_date : timestamp-like or None
+        Exact half-open analysis interval ``[start_date, end_date)``. Without
+        bounds, each participant uses only their observed trajectory.
+    resolution : str, timedelta, or sequence, default "day"
+        One window resolution or a strictly increasing hierarchy, such as
+        ``["1h", "cycle_night", "monthly"]``.
+    loader_kwargs : dict
+        Extra keyword arguments passed to ``loader.load_heart_rate``.
+    time_reference : {"auto", "local", "utc"}, default "auto"
+        Clock used for fixed windows. ``auto`` selects UTC for purely subdaily
+        extraction and local time when calendar or cycle parents require it.
+        Explicit UTC is invalid when any sleep-defined cycle is requested.
+    aggregation : str, sequence, nested sequence, or None
+        Operations for levels above the primary one. ``None`` uses the
+        standard numeric operations. With more than one upper level, provide
+        one nested specification per level, for example
+        ``[["mean"], ["mean", "p90"]]``.
+    cycle_kwargs : dict or None
+        Options forwarded to :func:`pywearable.cycle.get_intervals`, such as
+        ``missing_end="midnight"``.
+
+    Returns
+    -------
+    pandas.Series or pandas.DataFrame
+        A ``(user_id, time)`` trajectory. Hierarchical output names retain the
+        full calculation path and include immediate child coverage columns.
+
+    Examples
+    --------
+    Calculate ordinary five-minute features::
+
+        get_heart_rate_statistics(loader, resolution="5min")
+
+    Average hourly mean heart rate within each main-sleep cycle, then return
+    its monthly mean and 90th percentile::
+
+        get_heart_rate_statistics(
+            loader,
+            statistic="heart_rate_mean",
+            resolution=["1h", "cycle_night", "monthly"],
+            aggregation=[["mean"], ["mean", "p90"]],
+        )
+    """
+    chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
+    cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
+    if time_reference not in {"auto", "local", "utc"}:
+        raise ValueError("time_reference must be 'auto', 'local', or 'utc'")
+    if time_reference == "utc" and any(
+        value in cycle.CYCLE_TYPES for value in chain
+    ):
+        raise ValueError("sleep-defined heart-rate cycles require local time")
+    if not hierarchical and aggregation is not None:
+        raise ValueError("aggregation requires a resolution hierarchy")
+    if not hierarchical and chain[0] not in cycle.CYCLE_TYPES:
+        return _get_heart_rate_statistics_single_resolution(
+            loader=loader,
+            statistic=statistic,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            resolution=chain[0],
+            loader_kwargs=loader_kwargs,
+            time_reference=time_reference,
+        )
+
+    users = (
+        loader.get_user_ids()
+        if user_id == "all" or user_id is None
+        else user_id
+    )
+    if isinstance(users, str):
+        users = [users]
+    users = list(users)
+    statistics = _heart_rate_statistics_list(
+        statistic, allow_rest=chain[0] in cycle.CYCLE_TYPES or chain[0] == "daily"
+    )
+    if len(chain) == 1:
+        trajectory = _cycle_heart_rate_trajectory(
+            loader,
+            users,
+            statistics,
+            chain[0],
+            start_date,
+            end_date,
+            loader_kwargs,
+            cycle_kwargs,
+        )
+        result = trajectory[statistics].copy()
+        result.index = result.index.set_names(["user_id", "calendar_date"])
+        return result[statistics[0]] if len(statistics) == 1 else result
+
+    return _hierarchical_heart_rate_statistics(
+        loader,
+        statistics,
+        users,
+        start_date,
+        end_date,
+        chain,
+        aggregation,
+        loader_kwargs,
+        time_reference,
+        cycle_kwargs,
+    )

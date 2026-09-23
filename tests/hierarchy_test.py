@@ -81,7 +81,82 @@ def test_physical_membership_requires_complete_child_windows():
     assert result.iloc[0]["value__cycle_night_mean"] == 2
 
 
-def test_membership_must_be_label_or_physical():
+def test_majority_overlap_membership_is_separate_from_feature_validity():
+    trajectory = _trajectory(
+        [1.0, np.nan, 9.0],
+        [
+            "2024-01-01 22:00",
+            "2024-01-01 23:00",
+            "2024-01-02 00:00",
+        ],
+        [
+            "2024-01-01 23:00",
+            "2024-01-02 00:00",
+            "2024-01-02 01:00",
+        ],
+    )
+    parent = pd.DataFrame(
+        {
+            "start_time": [pd.Timestamp("2024-01-01 22:30")],
+            "end_time": [pd.Timestamp("2024-01-02 00:00")],
+        },
+        index=pd.MultiIndex.from_tuples(
+            [("user-1", pd.Timestamp("2024-01-02"))],
+            names=["user_id", "window_start"],
+        ),
+    )
+
+    result, _ = hierarchy.aggregate_level(
+        trajectory,
+        parent,
+        target_resolution="cycle_night",
+        aggregation="mean",
+        membership="majority_overlap",
+    )
+
+    row = result.iloc[0]
+    assert row["value__cycle_night_mean"] == 1
+    assert row["value__cycle_night_mean__coverage"] == 0.5
+
+
+def test_majority_overlap_tie_uses_half_open_midpoint_assignment():
+    trajectory = _trajectory(
+        [10.0],
+        ["2024-01-01 23:00"],
+        ["2024-01-02 00:00"],
+    )
+    parent = pd.DataFrame(
+        {
+            "start_time": pd.to_datetime(
+                ["2024-01-01 22:30", "2024-01-01 23:30"]
+            ),
+            "end_time": pd.to_datetime(
+                ["2024-01-01 23:30", "2024-01-02 00:30"]
+            ),
+        },
+        index=pd.MultiIndex.from_tuples(
+            [
+                ("user-1", pd.Timestamp("2024-01-01")),
+                ("user-1", pd.Timestamp("2024-01-02")),
+            ],
+            names=["user_id", "window_start"],
+        ),
+    )
+
+    result, _ = hierarchy.aggregate_level(
+        trajectory,
+        parent,
+        target_resolution="cycle_physiological",
+        aggregation="mean",
+        membership="majority_overlap",
+    )
+
+    feature = "value__cycle_physiological_mean"
+    assert pd.isna(result.loc[("user-1", pd.Timestamp("2024-01-01")), feature])
+    assert result.loc[("user-1", pd.Timestamp("2024-01-02")), feature] == 10
+
+
+def test_membership_must_be_supported():
     trajectory = _trajectory(
         [1.0],
         ["2024-01-01 23:00"],
@@ -119,9 +194,15 @@ def test_hierarchy_aggregation_operations_apply_to_every_feature():
 
 def test_temporal_mean_and_ordered_statistics_cross_midnight():
     values = pd.Series([datetime.time(23, 50), datetime.time(0, 10)])
-    assert hierarchy.aggregate_values(values, "mean", temporal=True) == datetime.time(0, 0)
-    assert hierarchy.aggregate_values(values, "min", temporal=True) == datetime.time(23, 50)
-    assert hierarchy.aggregate_values(values, "max", temporal=True) == datetime.time(0, 10)
+    assert hierarchy.aggregate_values(
+        values, "mean", temporal=True
+    ) == datetime.time(0, 0)
+    assert hierarchy.aggregate_values(
+        values, "min", temporal=True
+    ) == datetime.time(23, 50)
+    assert hierarchy.aggregate_values(
+        values, "max", temporal=True
+    ) == datetime.time(0, 10)
 
 
 def test_large_hierarchy_warns_before_execution():
