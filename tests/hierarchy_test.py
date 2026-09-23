@@ -29,6 +29,21 @@ def test_resolution_chains_must_increase():
         hierarchy.normalize_resolution_chain(["cycle_night", "daily"])
 
 
+def test_fixed_and_calendar_resolution_order_uses_real_durations():
+    assert hierarchy.normalize_resolution_chain(["2D", "weekly"])[0] == [
+        "2d",
+        "weekly",
+    ]
+    assert hierarchy.normalize_resolution_chain(["7D", "monthly"])[0] == [
+        "7d",
+        "monthly",
+    ]
+    with pytest.raises(ValueError, match="smaller to larger"):
+        hierarchy.normalize_resolution_chain(["7D", "weekly"])
+    with pytest.raises(ValueError, match="smaller to larger"):
+        hierarchy.normalize_resolution_chain(["30D", "monthly"])
+
+
 def test_single_item_resolution_sequence_is_not_a_hierarchy():
     assert hierarchy.normalize_resolution_chain(["1h"]) == (["1h"], False)
 
@@ -53,6 +68,41 @@ def test_calendar_aggregation_equal_weights_children_and_reports_coverage():
     assert row["value__monthly_mean"] == 15
     assert row["value__monthly_p90"] == 19
     assert row["value__monthly_mean__coverage"] == pytest.approx(2 / 3)
+
+
+def test_min_coverage_filters_value_but_preserves_measured_coverage():
+    trajectory = _trajectory(
+        [10.0, np.nan, np.nan],
+        ["2024-01-01", "2024-01-08", "2024-01-15"],
+        ["2024-01-08", "2024-01-15", "2024-01-22"],
+    )
+    windows = hierarchy.calendar_windows(
+        ["user-1"],
+        "monthly",
+        {"user-1": (pd.Timestamp("2024-01-01"), pd.Timestamp("2024-02-01"))},
+    )
+
+    result, _ = hierarchy.aggregate_level(
+        trajectory,
+        windows,
+        target_resolution="monthly",
+        aggregation="mean",
+        min_coverage=0.5,
+    )
+
+    row = result.iloc[0]
+    assert pd.isna(row["value__monthly_mean"])
+    assert row["value__monthly_mean__coverage"] == pytest.approx(1 / 3)
+
+
+def test_coverage_thresholds_can_be_global_or_per_level():
+    assert hierarchy.normalize_coverage_thresholds(0.7, 2) == [0.7, 0.7]
+    assert hierarchy.normalize_coverage_thresholds([0.5, None], 2) == [0.5, None]
+
+    with pytest.raises(ValueError, match="one value per resolution"):
+        hierarchy.normalize_coverage_thresholds([0.5], 2)
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        hierarchy.normalize_coverage_thresholds(1.1, 2)
 
 
 def test_physical_membership_requires_complete_child_windows():
@@ -176,6 +226,22 @@ def test_membership_must_be_supported():
             aggregation="mean",
             membership="physcial",
         )
+
+
+def test_fixed_parent_windows_retain_partial_edge_boundaries():
+    windows = hierarchy.fixed_windows(
+        ["user-1"],
+        "5min",
+        {
+            "user-1": (
+                pd.Timestamp("2024-01-01 10:03"),
+                pd.Timestamp("2024-01-01 10:08"),
+            )
+        },
+    )
+
+    assert windows.iloc[0]["start_time"] == pd.Timestamp("2024-01-01 10:03")
+    assert windows.iloc[-1]["end_time"] == pd.Timestamp("2024-01-01 10:08")
 
 
 def test_hierarchy_aggregation_operations_apply_to_every_feature():

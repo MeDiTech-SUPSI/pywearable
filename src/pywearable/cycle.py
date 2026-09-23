@@ -129,7 +129,9 @@ def get_intervals(
     Missing following nights invalidate the latter two by default. Setting
     ``missing_end='midnight'`` closes a cycle with a known start at the next
     local midnight; it never invents a missing starting boundary. Naps remain
-    inside the latter two cycles and do not alter their boundaries.
+    inside the latter two cycles and do not alter their boundaries. Date
+    bounds select cycle ``calendar_date`` labels; selected intervals retain
+    their complete physical boundaries and are never clipped.
     """
     if cycle_type not in CYCLE_TYPES:
         raise ValueError(

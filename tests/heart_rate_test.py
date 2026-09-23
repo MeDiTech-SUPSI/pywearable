@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 import pytest
 
@@ -142,6 +144,155 @@ def test_invalid_time_reference_is_rejected():
         )
 
 
+def test_end_date_must_follow_start_date():
+    with pytest.raises(ValueError, match="end_date must be after start_date"):
+        heart_rate.get_heart_rate_statistics(
+            HeartRateLoader(_samples()),
+            user_id="person-1",
+            start_date="2024-01-02",
+            end_date="2024-01-01",
+        )
+
+
+def test_unbounded_empty_result_keeps_the_multiindex_contract():
+    result = heart_rate.get_heart_rate_statistics(
+        HeartRateLoader(_samples().iloc[0:0]),
+        user_id="person-1",
+        statistic="heart_rate_mean",
+        resolution="1h",
+    )
+
+    assert result.empty
+    assert result.index.names == ["user_id", "utc_time"]
+
+
+def test_primary_coverage_uses_inferred_cadence_and_filters_low_coverage():
+    local_time = pd.date_range("2024-01-01", periods=16, freq="15s")
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": 60,
+        }
+    )
+
+    retained = heart_rate.get_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        start_date="2024-01-01 00:00",
+        end_date="2024-01-01 00:05",
+        resolution="5min",
+        statistic="heart_rate_mean",
+        time_reference="local",
+        min_coverage=0.7,
+    )
+    excluded = heart_rate.get_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        start_date="2024-01-01 00:00",
+        end_date="2024-01-01 00:05",
+        resolution="5min",
+        statistic="heart_rate_mean",
+        time_reference="local",
+        min_coverage=0.9,
+    )
+
+    assert retained.iloc[0]["heart_rate_mean"] == 60
+    assert retained.iloc[0]["heart_rate_mean__coverage"] == pytest.approx(0.8)
+    assert pd.isna(excluded.iloc[0]["heart_rate_mean"])
+    assert excluded.iloc[0]["heart_rate_mean__coverage"] == pytest.approx(0.8)
+
+
+def test_partial_calendar_windows_use_their_actual_duration_for_coverage():
+    local_time = pd.date_range(
+        "2024-01-10 12:00", "2024-01-11 12:00", freq="15min", inclusive="left"
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": 60,
+        }
+    )
+
+    result = heart_rate.get_daily_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        statistic="heart_rate_mean",
+        start_date="2024-01-10 12:00",
+        end_date="2024-01-11 12:00",
+        min_coverage=0.9,
+    )
+
+    assert result["heart_rate_mean__coverage"].tolist() == [1, 1]
+    assert result["heart_rate_mean"].tolist() == [60, 60]
+
+
+def test_unknown_primary_coverage_only_excludes_when_threshold_is_requested():
+    local_time = pd.to_datetime("2024-01-01") + pd.to_timedelta(
+        [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55], unit="s"
+    )
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time - pd.Timedelta(hours=1),
+            "local_time": local_time,
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": 60,
+            "source": "awake",
+        }
+    )
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        retained = heart_rate.get_heart_rate_statistics(
+            HeartRateLoader(samples),
+            user_id="person-1",
+            start_date="2024-01-01 00:00",
+            end_date="2024-01-01 00:05",
+            resolution="5min",
+            statistic="heart_rate_mean",
+            time_reference="local",
+        )
+    assert retained.iloc[0] == 60
+    assert not caught
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        excluded = heart_rate.get_heart_rate_statistics(
+            HeartRateLoader(samples),
+            user_id="person-1",
+            start_date="2024-01-01 00:00",
+            end_date="2024-01-01 00:10",
+            resolution="5min",
+            statistic="heart_rate_mean",
+            time_reference="local",
+            min_coverage=0.7,
+        )
+
+    coverage_warning = [
+        warning
+        for warning in caught
+        if "Primary HR coverage could not be determined" in str(warning.message)
+    ]
+    assert len(coverage_warning) == 1
+    assert excluded["heart_rate_mean"].isna().all()
+    assert excluded["heart_rate_mean__coverage"].isna().all()
+
+
+def test_cadence_inference_accepts_missed_multiples_but_not_irregular_streams():
+    regular = pd.to_datetime("2024-01-01") + pd.to_timedelta(
+        [0, 5, 10, 20, 25, 30, 45, 50, 55, 60, 70, 75, 80], unit="s"
+    )
+    irregular = pd.to_datetime("2024-01-01") + pd.to_timedelta(
+        [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55], unit="s"
+    )
+
+    assert heart_rate._infer_heart_rate_cadence(regular) == pd.Timedelta(seconds=5)
+    assert heart_rate._infer_heart_rate_cadence(irregular) is None
+
+
 def test_requested_statistics_and_invalid_name():
     loader = HeartRateLoader(_samples())
     result = heart_rate.get_daily_heart_rate_statistics(
@@ -154,6 +305,20 @@ def test_requested_statistics_and_invalid_name():
         heart_rate.get_heart_rate_statistics(
             loader, user_id="person-1", statistic="not_a_statistic"
         )
+
+
+def test_unrequested_resting_heart_rate_is_not_calculated(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("resting heart rate was not requested")
+
+    monkeypatch.setattr(heart_rate, "_resting_heart_rate", fail_if_called)
+    result = heart_rate.get_daily_heart_rate_statistics(
+        HeartRateLoader(_samples()),
+        user_id="person-1",
+        statistic="heart_rate_mean",
+    )
+
+    assert result.notna().all()
 
 
 def test_non_daily_defaults_exclude_daily_rest_heart_rate():
@@ -188,6 +353,31 @@ def test_resolution_convenience_functions_remain_available(
     )
     assert isinstance(result, pd.Series)
     assert loader.requested_time_cols == [expected_time_col]
+
+
+def test_resolution_wrapper_exposes_primary_coverage():
+    local_time = pd.date_range("2024-01-01", periods=12, freq="5s")
+    samples = pd.DataFrame(
+        {
+            "utc_time": local_time,
+            "local_time": local_time,
+            "timezone": pd.Timedelta(0),
+            "heart_rate": 60,
+        }
+    )
+
+    result = heart_rate.get_minute_heart_rate_statistics(
+        HeartRateLoader(samples),
+        user_id="person-1",
+        statistic="heart_rate_mean",
+        start_date="2024-01-01 00:00",
+        end_date="2024-01-01 00:01",
+        min_coverage=0.9,
+    )
+
+    assert isinstance(result, pd.DataFrame)
+    assert result.iloc[0]["heart_rate_mean"] == 60
+    assert result.iloc[0]["heart_rate_mean__coverage"] == 1
 
 
 @pytest.mark.parametrize(

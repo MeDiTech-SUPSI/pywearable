@@ -12,6 +12,7 @@ from __future__ import annotations
 import datetime
 import warnings
 from collections.abc import Sequence
+from numbers import Real
 
 import numpy as np
 import pandas as pd
@@ -57,41 +58,56 @@ def normalize_resolution_chain(resolution) -> tuple[list[str], bool]:
     return chain, len(chain) > 1
 
 
-def _resolution_rank(resolution: str) -> float:
-    """Return an ordering rank used to validate resolution chains."""
-    if resolution == "nightly" or resolution in CYCLE_TYPES:
-        return 1.0
-    if resolution in CALENDAR_RESOLUTIONS:
-        return {"daily": 1.0, "weekly": 2.0, "monthly": 3.0, "yearly": 4.0}[
-            resolution
-        ]
+def _fixed_duration(resolution: str) -> pd.Timedelta | None:
+    """Return a fixed duration, or ``None`` for calendar and cycle windows."""
+    if (
+        resolution == "nightly"
+        or resolution in CYCLE_TYPES
+        or resolution in CALENDAR_RESOLUTIONS
+    ):
+        return None
     try:
         duration = pd.Timedelta(resolution)
     except ValueError as error:
         raise ValueError(f"Resolution {resolution!r} is not supported") from error
     if duration <= pd.Timedelta(0):
         raise ValueError("fixed resolutions must be positive")
-    return duration / pd.Timedelta(days=1)
+    return duration
 
 
 def _validate_resolution_chain(chain: list[str]) -> None:
     """Reject unsupported or non-increasing multi-resolution chains."""
+    fixed = [_fixed_duration(value) for value in chain]
     if len(chain) == 1:
-        _resolution_rank(chain[0])
         return
-    ranks = [_resolution_rank(value) for value in chain]
-    if any(right <= left for left, right in zip(ranks, ranks[1:])):
-        raise ValueError("resolutions must move from smaller to larger windows")
     if "nightly" in chain[1:]:
         raise ValueError("nightly can only be the primary sleep resolution")
-    for index, value in enumerate(chain):
-        if value in CYCLE_TYPES:
-            if index == len(chain) - 1:
-                continue
-            if chain[index + 1] not in {"weekly", "monthly", "yearly"}:
-                raise ValueError(
-                    "a cycle resolution can only be followed by weekly, monthly, or yearly"
-                )
+
+    calendar_order = {"daily": 0, "weekly": 1, "monthly": 2, "yearly": 3}
+    calendar_minimum = {
+        "daily": pd.Timedelta(days=1),
+        "weekly": pd.Timedelta(days=7),
+        "monthly": pd.Timedelta(days=28),
+        "yearly": pd.Timedelta(days=365),
+    }
+    for index, (left, right) in enumerate(zip(chain, chain[1:])):
+        left_fixed = fixed[index]
+        right_fixed = fixed[index + 1]
+        valid = False
+        if left_fixed is not None and right_fixed is not None:
+            valid = left_fixed < right_fixed
+        elif left_fixed is not None and right in CALENDAR_RESOLUTIONS:
+            valid = left_fixed < calendar_minimum[right]
+        elif left_fixed is not None and right in CYCLE_TYPES:
+            valid = left_fixed < pd.Timedelta(days=1)
+        elif left in CALENDAR_RESOLUTIONS and right in CALENDAR_RESOLUTIONS:
+            valid = calendar_order[left] < calendar_order[right]
+        elif left in CYCLE_TYPES and right in {"weekly", "monthly", "yearly"}:
+            valid = True
+        elif left == "nightly" and right in {"weekly", "monthly", "yearly"}:
+            valid = True
+        if not valid:
+            raise ValueError("resolutions must move from smaller to larger windows")
 
 
 def is_percentile(operation: str) -> bool:
@@ -151,6 +167,40 @@ def normalize_aggregation_levels(aggregation, level_count: int):
             "for more than two resolutions, nest operation lists by level"
         )
     return list(aggregation)
+
+
+def normalize_coverage_thresholds(min_coverage, level_count: int):
+    """Return one optional feature-coverage threshold per processing level.
+
+    A scalar applies to every requested resolution. A sequence must contain
+    one value for each resolution in the chain, including the primary level.
+    ``None`` disables filtering globally or at an individual level.
+    """
+    if min_coverage is None:
+        return [None] * level_count
+    if isinstance(min_coverage, Real) and not isinstance(min_coverage, bool):
+        thresholds = [float(min_coverage)] * level_count
+    elif isinstance(min_coverage, Sequence) and not isinstance(min_coverage, str):
+        if len(min_coverage) != level_count:
+            raise ValueError(
+                "min_coverage must provide one value per resolution"
+            )
+        thresholds = list(min_coverage)
+    else:
+        raise ValueError(
+            "min_coverage must be None, a number, or a sequence of numbers"
+        )
+
+    for threshold in thresholds:
+        if threshold is None:
+            continue
+        if (
+            not isinstance(threshold, Real)
+            or isinstance(threshold, bool)
+            or not 0 <= threshold <= 1
+        ):
+            raise ValueError("coverage thresholds must be between 0 and 1")
+    return [None if value is None else float(value) for value in thresholds]
 
 
 def resolve_feature_operations(features, specification):
@@ -310,8 +360,8 @@ def fixed_windows(users, resolution: str, user_bounds: dict) -> pd.DataFrame:
         )
         frames[user] = pd.DataFrame(
             {
-                "start_time": starts,
-                "end_time": starts + duration,
+                "start_time": starts.where(starts >= start, start),
+                "end_time": (starts + duration).where(starts + duration <= end, end),
             },
             index=starts,
         )
@@ -404,6 +454,7 @@ def aggregate_level(
     aggregation,
     temporal_features=frozenset(),
     membership: str = "label",
+    min_coverage: float | None = None,
 ):
     """Aggregate one child trajectory into one larger resolution.
 
@@ -415,7 +466,10 @@ def aggregate_level(
     expected children, while feature missingness determines which are valid.
     Each valid child has equal weight. Output names append
     ``__{target_resolution}_{operation}``, and each output currently receives
-    immediate ``valid / expected`` coverage.
+    immediate ``valid / expected`` coverage. When ``min_coverage`` is set, an
+    output below that threshold is missing while its measured coverage remains
+    available. This missing value then propagates as an invalid child at the
+    next hierarchy level.
 
     Returns the aggregated trajectory and the names of outputs that remain
     temporal for a possible next level.
@@ -424,6 +478,7 @@ def aggregate_level(
         raise ValueError(
             "membership must be 'label', 'physical', or 'majority_overlap'"
         )
+    min_coverage = normalize_coverage_thresholds(min_coverage, 1)[0]
     metadata = {"period_start", "period_end", "interval_valid", "end_source"}
     features = [
         column
@@ -468,15 +523,19 @@ def aggregate_level(
         }
         for feature in features:
             valid_count = int(selected[feature].notna().sum())
+            coverage = (
+                valid_count / expected_count if expected_count else np.nan
+            )
             for operation in operations[feature]:
                 output = f"{feature}__{target_resolution}_{operation}"
                 is_temporal = feature in temporal_features
-                record[output] = aggregate_values(
+                value = aggregate_values(
                     selected[feature], operation, temporal=is_temporal
                 )
-                record[f"{output}__coverage"] = (
-                    valid_count / expected_count if expected_count else np.nan
-                )
+                if min_coverage is not None and coverage < min_coverage:
+                    value = np.nan
+                record[output] = value
+                record[f"{output}__coverage"] = coverage
                 if is_temporal and operation != "std":
                     next_temporal.add(output)
         records.append(record)

@@ -7,6 +7,7 @@ import datetime
 import warnings
 from typing import Union
 
+import numpy as np
 import pandas as pd
 
 from . import cycle, heart_rate_schema, hierarchy
@@ -35,6 +36,19 @@ HEART_RATE_STATISTICS = [
     HEART_RATE_STATISTIC_REST,
 ]
 
+HEART_RATE_REDUCTIONS = {
+    HEART_RATE_STATISTIC_COUNT: "count",
+    HEART_RATE_STATISTIC_MAX: "max",
+    HEART_RATE_STATISTIC_MEAN: "mean",
+    HEART_RATE_STATISTIC_MEDIAN: "median",
+    HEART_RATE_STATISTIC_MIN: "min",
+    HEART_RATE_STATISTIC_STD: "std",
+}
+HEART_RATE_QUANTILES = {
+    HEART_RATE_STATISTIC_P10: 0.1,
+    HEART_RATE_STATISTIC_P90: 0.9,
+}
+
 
 def get_daily_rest_heart_rate(
     loader: BaseLoader,
@@ -43,6 +57,7 @@ def get_daily_rest_heart_rate(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> pd.Series:
     """Get daily rest heart rate (RHR).
 
@@ -95,6 +110,7 @@ def get_daily_rest_heart_rate(
         loader_kwargs=loader_kwargs,
         resolution="daily",
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -105,6 +121,7 @@ def get_daily_max_heart_rate(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> pd.Series:
     """Get daily maximum heart rate.
 
@@ -158,6 +175,7 @@ def get_daily_max_heart_rate(
         loader_kwargs=loader_kwargs,
         resolution="daily",
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -168,6 +186,7 @@ def get_daily_min_heart_rate(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> pd.Series:
     """Get daily minimum heart rate.
 
@@ -220,6 +239,7 @@ def get_daily_min_heart_rate(
         end_date=end_date,
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -230,6 +250,7 @@ def get_daily_mean_heart_rate(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> pd.Series:
     """Get daily mean heart rate.
 
@@ -282,6 +303,7 @@ def get_daily_mean_heart_rate(
         end_date=end_date,
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -328,35 +350,276 @@ def _prepare_heart_rate_samples(
     return heart_rate.drop_duplicates(subset=duplicate_time_col)
 
 
+def _infer_heart_rate_cadence(timestamps) -> Union[pd.Timedelta, None]:
+    """Infer a nominal cadence when one clustered difference is prevalent."""
+    timestamps = pd.Series(pd.to_datetime(timestamps, errors="coerce")).dropna()
+    differences = (
+        timestamps.drop_duplicates()
+        .sort_values()
+        .diff()
+        .dt.total_seconds()
+        .dropna()
+    )
+    differences = differences[differences > 0]
+    if len(differences) < 10:
+        return None
+
+    values = differences.to_numpy(dtype=float)
+    rounded = np.where(values < 10, np.round(values, 2), np.round(values))
+    mode = float(pd.Series(rounded).value_counts().index[0])
+    tolerance = max(0.05, mode * 0.1)
+    cluster = values[np.abs(values - mode) <= tolerance]
+    if len(cluster) / len(values) < 0.2:
+        return None
+
+    cadence = float(np.median(cluster))
+    median_difference = float(np.median(values))
+    if not 0.5 <= cadence / median_difference <= 2:
+        return None
+    return pd.Timedelta(seconds=cadence)
+
+
+def _heart_rate_cadences(heart_rate: pd.DataFrame, time_col: str):
+    """Return the optional source column and inferred cadence per stream."""
+    source_col = "source" if "source" in heart_rate.columns else None
+    if source_col is None or heart_rate[source_col].isna().all():
+        return None, {"heart_rate": _infer_heart_rate_cadence(heart_rate[time_col])}
+
+    streams = heart_rate[source_col].astype("string").fillna("unknown")
+    cadences = {
+        source: _infer_heart_rate_cadence(heart_rate.loc[streams.eq(source), time_col])
+        for source in streams.unique()
+    }
+    return source_col, cadences
+
+
+def _coverage_window_label(value, resolution):
+    """Return the canonical primary-window label containing ``value``."""
+    value = pd.Timestamp(value)
+    canonical = hierarchy.canonical_resolution(resolution)
+    if canonical in hierarchy.CALENDAR_RESOLUTIONS:
+        spec = time_utils.get_resampling_spec(canonical, time_reference="local")
+        return time_utils.get_calendar_period_start(value, spec.rule)
+    return value.floor(canonical)
+
+
+def _primary_coverage_context(
+    heart_rate: pd.DataFrame,
+    resolution,
+    time_col: str,
+    source_col,
+    cadences,
+):
+    """Pre-aggregate valid samples by primary window and source."""
+    if heart_rate.empty:
+        return {}, cadences
+
+    streams = (
+        pd.Series("heart_rate", index=heart_rate.index, dtype="string")
+        if source_col is None
+        else heart_rate[source_col].astype("string").fillna("unknown")
+    )
+    labels = heart_rate[time_col].map(
+        lambda value: _coverage_window_label(value, resolution)
+    )
+    counts = (
+        pd.DataFrame(
+            {
+                "window_start": labels,
+                "stream": streams,
+                "timestamp": heart_rate[time_col],
+            }
+        )
+        .groupby(["window_start", "stream"], sort=False)["timestamp"]
+        .nunique()
+    )
+    by_window = {
+        window_start: rows.droplevel("window_start").to_dict()
+        for window_start, rows in counts.groupby(level="window_start", sort=False)
+    }
+    return by_window, cadences
+
+
+def _heart_rate_window_coverage(
+    counts,
+    start: pd.Timestamp,
+    end: pd.Timestamp,
+    cadences,
+):
+    """Return observed/expected samples and unresolved stream labels."""
+    if len(cadences) == 1:
+        stream = next(iter(cadences))
+        cadence = cadences[stream]
+        unresolved = {stream} if cadence is None else set()
+    else:
+        if not counts:
+            streams = set(cadences)
+        else:
+            streams = set(counts)
+        unresolved = {stream for stream in streams if cadences.get(stream) is None}
+        known = {cadences[stream] for stream in streams if stream not in unresolved}
+        if unresolved or len(known) != 1:
+            return np.nan, unresolved or {"mixed_cadence"}
+        cadence = next(iter(known))
+
+    if cadence is None or end <= start:
+        return np.nan, unresolved
+    expected = (end - start) / cadence
+    if expected <= 0:
+        return np.nan, unresolved
+    observed = sum(counts.values())
+    return min(1.0, observed / expected), set()
+
+
+def _heart_rate_period_end(start, resolution):
+    canonical = hierarchy.canonical_resolution(resolution)
+    if canonical in hierarchy.CALENDAR_RESOLUTIONS:
+        spec = time_utils.get_resampling_spec(canonical, time_reference="local")
+        period_start = time_utils.get_calendar_period_start(start, spec.rule)
+        if spec.rule == "d":
+            return period_start + pd.Timedelta(days=1)
+        return pd.date_range(period_start, periods=2, freq=spec.rule)[1]
+    return start + pd.Timedelta(canonical)
+
+
+def _attach_primary_heart_rate_coverage(
+    statistics_frame,
+    contexts,
+    statistics,
+    resolution,
+    time_col,
+    start_date,
+    end_date,
+    min_coverage,
+    unresolved_streams,
+):
+    """Attach raw-to-primary coverage and apply its optional threshold."""
+    coverage = []
+    for index in statistics_frame.index:
+        index = index if isinstance(index, tuple) else (index,)
+        user, window_start = index[:2]
+        window_start = pd.Timestamp(window_start)
+        window_end = _heart_rate_period_end(window_start, resolution)
+        physical_start = (
+            max(window_start, start_date)
+            if start_date is not None
+            else window_start
+        )
+        physical_end = min(window_end, end_date) if end_date is not None else window_end
+        context = contexts.get(user)
+        if context is None:
+            value, unresolved = np.nan, {"heart_rate"}
+        else:
+            counts_by_window, cadences = context
+            canonical_start = _coverage_window_label(window_start, resolution)
+            value, unresolved = _heart_rate_window_coverage(
+                counts_by_window.get(canonical_start, {}),
+                physical_start,
+                physical_end,
+                cadences,
+            )
+        coverage.append(value)
+        if min_coverage is not None and pd.isna(value):
+            unresolved_streams.update((user, stream) for stream in unresolved)
+
+    coverage = pd.Series(coverage, index=statistics_frame.index, dtype=float)
+    for statistic in statistics:
+        statistics_frame[f"{statistic}__coverage"] = coverage
+    if min_coverage is not None:
+        invalid = coverage.isna() | coverage.lt(min_coverage)
+        statistics_frame.loc[invalid, statistics] = np.nan
+    return statistics_frame
+
+
+def _warn_unknown_primary_coverage(unresolved_streams):
+    if unresolved_streams:
+        warnings.warn(
+            "Primary HR coverage could not be determined for "
+            f"{len(unresolved_streams)} user/source stream(s); features requiring "
+            "a primary coverage threshold were excluded."
+        )
+
+
+def _resting_heart_rate(heart_rate: pd.DataFrame, time_col: str):
+    """Return the minimum 30-minute mean with at least 20 observed minutes."""
+    if heart_rate.empty:
+        return np.nan
+    minute = (
+        heart_rate.sort_values(time_col)
+        .set_index(time_col)[heart_rate_schema.HEART_RATE_COL]
+        .resample("1min", closed="left", label="left")
+        .mean()
+    )
+    return minute.rolling("30min", min_periods=20, closed="left").mean().min()
+
+
+def _summarize_heart_rate_values(values: pd.Series, statistics) -> dict:
+    """Calculate requested scalar reductions from one interval's values."""
+    values = pd.to_numeric(values, errors="coerce").dropna()
+    result = {}
+    for statistic in statistics:
+        if statistic in HEART_RATE_REDUCTIONS:
+            result[statistic] = float(
+                getattr(values, HEART_RATE_REDUCTIONS[statistic])()
+            )
+        elif statistic in HEART_RATE_QUANTILES:
+            result[statistic] = values.quantile(HEART_RATE_QUANTILES[statistic])
+    return result
+
+
 def _compute_hr_statistics(
-    heart_rate: pd.DataFrame, rule: str, time_col: str, calendar_based: bool
-) -> pd.Series:
+    heart_rate: pd.DataFrame,
+    statistics,
+    rule: str,
+    time_col: str,
+    calendar_based: bool,
+) -> pd.DataFrame:
     """Compute heart-rate statistics over one resampling rule."""
-    heart_rate = _prepare_heart_rate_samples(heart_rate, time_col)
     if heart_rate.empty:
         return pd.DataFrame()
 
-    heart_rate_stats = (
-        heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
-            heart_rate_schema.HEART_RATE_COL
-        ]
-        .agg(["count", "max", "min", "mean", "median", "std"])
-        .astype("float")
-        .add_prefix("heart_rate_")
-    )
-
-    heart_rate_quantiles = (
-        heart_rate.resample(rule=rule, on=time_col, label="left", closed="left")[
-            heart_rate_schema.HEART_RATE_COL
-        ]
-        .quantile([0.1, 0.9])
-        .unstack(level=-1)
-    )
-    # Rename columns from 0.10, 0.90 to p10, p90
-    heart_rate_quantiles.columns = [
-        f"heart_rate_p{int(q*100)}" for q in heart_rate_quantiles.columns
+    grouped = heart_rate.resample(
+        rule=rule, on=time_col, label="left", closed="left"
+    )[heart_rate_schema.HEART_RATE_COL]
+    frames = []
+    reductions = [
+        HEART_RATE_REDUCTIONS[statistic]
+        for statistic in statistics
+        if statistic in HEART_RATE_REDUCTIONS
     ]
-    heart_rate_stats = pd.concat((heart_rate_stats, heart_rate_quantiles), axis=1)
+    if reductions:
+        reduced = grouped.agg(reductions).astype("float")
+        reduced = reduced.rename(
+            columns={operation: f"heart_rate_{operation}" for operation in reductions}
+        )
+        frames.append(reduced)
+
+    quantile_statistics = [
+        statistic for statistic in statistics if statistic in HEART_RATE_QUANTILES
+    ]
+    if quantile_statistics:
+        quantiles = [
+            HEART_RATE_QUANTILES[statistic]
+            for statistic in quantile_statistics
+        ]
+        quantile_frame = grouped.quantile(quantiles).unstack(level=-1)
+        quantile_frame.columns = quantile_statistics
+        frames.append(quantile_frame)
+
+    if HEART_RATE_STATISTIC_REST in statistics:
+        rest = pd.Series(
+            {
+                label: _resting_heart_rate(frame, time_col)
+                for label, frame in heart_rate.groupby(
+                    pd.Grouper(key=time_col, freq="D")
+                )
+            },
+            name=HEART_RATE_STATISTIC_REST,
+            dtype=float,
+        )
+        frames.append(rest.to_frame())
+
+    heart_rate_stats = pd.concat(frames, axis=1).reindex(columns=statistics)
 
     # Let's add back timezone info
     if (
@@ -383,26 +646,6 @@ def _compute_hr_statistics(
             [heart_rate_schema.UTC_TIME_COL, heart_rate_schema.TIMEZONE_COL]
         )
 
-    # We can extract rest heart rate only if resolution is at
-    # daily level, otherwise it doesn't have any sense
-    if rule == "d":
-        hr_one_min_agg = (
-            heart_rate.sort_values(time_col)
-            .set_index(time_col)
-            .resample("1min", closed="left", label="left")[
-                heart_rate_schema.HEART_RATE_COL
-            ]
-            .mean()
-        )
-        # Perform 30-minute average and get the minimum by day
-        rest_hr = (
-            hr_one_min_agg.groupby(pd.Grouper(freq="D"))
-            .apply(
-                lambda x: x.rolling("30min", min_periods=20, closed="left").mean().min()
-            )
-            .rename("heart_rate_rest")
-        )
-        heart_rate_stats = pd.concat((heart_rate_stats, rest_hr), axis=1)
     return heart_rate_stats
 
 
@@ -414,14 +657,14 @@ def get_minute_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a minute level.
 
     This function computes the specified heart rate statistics
     over periods of one minute.
-    Aggregations are performed at ``UTC`` level,
-    and time-zone is reported to recover
-    local time, if needed.
+    ``time_reference="auto"`` uses UTC windows; local windows can be requested
+    explicitly.
     Statistics are reported for each minute
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
@@ -464,6 +707,7 @@ def get_minute_heart_rate_statistics(
         resolution="60s",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -475,14 +719,14 @@ def get_hourly_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a hourly level.
 
     This function computes the specified heart rate statistics
     over periods of one hour.
-    Aggregations are performed at ``UTC`` level,
-    and time-zone is reported to recover
-    local time, if needed.
+    ``time_reference="auto"`` uses UTC windows; local windows can be requested
+    explicitly.
     Statistics are reported for each hour
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
@@ -525,6 +769,7 @@ def get_hourly_heart_rate_statistics(
         resolution="1h",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -536,13 +781,13 @@ def get_daily_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a daily level.
 
     This function computes the specified heart rate statistics
     over periods of one day.
-    Aggregations are performed using local
-    time as time source.
+    ``time_reference="auto"`` uses local calendar days.
     Statistics are reported for each day
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
@@ -585,6 +830,7 @@ def get_daily_heart_rate_statistics(
         resolution="daily",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -596,13 +842,13 @@ def get_weekly_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get heart rate statistics at a weekly level.
 
     This function computes the specified heart rate statistics
     over periods of one week.
-    Aggregations are performed using local
-    time as time source.
+    ``time_reference="auto"`` uses local calendar weeks.
     Statistics are reported for each calendar week
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
@@ -645,6 +891,7 @@ def get_weekly_heart_rate_statistics(
         resolution="weekly",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -656,15 +903,13 @@ def get_monthly_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
-    """Get heart rate statistics at a minute level.
+    """Get heart rate statistics at a monthly level.
 
     This function computes the specified heart rate statistics
-    over periods of one minute.
-    Aggregations are performed at ``UTC`` level,
-    and time-zone is reported to recover
-    local time, if needed.
-    Statistics are reported for each minute
+    over calendar months. ``time_reference="auto"`` uses local time.
+    Statistics are reported for each month
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
@@ -707,6 +952,7 @@ def get_monthly_heart_rate_statistics(
         resolution="monthly",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -718,6 +964,7 @@ def get_yearly_heart_rate_statistics(
     end_date: Union[pd.Timestamp, None] = None,
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    min_coverage=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     return get_heart_rate_statistics(
         loader=loader,
@@ -728,6 +975,7 @@ def get_yearly_heart_rate_statistics(
         resolution="yearly",
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        min_coverage=min_coverage,
     )
 
 
@@ -761,6 +1009,9 @@ def _get_heart_rate_statistics_single_resolution(
     resolution: Union[pd.Timedelta, str] = "day",
     loader_kwargs: dict = {},
     time_reference: str = "auto",
+    primary_min_coverage=None,
+    return_primary_coverage: bool = False,
+    unresolved_streams=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Get all the available statistics based on heart rate.
 
@@ -868,13 +1119,22 @@ def _get_heart_rate_statistics_single_resolution(
 
     start_date = heart_rate_schema.normalize_time_bound(start_date, time_col)
     end_date = heart_rate_schema.normalize_time_bound(end_date, time_col)
+    if (
+        start_date is not None
+        and end_date is not None
+        and end_date <= start_date
+    ):
+        raise ValueError("end_date must be after start_date")
 
     heart_rate_stats_df_list: list[pd.DataFrame] = []
+    coverage_contexts = {}
+    needs_coverage = return_primary_coverage or primary_min_coverage is not None
+    unresolved_streams = set() if unresolved_streams is None else unresolved_streams
     for user in user_id:
 
         # TODO we may need to split the computation in chuncks if
         # window is too long
-        heart_rate = loader.load_heart_rate(
+        loaded_heart_rate = loader.load_heart_rate(
             user_id=user,
             start_date=(
                 None if start_date is None else start_date - pd.Timedelta(days=2)
@@ -883,16 +1143,34 @@ def _get_heart_rate_statistics_single_resolution(
             time_col=time_col,
             **loader_kwargs,
         )
-        if len(heart_rate) > 0:
+        if len(loaded_heart_rate) > 0:
+            loaded_heart_rate = _prepare_heart_rate_samples(
+                loaded_heart_rate, time_col
+            )
             heart_rate = heart_rate_schema.filter_by_time(
-                heart_rate,
+                loaded_heart_rate,
                 start_date=start_date,
                 end_date=end_date,
                 time_col=time_col,
             )
+            if needs_coverage:
+                source_col, cadences = _heart_rate_cadences(
+                    loaded_heart_rate, time_col
+                )
+                coverage_contexts[user] = _primary_coverage_context(
+                    heart_rate,
+                    resolution,
+                    time_col,
+                    source_col,
+                    cadences,
+                )
 
             user_heart_rate_stats = _compute_hr_statistics(
-                heart_rate, rule=rule, time_col=time_col, calendar_based=calendar_based
+                heart_rate,
+                statistics=statistics,
+                rule=rule,
+                time_col=time_col,
+                calendar_based=calendar_based,
             )
             if len(user_heart_rate_stats) > 0:
                 if calendar_based and start_date is not None:
@@ -962,6 +1240,28 @@ def _get_heart_rate_statistics_single_resolution(
                     (heart_rate_stats_df, tz), axis=1
                 ).set_index("timezone", append=True)
 
+        if needs_coverage:
+            heart_rate_stats_df = _attach_primary_heart_rate_coverage(
+                heart_rate_stats_df,
+                coverage_contexts,
+                statistics,
+                resolution,
+                time_col,
+                start_date,
+                end_date,
+                primary_min_coverage,
+                unresolved_streams,
+            )
+            columns = [
+                column
+                for statistic_name in statistics
+                for column in (
+                    statistic_name,
+                    f"{statistic_name}__coverage",
+                )
+            ]
+            return heart_rate_stats_df[columns]
+
         # Return series if only statistic
         if len(statistics) == 1:
             return heart_rate_stats_df[statistics[0]]
@@ -982,49 +1282,47 @@ def _get_heart_rate_statistics_single_resolution(
                     inclusive="left",
                     freq=rule,
                 )
-            return pd.DataFrame(
+            heart_rate_stats_df = pd.DataFrame(
                 columns=statistics,
-                index=pd.MultiIndex.from_product([user_id, new_idx]),
-            )[statistics].squeeze(axis=1)
+                index=pd.MultiIndex.from_product(
+                    [user_id, new_idx], names=["user_id", time_col]
+                ),
+            )
+            if needs_coverage:
+                return _attach_primary_heart_rate_coverage(
+                    heart_rate_stats_df,
+                    coverage_contexts,
+                    statistics,
+                    resolution,
+                    time_col,
+                    start_date,
+                    end_date,
+                    primary_min_coverage,
+                    unresolved_streams,
+                )
+            return heart_rate_stats_df[statistics].squeeze(axis=1)
         else:
-            return pd.DataFrame(
-                columns=statistics,
-                index={"user_id": user_id},
-            )[
-                statistics
-            ].squeeze(axis=1)
+            index = pd.MultiIndex.from_arrays(
+                [[], []], names=["user_id", time_col]
+            )
+            result = pd.DataFrame(columns=statistics, index=index)
+            if needs_coverage:
+                for statistic_name in statistics:
+                    result[f"{statistic_name}__coverage"] = pd.Series(
+                        index=index, dtype=float
+                    )
+                return result
+            return result[statistics].squeeze(axis=1)
 
 
-def _interval_heart_rate_statistics(heart_rate, start, end):
-    data = heart_rate[
-        heart_rate[heart_rate_schema.LOCAL_TIME_COL].ge(start)
-        & heart_rate[heart_rate_schema.LOCAL_TIME_COL].lt(end)
-    ]
-    values = pd.to_numeric(
-        data[heart_rate_schema.HEART_RATE_COL], errors="coerce"
-    ).dropna()
-    result = {
-        HEART_RATE_STATISTIC_COUNT: float(values.count()),
-        HEART_RATE_STATISTIC_MAX: values.max(),
-        HEART_RATE_STATISTIC_MEAN: values.mean(),
-        HEART_RATE_STATISTIC_MEDIAN: values.median(),
-        HEART_RATE_STATISTIC_MIN: values.min(),
-        HEART_RATE_STATISTIC_P10: values.quantile(0.1),
-        HEART_RATE_STATISTIC_P90: values.quantile(0.9),
-        HEART_RATE_STATISTIC_STD: values.std(),
-        HEART_RATE_STATISTIC_REST: float("nan"),
-    }
-    if not values.empty:
-        minute = (
-            data.sort_values(heart_rate_schema.LOCAL_TIME_COL)
-            .set_index(heart_rate_schema.LOCAL_TIME_COL)[
-                heart_rate_schema.HEART_RATE_COL
-            ]
-            .resample("1min", closed="left", label="left")
-            .mean()
-        )
-        result[HEART_RATE_STATISTIC_REST] = (
-            minute.rolling("30min", min_periods=20, closed="left").mean().min()
+def _interval_heart_rate_statistics(heart_rate, statistics):
+    """Calculate only the requested statistics for one irregular interval."""
+    result = _summarize_heart_rate_values(
+        heart_rate[heart_rate_schema.HEART_RATE_COL], statistics
+    )
+    if HEART_RATE_STATISTIC_REST in statistics:
+        result[HEART_RATE_STATISTIC_REST] = _resting_heart_rate(
+            heart_rate, heart_rate_schema.LOCAL_TIME_COL
         )
     return result
 
@@ -1038,6 +1336,9 @@ def _cycle_heart_rate_trajectory(
     end_date,
     loader_kwargs,
     cycle_kwargs,
+    primary_min_coverage=None,
+    return_primary_coverage=False,
+    unresolved_streams=None,
 ):
     intervals = cycle.get_intervals(
         loader,
@@ -1048,6 +1349,8 @@ def _cycle_heart_rate_trajectory(
         **cycle_kwargs,
     )
     records = []
+    needs_coverage = return_primary_coverage or primary_min_coverage is not None
+    unresolved_streams = set() if unresolved_streams is None else unresolved_streams
     for user in users:
         if user not in intervals.index.get_level_values(0):
             continue
@@ -1059,24 +1362,72 @@ def _cycle_heart_rate_trajectory(
                 heart_rate_schema.HEART_RATE_COL,
             ]
         )
+        source_col = None
+        cadences = {"heart_rate": None}
         if not valid.empty:
+            coverage_padding = (
+                pd.Timedelta(days=2) if needs_coverage else pd.Timedelta(0)
+            )
             heart_rate = loader.load_heart_rate(
                 user_id=user,
-                start_date=valid["start_time"].min(),
-                end_date=valid["end_time"].max(),
+                start_date=valid["start_time"].min() - coverage_padding,
+                end_date=valid["end_time"].max() + coverage_padding,
                 time_col=heart_rate_schema.LOCAL_TIME_COL,
                 **loader_kwargs,
             )
             heart_rate = _prepare_heart_rate_samples(
                 heart_rate, heart_rate_schema.LOCAL_TIME_COL
-            )
+            ).sort_values(heart_rate_schema.LOCAL_TIME_COL, kind="stable")
+            if needs_coverage:
+                source_col, cadences = _heart_rate_cadences(
+                    heart_rate, heart_rate_schema.LOCAL_TIME_COL
+                )
+        timestamps = pd.DatetimeIndex(
+            heart_rate[heart_rate_schema.LOCAL_TIME_COL]
+        )
         for label, interval in user_intervals.iterrows():
             values = {statistic: float("nan") for statistic in statistics}
+            coverage = np.nan
             if interval["interval_valid"]:
-                computed = _interval_heart_rate_statistics(
-                    heart_rate, interval["start_time"], interval["end_time"]
-                )
+                left = timestamps.searchsorted(interval["start_time"], side="left")
+                right = timestamps.searchsorted(interval["end_time"], side="left")
+                data = heart_rate.iloc[left:right]
+                computed = _interval_heart_rate_statistics(data, statistics)
                 values = {statistic: computed[statistic] for statistic in statistics}
+                if needs_coverage:
+                    if source_col is None:
+                        counts = {
+                            "heart_rate": data[
+                                heart_rate_schema.LOCAL_TIME_COL
+                            ].nunique()
+                        }
+                    else:
+                        counts = (
+                            data.assign(
+                                __stream=data[source_col]
+                                .astype("string")
+                                .fillna("unknown")
+                            )
+                            .groupby("__stream")[heart_rate_schema.LOCAL_TIME_COL]
+                            .nunique()
+                            .to_dict()
+                        )
+                    coverage, unresolved = _heart_rate_window_coverage(
+                        counts,
+                        interval["start_time"],
+                        interval["end_time"],
+                        cadences,
+                    )
+                    if primary_min_coverage is not None and pd.isna(coverage):
+                        unresolved_streams.update(
+                            (user, stream) for stream in unresolved
+                        )
+                if primary_min_coverage is not None and (
+                    pd.isna(coverage) or coverage < primary_min_coverage
+                ):
+                    values = {
+                        statistic: float("nan") for statistic in statistics
+                    }
             records.append(
                 {
                     "user_id": user,
@@ -1086,6 +1437,14 @@ def _cycle_heart_rate_trajectory(
                     "interval_valid": bool(interval["interval_valid"]),
                     "end_source": interval["end_source"],
                     **values,
+                    **(
+                        {
+                            f"{statistic}__coverage": coverage
+                            for statistic in statistics
+                        }
+                        if return_primary_coverage
+                        else {}
+                    ),
                 }
             )
     if not records:
@@ -1093,7 +1452,17 @@ def _cycle_heart_rate_trajectory(
             [[], []], names=["user_id", "window_start"]
         )
         return pd.DataFrame(
-            columns=["period_start", "period_end", *statistics], index=index
+            columns=[
+                "period_start",
+                "period_end",
+                *statistics,
+                *(
+                    [f"{statistic}__coverage" for statistic in statistics]
+                    if return_primary_coverage
+                    else []
+                ),
+            ],
+            index=index,
         )
     return pd.DataFrame(records).set_index(["user_id", "window_start"]).sort_index()
 
@@ -1107,6 +1476,8 @@ def _single_resolution_hr_trajectory(
     resolution,
     loader_kwargs,
     time_reference,
+    primary_min_coverage,
+    unresolved_streams,
 ):
     result = _get_heart_rate_statistics_single_resolution(
         loader=loader,
@@ -1117,6 +1488,9 @@ def _single_resolution_hr_trajectory(
         resolution=resolution,
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
+        primary_min_coverage=primary_min_coverage,
+        return_primary_coverage=primary_min_coverage is not None,
+        unresolved_streams=unresolved_streams,
     )
     if isinstance(result, pd.Series):
         result = result.to_frame()
@@ -1138,19 +1512,31 @@ def _single_resolution_hr_trajectory(
     canonical = hierarchy.canonical_resolution(resolution)
     if canonical in hierarchy.CALENDAR_RESOLUTIONS:
         spec = time_utils.get_resampling_spec(canonical, time_reference="local")
+        canonical_starts = starts.map(
+            lambda value: time_utils.get_calendar_period_start(value, spec.rule)
+        )
         if spec.rule == "d":
-            ends = starts + pd.Timedelta(days=1)
+            ends = canonical_starts + pd.Timedelta(days=1)
         else:
-            canonical_starts = starts.map(
-                lambda value: time_utils.get_calendar_period_start(value, spec.rule)
-            )
             ends = canonical_starts.map(
                 lambda value: pd.date_range(value, periods=2, freq=spec.rule)[1]
             )
     else:
         ends = starts + pd.Timedelta(canonical)
-    result.insert(0, "period_start", starts.to_numpy())
-    result.insert(1, "period_end", pd.to_datetime(ends).to_numpy())
+    period_starts = starts.copy()
+    period_ends = pd.to_datetime(ends)
+    if start_date is not None:
+        requested_start = pd.Timestamp(start_date)
+        period_starts = period_starts.map(
+            lambda value: max(pd.Timestamp(value), requested_start)
+        )
+    if end_date is not None:
+        requested_end = pd.Timestamp(end_date)
+        period_ends = period_ends.map(
+            lambda value: min(pd.Timestamp(value), requested_end)
+        )
+    result.insert(0, "period_start", pd.to_datetime(period_starts).to_numpy())
+    result.insert(1, "period_end", pd.to_datetime(period_ends).to_numpy())
     return result
 
 
@@ -1162,6 +1548,8 @@ def _primary_heart_rate_trajectory_for_cycle_hierarchy(
     parent_intervals,
     loader_kwargs,
     time_reference,
+    primary_min_coverage,
+    unresolved_streams,
 ):
     """Calculate the primary windows within each user's valid cycle span."""
     trajectories = []
@@ -1182,6 +1570,8 @@ def _primary_heart_rate_trajectory_for_cycle_hierarchy(
             resolution,
             loader_kwargs,
             time_reference,
+            primary_min_coverage,
+            unresolved_streams,
         )
         if not trajectory.empty:
             trajectories.append(trajectory)
@@ -1203,12 +1593,16 @@ def _hierarchical_heart_rate_statistics(
     end_date,
     chain,
     aggregation,
+    min_coverage,
     loader_kwargs,
     time_reference,
     cycle_kwargs,
 ):
     aggregation_levels = hierarchy.normalize_aggregation_levels(
         aggregation, len(chain) - 1
+    )
+    coverage_thresholds = hierarchy.normalize_coverage_thresholds(
+        min_coverage, len(chain)
     )
     hierarchy.warn_if_wide(statistics, aggregation_levels)
     primary = chain[0]
@@ -1224,6 +1618,7 @@ def _hierarchical_heart_rate_statistics(
         (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
     )
     cycle_parent = None
+    unresolved_streams = set()
     if cycle_target is not None:
         cycle_parent = cycle.get_intervals(
             loader,
@@ -1243,6 +1638,8 @@ def _hierarchical_heart_rate_statistics(
             end_date,
             loader_kwargs,
             cycle_kwargs,
+            primary_min_coverage=coverage_thresholds[0],
+            unresolved_streams=unresolved_streams,
         )
     elif cycle_parent is not None:
         trajectory = _primary_heart_rate_trajectory_for_cycle_hierarchy(
@@ -1253,6 +1650,8 @@ def _hierarchical_heart_rate_statistics(
             cycle_parent,
             loader_kwargs,
             primary_reference,
+            coverage_thresholds[0],
+            unresolved_streams,
         )
     else:
         trajectory = _single_resolution_hr_trajectory(
@@ -1264,7 +1663,12 @@ def _hierarchical_heart_rate_statistics(
             primary,
             loader_kwargs,
             primary_reference,
+            coverage_thresholds[0],
+            unresolved_streams,
         )
+
+    if coverage_thresholds[0] is not None:
+        _warn_unknown_primary_coverage(unresolved_streams)
 
     rename = {feature: f"{feature}__{primary}" for feature in statistics}
     trajectory = trajectory.rename(columns=rename)
@@ -1286,6 +1690,8 @@ def _hierarchical_heart_rate_statistics(
         else:
             bounds = {}
             active_users = []
+            lower_resolution = chain[level_index]
+            lower_is_cycle = lower_resolution in cycle.CYCLE_TYPES
             for user in users:
                 user_rows = (
                     trajectory.xs(user)
@@ -1295,14 +1701,16 @@ def _hierarchical_heart_rate_statistics(
                 if user_rows.empty and (start_date is None or end_date is None):
                     continue
                 if start_date is None:
-                    if chain[level_index] in cycle.CYCLE_TYPES:
+                    if lower_is_cycle:
                         lower = pd.Timestamp(user_rows.index.min()).normalize()
                     else:
                         lower = user_rows["period_start"].min()
                 else:
                     lower = pd.Timestamp(start_date)
+                    if lower_is_cycle:
+                        lower = lower.normalize()
                 if end_date is None:
-                    if chain[level_index] in cycle.CYCLE_TYPES:
+                    if lower_is_cycle:
                         upper = (
                             pd.Timestamp(user_rows.index.max()).normalize()
                             + pd.Timedelta(days=1)
@@ -1311,6 +1719,8 @@ def _hierarchical_heart_rate_statistics(
                         upper = user_rows["period_end"].max()
                 else:
                     upper = pd.Timestamp(end_date)
+                    if lower_is_cycle:
+                        upper = upper.normalize()
                 if pd.isna(lower) or pd.isna(upper):
                     continue
                 bounds[user] = (lower, upper)
@@ -1322,13 +1732,20 @@ def _hierarchical_heart_rate_statistics(
             parent = hierarchy.windows_for_resolution(
                 active_users, target, bounds
             )
-            membership = "label"
+            membership = (
+                "majority_overlap"
+                if lower_resolution not in hierarchy.CALENDAR_RESOLUTIONS
+                and lower_resolution not in cycle.CYCLE_TYPES
+                and lower_resolution != "nightly"
+                else "label"
+            )
         trajectory, _ = hierarchy.aggregate_level(
             trajectory,
             parent,
             target_resolution=target,
             aggregation=specification,
             membership=membership,
+            min_coverage=coverage_thresholds[level_index + 1],
         )
     if chain[-1] in cycle.CYCLE_TYPES or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS:
         index_name = "calendar_date"
@@ -1354,6 +1771,7 @@ def get_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     aggregation=None,
+    min_coverage=None,
     cycle_kwargs=None,
 ) -> Union[pd.Series, pd.DataFrame]:
     """Return heart-rate features at one resolution or along a hierarchy.
@@ -1373,7 +1791,9 @@ def get_heart_rate_statistics(
     user_id : str or list, default "all"
         Participant identifiers.
     start_date, end_date : timestamp-like or None
-        Exact half-open analysis interval ``[start_date, end_date)``. Without
+        For fixed and calendar windows, the exact half-open analysis interval
+        ``[start_date, end_date)``. For cycle resolutions, the bounds select
+        cycle calendar labels and selected cycles are never clipped. Without
         bounds, each participant uses only their observed trajectory.
     resolution : str, timedelta, or sequence, default "day"
         One window resolution or a strictly increasing hierarchy, such as
@@ -1389,6 +1809,15 @@ def get_heart_rate_statistics(
         standard numeric operations. With more than one upper level, provide
         one nested specification per level, for example
         ``[["mean"], ["mean", "p90"]]``.
+    min_coverage : float, sequence of float or None
+        Minimum coverage required at each requested resolution. The first
+        value controls raw samples to the primary feature window; later values
+        control valid child windows to each parent. A scalar applies to every
+        level, while a sequence supplies one value per resolution. An
+        individual ``None`` disables filtering at that level. If primary
+        cadence cannot be inferred, its coverage is unknown: the feature is
+        retained when no primary threshold is requested and excluded when one
+        is requested.
     cycle_kwargs : dict or None
         Options forwarded to :func:`pywearable.cycle.get_intervals`, such as
         ``missing_end="midnight"``.
@@ -1398,6 +1827,8 @@ def get_heart_rate_statistics(
     pandas.Series or pandas.DataFrame
         A ``(user_id, time)`` trajectory. Hierarchical output names retain the
         full calculation path and include immediate child coverage columns.
+        A single-resolution request with ``min_coverage`` returns a DataFrame
+        containing each requested feature and its ``__coverage`` column.
 
     Examples
     --------
@@ -1413,6 +1844,7 @@ def get_heart_rate_statistics(
             statistic="heart_rate_mean",
             resolution=["1h", "cycle_night", "monthly"],
             aggregation=[["mean"], ["mean", "p90"]],
+            min_coverage=[0.5, 0.7, 0.8],
         )
     """
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
@@ -1426,7 +1858,9 @@ def get_heart_rate_statistics(
     if not hierarchical and aggregation is not None:
         raise ValueError("aggregation requires a resolution hierarchy")
     if not hierarchical and chain[0] not in cycle.CYCLE_TYPES:
-        return _get_heart_rate_statistics_single_resolution(
+        threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
+        unresolved_streams = set()
+        result = _get_heart_rate_statistics_single_resolution(
             loader=loader,
             statistic=statistic,
             user_id=user_id,
@@ -1435,7 +1869,13 @@ def get_heart_rate_statistics(
             resolution=chain[0],
             loader_kwargs=loader_kwargs,
             time_reference=time_reference,
+            primary_min_coverage=threshold,
+            return_primary_coverage=min_coverage is not None,
+            unresolved_streams=unresolved_streams,
         )
+        if threshold is not None:
+            _warn_unknown_primary_coverage(unresolved_streams)
+        return result
 
     users = (
         loader.get_user_ids()
@@ -1449,6 +1889,8 @@ def get_heart_rate_statistics(
         statistic, allow_rest=chain[0] in cycle.CYCLE_TYPES or chain[0] == "daily"
     )
     if len(chain) == 1:
+        threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
+        unresolved_streams = set()
         trajectory = _cycle_heart_rate_trajectory(
             loader,
             users,
@@ -1458,10 +1900,22 @@ def get_heart_rate_statistics(
             end_date,
             loader_kwargs,
             cycle_kwargs,
+            primary_min_coverage=threshold,
+            return_primary_coverage=min_coverage is not None,
+            unresolved_streams=unresolved_streams,
         )
-        result = trajectory[statistics].copy()
+        if threshold is not None:
+            _warn_unknown_primary_coverage(unresolved_streams)
+        result_columns = list(statistics)
+        if min_coverage is not None:
+            result_columns.extend(
+                f"{statistic_name}__coverage" for statistic_name in statistics
+            )
+        result = trajectory[result_columns].copy()
         result.index = result.index.set_names(["user_id", "calendar_date"])
-        return result[statistics[0]] if len(statistics) == 1 else result
+        if len(statistics) == 1 and min_coverage is None:
+            return result[statistics[0]]
+        return result
 
     return _hierarchical_heart_rate_statistics(
         loader,
@@ -1471,6 +1925,7 @@ def get_heart_rate_statistics(
         end_date,
         chain,
         aggregation,
+        min_coverage,
         loader_kwargs,
         time_reference,
         cycle_kwargs,

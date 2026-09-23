@@ -175,6 +175,46 @@ def test_scalar_heart_rate_does_not_load_sleep_sessions():
     assert loader.session_calls == 0
 
 
+def test_default_extraction_skips_raw_coverage_work(monkeypatch):
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("raw coverage should not be computed by default")
+
+    monkeypatch.setattr(heart_rate, "_heart_rate_cadences", fail_if_called)
+    loader = HeartRateCycleLoader()
+
+    scalar = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10",
+        end_date="2024-01-11",
+        resolution="1h",
+        time_reference="local",
+    )
+    hierarchical = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10",
+        end_date="2024-01-11",
+        resolution=["1h", "daily"],
+        aggregation="mean",
+        time_reference="local",
+    )
+    cycle_result = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10",
+        end_date="2024-01-11",
+        resolution="cycle_night",
+    )
+
+    assert not scalar.empty
+    assert not hierarchical.empty
+    assert not cycle_result.empty
+
+
 def test_fixed_windows_can_be_aggregated_through_cycles_and_calendar_periods():
     loader = HeartRateCycleLoader()
     result = heart_rate.get_heart_rate_statistics(
@@ -190,6 +230,34 @@ def test_fixed_windows_can_be_aggregated_through_cycles_and_calendar_periods():
     column = "heart_rate_mean__5min__cycle_night_mean__monthly_mean"
     assert result.iloc[0][column] == 85
     assert loader.session_calls == 1
+
+
+def test_per_level_coverage_thresholds_cascade_through_the_hierarchy():
+    result = heart_rate.get_heart_rate_statistics(
+        HeartRateCycleLoader(),
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10",
+        end_date="2024-01-13",
+        resolution=["1h", "cycle_night", "monthly"],
+        aggregation=[["mean"], ["mean"]],
+        min_coverage=[None, 0.2, 0.5],
+    )
+
+    feature = "heart_rate_mean__1h__cycle_night_mean__monthly_mean"
+    assert pd.isna(result.iloc[0][feature])
+    assert result.iloc[0][f"{feature}__coverage"] == pytest.approx(1 / 3)
+
+
+def test_coverage_threshold_count_matches_every_resolution():
+    with pytest.raises(ValueError, match="one value per resolution"):
+        heart_rate.get_heart_rate_statistics(
+            HeartRateCycleLoader(),
+            statistic="heart_rate_mean",
+            user_id="user-1",
+            resolution=["1h", "daily", "monthly"],
+            min_coverage=[0.5, 0.8],
+        )
 
 
 def test_fixed_windows_with_half_their_duration_in_a_cycle_are_included():
@@ -249,6 +317,69 @@ def test_fixed_windows_can_be_aggregated_to_a_larger_fixed_resolution():
         ("user-1", pd.Timestamp("2024-01-10 02:00")),
         "heart_rate_mean__5min__1h_mean",
     ] == 80
+
+
+def test_partial_fixed_windows_feed_calendar_parents_by_physical_overlap():
+    loader = HeartRateCycleLoader()
+    local = pd.to_datetime(["2024-01-10 10:03", "2024-01-10 10:06"])
+    loader.hr = pd.DataFrame(
+        {
+            "local_time": local,
+            "utc_time": local - pd.Timedelta(hours=1),
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [10, 100],
+            "timestamp_conflict": False,
+        }
+    )
+
+    result = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10 10:03",
+        end_date="2024-01-10 10:08",
+        resolution=["5min", "daily"],
+        aggregation="mean",
+        time_reference="local",
+    )
+
+    feature = "heart_rate_mean__5min__daily_mean"
+    assert result.iloc[0][feature] == 55
+    assert result.iloc[0][f"{feature}__coverage"] == 1
+
+
+def test_partial_daily_primary_windows_stop_at_calendar_midnight():
+    loader = HeartRateCycleLoader()
+    local = pd.to_datetime(["2024-01-10 13:00", "2024-01-11 01:00"])
+    loader.hr = pd.DataFrame(
+        {
+            "local_time": local,
+            "utc_time": local - pd.Timedelta(hours=1),
+            "timezone": pd.Timedelta(hours=1),
+            "heart_rate": [60, 80],
+            "timestamp_conflict": False,
+        }
+    )
+
+    trajectory = heart_rate._single_resolution_hr_trajectory(
+        loader,
+        ["user-1"],
+        ["heart_rate_mean"],
+        "2024-01-10 12:00",
+        "2024-01-11 12:00",
+        "daily",
+        {},
+        "local",
+        None,
+        set(),
+    )
+
+    assert trajectory["period_start"].tolist() == pd.to_datetime(
+        ["2024-01-10 12:00", "2024-01-11 00:00"]
+    ).tolist()
+    assert trajectory["period_end"].tolist() == pd.to_datetime(
+        ["2024-01-11 00:00", "2024-01-11 12:00"]
+    ).tolist()
 
 
 def test_unbounded_hierarchy_counts_internal_missing_primary_windows():
@@ -312,6 +443,31 @@ def test_utc_cannot_be_requested_for_a_primary_sleep_cycle():
             resolution="cycle_night",
             time_reference="utc",
         )
+
+
+def test_cycle_bounds_select_labels_without_clipping_physical_intervals():
+    result = heart_rate.get_heart_rate_statistics(
+        HeartRateCycleLoader(),
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10 12:00",
+        end_date="2024-01-11 12:00",
+        resolution="cycle_night",
+    )
+
+    assert result.index.tolist() == [("user-1", pd.Timestamp("2024-01-10"))]
+    assert result.iloc[0] == 70
+
+    monthly = heart_rate.get_heart_rate_statistics(
+        HeartRateCycleLoader(),
+        statistic="heart_rate_mean",
+        user_id="user-1",
+        start_date="2024-01-10 12:00",
+        end_date="2024-01-11 12:00",
+        resolution=["cycle_night", "monthly"],
+        aggregation="mean",
+    )
+    assert monthly.iloc[0]["heart_rate_mean__cycle_night__monthly_mean"] == 70
 
 
 def test_cycle_resolution_rejects_unused_secondary_aggregation():
