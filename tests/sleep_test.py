@@ -12,12 +12,6 @@ import pywearable.loader
 import pywearable.sleep
 import pywearable.sleep_schema
 
-# TODO tests to be added:
-# - users with no data
-# - add filtering function as argument to computation
-# - start and end data with no date for user
-
-
 @pytest.fixture
 def sleep_summary():
     """

@@ -18,8 +18,6 @@ from ... import constants, heart_rate_schema, sleep, sleep_schema, utils
 from ..base import BaseLoader
 from . import constants as lf_constants
 
-# TODO some Labfront folders have midnigt in end-date, other in start-date...
-
 _LABFRONT_METRICS_DICT = {
     constants.METRIC_HEART_RATE: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
@@ -740,10 +738,8 @@ class LabfrontLoader(BaseLoader):
             end_date = participant_files[
                 lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
             ].max()
-        # TODO midnight is present in the previous file for some files
-        # We need to floor start_date to the previous day
-        # since Labfront files contain the midnight in the
-        # file belonging to the previous day
+        # Floor to the previous day because some Labfront files store
+        # midnight in the file belonging to the previous day.
         start_date = pd.Timestamp(
             start_date - datetime.timedelta(microseconds=1)
         ).floor("1d")

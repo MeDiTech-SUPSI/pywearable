@@ -24,11 +24,9 @@ try:
 except:
     warnings.warn("Neurokit was not found")
 
-# TODO hrv statistics extracted at 5-minute intervals
 # TODO possibility of filtering by day/night
 # TODO return multiple statistics by night/day
 # TODO add parameter for base_window
-# TODO add neurokit as backend
 # TODO check if loader has hrv_features already
 # TODO compute all power statistics at once
 

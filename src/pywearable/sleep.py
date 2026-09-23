@@ -3093,9 +3093,7 @@ def _sleep_statistics_list(statistic):
     return statistics
 
 
-# TODO reduce number of function calls
-# TODO work by calendarDate and not by sleepSummaryId
-# TODO add consistent bedtime/wakeup time on rolling basis
+# TODO reduce repeated sleep-feature calculations
 
 
 def get_sleep_statistic(
