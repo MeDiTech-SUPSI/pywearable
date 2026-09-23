@@ -10,7 +10,7 @@ import pytest
 
 import pywearable.loader
 import pywearable.sleep
-import pywearable.sleep_schema
+import pywearable.schema
 
 @pytest.fixture
 def sleep_summary():
@@ -35,7 +35,7 @@ x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    return pywearable.sleep_schema.normalize_sleep_columns(sleep_summary)
+    return pywearable.schema.normalize_sleep_columns(sleep_summary)
 
 
 @pytest.fixture
@@ -81,12 +81,12 @@ x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    return pywearable.sleep_schema.normalize_sleep_columns(sleep_stages)
+    return pywearable.schema.normalize_sleep_columns(sleep_stages)
 
 
 @pytest.fixture
 def sleep_summary_id_as_idx(sleep_summary):
-    return sleep_summary.set_index(pywearable.sleep_schema.SLEEP_SUMMARY_ID_COL)
+    return sleep_summary.set_index(pywearable.schema.SLEEP_SUMMARY_ID_COL)
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ SLEEP_SERIES_INDEX = pd.Index(
         pd.Timestamp(2023, 5, 11),
         pd.Timestamp(2023, 5, 12),
     ],
-    name=pywearable.sleep_schema.CALENDAR_DATE_COL,
+    name=pywearable.schema.CALENDAR_DATE_COL,
 )
 
 # Index with days from sleep stages
@@ -137,7 +137,7 @@ SLEEP_STAGES_SERIES_INDEX = pd.Index(
         pd.Timestamp(2023, 5, 11),
         pd.Timestamp(2023, 5, 12),
     ],
-    name=pywearable.sleep_schema.CALENDAR_DATE_COL,
+    name=pywearable.schema.CALENDAR_DATE_COL,
 )
 
 
@@ -191,8 +191,8 @@ def test_get_sleep_period_time(base_loader):
                 ],
             ],
             names=[
-                pywearable.sleep_schema.USER_COL,
-                pywearable.sleep_schema.CALENDAR_DATE_COL,
+                pywearable.schema.USER_COL,
+                pywearable.schema.CALENDAR_DATE_COL,
             ],
         ),
         name=pywearable.sleep.SLEEP_STATISTIC_SPT,
@@ -218,8 +218,8 @@ def test_get_sleep_efficiency(base_loader):
         index=pd.MultiIndex.from_product(
             [["1"], SLEEP_SERIES_INDEX],
             names=[
-                pywearable.sleep_schema.USER_COL,
-                pywearable.sleep_schema.CALENDAR_DATE_COL,
+                pywearable.schema.USER_COL,
+                pywearable.schema.CALENDAR_DATE_COL,
             ],
         ),
         name=pywearable.sleep.SLEEP_STATISTIC_SE,
@@ -251,7 +251,7 @@ def test_get_sleep_maintenance_efficiency(base_loader):
 
 
 def test_compute_bedtime(sleep_summary: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     bedtime = pywearable.sleep._compute_bedtime(sleep_summary)
     print(bedtime)
     assert type(bedtime) == pd.Series
@@ -273,7 +273,7 @@ def test_compute_bedtime(sleep_summary: pd.DataFrame):
 
 
 def test_compute_getup_time(sleep_summary: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     getup_time = pywearable.sleep._compute_getup_time(sleep_summary)
     assert type(getup_time) == pd.Series
     pandas.testing.assert_series_equal(
@@ -294,7 +294,7 @@ def test_compute_getup_time(sleep_summary: pd.DataFrame):
 
 
 def test_compute_sleep_score(sleep_summary: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     sleep_score = pywearable.sleep._compute_sleep_score(sleep_summary)
     assert type(sleep_score) == pd.Series
     pandas.testing.assert_series_equal(
@@ -310,7 +310,7 @@ def test_compute_sleep_score(sleep_summary: pd.DataFrame):
 
 
 def test_compute_time_in_bed(sleep_summary: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     time_in_bed = pywearable.sleep._compute_time_in_bed(sleep_summary)
     # Time is define as the total time spent in bed: thus
     # it is the duration from the start up to the real wakeup
@@ -328,7 +328,7 @@ def test_compute_total_sleep_time(
 ):
     # Total Sleep Time is the total duration of
     # deep, light, and REM sleep in the sleep period time (SPT)
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     tst = pywearable.sleep._compute_total_sleep_time(
         sleep_summary=sleep_summary,
         sleep_stages=sleep_stages,
@@ -347,7 +347,7 @@ def test_compute_sleep_efficiency(
     # total sleep time and sleep period time,
     # thus telling how much time was spent
     # sleeping inside the sleep phase
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     sleep_efficiency = pywearable.sleep._compute_sleep_efficiency(
         sleep_summary, sleep_stages
     )
@@ -371,7 +371,7 @@ def test_compute_sleep_efficiency(
 
 
 def test_compute_sleep_maintenance_efficiency(sleep_summary, sleep_stages):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     sleep_maintenance_efficiency = (
         pywearable.sleep._compute_sleep_maintenance_efficiency(
             sleep_summary=sleep_summary, sleep_stages=sleep_stages
@@ -384,7 +384,7 @@ def test_compute_sleep_maintenance_efficiency(sleep_summary, sleep_stages):
 
 
 def test_compute_awake_count(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     awake_count = pywearable.sleep._compute_awake_count(sleep_summary, sleep_stages)
     pd.testing.assert_series_equal(
         awake_count,
@@ -397,15 +397,15 @@ def test_compute_awake_count(sleep_summary: pd.DataFrame, sleep_stages: pd.DataF
 
 
 def test_compute_latencies(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     sleep_latencies = pywearable.sleep._compute_latencies(sleep_summary, sleep_stages)
     assert type(sleep_latencies) == pd.DataFrame
     assert set(
         [
-            pywearable.sleep_schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-            pywearable.sleep_schema.SLEEP_STAGE_DEEP_STAGE_VALUE,
-            pywearable.sleep_schema.SLEEP_STAGE_REM_STAGE_VALUE,
-            pywearable.sleep_schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+            pywearable.schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            pywearable.schema.SLEEP_STAGE_DEEP_STAGE_VALUE,
+            pywearable.schema.SLEEP_STAGE_REM_STAGE_VALUE,
+            pywearable.schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
         ]
     ).issubset(sleep_latencies.columns)
     # Check latencies for a given sleep summary
@@ -423,7 +423,7 @@ def test_compute_latencies(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFra
 
 def test_compute_waso(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
     waso = pywearable.sleep._compute_wake_after_sleep_onset(
-        sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL), sleep_stages
+        sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )
     print(waso)
     assert type(waso) == pd.Series
@@ -439,7 +439,7 @@ def test_compute_sleep_onset_latency(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
     sol = pywearable.sleep._compute_sleep_onset_latency(
-        sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL), sleep_stages
+        sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )
     assert type(sol) == pd.Series
     # Check onset latency
@@ -453,7 +453,7 @@ def test_compute_sleep_onset_latency(
 def test_compute_wakeup_time(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary, sleep_stages)
     pandas.testing.assert_series_equal(
         wakeup_time,
@@ -475,7 +475,7 @@ def test_compute_sleep_period_time(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
     # Make sure that we have calendar date as index
-    sleep_summary = sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL)
+    sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     # Compute sleep period time
     spt = pywearable.sleep._compute_sleep_period_time(sleep_summary, sleep_stages)
     # Assert is series
@@ -510,44 +510,44 @@ def test_compute_stage_count(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
     counts = pywearable.sleep._compute_stage_count(
-        sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL), sleep_stages
+        sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )
     assert type(counts) == pd.DataFrame
     assert (
         counts.loc[
-            pd.Timestamp("2023-05-09"), pywearable.sleep_schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
+            pd.Timestamp("2023-05-09"), pywearable.schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
         ]
         == 11.0
     )
     assert (
         counts.loc[
-            pd.Timestamp("2023-05-09"), pywearable.sleep_schema.SLEEP_STAGE_DEEP_STAGE_VALUE
+            pd.Timestamp("2023-05-09"), pywearable.schema.SLEEP_STAGE_DEEP_STAGE_VALUE
         ]
         == 5.0
     )
     assert (
         counts.loc[
             pd.Timestamp("2023-05-09"),
-            pywearable.sleep_schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+            pywearable.schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
         ]
         == 3.0
     )
     assert pd.Timestamp("2023-05-10") not in counts.index
     assert (
         counts.loc[
-            pd.Timestamp("2023-05-11"), pywearable.sleep_schema.SLEEP_STAGE_DEEP_STAGE_VALUE
+            pd.Timestamp("2023-05-11"), pywearable.schema.SLEEP_STAGE_DEEP_STAGE_VALUE
         ]
         == 1.0
     )
     assert (
         counts.loc[
-            pd.Timestamp("2023-05-12"), pywearable.sleep_schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
+            pd.Timestamp("2023-05-12"), pywearable.schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
         ]
         == 1.0
     )
     assert (
         counts.loc[
-            pd.Timestamp("2023-05-12"), pywearable.sleep_schema.SLEEP_STAGE_REM_STAGE_VALUE
+            pd.Timestamp("2023-05-12"), pywearable.schema.SLEEP_STAGE_REM_STAGE_VALUE
         ]
         == 0.0
     )
@@ -555,7 +555,7 @@ def test_compute_stage_count(
 
 def test_compute_stage_count_distinguishes_zero_from_unavailable(sleep_summary):
     sleep_summary = sleep_summary.iloc[:2].set_index(
-        pywearable.sleep_schema.CALENDAR_DATE_COL
+        pywearable.schema.CALENDAR_DATE_COL
     )
     stages = pd.DataFrame(
         {
@@ -577,7 +577,7 @@ def test_compute_rem_count(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ):
     counts = pywearable.sleep._compute_rem_count(
-        sleep_summary.set_index(pywearable.sleep_schema.CALENDAR_DATE_COL), sleep_stages
+        sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )
     assert type(counts) == pd.Series
     assert counts.loc[pd.Timestamp("2023-05-09")] == 3.0

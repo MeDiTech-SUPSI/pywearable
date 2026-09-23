@@ -10,7 +10,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from . import cycle, heart_rate_schema, hierarchy
+from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 from .utils import time as time_utils
 
@@ -317,7 +317,7 @@ def _prepare_heart_rate_samples(
             f"{type(heart_rate)} is not a valid type."
         )
 
-    required_columns = {time_col, heart_rate_schema.HEART_RATE_COL}
+    required_columns = {time_col, schema.HEART_RATE_COL}
     missing_columns = required_columns.difference(heart_rate.columns)
     if missing_columns:
         raise ValueError(
@@ -329,7 +329,7 @@ def _prepare_heart_rate_samples(
     if heart_rate.empty:
         return heart_rate
 
-    conflict_col = heart_rate_schema.TIMESTAMP_CONFLICT_COL
+    conflict_col = schema.TIMESTAMP_CONFLICT_COL
     if conflict_col in heart_rate.columns and heart_rate[conflict_col].any():
         warnings.warn(
             "Excluding ambiguous same-timestamp heart-rate readings from aggregation."
@@ -342,9 +342,9 @@ def _prepare_heart_rate_samples(
     # retain repeated, identical exports, so collapse those timestamps once
     # before computing both ordinary statistics and quantiles.
     duplicate_time_col = (
-        heart_rate_schema.UTC_TIME_COL
-        if heart_rate_schema.UTC_TIME_COL in heart_rate.columns
-        and heart_rate[heart_rate_schema.UTC_TIME_COL].notna().any()
+        schema.UTC_TIME_COL
+        if schema.UTC_TIME_COL in heart_rate.columns
+        and heart_rate[schema.UTC_TIME_COL].notna().any()
         else time_col
     )
     return heart_rate.drop_duplicates(subset=duplicate_time_col)
@@ -546,7 +546,7 @@ def _resting_heart_rate(heart_rate: pd.DataFrame, time_col: str):
         return np.nan
     minute = (
         heart_rate.sort_values(time_col)
-        .set_index(time_col)[heart_rate_schema.HEART_RATE_COL]
+        .set_index(time_col)[schema.HEART_RATE_COL]
         .resample("1min", closed="left", label="left")
         .mean()
     )
@@ -580,7 +580,7 @@ def _compute_hr_statistics(
 
     grouped = heart_rate.resample(
         rule=rule, on=time_col, label="left", closed="left"
-    )[heart_rate_schema.HEART_RATE_COL]
+    )[schema.HEART_RATE_COL]
     frames = []
     reductions = [
         HEART_RATE_REDUCTIONS[statistic]
@@ -624,26 +624,26 @@ def _compute_hr_statistics(
     # Let's add back timezone info
     if (
         not calendar_based
-        and time_col == heart_rate_schema.UTC_TIME_COL
-        and heart_rate_schema.TIMEZONE_COL in heart_rate.columns
+        and time_col == schema.UTC_TIME_COL
+        and schema.TIMEZONE_COL in heart_rate.columns
     ):
         tz_lookup = (
             heart_rate[
-                [heart_rate_schema.UTC_TIME_COL, heart_rate_schema.TIMEZONE_COL]
+                [schema.UTC_TIME_COL, schema.TIMEZONE_COL]
             ]
-            .sort_values(heart_rate_schema.UTC_TIME_COL)
-            .drop_duplicates(subset=heart_rate_schema.UTC_TIME_COL, keep="last")
+            .sort_values(schema.UTC_TIME_COL)
+            .drop_duplicates(subset=schema.UTC_TIME_COL, keep="last")
         )
         heart_rate_stats = heart_rate_stats.reset_index()
 
         heart_rate_stats = pd.merge_asof(
             heart_rate_stats.sort_values("utc_time"),
             tz_lookup,
-            on=heart_rate_schema.UTC_TIME_COL,
+            on=schema.UTC_TIME_COL,
             direction="nearest",
         )
         heart_rate_stats = heart_rate_stats.set_index(
-            [heart_rate_schema.UTC_TIME_COL, heart_rate_schema.TIMEZONE_COL]
+            [schema.UTC_TIME_COL, schema.TIMEZONE_COL]
         )
 
     return heart_rate_stats
@@ -1093,18 +1093,18 @@ def _get_heart_rate_statistics_single_resolution(
     calendar_based = resampling_spec.calendar_based
 
     available_time_columns = getattr(
-        loader, "heart_rate_time_columns", heart_rate_schema.TIME_COLUMNS
+        loader, "heart_rate_time_columns", schema.HEART_RATE_TIME_COLUMNS
     )
     if time_col not in available_time_columns:
         if (
             time_reference == "auto"
-            and heart_rate_schema.LOCAL_TIME_COL in available_time_columns
+            and schema.LOCAL_TIME_COL in available_time_columns
         ):
             warnings.warn(
                 "UTC heart-rate timestamps are unavailable; using local-time "
                 "windows instead."
             )
-            time_col = heart_rate_schema.LOCAL_TIME_COL
+            time_col = schema.LOCAL_TIME_COL
         else:
             raise ValueError(
                 f"The loader does not provide heart-rate timestamps in {time_col}."
@@ -1117,8 +1117,8 @@ def _get_heart_rate_statistics_single_resolution(
             f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
         )
 
-    start_date = heart_rate_schema.normalize_time_bound(start_date, time_col)
-    end_date = heart_rate_schema.normalize_time_bound(end_date, time_col)
+    start_date = schema.normalize_time_bound(start_date, time_col)
+    end_date = schema.normalize_time_bound(end_date, time_col)
     if (
         start_date is not None
         and end_date is not None
@@ -1147,7 +1147,7 @@ def _get_heart_rate_statistics_single_resolution(
             loaded_heart_rate = _prepare_heart_rate_samples(
                 loaded_heart_rate, time_col
             )
-            heart_rate = heart_rate_schema.filter_by_time(
+            heart_rate = schema.filter_heart_rate_by_time(
                 loaded_heart_rate,
                 start_date=start_date,
                 end_date=end_date,
@@ -1318,11 +1318,11 @@ def _get_heart_rate_statistics_single_resolution(
 def _interval_heart_rate_statistics(heart_rate, statistics):
     """Calculate only the requested statistics for one irregular interval."""
     result = _summarize_heart_rate_values(
-        heart_rate[heart_rate_schema.HEART_RATE_COL], statistics
+        heart_rate[schema.HEART_RATE_COL], statistics
     )
     if HEART_RATE_STATISTIC_REST in statistics:
         result[HEART_RATE_STATISTIC_REST] = _resting_heart_rate(
-            heart_rate, heart_rate_schema.LOCAL_TIME_COL
+            heart_rate, schema.LOCAL_TIME_COL
         )
     return result
 
@@ -1358,8 +1358,8 @@ def _cycle_heart_rate_trajectory(
         valid = user_intervals[user_intervals["interval_valid"]]
         heart_rate = pd.DataFrame(
             columns=[
-                heart_rate_schema.LOCAL_TIME_COL,
-                heart_rate_schema.HEART_RATE_COL,
+                schema.LOCAL_TIME_COL,
+                schema.HEART_RATE_COL,
             ]
         )
         source_col = None
@@ -1372,18 +1372,18 @@ def _cycle_heart_rate_trajectory(
                 user_id=user,
                 start_date=valid["start_time"].min() - coverage_padding,
                 end_date=valid["end_time"].max() + coverage_padding,
-                time_col=heart_rate_schema.LOCAL_TIME_COL,
+                time_col=schema.LOCAL_TIME_COL,
                 **loader_kwargs,
             )
             heart_rate = _prepare_heart_rate_samples(
-                heart_rate, heart_rate_schema.LOCAL_TIME_COL
-            ).sort_values(heart_rate_schema.LOCAL_TIME_COL, kind="stable")
+                heart_rate, schema.LOCAL_TIME_COL
+            ).sort_values(schema.LOCAL_TIME_COL, kind="stable")
             if needs_coverage:
                 source_col, cadences = _heart_rate_cadences(
-                    heart_rate, heart_rate_schema.LOCAL_TIME_COL
+                    heart_rate, schema.LOCAL_TIME_COL
                 )
         timestamps = pd.DatetimeIndex(
-            heart_rate[heart_rate_schema.LOCAL_TIME_COL]
+            heart_rate[schema.LOCAL_TIME_COL]
         )
         for label, interval in user_intervals.iterrows():
             values = {statistic: float("nan") for statistic in statistics}
@@ -1398,7 +1398,7 @@ def _cycle_heart_rate_trajectory(
                     if source_col is None:
                         counts = {
                             "heart_rate": data[
-                                heart_rate_schema.LOCAL_TIME_COL
+                                schema.LOCAL_TIME_COL
                             ].nunique()
                         }
                     else:
@@ -1408,7 +1408,7 @@ def _cycle_heart_rate_trajectory(
                                 .astype("string")
                                 .fillna("unknown")
                             )
-                            .groupby("__stream")[heart_rate_schema.LOCAL_TIME_COL]
+                            .groupby("__stream")[schema.LOCAL_TIME_COL]
                             .nunique()
                             .to_dict()
                         )
@@ -1759,10 +1759,10 @@ def _hierarchical_heart_rate_statistics(
             chain[-1], time_reference=primary_reference
         ).time_col
         available = getattr(
-            loader, "heart_rate_time_columns", heart_rate_schema.TIME_COLUMNS
+            loader, "heart_rate_time_columns", schema.HEART_RATE_TIME_COLUMNS
         )
         if index_name not in available and primary_reference == "auto":
-            index_name = heart_rate_schema.LOCAL_TIME_COL
+            index_name = schema.LOCAL_TIME_COL
     return trajectory.rename_axis(index={"window_start": index_name})
 
 

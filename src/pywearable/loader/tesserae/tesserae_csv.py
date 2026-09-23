@@ -6,7 +6,7 @@ from typing import Literal, Union
 
 import pandas as pd
 
-from ... import heart_rate_schema
+from ... import schema
 from ..base import BaseLoader
 
 
@@ -195,7 +195,7 @@ class TesseraeCSVLoader(BaseLoader):
                 by=["durationInMs", "validationMap"], ascending=[True, True]
             ).drop_duplicates(subset="calendarDate", keep="last")
 
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(sleep_summary)
 
@@ -304,7 +304,7 @@ class TesseraeCSVLoader(BaseLoader):
             sleep_stage = sleep_stage.loc[
                 sleep_stage["isoDate"] < pd.Timestamp(end_date)
             ]
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(sleep_stage)
 
@@ -554,7 +554,7 @@ class TesseraeCSVLoader(BaseLoader):
     ):
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
-        heart_rate_schema.validate_time_col(time_col)
+        schema.validate_heart_rate_time_col(time_col)
         # Load all files
         heart_rate_folder = self.root_folder / user_id / "GarminHealthAPI"
 
@@ -582,14 +582,14 @@ class TesseraeCSVLoader(BaseLoader):
             hr = hr[hr["heart_rate"] > 0]
             hr = hr.drop_duplicates(subset="utc_time", keep="last")
             return (
-                heart_rate_schema.filter_by_time(
+                schema.filter_heart_rate_by_time(
                     hr, start_date, end_date, time_col
                 )
                 .sort_values("utc_time")
                 .reset_index(drop=True)
             )
         else:
-            return heart_rate_schema.empty_frame(
+            return schema.empty_heart_rate_frame(
                 ["timezone_offset", "tz_source", "beats_per_minute"]
             )
 

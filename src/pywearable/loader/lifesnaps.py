@@ -6,7 +6,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from .. import heart_rate_schema
+from .. import schema
 from .base import BaseLoader
 
 
@@ -223,8 +223,8 @@ class LifeSnapsParquetLoader(BaseLoader):
             Heart-rate samples in the shared schema.
         """
         self._check_user_id(user_id)
-        heart_rate_schema.validate_time_col(time_col)
-        if time_col == heart_rate_schema.UTC_TIME_COL:
+        schema.validate_heart_rate_time_col(time_col)
+        if time_col == schema.UTC_TIME_COL:
             raise ValueError(
                 "LifeSnaps heart-rate data does not provide UTC timestamps; "
                 "use time_col='local_time'."
@@ -237,19 +237,19 @@ class LifeSnapsParquetLoader(BaseLoader):
             heart_rate["local_time"] = pd.to_datetime(heart_rate["local_time"])
             heart_rate["utc_time"] = pd.NaT
             heart_rate["timezone"] = pd.NaT
-            heart_rate[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+            heart_rate[schema.TIMESTAMP_CONFLICT_COL] = (
                 heart_rate.groupby("local_time")["heart_rate"].transform("nunique")
                 > 1
             )
             return (
-                heart_rate_schema.filter_by_time(
+                schema.filter_heart_rate_by_time(
                     heart_rate, start_date, end_date, time_col
                 )
                 .sort_values("local_time")
                 .reset_index(drop=True)
             )
         else:
-            return heart_rate_schema.empty_frame()
+            return schema.empty_heart_rate_frame()
 
     def load_respiration_summary(
         self,
@@ -412,7 +412,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep_stages = sleep_stages[
                     sleep_stages["local_time"] < pd.Timestamp(end_date)
                 ]
-            from ..sleep_schema import (
+            from ..schema import (
                 coalesce_sleep_stage_runs,
                 normalize_sleep_columns,
             )
@@ -737,7 +737,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 ]
             if drop_duplicates:
                 sleep = sleep.drop_duplicates(subset="calendar_date", keep="last")
-            from ..sleep_schema import normalize_sleep_columns
+            from ..schema import normalize_sleep_columns
 
             return normalize_sleep_columns(sleep)
         return pd.DataFrame(

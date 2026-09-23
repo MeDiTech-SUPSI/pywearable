@@ -3,7 +3,7 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from pywearable import sleep, sleep_schema
+from pywearable import sleep, schema
 
 
 def test_legacy_sleep_columns_are_normalized():
@@ -15,7 +15,7 @@ def test_legacy_sleep_columns_are_normalized():
             "REMValue": [2],
         }
     )
-    result = sleep_schema.normalize_sleep_columns(raw)
+    result = schema.normalize_sleep_columns(raw)
     assert list(result) == [
         "calendar_date",
         "sleep_summary_id",
@@ -283,7 +283,7 @@ def test_sleep_stage_contract_rejects_unknown_stage_labels():
     )
 
     with pytest.raises(ValueError, match="unsupported values: mystery"):
-        sleep_schema.prepare_sleep_stages(stages)
+        schema.prepare_sleep_stages(stages)
 
 
 def test_cpd_is_undefined_on_first_night_and_after_gap():

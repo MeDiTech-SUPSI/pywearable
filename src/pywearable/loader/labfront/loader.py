@@ -14,7 +14,7 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import constants, heart_rate_schema, sleep, sleep_schema, utils
+from ... import constants, schema, sleep, utils
 from ..base import BaseLoader
 from . import constants as lf_constants
 
@@ -2332,9 +2332,9 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
         time_col: str = "local_time",
     ) -> pd.DataFrame:
-        heart_rate_schema.validate_time_col(time_col)
-        requested_start = heart_rate_schema.normalize_time_bound(start_date, time_col)
-        requested_end = heart_rate_schema.normalize_time_bound(end_date, time_col)
+        schema.validate_heart_rate_time_col(time_col)
+        requested_start = schema.normalize_time_bound(start_date, time_col)
+        requested_end = schema.normalize_time_bound(end_date, time_col)
         data = self.load_garmin_metric(
             metric=constants.METRIC_HEART_RATE,
             user_id=user_id,
@@ -2352,8 +2352,8 @@ class LabfrontLoader(BaseLoader):
             filter_on_calendar_date=False,
         )
         if data.empty:
-            return heart_rate_schema.empty_frame(
-                ["source", heart_rate_schema.TIMESTAMP_CONFLICT_COL]
+            return schema.empty_heart_rate_frame(
+                ["source", schema.TIMESTAMP_CONFLICT_COL]
             )
 
         data = data.copy()
@@ -2369,14 +2369,14 @@ class LabfrontLoader(BaseLoader):
         )
         data = data[data["heart_rate"] > 0]
         data["source"] = source
-        data[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+        data[schema.TIMESTAMP_CONFLICT_COL] = (
             data.groupby("utc_time")["heart_rate"].transform("nunique") > 1
         )
         data = data.drop_duplicates(
             subset=["utc_time", "heart_rate"], keep="last"
         )
         return (
-            heart_rate_schema.filter_by_time(
+            schema.filter_heart_rate_by_time(
                 data, requested_start, requested_end, time_col
             )
             .sort_values("utc_time")
@@ -2595,7 +2595,7 @@ class LabfrontLoader(BaseLoader):
         available. ``"last"`` means the last snapshot in the deterministic
         Labfront file-index order (first timestamp, then last-edit timestamp).
         """
-        return sleep_schema.normalize_sleep_columns(
+        return schema.normalize_sleep_columns(
             self._load_sleep_stage_raw(
                 user_id, start_date, end_date, on_conflict=on_conflict
             )
@@ -2858,7 +2858,7 @@ class LabfrontLoader(BaseLoader):
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         """Return Garmin sleep summaries in the shared snake_case schema."""
-        return sleep_schema.normalize_sleep_columns(
+        return schema.normalize_sleep_columns(
             self._load_sleep_summary_raw(
                 user_id, start_date, end_date, drop_duplicates=drop_duplicates
             )

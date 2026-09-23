@@ -6,7 +6,7 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from ... import heart_rate_schema
+from ... import schema
 from ..base import BaseLoader
 
 
@@ -43,7 +43,7 @@ class TesseraeParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         if user_id not in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
-        heart_rate_schema.validate_time_col(time_col)
+        schema.validate_heart_rate_time_col(time_col)
         if backend == "health_api":
             path_to_file = self.root_folder / user_id / "GarminHealthAPI" / "HR.parquet"
         elif backend == "pa":
@@ -52,7 +52,7 @@ class TesseraeParquetLoader(BaseLoader):
             raise ValueError(f"Backend of type {backend} is not supported")
 
         if not path_to_file.exists():
-            return heart_rate_schema.empty_frame(
+            return schema.empty_heart_rate_frame(
                 ["timezone_offset", "tz_source", "beats_per_minute"]
             )
 
@@ -69,7 +69,7 @@ class TesseraeParquetLoader(BaseLoader):
         # Tesserae export timestamps.
         hr = hr.drop_duplicates(subset="utc_time", keep="last")
         return (
-            heart_rate_schema.filter_by_time(hr, start_date, end_date, time_col)
+            schema.filter_heart_rate_by_time(hr, start_date, end_date, time_col)
             .sort_values("utc_time")
             .reset_index(drop=True)
         )
@@ -212,7 +212,7 @@ class TesseraeParquetLoader(BaseLoader):
                 (sleep_stage["local_time"] < end_date),
                 :,
             ]
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(sleep_stage)
 
@@ -365,7 +365,7 @@ class TesseraeParquetLoader(BaseLoader):
                 :,
             ]
 
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(sleep)
 

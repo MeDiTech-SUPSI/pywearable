@@ -4,7 +4,7 @@ from typing import Union
 
 import pandas as pd
 
-from .. import constants, sleep_schema
+from .. import constants, schema
 
 
 class BaseLoader(ABC):
@@ -73,39 +73,39 @@ class BaseLoader(ABC):
         if summaries.empty:
             return pd.DataFrame(columns=columns)
 
-        summaries = sleep_schema.prepare_sleep_summary(summaries)
+        summaries = schema.prepare_sleep_summary(summaries)
         reconstructed_end = pd.to_datetime(
-            summaries[sleep_schema.ISODATE_COL]
+            summaries[schema.LOCAL_TIME_COL]
         ) + pd.to_timedelta(
             pd.to_numeric(
-                summaries[sleep_schema.SLEEP_SUMMARY_DURATION_IN_MS_COL],
+                summaries[schema.DURATION_IN_MS_COL],
                 errors="coerce",
             ).fillna(0)
             + pd.to_numeric(
-                summaries[sleep_schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+                summaries[schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
                 errors="coerce",
             ).fillna(0),
             unit="ms",
         )
-        if sleep_schema.LOCAL_END_TIME_COL in summaries:
+        if schema.LOCAL_END_TIME_COL in summaries:
             local_end = pd.to_datetime(
-                summaries[sleep_schema.LOCAL_END_TIME_COL]
+                summaries[schema.LOCAL_END_TIME_COL]
             ).fillna(reconstructed_end)
         else:
             local_end = reconstructed_end
         result = pd.DataFrame(
             {
-                "id": summaries[sleep_schema.SLEEP_SUMMARY_ID_COL],
+                "id": summaries[schema.SLEEP_SUMMARY_ID_COL],
                 "calendar_date": pd.to_datetime(
-                    summaries[sleep_schema.CALENDAR_DATE_COL]
+                    summaries[schema.CALENDAR_DATE_COL]
                 ).dt.normalize(),
                 "type": "main_sleep",
                 "main_sleep": True,
-                "local_time": pd.to_datetime(summaries[sleep_schema.ISODATE_COL]),
+                "local_time": pd.to_datetime(summaries[schema.LOCAL_TIME_COL]),
                 "local_end_time": local_end,
                 "time_in_bed_seconds": (
                     local_end
-                    - pd.to_datetime(summaries[sleep_schema.ISODATE_COL])
+                    - pd.to_datetime(summaries[schema.LOCAL_TIME_COL])
                 ).dt.total_seconds(),
             }
         )

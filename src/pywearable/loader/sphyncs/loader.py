@@ -2,7 +2,7 @@ import os
 
 import pandas as pd
 
-from ... import heart_rate_schema
+from ... import schema
 from ..base import BaseLoader
 
 
@@ -55,8 +55,8 @@ class SphyncsDataLoader(BaseLoader):
         The biometrics.parquet file should be located in the user's folder
         and must contain 'dateTime' and 'heart' columns.
         """
-        heart_rate_schema.validate_time_col(time_col)
-        if time_col == heart_rate_schema.UTC_TIME_COL:
+        schema.validate_heart_rate_time_col(time_col)
+        if time_col == schema.UTC_TIME_COL:
             raise ValueError(
                 "SPHYNCS heart-rate data does not provide UTC timestamps; "
                 "use time_col='local_time'."
@@ -94,12 +94,12 @@ class SphyncsDataLoader(BaseLoader):
         heart_rate_df = heart_rate_df[heart_rate_df["heart_rate"] > 0]
         heart_rate_df["utc_time"] = pd.NaT
         heart_rate_df["timezone"] = pd.NaT
-        heart_rate_df[heart_rate_schema.TIMESTAMP_CONFLICT_COL] = (
+        heart_rate_df[schema.TIMESTAMP_CONFLICT_COL] = (
             heart_rate_df.groupby("local_time")["heart_rate"].transform("nunique")
             > 1
         )
         return (
-            heart_rate_schema.filter_by_time(
+            schema.filter_heart_rate_by_time(
                 heart_rate_df, start_date, end_date, time_col
             )
             .sort_values("local_time")
@@ -296,7 +296,7 @@ class SphyncsDataLoader(BaseLoader):
         if drop_duplicates and len(result_df) > 0:
             result_df = result_df.drop_duplicates(subset=['calendarDate'], keep='first')
         
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(result_df).reset_index(drop=True)
 
@@ -480,7 +480,7 @@ class SphyncsDataLoader(BaseLoader):
             end_date = pd.Timestamp(end_date)
             result_df = result_df[result_df['isoDate'] < end_date]
         
-        from ...sleep_schema import normalize_sleep_columns
+        from ...schema import normalize_sleep_columns
 
         return normalize_sleep_columns(result_df).reset_index(drop=True)
 

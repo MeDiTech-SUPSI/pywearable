@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from ... import heart_rate_schema
+from ... import schema
 from ..base import BaseLoader
 
 
@@ -369,7 +369,7 @@ class OuraLoader(BaseLoader):
         and long-sleep offsets provide a fallback when activity is absent.
         Offsets are never interpolated across missing days or offset changes.
         """
-        heart_rate_schema.validate_time_col(time_col)
+        schema.validate_heart_rate_time_col(time_col)
         columns = [
             "utc_time", "local_time", "timezone", "heart_rate", "source",
             "timestamp_conflict", "local_time_source", "local_time_uncertain",
@@ -389,14 +389,14 @@ class OuraLoader(BaseLoader):
         # Local bounds cannot be converted exactly before offsets are known.
         # A one-day UTC margin safely narrows the records that need enrichment.
         if time_col == "utc_time":
-            frame = heart_rate_schema.filter_by_time(
+            frame = schema.filter_heart_rate_by_time(
                 frame, start_date, end_date, time_col
             )
         else:
-            broad_start = heart_rate_schema.normalize_time_bound(
+            broad_start = schema.normalize_time_bound(
                 start_date, time_col
             )
-            broad_end = heart_rate_schema.normalize_time_bound(end_date, time_col)
+            broad_end = schema.normalize_time_bound(end_date, time_col)
             if broad_start is not None:
                 frame = frame[
                     frame["utc_time"] >= broad_start - pd.Timedelta(days=1)
@@ -419,7 +419,7 @@ class OuraLoader(BaseLoader):
                 "offset; they remain available only through utc_time."
             )
         return (
-            heart_rate_schema.filter_by_time(
+            schema.filter_heart_rate_by_time(
                 frame, start_date, end_date, time_col
             )
             .sort_values(["utc_time", "source"])

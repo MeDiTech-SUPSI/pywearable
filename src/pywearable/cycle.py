@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Union
 
 import pandas as pd
 
-from . import sleep_schema
+from . import schema
 
 if TYPE_CHECKING:
     from .loader.base import BaseLoader
@@ -50,7 +50,7 @@ def _user_intervals(
     load_end = (
         None if requested_end is None else requested_end + pd.Timedelta(days=1)
     )
-    sessions = sleep_schema.prepare_sleep_sessions(
+    sessions = schema.prepare_sleep_sessions(
         loader.load_sleep_sessions(user_id, load_start, load_end)
     )
     sessions = sessions.loc[sessions["main_sleep"]].copy()
