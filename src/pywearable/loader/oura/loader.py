@@ -39,6 +39,9 @@ class OuraLoader(BaseLoader):
     times derived from the offsets included in each sleep record.
     """
 
+    hrv_source = "provider_samples"
+    hrv_time_columns = ("utc_time", "local_time")
+
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)
         if not self.data_dir.is_dir():
@@ -433,15 +436,32 @@ class OuraLoader(BaseLoader):
                 "sleep_summary_id": record["id"],
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
                 "oura_average_rmssd_ms": record.get("average_hrv"),
+                schema.HRV_RMSSD_COL: record.get("average_hrv"),
             }
             for record in self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
             if record.get("type") == "long_sleep"
         ]
-        return pd.DataFrame(rows, columns=["sleep_summary_id", "calendar_date", "oura_average_rmssd_ms"])
+        return pd.DataFrame(
+            rows,
+            columns=[
+                "sleep_summary_id",
+                "calendar_date",
+                "oura_average_rmssd_ms",
+                schema.HRV_RMSSD_COL,
+            ],
+        )
 
     def load_hrv_samples(self, user_id, start_date=None, end_date=None):
         """Return Oura-provided five-minute rMSSD estimates, not BBI-derived HRV."""
-        columns = ["sleep_summary_id", "utc_time", "local_time", "oura_rmssd_ms"]
+        columns = [
+            "sleep_summary_id",
+            "utc_time",
+            "local_time",
+            "timezone",
+            "oura_rmssd_ms",
+            schema.HRV_RMSSD_COL,
+            "source",
+        ]
         rows = []
         for record in self._read_records(user_id, "sleep"):
             if record.get("type") != "long_sleep":
@@ -463,7 +483,10 @@ class OuraLoader(BaseLoader):
                         "sleep_summary_id": record["id"],
                         "utc_time": instant.tz_convert("UTC").tz_localize(None),
                         "local_time": instant.tz_localize(None),
+                        "timezone": instant.utcoffset(),
                         "oura_rmssd_ms": value,
+                        schema.HRV_RMSSD_COL: value,
+                        "source": "oura_sleep_hrv",
                     }
                 )
         frame = pd.DataFrame(rows, columns=columns)

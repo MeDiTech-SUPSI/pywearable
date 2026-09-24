@@ -33,6 +33,8 @@ class LifeSnapsParquetLoader(BaseLoader):
     """
 
     heart_rate_time_columns = ("local_time",)
+    hrv_source = "provider_samples"
+    hrv_time_columns = ("local_time",)
 
     def __init__(self, root_folder: os.PathLike):
         root_folder = Path(root_folder)
@@ -583,22 +585,19 @@ class LifeSnapsParquetLoader(BaseLoader):
             self.root_folder / user_id / "heart_rate_variability_details.parquet"
         )
         if file_path.exists():
-            hrv_details = (
-                pd.read_parquet(file_path)
-                .rename(
-                    columns={
-                        "timestamp": "utc_time",
-                        "rmssd": "RMSSD",
-                        "low_frequency": "LF",
-                        "high_frequency": "HF",
-                    }
-                )
-                .sort_values("utc_time", ascending=True, ignore_index=True)
+            hrv_details = pd.read_parquet(file_path).rename(
+                columns={
+                    "timestamp": "local_time",
+                    "rmssd": schema.HRV_RMSSD_COL,
+                    "low_frequency": schema.HRV_LF_POWER_COL,
+                    "high_frequency": schema.HRV_HF_POWER_COL,
+                    "coverage": schema.HRV_COVERAGE_COL,
+                }
             )
-
-            hrv_details["utc_time"] = pd.to_datetime(hrv_details["utc_time"])
-            hrv_details["local_time"] = hrv_details["utc_time"]
-            hrv_details["timezone_offset"] = pd.Timedelta(0)
+            hrv_details["local_time"] = pd.to_datetime(hrv_details["local_time"])
+            hrv_details["utc_time"] = pd.NaT
+            hrv_details["timezone"] = pd.NaT
+            hrv_details["source"] = "fitbit_hrv_details"
             if not (start_date is None):
                 hrv_details = hrv_details[
                     hrv_details["local_time"] >= pd.Timestamp(start_date)
@@ -607,19 +606,60 @@ class LifeSnapsParquetLoader(BaseLoader):
                 hrv_details = hrv_details[
                     hrv_details["local_time"] < pd.Timestamp(end_date)
                 ]
-            return hrv_details
+            return hrv_details.sort_values(
+                "local_time", ascending=True, ignore_index=True
+            )
         else:
             return pd.DataFrame(
                 columns=[
                     "local_time",
                     "utc_time",
-                    "timezone_offset",
-                    "RMSSD",
-                    "coverage",
-                    "LF",
-                    "HF",
+                    "timezone",
+                    schema.HRV_RMSSD_COL,
+                    schema.HRV_COVERAGE_COL,
+                    schema.HRV_LF_POWER_COL,
+                    schema.HRV_HF_POWER_COL,
+                    "source",
                 ]
             )
+
+    def load_hrv_samples(self, user_id, start_date=None, end_date=None):
+        """Return Fitbit-provided five-minute HRV estimates in canonical columns."""
+        return self.load_hrv_features(user_id, start_date, end_date)
+
+    def load_hrv_summary(self, user_id, start_date=None, end_date=None):
+        """Return Fitbit-provided daily HRV summaries without using them as fallback."""
+        file_path = (
+            self.root_folder / user_id / "daily_heart_rate_variability_summary.parquet"
+        )
+        columns = [
+            "calendar_date",
+            schema.HRV_RMSSD_COL,
+            "fitbit_nrem_heart_rate",
+            "fitbit_entropy",
+        ]
+        if not file_path.exists():
+            return pd.DataFrame(columns=columns)
+        summary = pd.read_parquet(file_path).rename(
+            columns={
+                "timestamp": "calendar_date",
+                "rmssd": schema.HRV_RMSSD_COL,
+                "nremhr": "fitbit_nrem_heart_rate",
+                "entropy": "fitbit_entropy",
+            }
+        )
+        summary["calendar_date"] = pd.to_datetime(
+            summary["calendar_date"]
+        ).dt.normalize()
+        if start_date is not None:
+            summary = summary[
+                summary["calendar_date"] >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            summary = summary[
+                summary["calendar_date"] < pd.Timestamp(end_date).normalize()
+            ]
+        return summary[columns].sort_values("calendar_date").reset_index(drop=True)
 
     def load_sleep_sessions(
         self,

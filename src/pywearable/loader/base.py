@@ -11,6 +11,8 @@ class BaseLoader(ABC):
     """Abstract class for the implementation of loader classes."""
 
     heart_rate_time_columns = ("utc_time", "local_time")
+    hrv_source = "bbi"
+    hrv_time_columns = ("utc_time", "local_time")
 
     def __init__(self):
         pass
@@ -256,15 +258,6 @@ class BaseLoader(ABC):
         """
         pass
 
-    @abstractmethod
-    def load_bbi(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    ) -> pd.DataFrame:
-        pass
-
     def load_stress(
         self,
         user_id: str,
@@ -288,6 +281,24 @@ class BaseLoader(ABC):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         raise NotImplementedError
+
+    def load_hrv_samples(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load provider-computed HRV samples when the source supplies them."""
+        return pd.DataFrame()
+
+    def load_hrv_summary(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load provider-computed daily or nightly HRV summaries."""
+        return pd.DataFrame()
 
     def load_hypnogram(
         self,

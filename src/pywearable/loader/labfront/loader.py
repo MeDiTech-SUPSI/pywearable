@@ -65,6 +65,8 @@ class LabfrontLoader(BaseLoader):
         ``"drop_night"``.
     """
 
+    hrv_source = "bbi"
+
     def __init__(
         self,
         data_paths: Union[str, Path, list],
@@ -2015,7 +2017,21 @@ class LabfrontLoader(BaseLoader):
             start_date,
             end_date,
         )
-        return data
+        if data.empty:
+            return schema.empty_bbi_frame(["source", "timezone_name"])
+        data = data.copy()
+        data[schema.LOCAL_TIME_COL] = pd.to_datetime(data[constants.ISODATE_COL])
+        data[schema.UTC_TIME_COL] = pd.to_datetime(
+            data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+        ).dt.tz_localize(None)
+        if "timezone" in data.columns:
+            data = data.rename(columns={"timezone": "timezone_name"})
+        data[schema.TIMEZONE_COL] = (
+            data[schema.LOCAL_TIME_COL] - data[schema.UTC_TIME_COL]
+        )
+        data[schema.BBI_COL] = pd.to_numeric(data[schema.BBI_COL], errors="coerce")
+        data["source"] = "garmin_device_bbi"
+        return schema.prepare_bbi(data)
 
     def load_daily_summary(
         self,

@@ -20,6 +20,8 @@ class TesseraeParquetLoader(BaseLoader):
     of the package.
     """
 
+    hrv_source = "bbi"
+
     def __init__(self, root_folder: os.PathLike):
         self.root_folder = Path(root_folder)
         if not self.root_folder.exists():
@@ -374,9 +376,7 @@ class TesseraeParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         path_to_file = self.root_folder / user_id / "GarminPA" / "BBI.parquet"
         if not path_to_file.exists():
-            return pd.DataFrame(
-                columns=["utc_time", "local_time", "timezone_offset", "bbi"]
-            )
+            return schema.empty_bbi_frame(["source"])
         bbi = (
             pd.read_parquet(
                 self.root_folder / user_id / "GarminPA" / "BBI.parquet",
@@ -386,19 +386,18 @@ class TesseraeParquetLoader(BaseLoader):
         )
 
         if len(bbi) == 0:
-            return pd.DataFrame(
-                columns=["utc_time", "local_time", "timezone_offset", "bbi"]
-            )
+            return schema.empty_bbi_frame(["source"])
         bbi["utc_time"] = bbi["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
-        bbi["timezone_offset"] = bbi["local_time"] - bbi["utc_time"]
+        bbi["timezone"] = bbi["local_time"] - bbi["utc_time"]
         # we may have some milliseconds difference between utc and local time
-        bbi["timezone_offset"] = bbi["timezone_offset"].dt.round("1min")
+        bbi["timezone"] = bbi["timezone"].dt.round("1min")
 
         if not (start_date is None):
             bbi = bbi[bbi["local_time"] >= pd.Timestamp(start_date)]
         if not (end_date is None):
             bbi = bbi[bbi["local_time"] < pd.Timestamp(end_date)]
-        return bbi
+        bbi["source"] = "garmin_pa_bbi"
+        return schema.prepare_bbi(bbi)
 
     def load_respiration(self, user_id: str, start_date: pd.Timestamp, end_date):
         """Load respiration data.

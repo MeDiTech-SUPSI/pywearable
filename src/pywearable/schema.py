@@ -24,6 +24,21 @@ HEART_RATE_REQUIRED_COLUMNS = (
     HEART_RATE_COL,
 )
 
+BBI_COL = "bbi"
+BBI_TIME_COLUMNS = (UTC_TIME_COL, LOCAL_TIME_COL)
+BBI_REQUIRED_COLUMNS = (
+    UTC_TIME_COL,
+    LOCAL_TIME_COL,
+    TIMEZONE_COL,
+    BBI_COL,
+)
+
+HRV_RMSSD_COL = "hrv_rmssd"
+HRV_VLF_POWER_COL = "hrv_vlf_power"
+HRV_LF_POWER_COL = "hrv_lf_power"
+HRV_HF_POWER_COL = "hrv_hf_power"
+HRV_COVERAGE_COL = "hrv_coverage"
+
 SLEEP_SUMMARY_ID_COL = "sleep_summary_id"
 SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL = "overall_sleep_score"
 SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL = "light_sleep_duration_in_ms"
@@ -132,6 +147,72 @@ def filter_heart_rate_by_time(
 def empty_heart_rate_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical heart-rate columns."""
     return pd.DataFrame(columns=[*HEART_RATE_REQUIRED_COLUMNS, *extra_columns])
+
+
+def empty_bbi_frame(extra_columns=()) -> pd.DataFrame:
+    """Return an empty table containing the canonical BBI columns."""
+    return pd.DataFrame(columns=[*BBI_REQUIRED_COLUMNS, *extra_columns])
+
+
+def prepare_bbi(frame):
+    """Validate and order beat-to-beat intervals in the shared schema."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("BBI data must be a pandas DataFrame")
+    frame = frame.copy()
+    aliases = {
+        "isoDate": LOCAL_TIME_COL,
+        "timezoneOffsetInMs": TIMEZONEOFFSET_IN_MS_COL,
+        "unixTimestampInMs": UNIXTIMESTAMP_IN_MS_COL,
+    }
+    frame = frame.rename(
+        columns={source: target for source, target in aliases.items() if target not in frame}
+    )
+    if "timezone_offset" in frame.columns and TIMEZONE_COL not in frame.columns:
+        frame = frame.rename(columns={"timezone_offset": TIMEZONE_COL})
+    if UTC_TIME_COL not in frame.columns and UNIXTIMESTAMP_IN_MS_COL in frame.columns:
+        frame[UTC_TIME_COL] = pd.to_datetime(
+            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
+        ).dt.tz_localize(None)
+    if LOCAL_TIME_COL in frame.columns:
+        frame[LOCAL_TIME_COL] = pd.to_datetime(
+            frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
+        ).map(
+            lambda value: value.tz_localize(None)
+            if pd.notna(value) and value.tzinfo is not None
+            else value
+        )
+    if TIMEZONE_COL not in frame.columns:
+        if TIMEZONEOFFSET_IN_MS_COL in frame.columns:
+            frame[TIMEZONE_COL] = pd.to_timedelta(
+                pd.to_numeric(frame[TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
+                unit="ms",
+            )
+        elif UTC_TIME_COL in frame.columns and LOCAL_TIME_COL in frame.columns:
+            frame[TIMEZONE_COL] = (
+                pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
+                - pd.to_datetime(frame[UTC_TIME_COL], errors="coerce")
+            )
+    if frame.empty:
+        for column in BBI_REQUIRED_COLUMNS:
+            if column not in frame.columns:
+                frame[column] = pd.Series(dtype="object")
+        return frame
+    missing = [column for column in BBI_REQUIRED_COLUMNS if column not in frame.columns]
+    if missing:
+        raise ValueError("BBI data is missing required columns: " + ", ".join(missing))
+    frame[UTC_TIME_COL] = pd.to_datetime(
+        frame[UTC_TIME_COL], errors="coerce", utc=True
+    ).dt.tz_localize(None)
+    frame[LOCAL_TIME_COL] = pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
+    frame[BBI_COL] = pd.to_numeric(frame[BBI_COL], errors="coerce")
+    frame = frame[
+        frame[BBI_COL].gt(0)
+        & (frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna())
+    ]
+    return frame.sort_values(
+        UTC_TIME_COL if frame[UTC_TIME_COL].notna().any() else LOCAL_TIME_COL,
+        kind="stable",
+    ).reset_index(drop=True)
 
 
 def normalize_sleep_columns(frame):
