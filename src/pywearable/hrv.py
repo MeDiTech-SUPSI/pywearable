@@ -1,935 +1,1219 @@
-"""
-This module contains all the functions related to the analysis
-of cardiac data, mostly for heart rate (HR) and heart rate
-variability (HRV).
-"""
+"""Heart-rate-variability features from BBI or provider estimates."""
 
-import datetime
-import math
+from __future__ import annotations
+
 import warnings
 from typing import Literal, Union
 
 import numpy as np
 import pandas as pd
-import scipy.stats
-from loguru import logger
-from scipy import interpolate, signal
+from scipy import integrate, interpolate, signal
 
-from . import constants  # , sleep, utils
+from . import cycle, hierarchy, schema, utils
 from .loader.base import BaseLoader
-from .utils import time as time_utils
 
-try:
-    import neurokit2 as nk
-except:
-    warnings.warn("Neurokit was not found")
-
-# TODO possibility of filtering by day/night
-# TODO return multiple statistics by night/day
-# TODO add parameter for base_window
-# TODO check if loader has hrv_features already
-# TODO compute all power statistics at once
 
 HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES = "hrv_rmssd"
 HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL = "hrv_sdnn"
+HRV_STATISTIC_PNN20 = "hrv_pnn20"
+HRV_STATISTIC_PNN50 = "hrv_pnn50"
 HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER = "hrv_vlf_power"
 HRV_STATISTIC_LOW_FREQUENCY_POWER = "hrv_lf_power"
 HRV_STATISTIC_HIGH_FREQUENCY_POWER = "hrv_hf_power"
 HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO = "hrv_lfhf_ratio"
 HRV_STATISTIC_BBI_MEDIAN = "hrv_bbi_median"
-HRV_STATISTIC_BBI_TIME = "hrv_bbi_wearing_time"
 
-HRV_TIME_DOMAIN_STATISTICS = [
+HRV_TIME_DOMAIN_STATISTICS = (
     HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
     HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
-]
-
-HRV_FREQUENCY_DOMAIN_STATISTICS = [
+    HRV_STATISTIC_PNN20,
+    HRV_STATISTIC_PNN50,
+    HRV_STATISTIC_BBI_MEDIAN,
+)
+HRV_FREQUENCY_DOMAIN_STATISTICS = (
     HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER,
     HRV_STATISTIC_LOW_FREQUENCY_POWER,
     HRV_STATISTIC_HIGH_FREQUENCY_POWER,
     HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
-]
-
+)
 HRV_STATISTICS = HRV_TIME_DOMAIN_STATISTICS + HRV_FREQUENCY_DOMAIN_STATISTICS
 
-
-def get_night_hrv_rmssd(
-    loader: BaseLoader,
-    user_id: Union[str, list, None] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, str, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs: dict = {},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> dict:
-    """Computes RMSSD metric considering night data.
-
-    This function computes the root mean squared successive difference (RMSSD),
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of RMSSD short-term (5 mins) computations overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which RMSSD must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform RMSSD over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and RMSSD as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `RMSSD`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        period="night",
-        backend=backend,
-    )
+HRV_PRIMARY_RESOLUTION = "5min"
+_PROVIDER_COLUMNS = {
+    HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: schema.HRV_RMSSD_COL,
+    HRV_STATISTIC_LOW_FREQUENCY_POWER: schema.HRV_LF_POWER_COL,
+    HRV_STATISTIC_HIGH_FREQUENCY_POWER: schema.HRV_HF_POWER_COL,
+}
 
 
-def get_night_hrv_sdnn(
-    loader: BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs: dict = {},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> dict:
-    """Computes SDNN metric considering night data.
-
-    This function computes the standard deviation of normal to normal (SDNN) intervals,
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of SDNN short term computations (5 mins) overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which SDNN must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform SDNN over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and SDNN as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `SDNN`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        period="night",
-        backend=backend,
-    )
+def _valid_bbi_values_and_segments(values, segment_ids=None):
+    values = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+    valid = np.isfinite(values) & (values > 0)
+    if segment_ids is None:
+        return values[valid], None
+    segments = np.asarray(segment_ids)
+    if segments.size != values.size:
+        raise ValueError("segment_ids must contain one value per BBI interval")
+    return values[valid], segments[valid]
 
 
-def get_night_hrv_vlf_power(
-    loader: BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs={},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> Union[dict, pd.DataFrame]:
-    """Compute LF power metrics considering night data.
-
-    This function computes the low frequency (LF, 0.04Hz - 0.15Hz) power,
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of LF short-term (5 mins) computations overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which LF must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform LF over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and LF as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `LF`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        backend=backend,
-        period="night",
-    )
+def _valid_bbi_values(values) -> np.ndarray:
+    return _valid_bbi_values_and_segments(values)[0]
 
 
-def get_night_hrv_lf_power(
-    loader: BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs={},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> Union[dict, pd.DataFrame]:
-    """Compute LF power metrics considering night data.
-
-    This function computes the low frequency (LF, 0.04Hz - 0.15Hz) power,
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of LF short-term (5 mins) computations overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which LF must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform LF over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and LF as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `LF`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_LOW_FREQUENCY_POWER,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        backend=backend,
-        period="night",
-    )
+def _successive_differences(values, segment_ids=None):
+    values, segments = _valid_bbi_values_and_segments(values, segment_ids)
+    if values.size < 2:
+        return values, np.array([], dtype=float)
+    differences = np.diff(values)
+    if segments is not None:
+        differences = differences[segments[1:] == segments[:-1]]
+    return values, differences
 
 
-def get_night_hrv_hf_power(
-    loader: BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs={},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> Union[dict, pd.DataFrame]:
-    """Compute HF power metrics considering night data.
-
-    This function computes the low frequency (HF, 0.15Hz - 0.4Hz) power,
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of HF short-term (5 mins) computations overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which HF must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform HF over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and HF as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `HF`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_HIGH_FREQUENCY_POWER,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        period="night",
-        backend=backend,
-    )
-
-
-def get_night_lfhf(
-    loader: BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs={},
-    backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> dict:
-    """Compute LF/HF power ratio metrics considering night data.
-
-    This function computes the ratio between low frequency (LF) and high frequency (HF) power,
-    taking in consideration only periods where the user was asleep.
-    Depending on the value of the ``kind`` parameter, this function
-    returns the mean of LFHF short-term (5 mins) computations overnight
-    for each calendar day (``kind=None``) from ``start_date`` to
-    ``end_date`` or the transformed value across all days.
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) for which LFHF must be retrieved, by default "all".
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date for data retrieval, by default None.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date for data retrieval, by default None.
-    kind : :class:`str` or None, optional
-        Whether to transform LFHF over days, or to return the value for each day, by default None.
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
-
-    Returns
-    -------
-    :class:`dict`
-        If ``kind==None``, dictionary with ``user_id`` as key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and LFHF as values.
-        If ``kind!=None``, dictionary with ``user_id`` as key, and a nested dictionary with `LFHF`
-        as key and its transformed value, and an additional `days` keys that contains an array of all
-        calendar days over which the transformation was computed.
-    """
-
-    return get_hrv_statistic(
-        loader=loader,
-        user_id=user_id,
-        statistic=HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO,
-        start_date=start_date,
-        end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        period="night",
-        backend=backend,
-    )
-
-
-def compute_rmssd(x):
-    return np.sqrt(np.mean(np.diff(x) ** 2)) if len(x) > 5 else np.nan
-
-
-def compute_sdnn(x):
-    return np.std(x, ddof=1) if len(x) > 5 else 0
-
-
-def compute_pnn20(x):
-    x = np.asarray(x)
-
-    if x.size < 2:
+def _compute_rmssd(values, segment_ids=None):
+    values, differences = _successive_differences(values, segment_ids)
+    if values.size <= 5 or differences.size == 0:
         return np.nan
-
-    diff = np.abs(np.diff(x))
-
-    nn20 = np.sum(diff > 20)
-
-    total = diff.size + 1
-
-    return nn20 / total * 100
+    return np.sqrt(np.mean(differences**2))
 
 
-def compute_pnn50(x):
-    x = np.asarray(x)
-
-    if x.size < 2:
+def _compute_pnn(values, threshold, segment_ids=None):
+    values, differences = _successive_differences(values, segment_ids)
+    if values.size < 2 or differences.size == 0:
         return np.nan
+    return np.sum(np.abs(differences) > threshold) / values.size * 100
 
-    diff = np.abs(np.diff(x))
 
-    nn50 = np.sum(diff > 50)
+def compute_rmssd(values):
+    """Return RMSSD in milliseconds, or missing for fewer than six intervals."""
+    return _compute_rmssd(values)
 
-    total = diff.size + 1
 
-    return nn50 / total * 100
+def compute_sdnn(values):
+    """Return sample SDNN in milliseconds, or missing for insufficient data."""
+    values = _valid_bbi_values(values)
+    return np.std(values, ddof=1) if values.size > 5 else np.nan
+
+
+def compute_pnn20(values):
+    """Return the percentage of supplied intervals followed by a >20 ms change."""
+    return _compute_pnn(values, 20)
+
+
+def compute_pnn50(values):
+    """Return the percentage of supplied intervals followed by a >50 ms change."""
+    return _compute_pnn(values, 50)
+
+
+def _power_spectrum(values) -> tuple[np.ndarray, np.ndarray] | None:
+    """Interpolate irregular BBI at 4 Hz and calculate one Welch spectrum."""
+    values = _valid_bbi_values(values)
+    if values.size <= 5:
+        return None
+    times = np.cumsum(values) / 1000
+    times -= times[0]
+    if times[-1] <= 0:
+        return None
+    interpolator = interpolate.interp1d(
+        times,
+        values,
+        kind="cubic",
+        bounds_error=False,
+        fill_value="extrapolate",
+    )
+    regular_times = np.arange(0, times[-1], 0.25)
+    if regular_times.size < 4:
+        return None
+    regular_values = interpolator(regular_times)
+    regular_values -= regular_values.mean()
+    frequencies, density = signal.welch(
+        regular_values,
+        fs=4,
+        window="hamming",
+        nperseg=min(4096, regular_values.size),
+        nfft=4096,
+        scaling="density",
+    )
+    return frequencies, density
+
+
+def _band_power(spectrum, low: float, high: float) -> float:
+    if spectrum is None:
+        return np.nan
+    frequencies, density = spectrum
+    selected = (frequencies >= low) & (frequencies < high)
+    if selected.sum() < 2:
+        return np.nan
+    return float(integrate.trapezoid(density[selected], frequencies[selected]))
+
+
+def _pywearable_window_statistics(values, statistics, segment_ids=None) -> dict:
+    values, segments = _valid_bbi_values_and_segments(values, segment_ids)
+    has_internal_gap = segments is not None and np.unique(segments).size > 1
+    result = {name: np.nan for name in statistics}
+    operations = {
+        HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: lambda data: (
+            _compute_rmssd(data, segments)
+        ),
+        HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: compute_sdnn,
+        HRV_STATISTIC_PNN20: lambda data: _compute_pnn(data, 20, segments),
+        HRV_STATISTIC_PNN50: lambda data: _compute_pnn(data, 50, segments),
+        HRV_STATISTIC_BBI_MEDIAN: lambda data: (
+            float(np.median(data)) if data.size else np.nan
+        ),
+    }
+    for name in set(statistics).intersection(operations):
+        result[name] = operations[name](values)
+
+    requested_frequency = set(statistics).intersection(
+        HRV_FREQUENCY_DOMAIN_STATISTICS
+    )
+    if requested_frequency and not has_internal_gap:
+        spectrum = _power_spectrum(values)
+        powers = {
+            HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER: _band_power(
+                spectrum, 0.0033, 0.04
+            ),
+            HRV_STATISTIC_LOW_FREQUENCY_POWER: _band_power(spectrum, 0.04, 0.15),
+            HRV_STATISTIC_HIGH_FREQUENCY_POWER: _band_power(spectrum, 0.15, 0.40),
+        }
+        for name in requested_frequency.difference(
+            {HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO}
+        ):
+            result[name] = powers[name]
+        if HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO in requested_frequency:
+            hf = powers[HRV_STATISTIC_HIGH_FREQUENCY_POWER]
+            result[HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO] = (
+                powers[HRV_STATISTIC_LOW_FREQUENCY_POWER] / hf
+                if pd.notna(hf) and hf > 0
+                else np.nan
+            )
+    return result
+
+
+def _neurokit_window_statistics(values, statistics, segment_ids=None) -> dict:
+    """Calculate requested NeuroKit features with one call per feature domain."""
+    try:
+        import neurokit2 as nk
+    except ImportError as error:
+        raise ImportError("backend='neurokit' requires neurokit2") from error
+
+    values, segments = _valid_bbi_values_and_segments(values, segment_ids)
+    has_internal_gap = segments is not None and np.unique(segments).size > 1
+    result = {name: np.nan for name in statistics}
+    if values.size <= 5:
+        return result
+    intervals = {"RRI": values, "RRI_Time": np.cumsum(values) / 1000}
+    time_mapping = {
+        HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: "HRV_RMSSD",
+        HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: "HRV_SDNN",
+    }
+    requested_time = set(statistics).intersection(time_mapping)
+    if requested_time and not has_internal_gap:
+        frame = nk.hrv_time(intervals, show=False)
+        for name in requested_time:
+            result[name] = frame.iloc[0].get(time_mapping[name], np.nan)
+    elif requested_time:
+        if HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES in requested_time:
+            result[HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES] = (
+                _compute_rmssd(values, segments)
+            )
+        if HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL in requested_time:
+            result[HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL] = compute_sdnn(
+                values
+            )
+    if HRV_STATISTIC_PNN20 in statistics:
+        result[HRV_STATISTIC_PNN20] = _compute_pnn(values, 20, segments)
+    if HRV_STATISTIC_PNN50 in statistics:
+        result[HRV_STATISTIC_PNN50] = _compute_pnn(values, 50, segments)
+    if HRV_STATISTIC_BBI_MEDIAN in statistics:
+        result[HRV_STATISTIC_BBI_MEDIAN] = float(np.median(values))
+
+    frequency_mapping = {
+        HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER: "HRV_VLF",
+        HRV_STATISTIC_LOW_FREQUENCY_POWER: "HRV_LF",
+        HRV_STATISTIC_HIGH_FREQUENCY_POWER: "HRV_HF",
+        HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO: "HRV_LFHF",
+    }
+    requested_frequency = set(statistics).intersection(frequency_mapping)
+    if requested_frequency and not has_internal_gap:
+        frame = nk.hrv_frequency(
+            intervals,
+            show=False,
+            normalize=False,
+            interpolation_rate=4,
+        )
+        for name in requested_frequency:
+            result[name] = frame.iloc[0].get(frequency_mapping[name], np.nan)
+    return result
+
+
+def _window_statistics(values, statistics, backend: str, segment_ids=None) -> dict:
+    if backend == "pywearable":
+        return _pywearable_window_statistics(values, statistics, segment_ids)
+    if backend == "neurokit":
+        return _neurokit_window_statistics(values, statistics, segment_ids)
+    raise ValueError("backend must be 'pywearable' or 'neurokit'")
+
+
+def _statistics_list(statistic) -> list[str]:
+    if statistic is None:
+        return list(HRV_STATISTICS)
+    statistics = [statistic] if isinstance(statistic, str) else list(statistic)
+    unknown = set(statistics).difference(HRV_STATISTICS)
+    if unknown:
+        raise ValueError(
+            f"statistic must be one among {list(HRV_STATISTICS)}, "
+            f"not {sorted(unknown)}"
+        )
+    return list(dict.fromkeys(statistics))
+
+
+def _resolve_time_col(loader, time_reference: str, chain) -> str:
+    """Select the available clock appropriate for the requested hierarchy."""
+    if time_reference not in {"auto", "local", "utc"}:
+        raise ValueError("time_reference must be 'auto', 'local', or 'utc'")
+    has_local_parent = any(
+        value in cycle.CYCLE_TYPES or value in hierarchy.CALENDAR_RESOLUTIONS
+        for value in chain[1:]
+    )
+    if time_reference == "utc" and any(value in cycle.CYCLE_TYPES for value in chain):
+        raise ValueError("sleep-defined HRV cycles require local time")
+    requested = (
+        schema.LOCAL_TIME_COL
+        if has_local_parent and time_reference == "auto"
+        else f"{time_reference}_time"
+        if time_reference != "auto"
+        else schema.UTC_TIME_COL
+    )
+    available = getattr(loader, "hrv_time_columns", schema.BBI_TIME_COLUMNS)
+    if requested in available:
+        return requested
+    if time_reference == "auto" and schema.LOCAL_TIME_COL in available:
+        warnings.warn(
+            "UTC HRV timestamps are unavailable; using local-time windows instead.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return schema.LOCAL_TIME_COL
+    raise ValueError(f"The loader does not provide HRV timestamps in {requested}.")
+
+
+def _empty_primary(
+    statistics, time_col="window_start", include_coverage=False
+) -> pd.DataFrame:
+    """Return an empty primary trajectory with the normal index and columns."""
+    index = pd.MultiIndex.from_arrays([[], []], names=[schema.USER_COL, time_col])
+    return pd.DataFrame(
+        columns=[
+            "period_start",
+            "period_end",
+            *statistics,
+            *(
+                [f"{name}__coverage" for name in statistics]
+                if include_coverage
+                else []
+            ),
+        ],
+        index=index,
+    )
+
+
+def _window_bounds(frame, time_col, start_date, end_date, resolution):
+    """Normalize explicit bounds and infer missing bounds from observed samples."""
+    start = schema.normalize_time_bound(start_date, time_col)
+    end = schema.normalize_time_bound(end_date, time_col)
+    if start is None and not frame.empty:
+        start = frame[time_col].min().floor(resolution)
+    if end is None and not frame.empty:
+        end = frame[time_col].max().floor(resolution) + pd.Timedelta(resolution)
+    if start is None or end is None:
+        return None
+    if end <= start:
+        raise ValueError("end_date must be after start_date")
+    return start, end
+
+
+def _interval_mask(timestamps: pd.Series, intervals: pd.DataFrame) -> np.ndarray:
+    """Return membership in the union of valid half-open intervals."""
+    mask = np.zeros(len(timestamps), dtype=bool)
+    if intervals.empty or timestamps.empty:
+        return mask
+    values = pd.DatetimeIndex(timestamps)
+    for interval in intervals.itertuples():
+        start = getattr(interval, "start_time")
+        end = getattr(interval, "end_time")
+        if pd.isna(start) or pd.isna(end) or end <= start:
+            continue
+        left = values.searchsorted(start, side="left")
+        right = values.searchsorted(end, side="left")
+        mask[left:right] = True
+    return mask
+
+
+def _primary_windows(user_id, start, end, cycle_intervals=None):
+    """Construct the required five-minute grid, omitting inter-cycle gaps."""
+    if cycle_intervals is None:
+        return hierarchy.fixed_windows(
+            [user_id], HRV_PRIMARY_RESOLUTION, {user_id: (start, end)}
+        ).xs(user_id)
+    duration = pd.Timedelta(HRV_PRIMARY_RESOLUTION)
+    starts = []
+    valid = cycle_intervals[cycle_intervals["interval_valid"]]
+    for interval in valid.itertuples():
+        starts.extend(
+            pd.date_range(
+                interval.start_time.floor(duration),
+                interval.end_time,
+                freq=duration,
+                inclusive="left",
+            )
+        )
+    starts = pd.DatetimeIndex(starts).drop_duplicates().sort_values()
+    return pd.DataFrame(
+        {"start_time": starts, "end_time": starts + duration}, index=starts
+    ).rename_axis("window_start")
+
+
+def _asleep_stage_membership(loader, user_id, timestamps, start_date, end_date):
+    """Return asleep membership and contiguous asleep-block identifiers."""
+    stages = schema.prepare_sleep_stages(
+        loader.load_sleep_stage(user_id, start_date, end_date)
+    )
+    if stages.empty:
+        return np.ones(len(timestamps), dtype=bool), np.zeros(len(timestamps), dtype=int)
+    if "local_time_uncertain" in stages.columns:
+        stages = stages[~stages["local_time_uncertain"].fillna(False)]
+    stages = stages[
+        ~stages[schema.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
+            {
+                schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+            }
+        )
+    ]
+    intervals = stages.assign(
+        start_time=stages[schema.LOCAL_TIME_COL],
+        end_time=stages[schema.LOCAL_TIME_COL]
+        + pd.to_timedelta(stages[schema.DURATION_IN_MS_COL], unit="ms"),
+    )[["start_time", "end_time"]].sort_values("start_time")
+
+    blocks = []
+    for interval in intervals.itertuples(index=False):
+        if pd.isna(interval.start_time) or pd.isna(interval.end_time):
+            continue
+        if interval.end_time <= interval.start_time:
+            continue
+        if not blocks or interval.start_time > blocks[-1][1]:
+            blocks.append([interval.start_time, interval.end_time])
+        else:
+            blocks[-1][1] = max(blocks[-1][1], interval.end_time)
+
+    values = pd.DatetimeIndex(timestamps)
+    mask = np.zeros(len(values), dtype=bool)
+    segment_ids = np.full(len(values), -1, dtype=int)
+    for segment_id, (block_start, block_end) in enumerate(blocks):
+        left = values.searchsorted(block_start, side="left")
+        right = values.searchsorted(block_end, side="left")
+        mask[left:right] = True
+        segment_ids[left:right] = segment_id
+    return mask, segment_ids
+
+
+def _asleep_stage_mask(loader, user_id, timestamps, start_date, end_date):
+    """Mark samples in sleep stages, retaining all samples if stages are absent."""
+    return _asleep_stage_membership(
+        loader, user_id, timestamps, start_date, end_date
+    )[0]
+
+
+def _raw_bbi_frame_trajectory(
+    bbi,
+    user_id,
+    statistics,
+    start_date,
+    end_date,
+    time_col,
+    backend,
+    min_coverage,
+    return_coverage,
+    cycle_intervals=None,
+    sleep_stage_loader=None,
+):
+    bbi = schema.prepare_bbi(bbi)
+    bbi = bbi[bbi[time_col].notna()].sort_values(time_col, kind="stable")
+    bounds = _window_bounds(bbi, time_col, start_date, end_date, HRV_PRIMARY_RESOLUTION)
+    if bounds is None:
+        return _empty_primary(statistics, include_coverage=return_coverage)
+    start, end = bounds
+    bbi = bbi[bbi[time_col].ge(start) & bbi[time_col].lt(end)].reset_index(drop=True)
+
+    if cycle_intervals is not None and not bbi.empty:
+        valid = cycle_intervals[cycle_intervals["interval_valid"]]
+        bbi = bbi[_interval_mask(bbi[time_col], valid)].reset_index(drop=True)
+        if sleep_stage_loader is not None and not bbi.empty:
+            asleep, segments = _asleep_stage_membership(
+                sleep_stage_loader, user_id, bbi[time_col], start, end
+            )
+            bbi = bbi[asleep].copy()
+            bbi["_hrv_segment"] = segments[asleep]
+            bbi = bbi.reset_index(drop=True)
+
+    windows = _primary_windows(user_id, start, end, cycle_intervals)
+    labels = (
+        bbi[time_col].dt.floor(HRV_PRIMARY_RESOLUTION)
+        if not bbi.empty
+        else pd.Series(dtype="datetime64[ns]")
+    )
+    groups = {label: rows for label, rows in bbi.groupby(labels, sort=False)}
+    records = []
+    for label, window in windows.iterrows():
+        rows = groups.get(label, bbi.iloc[0:0])
+        duration_ms = (window["end_time"] - window["start_time"]).total_seconds() * 1000
+        coverage = (
+            min(1.0, rows[schema.BBI_COL].sum() / duration_ms)
+            if duration_ms > 0
+            else np.nan
+        )
+        accepted = min_coverage is None or coverage >= min_coverage
+        values = (
+            _window_statistics(
+                rows[schema.BBI_COL],
+                statistics,
+                backend,
+                rows["_hrv_segment"] if "_hrv_segment" in rows else None,
+            )
+            if accepted
+            else {name: np.nan for name in statistics}
+        )
+        records.append(
+            {
+                schema.USER_COL: user_id,
+                "window_start": label,
+                "period_start": window["start_time"],
+                "period_end": window["end_time"],
+                **values,
+                **(
+                    {f"{name}__coverage": coverage for name in statistics}
+                    if return_coverage
+                    else {}
+                ),
+            }
+        )
+    return (
+        pd.DataFrame(records)
+        .set_index([schema.USER_COL, "window_start"])
+        .sort_index()
+    )
+
+
+def _raw_bbi_primary_trajectory(
+    loader,
+    user_id,
+    statistics,
+    start_date,
+    end_date,
+    time_col,
+    loader_kwargs,
+    backend,
+    min_coverage,
+    return_coverage,
+    cycle_intervals=None,
+    sleep_only=False,
+):
+    padding = pd.Timedelta(days=2)
+    load_start = None if start_date is None else pd.Timestamp(start_date) - padding
+    load_end = None if end_date is None else pd.Timestamp(end_date) + padding
+    bbi = loader.load_bbi(user_id, load_start, load_end, **loader_kwargs)
+    return _raw_bbi_frame_trajectory(
+        bbi,
+        user_id,
+        statistics,
+        start_date,
+        end_date,
+        time_col,
+        backend,
+        min_coverage,
+        return_coverage,
+        cycle_intervals=cycle_intervals,
+        sleep_stage_loader=loader if sleep_only else None,
+    )
+
+
+def _prepare_provider_samples(frame) -> pd.DataFrame:
+    """Normalize provider HRV samples to the shared column and dtype contract."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("provider HRV samples must be a pandas DataFrame")
+    frame = frame.copy().rename(
+        columns={
+            "RMSSD": schema.HRV_RMSSD_COL,
+            "LF": schema.HRV_LF_POWER_COL,
+            "HF": schema.HRV_HF_POWER_COL,
+            "coverage": schema.HRV_COVERAGE_COL,
+            "timezone_offset": schema.TIMEZONE_COL,
+        }
+    )
+    for column in schema.BBI_TIME_COLUMNS:
+        if column not in frame.columns:
+            frame[column] = pd.NaT
+        frame[column] = pd.to_datetime(
+            frame[column], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+    for column in {
+        schema.HRV_RMSSD_COL,
+        schema.HRV_VLF_POWER_COL,
+        schema.HRV_LF_POWER_COL,
+        schema.HRV_HF_POWER_COL,
+        schema.HRV_COVERAGE_COL,
+    }:
+        if column in frame.columns:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    return frame
+
+
+def _provider_primary_trajectory(
+    loader,
+    user_id,
+    statistics,
+    start_date,
+    end_date,
+    time_col,
+    loader_kwargs,
+    min_coverage,
+    return_coverage,
+    unknown_coverage,
+    cycle_intervals=None,
+):
+    padding = pd.Timedelta(days=2)
+    load_start = None if start_date is None else pd.Timestamp(start_date) - padding
+    load_end = None if end_date is None else pd.Timestamp(end_date) + padding
+    samples = _prepare_provider_samples(
+        loader.load_hrv_samples(user_id, load_start, load_end, **loader_kwargs)
+    )
+    samples = samples[samples[time_col].notna()].sort_values(time_col, kind="stable")
+    bounds = _window_bounds(
+        samples, time_col, start_date, end_date, HRV_PRIMARY_RESOLUTION
+    )
+    if bounds is None:
+        return _empty_primary(statistics, include_coverage=return_coverage)
+    start, end = bounds
+    samples = samples[
+        samples[time_col].ge(start) & samples[time_col].lt(end)
+    ].copy()
+    if cycle_intervals is not None and not samples.empty:
+        valid = cycle_intervals[cycle_intervals["interval_valid"]]
+        samples = samples[_interval_mask(samples[time_col], valid)].copy()
+    windows = _primary_windows(user_id, start, end, cycle_intervals)
+    samples["window_start"] = samples[time_col].dt.floor(HRV_PRIMARY_RESOLUTION)
+    groups = {
+        label: rows for label, rows in samples.groupby("window_start", sort=False)
+    }
+    records = []
+    for label, window in windows.iterrows():
+        rows = groups.get(label, samples.iloc[0:0])
+        provider_coverage = (
+            rows[schema.HRV_COVERAGE_COL].mean()
+            if schema.HRV_COVERAGE_COL in rows
+            and rows[schema.HRV_COVERAGE_COL].notna().any()
+            else np.nan
+        )
+        if pd.notna(provider_coverage):
+            provider_coverage = float(np.clip(provider_coverage, 0, 1))
+        elif min_coverage is not None and not rows.empty:
+            unknown_coverage.add((user_id, getattr(loader, "hrv_source", "provider")))
+        accepted = min_coverage is None or (
+            pd.notna(provider_coverage) and provider_coverage >= min_coverage
+        )
+        values = {name: np.nan for name in statistics}
+        if accepted and not rows.empty:
+            for name, column in _PROVIDER_COLUMNS.items():
+                if name in statistics and column in rows:
+                    values[name] = rows[column].mean()
+            if HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO in statistics:
+                lf = values.get(HRV_STATISTIC_LOW_FREQUENCY_POWER)
+                hf = values.get(HRV_STATISTIC_HIGH_FREQUENCY_POWER)
+                if pd.isna(lf) and schema.HRV_LF_POWER_COL in rows:
+                    lf = rows[schema.HRV_LF_POWER_COL].mean()
+                if pd.isna(hf) and schema.HRV_HF_POWER_COL in rows:
+                    hf = rows[schema.HRV_HF_POWER_COL].mean()
+                values[HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO] = (
+                    lf / hf if pd.notna(hf) and hf > 0 else np.nan
+                )
+        records.append(
+            {
+                schema.USER_COL: user_id,
+                "window_start": label,
+                "period_start": window["start_time"],
+                "period_end": window["end_time"],
+                **values,
+                **(
+                    {f"{name}__coverage": provider_coverage for name in statistics}
+                    if return_coverage
+                    else {}
+                ),
+            }
+        )
+    return (
+        pd.DataFrame(records)
+        .set_index([schema.USER_COL, "window_start"])
+        .sort_index()
+    )
+
+
+def _primary_trajectory(
+    loader,
+    users,
+    statistics,
+    start_date,
+    end_date,
+    time_col,
+    loader_kwargs,
+    backend,
+    min_coverage,
+    return_coverage,
+    cycle_parent=None,
+    sleep_only=False,
+):
+    frames = []
+    unknown_coverage = set()
+    source = getattr(loader, "hrv_source", "bbi")
+    interval_users = (
+        set(cycle_parent.index.get_level_values(0))
+        if cycle_parent is not None and not cycle_parent.empty
+        else set()
+    )
+    for user in users:
+        user_start, user_end = start_date, end_date
+        user_intervals = None
+        if cycle_parent is not None:
+            if user not in interval_users:
+                continue
+            user_intervals = cycle_parent.xs(user)
+            valid = user_intervals[user_intervals["interval_valid"]]
+            if valid.empty:
+                continue
+            user_start = valid["start_time"].min()
+            user_end = valid["end_time"].max()
+        if source == "provider_samples":
+            frame = _provider_primary_trajectory(
+                loader,
+                user,
+                statistics,
+                user_start,
+                user_end,
+                time_col,
+                loader_kwargs,
+                min_coverage,
+                return_coverage,
+                unknown_coverage,
+                cycle_intervals=user_intervals,
+            )
+        elif source == "bbi":
+            frame = _raw_bbi_primary_trajectory(
+                loader,
+                user,
+                statistics,
+                user_start,
+                user_end,
+                time_col,
+                loader_kwargs,
+                backend,
+                min_coverage,
+                return_coverage,
+                cycle_intervals=user_intervals,
+                sleep_only=sleep_only,
+            )
+        else:
+            raise ValueError(
+                "loader.hrv_source must be 'bbi' or 'provider_samples'"
+            )
+        if not frame.empty:
+            frames.append(frame)
+    if min_coverage is not None and unknown_coverage:
+        warnings.warn(
+            "Primary HRV coverage could not be determined for "
+            f"{len(unknown_coverage)} user/source stream(s); features requiring "
+            "a primary coverage threshold were excluded.",
+            UserWarning,
+            stacklevel=3,
+        )
+    return (
+        pd.concat(frames).sort_index()
+        if frames
+        else _empty_primary(statistics, include_coverage=return_coverage)
+    )
 
 
 def compute_hrv_statistics(
     bbi: pd.DataFrame,
-    statistics: Union[list, str, None] = None,
-    backend: str = "pywearable",
-    coverage: float = 0.7,
-    window_size: Union[str, pd.Timedelta] = pd.Timedelta("5min"),
+    statistics: Union[list, tuple, str, None] = None,
+    backend: Literal["pywearable", "neurokit"] = "pywearable",
+    coverage: float | None = 0.7,
+    window_size: Union[str, pd.Timedelta] = HRV_PRIMARY_RESOLUTION,
+    time_col: str = schema.UTC_TIME_COL,
 ) -> pd.DataFrame:
-    # We need to extract hrv features with overlapping windows
-    # using 5 minute resolution
-
-    time_grid = pd.date_range(
-        start=bbi["utc_time"].min().floor("min"),
-        end=bbi["utc_time"].max().ceil("min"),
-        freq="1min",
+    """Calculate non-overlapping HRV windows from an already loaded BBI table."""
+    statistics = _statistics_list(statistics)
+    resolution = hierarchy.canonical_resolution(window_size)
+    if resolution != HRV_PRIMARY_RESOLUTION:
+        raise ValueError("window_size must currently be five minutes")
+    frame = schema.prepare_bbi(bbi)
+    if frame.empty:
+        return pd.DataFrame(columns=statistics)
+    trajectory = _raw_bbi_frame_trajectory(
+        frame,
+        "user",
+        statistics,
+        frame[time_col].min(),
+        frame[time_col].max().floor(resolution) + pd.Timedelta(resolution),
+        time_col,
+        backend,
+        coverage,
+        coverage is not None,
     )
+    return trajectory.droplevel(schema.USER_COL)
 
-    time_features = []
-    timezone_info = []
-    frequency_features = []
 
-    left = 0
-    right = 0
+def _expanded_chain(resolution):
+    """Canonicalize HRV resolution shorthand and prepend the five-minute base."""
+    chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
+    chain = [cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain]
+    if chain[0] != HRV_PRIMARY_RESOLUTION:
+        if chain[0] not in cycle.CYCLE_TYPES and chain[0] not in hierarchy.CALENDAR_RESOLUTIONS:
+            raise ValueError("HRV extraction must start with five-minute windows")
+        chain = [HRV_PRIMARY_RESOLUTION, *chain]
+        hierarchical = True
+        hierarchy.normalize_resolution_chain(chain)
+    return chain, hierarchical
 
-    window_before = pd.Timedelta("5min")
-    bbi = bbi.set_index("utc_time")
-    bbi_values = bbi["bbi"].values
-    times = bbi.index.values.astype("datetime64[ns]")
-    timezones = bbi["timezone_offset"].values
-    n = len(times)
 
-    compute_time_features = any(
-        stat in HRV_TIME_DOMAIN_STATISTICS for stat in statistics
+def _hierarchical_hrv_statistics(
+    loader,
+    statistics,
+    users,
+    start_date,
+    end_date,
+    chain,
+    aggregation,
+    min_coverage,
+    min_valid_children,
+    loader_kwargs,
+    time_reference,
+    cycle_kwargs,
+    backend,
+):
+    aggregation_levels = hierarchy.normalize_aggregation_levels(
+        aggregation, len(chain) - 1
     )
-    compute_frequency_features = any(
-        stat in HRV_FREQUENCY_DOMAIN_STATISTICS for stat in statistics
+    coverage_thresholds = hierarchy.normalize_coverage_thresholds(
+        min_coverage, len(chain)
     )
-
-    for t in time_grid:
-        start = t - window_before
-        end = t
-
-        # logger.info(f"Extracting features on window: {start}-{end}")
-
-        # move left pointer
-        while left < n and times[left] < start:
-            left += 1
-
-        # move right pointer
-        while right < n and times[right] < end:
-            right += 1
-        w = bbi_values[left:right]
-        window_times = times[left:right]
-        window_timezones = timezones[left:right]
-        if len(w) > 0:
-
-            timezone_info.append(
-                {
-                    "utc_time": t,
-                    "timezone_offset": window_timezones[0],
-                }
-            )
-            if compute_time_features:
-                if backend == "pywearable":
-                    window_time_features = {}
-                    window_time_features["utc_time"] = t
-                    window_time_features["hrv_min_nn"] = np.nanmin(w)
-                    window_time_features["hrv_mean_nn"] = np.nanmean(w)
-                    window_time_features["hrv_median_nn"] = np.nanmedian(w)
-                    window_time_features["hrv_max_nn"] = np.nanmax(w)
-
-                    window_time_features["hrv_sdnn"] = compute_sdnn(w)
-                    window_time_features["hrv_rmssd"] = compute_rmssd(w)
-                    window_time_features["hrv_pnn20"] = compute_pnn20(w)
-                    window_time_features["hrv_pnn50"] = compute_pnn50(w)
-
-                    window_time_features["hrv_prc20nn"] = np.nanpercentile(w, q=20)
-                    window_time_features["hrv_prc80nn"] = np.nanpercentile(w, q=80)
-
-                    window_time_features["hrv_duration"] = (
-                        pd.to_timedelta(w.sum(), unit="ms"),
-                    )
-                    window_time_features["hrv_count"] = len(w)
-
-                    window_time_features["hrv_sdrmmsd"] = (
-                        window_time_features["hrv_sdnn"]
-                        / window_time_features["hrv_rmssd"]
-                    )  # Sollers (2007)
-
-                    window_time_features["hrv_cv_nn"] = (
-                        window_time_features["hrv_sdnn"]
-                        / window_time_features["hrv_mean_nn"]
-                    )
-                    window_time_features["hrv_cv_sd"] = (
-                        window_time_features["hrv_rmssd"]
-                        / window_time_features["hrv_mean_nn"]
-                    )
-                    window_time_features["hrv_iqr_nn"] = scipy.stats.iqr(w)
-
-                    window_time_features = pd.DataFrame.from_dict(
-                        window_time_features, orient="columns"
-                    )
-
-                elif backend == "neurokit":
-                    window_time_features: pd.DataFrame = nk.hrv_time(
-                        {"RRI": w, "RRI_Times": window_times}
-                    )
-
-                    window_time_features["utc_time"] = t
-                    window_time_features["hrv_duration"] = pd.to_timedelta(
-                        w.sum(), unit="ms"
-                    )
-
-                time_features.append(window_time_features)
-
-            if compute_frequency_features:
-                if backend == "neurokit":
-                    window_frequency_features: pd.DataFrame = nk.hrv_frequency(
-                        {"RRI": w, "RRI_Times": window_times}
-                    )
-
-                    window_frequency_features["utc_time"] = t
-
-                frequency_features.append(window_frequency_features)
-
-    if compute_time_features:
-        if len(time_features) > 0:
-
-            hrv_time_features = (
-                pd.concat(time_features, axis=0, ignore_index=True)
-                .set_index("utc_time")
-                .rename_axis(None, axis=1)
-            )
-            if backend == "neurokit":
-                hrv_time_features = hrv_time_features.drop(
-                    [
-                        "HRV_SDNNI1",
-                        "HRV_SDANN1",
-                        "HRV_SDANN2",
-                        "HRV_SDNNI2",
-                        "HRV_SDANN5",
-                        "HRV_SDNNI5",
-                        "HRV_HTI",
-                        "HRV_TINN",
-                    ],
-                    axis=1,
+    valid_child_thresholds = hierarchy.normalize_valid_child_thresholds(
+        min_valid_children, len(chain)
+    )
+    hierarchy.warn_if_wide(statistics, aggregation_levels)
+    time_col = _resolve_time_col(loader, time_reference, chain)
+    cycle_target = next(
+        (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
+    )
+    cycle_parent = None
+    if cycle_target is not None:
+        cycle_parent = cycle.get_intervals(
+            loader,
+            cycle_type=cycle_target,
+            user_id=users,
+            start_date=start_date,
+            end_date=end_date,
+            **cycle_kwargs,
+        )
+    trajectory = _primary_trajectory(
+        loader,
+        users,
+        statistics,
+        start_date,
+        end_date,
+        time_col,
+        loader_kwargs,
+        backend,
+        coverage_thresholds[0],
+        coverage_thresholds[0] is not None,
+        cycle_parent=cycle_parent,
+        sleep_only=cycle_target == cycle.CYCLE_NIGHT
+        and getattr(loader, "hrv_source", "bbi") == "bbi",
+    )
+    trajectory = trajectory.rename(
+        columns={name: f"{name}__{HRV_PRIMARY_RESOLUTION}" for name in statistics}
+    )
+    for level_index, target in enumerate(chain[1:]):
+        lower = chain[level_index]
+        if target in cycle.CYCLE_TYPES:
+            parent = cycle_parent
+            if parent is None or target != cycle_target:
+                parent = cycle.get_intervals(
+                    loader,
+                    cycle_type=target,
+                    user_id=users,
+                    start_date=start_date,
+                    end_date=end_date,
+                    **cycle_kwargs,
                 )
-                hrv_time_features.columns = hrv_time_features.columns.str.lower()
-                hrv_time_features = hrv_time_features.rename(
-                    columns={
-                        "hrv_meannn": "hrv_mean_nn",
-                        "hrv_mediannn": "hrv_median_nn",
-                        "hrv_minnn": "hrv_min_nn",
-                        "hrv_maxnn": "hrv_max_nn",
-                    }
+            parent = parent.rename_axis(index={"calendar_date": "window_start"})
+            membership = "majority_overlap"
+        else:
+            bounds = {}
+            active_users = []
+            available_users = set(trajectory.index.get_level_values(0))
+            for user in users:
+                rows = trajectory.xs(user) if user in available_users else trajectory.iloc[0:0]
+                if rows.empty and (start_date is None or end_date is None):
+                    continue
+                lower_bound = (
+                    pd.Timestamp(start_date)
+                    if start_date is not None
+                    else rows["period_start"].min()
                 )
-    if compute_frequency_features:
-        if len(frequency_features) > 0:
-            hrv_frequency_features = (
-                pd.concat(frequency_features, axis=0, ignore_index=True)
-                .set_index("utc_time")
-                .rename_axis(None, axis=1)
+                upper_bound = (
+                    pd.Timestamp(end_date)
+                    if end_date is not None
+                    else rows["period_end"].max()
+                )
+                if lower in cycle.CYCLE_TYPES:
+                    lower_bound = lower_bound.normalize()
+                    upper_bound = upper_bound.normalize()
+                if pd.isna(lower_bound) or pd.isna(upper_bound):
+                    continue
+                bounds[user] = (lower_bound, upper_bound)
+                active_users.append(user)
+            if not active_users:
+                return trajectory.iloc[0:0].rename_axis(
+                    index={"window_start": schema.CALENDAR_DATE_COL}
+                )
+            parent = hierarchy.windows_for_resolution(active_users, target, bounds)
+            membership = (
+                "majority_overlap"
+                if lower not in hierarchy.CALENDAR_RESOLUTIONS
+                and lower not in cycle.CYCLE_TYPES
+                else "label"
             )
-        # TODO merge with frequency features
-        # TODO resample with 1 minute resolution
-
-    hrv_features = pd.concat(
-        (
-            pd.DataFrame.from_dict(timezone_info)
-            .set_index("utc_time")
-            .rename_axis(None, axis=1),
-            hrv_time_features,
-        ),
-        axis=1,
+        trajectory, _ = hierarchy.aggregate_level(
+            trajectory,
+            parent,
+            target_resolution=target,
+            aggregation=aggregation_levels[level_index],
+            membership=membership,
+            min_coverage=coverage_thresholds[level_index + 1],
+            min_valid_children=valid_child_thresholds[level_index + 1],
+        )
+    index_name = (
+        schema.CALENDAR_DATE_COL
+        if chain[-1] in cycle.CYCLE_TYPES
+        or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS
+        else time_col
     )
-    print(hrv_features)
-
-    return hrv_time_features
+    return trajectory.rename_axis(index={"window_start": index_name})
 
 
-def _compute_hrv_statistic(
-    bbi_dict: dict, metric: str, coverage: float = 0.7, **kwargs
-) -> dict:
-    """Computes a HRV statistic at a per night level
+def get_hrv_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    resolution: Union[str, pd.Timedelta, list, tuple] = "day",
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    aggregation=None,
+    min_coverage=None,
+    cycle_kwargs: dict | None = None,
+    min_valid_children=None,
+    backend: Literal["pywearable", "neurokit"] = "pywearable",
+) -> Union[pd.Series, pd.DataFrame]:
+    """Return HRV features at five minutes or along a resolution hierarchy.
 
-    This function computes a specific statistic for
-    the BBI data available for each night.
+    Raw-BBI loaders calculate non-overlapping five-minute features. Provider
+    loaders use their five-minute estimates and leave unsupported statistics
+    missing. A scalar calendar or cycle resolution is shorthand for a
+    five-minute-to-parent hierarchy. Source selection is fixed by the loader;
+    missing provider values are never filled from a different HRV source.
 
-    Parameters
-    ----------
-    bbi_dict: :class:`dict`
-        Dictionary of BBI night data, already filtered to include only sleep periods.
-    metric : :class:`str`
-        Name of the statistic to be computed
-    coverage : :class:`float`, optional
-        The percentage of expected bbi observations for a period to be considered in the analysis, by default 0.7.
+    ``min_coverage`` supplies one threshold per level. At the primary raw-BBI
+    level, coverage is represented BBI duration divided by window duration.
+    Provider coverage is used when available; an explicit primary threshold
+    rejects provider samples whose coverage is unavailable. Higher-level
+    coverage is the fraction of valid child features.
 
-    Returns
-    -------
-    :class:`dict`
-        dictionary with ``user_id`` as primary key, and a nested dictionary with
-        calendar days (:class:`datetime.date`) as keys and the cardiac metric as values.
+    Examples
+    --------
+    Five-minute RMSSD::
 
-     Raises
-    ------
-    ValueError
-        if `metric` isn't one of "RMSSD", "SDNN", "LF", "HF", "LFHF"
+        get_hrv_statistics(loader, statistic="hrv_rmssd", resolution="5min")
+
+    Nightly RMSSD followed by monthly mean and p90::
+
+        get_hrv_statistics(
+            loader,
+            statistic="hrv_rmssd",
+            resolution=["5min", "cycle_night", "monthly"],
+            aggregation=[["mean"], ["mean", "p90"]],
+            min_coverage=[0.7, 0.5, 0.8],
+            min_valid_children=[None, 3, 10],
+        )
     """
+    chain, hierarchical = _expanded_chain(resolution)
+    if not hierarchical and aggregation is not None:
+        raise ValueError("aggregation requires a resolution hierarchy")
+    if not hierarchical and min_valid_children is not None:
+        raise ValueError("min_valid_children requires a resolution hierarchy")
+    if backend not in {"pywearable", "neurokit"}:
+        raise ValueError("backend must be 'pywearable' or 'neurokit'")
+    loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
+    cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
+    statistics = _statistics_list(statistic)
+    users = list(utils.get_user_ids(loader, "all" if user_id is None else user_id))
 
-    daily_means = {}
+    if not hierarchical:
+        threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
+        time_col = _resolve_time_col(loader, time_reference, chain)
+        result = _primary_trajectory(
+            loader,
+            users,
+            statistics,
+            start_date,
+            end_date,
+            time_col,
+            loader_kwargs,
+            backend,
+            threshold,
+            min_coverage is not None,
+        )
+        columns = list(statistics)
+        if min_coverage is not None:
+            columns.extend(f"{name}__coverage" for name in statistics)
+        result = result[columns].rename_axis(index={"window_start": time_col})
+        if len(statistics) == 1 and min_coverage is None:
+            return result[statistics[0]]
+        return result
 
-    for date, bbi_df in bbi_dict.items():
-        bbi_df = bbi_df.set_index(constants.ISODATE_COL)
-        # we consider the coverage against the mean bbi in that window
-        counts = bbi_df.resample("5min").bbi.count()
-        means = bbi_df.resample("5min").bbi.mean()
-        coverage_filter = (counts > ((300 / (means / 1000)) * coverage)).values
-
-        # time-domain
-        if metric == CARDIAC_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES:
-            ST_analysis = bbi_df.resample("5min").bbi.apply(
-                lambda x: np.sqrt(np.mean(np.diff(x) ** 2)) if x.count() > 5 else 0
-            )
-        elif metric == CARDIAC_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL:
-            ST_analysis = bbi_df.resample("5min").bbi.apply(
-                lambda x: np.std(x, ddof=1) if x.count() > 5 else 0
-            )
-        # frequency domain
-        elif metric in CARDIAC_HRV_FREQUENCY_DOMAIN_STATISTICS:
-            LF_range = (0.04, 0.15)
-            HF_range = (0.15, 0.40)
-
-            def calculate_power(bbi, freq_range):
-                """Calculates power in freq band between `f1` and `f2` given an array of beat-to-beat intervals"""
-
-                # Resampling (with 4Hz) and interpolate
-                # Because RRi are unevenly spaced we must interpolate it for accurate PSD estimation.
-
-                fs = 4
-                t = np.cumsum(bbi)
-                t -= t.iloc[0]
-                f_interpol = interpolate.interp1d(
-                    t, bbi, kind="cubic", fill_value="extrapolate"
-                )
-                t_interpol = np.arange(t.iloc[0], t.iloc[-1], 1000.0 / fs)
-                nn_interpol = f_interpol(t_interpol)
-
-                # Subtract mean value from each sample for suppression of DC-offsets
-                nn_interpol = nn_interpol - np.mean(nn_interpol)
-                # Calculate power spectral density using Welch method
-                nfft = 2**12
-                if t.max() < 300000:
-                    nperseg = min(nfft, len(nn_interpol))
-                else:
-                    nperseg = 300
-                freq, psd = signal.welch(
-                    x=nn_interpol,
-                    fs=fs,
-                    window="hamming",
-                    nfft=nfft,
-                    nperseg=nperseg,
-                    scaling="density",
-                )
-
-                f1, f2 = freq_range
-                pow = np.trapz(
-                    psd[np.logical_and(freq >= f1, freq < f2)],
-                    freq[np.logical_and(freq >= f1, freq < f2)],
-                )
-
-                return pow
-
-            if metric == CARDIAC_STATISTIC_HIGH_FREQUENCY:
-                ST_analysis = bbi_df.resample("5min").bbi.apply(
-                    lambda x: calculate_power(x, HF_range) if x.count() > 5 else 0
-                )
-            elif metric == CARDIAC_STATISTIC_LOW_FREQUENCY:
-                ST_analysis = bbi_df.resample("5min").bbi.apply(
-                    lambda x: calculate_power(x, LF_range) if x.count() > 5 else 0
-                )
-            else:
-                # note that here we're computing LFHF ratios over 5 minutes and then getting the average
-                # it's not the same as computing the ratio of the mean LF and mean HF over a night
-                # if one wants the latter, it should be done as post processing by getting LF and HF overnight metrics
-                ST_analysis = bbi_df.resample("5min").bbi.apply(
-                    lambda x: (
-                        calculate_power(x, LF_range) / calculate_power(x, HF_range)
-                        if x.count() > 5
-                        else 0
-                    )
-                )
-        else:
-            raise ValueError(
-                f"{metric} is not a valid value. Select among {CARDIAC_HRV_STATISTICS}"
-            )
-        # check coverage
-        ST_analysis = ST_analysis.iloc[coverage_filter & (ST_analysis != 0).values]
-        # compute the mean overnight
-        if len(ST_analysis) > 0:
-            daily_mean = ST_analysis.values.mean()
-            if daily_mean is not None:
-                daily_means[date] = round(daily_mean, 2)
-            else:
-                daily_means[date] = np.nan
-        else:
-            daily_means[date] = np.nan
-    daily_means = pd.Series(daily_means)
-    daily_means.index = pd.to_datetime(daily_means.index)
-    return daily_means
-
-
-def _compute_bbi_wearing_time(bbi_dict: dict, **kwargs) -> pd.Series:
-    if len(bbi_dict) > 0:
-        bbi_df_list = []
-        for k, v in bbi_dict.items():
-            tmp_df = pd.DataFrame({"bbi": v["bbi"], "calendarDate": k})
-            bbi_df_list.append(tmp_df)
-        bbi_df = pd.concat(bbi_df_list, axis=0)
-        return pd.to_timedelta(bbi_df.groupby("calendarDate")["bbi"].sum(), unit="ms")
-
-    else:
-        return pd.Series()
+    return _hierarchical_hrv_statistics(
+        loader,
+        statistics,
+        users,
+        start_date,
+        end_date,
+        chain,
+        aggregation,
+        min_coverage,
+        min_valid_children,
+        loader_kwargs,
+        time_reference,
+        cycle_kwargs,
+        backend,
+    )
 
 
 def get_hrv_statistic(
     loader: BaseLoader,
     statistic: str,
-    user_id: Union[str, list] = "all",
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs: dict = {},
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    resolution: Union[str, pd.Timedelta, list, tuple] = "day",
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    aggregation=None,
+    min_coverage=None,
+    cycle_kwargs: dict | None = None,
+    min_valid_children=None,
     backend: Literal["pywearable", "neurokit"] = "pywearable",
-    period: Literal["awake", "sleep", "all"] = "all",
-    resolution: Union[pd.Timedelta, str] = "day",
 ):
+    """Return one HRV statistic; thin wrapper around :func:`get_hrv_statistics`."""
     return get_hrv_statistics(
         loader=loader,
         statistic=statistic,
         user_id=user_id,
         start_date=start_date,
         end_date=end_date,
-        coverage=coverage,
-        loader_kwargs=loader_kwargs,
-        backend=backend,
-        period=period,
         resolution=resolution,
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+        aggregation=aggregation,
+        min_coverage=min_coverage,
+        cycle_kwargs=cycle_kwargs,
+        min_valid_children=min_valid_children,
+        backend=backend,
     )
 
 
-def get_hrv_statistics(
+def get_five_minute_hrv_statistics(
     loader: BaseLoader,
-    user_id: Union[str, list, None],
-    start_date: Union[pd.Timestamp, None] = None,
-    end_date: Union[pd.Timestamp, None] = None,
     statistic: Union[str, list, tuple, None] = None,
-    coverage: float = 0.7,
-    loader_kwargs: dict = {},
-    sleep_stages_to_remove: Union[list, None] = ["awake", "unmeasurable"],
-    overlap_days: Union[int, None] = 7,
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    min_coverage=None,
     backend: Literal["pywearable", "neurokit"] = "pywearable",
-    period: Literal["day", "night", "all"] = "all",
-    resolution: Union[pd.Timedelta, str] = "day",
 ):
-    # Get user id from the loader
-    if user_id is None:
-        user_ids = loader.get_user_ids()
-    elif type(user_id) is str:
-        user_ids = [user_id]
-    else:
-        user_ids = user_id
+    """Return non-overlapping five-minute HRV features."""
+    return get_hrv_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution=HRV_PRIMARY_RESOLUTION,
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+        min_coverage=min_coverage,
+        backend=backend,
+    )
 
-    # Convert to datetime
-    start_date = pd.Timestamp(start_date) if not (start_date is None) else None
-    end_date = pd.Timestamp(end_date) if not (end_date is None) else None
 
-    # Check metrics
-    if statistic is None:
-        # Consider all metrics
-        statistics = HRV_STATISTICS
-    elif type(statistic) == str:
-        statistics = [statistic]
+def get_night_hrv_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    aggregation="mean",
+    min_coverage=None,
+    cycle_kwargs: dict | None = None,
+    min_valid_children=None,
+    backend: Literal["pywearable", "neurokit"] = "pywearable",
+):
+    """Return aggregated five-minute HRV features for main-sleep cycles."""
+    if min_coverage is None:
+        primary = 0.7 if getattr(loader, "hrv_source", "bbi") == "bbi" else None
+        min_coverage = [primary, None]
+    return get_hrv_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution=[HRV_PRIMARY_RESOLUTION, cycle.CYCLE_NIGHT],
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+        aggregation=aggregation,
+        min_coverage=min_coverage,
+        cycle_kwargs=cycle_kwargs,
+        min_valid_children=min_valid_children,
+        backend=backend,
+    )
 
-    # Check args and kwargs
-    if type(loader_kwargs) != dict:
+
+def get_daily_hrv_statistics(
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    aggregation=None,
+    min_coverage=None,
+    min_valid_children=None,
+    backend: Literal["pywearable", "neurokit"] = "pywearable",
+):
+    """Return HRV features aggregated over participant-local calendar days."""
+    return get_hrv_statistics(
+        loader=loader,
+        statistic=statistic,
+        user_id=user_id,
+        start_date=start_date,
+        end_date=end_date,
+        resolution="daily",
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+        aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
+        backend=backend,
+    )
+
+
+def _night_statistic_wrapper(loader, statistic, coverage=None, **kwargs):
+    """Implement the named nightly means through the multi-statistic API."""
+    aggregation = kwargs.pop("aggregation", "mean")
+    if aggregation != "mean":
         raise ValueError(
-            f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
+            "named night HRV wrappers only support aggregation='mean'; "
+            "use get_hrv_statistics for other aggregations"
         )
-
-    hrv_stats_df_list = []
-
-    if (start_date is None) and (end_date is None):
-        intervals = 1
-    else:
-        normalized_start_date = pd.Timestamp(start_date).normalize()
-        normalized_end_date = pd.Timestamp(end_date).normalize()
-        if end_date.hour > 0:
-            normalized_end_date += pd.Timedelta(hours=1)
-        intervals = int(
-            (normalized_end_date - normalized_start_date).days / (overlap_days)
-        )
-
-    # TODO do this at the end when filtering (?)
-    # Check if we need to filter sleep stages
-    filter_sleep_stages = False
-    if type(sleep_stages_to_remove) is list:
-        if len(sleep_stages_to_remove) > 0:
-            filter_sleep_stages = True
-    elif type(sleep_stages_to_remove) is str:
-        sleep_stages_to_remove = [sleep_stages_to_remove]
-        filter_sleep_stages = True
-
-    for user_id in user_ids:
-
-        # load the whole bbi history required, with some room (+- 12 hrs at start/end)
-        # to account for timezones
-        user_hrv_stats_df_list = []
-        for i in range(intervals):
-
-            tmp_start_date = (
-                normalized_start_date + pd.Timedelta(i * overlap_days, unit="d")
-                if not (start_date is None)
-                else None
-            )
-
-            tmp_end_date = (
-                tmp_start_date + pd.Timedelta((i + 1) * overlap_days, unit="d")
-                if not (start_date is None)
-                else None
-            )
-
-            logger.info(f"Loading BBI from {tmp_start_date} to {tmp_end_date}")
-
-            bbi_df = loader.load_bbi(
-                user_id=user_id,
-                start_date=tmp_start_date,
-                end_date=tmp_end_date,
-                **loader_kwargs,
-            )
-            logger.info(f"Total length of BBI: {len(bbi_df)} rows")
-            logger.info(f"First date: {bbi_df["local_time"].min()}")
-            logger.info(f"Last date: {bbi_df["local_time"].max()}")
-
-            if len(bbi_df) > 0:
-                if filter_sleep_stages:
-                    bbi_df = utils.filter_out_sleep_stages(
-                        loader=loader,
-                        user_id=user_id,
-                        df=bbi_df,
-                        stages_to_filter=sleep_stages_to_remove,
-                    )
-
-                # Get series with metrics computed over 5-minute windows
-                # split in time/frequency domain
-                user_hrv_stats = compute_hrv_statistics(
-                    bbi=bbi_df,
-                    coverage=coverage,
-                    backend=backend,
-                    statistics=statistics,
-                )
-                if len(user_hrv_stats) > 0:
-                    user_hrv_stats_df_list.append(user_hrv_stats)
-
-        if len(user_hrv_stats_df_list) > 0:
-            user_hrv_stats_df = pd.concat(user_hrv_stats_df_list, axis=0).assign(
-                user_id=user_id
-            )
-        else:
-            user_hrv_stats_df = (
-                pd.DataFrame(columns=statistics)
-                if len(statistics) > 1
-                else pd.Series(name=statistics[0])
-            )
-        # TODO not always start and end date are populated
-        user_hrv_stats_df = user_hrv_stats_df.reindex(
-            pd.date_range(
-                start=start_date,
-                end=end_date,
-                inclusive="left",
-                # normalize=True,
-                freq="1min",
-            )
-        )
-
-        hrv_stats_df_list.append(user_hrv_stats_df)
-    hrv_stats_df = pd.concat(hrv_stats_df_list, axis=0)
-    print(hrv_stats_df)
-    # TODO move this at the end only if period is day/night
-    sleep_summary = (
-        loader.load_sleep_summary(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-            drop_duplicates=True,
-        )
-        .sort_values(constants.CALENDAR_DATE_COL, ascending=True)
-        .set_index(constants.CALENDAR_DATE_COL)
+    if coverage is not None:
+        kwargs.setdefault("min_coverage", [coverage, None])
+    result = get_night_hrv_statistics(
+        loader=loader,
+        statistic=statistic,
+        aggregation="mean",
+        **kwargs,
     )
-    sleep_summary["wakeup"] = sleep_summary[constants.ISODATE_COL] + pd.to_timedelta(
-        sleep_summary[constants.DURATION_IN_MS_COL]
-        + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
-        unit="ms",
+    column = f"{statistic}__{HRV_PRIMARY_RESOLUTION}__{cycle.CYCLE_NIGHT}_mean"
+    return result[column].rename(statistic)
+
+
+def get_night_hrv_rmssd(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute RMSSD for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES, coverage, **kwargs
     )
 
-    if len(statistics) == 1:
-        return hrv_stats_df[statistic[0]]
-    else:
-        return hrv_stats_df
+
+def get_night_hrv_sdnn(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute SDNN for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL, coverage, **kwargs
+    )
+
+
+def get_night_hrv_vlf_power(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute VLF power for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER, coverage, **kwargs
+    )
+
+
+def get_night_hrv_lf_power(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute LF power for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_LOW_FREQUENCY_POWER, coverage, **kwargs
+    )
+
+
+def get_night_hrv_hf_power(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute HF power for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_HIGH_FREQUENCY_POWER, coverage, **kwargs
+    )
+
+
+def get_night_lfhf(loader, coverage: float | None = None, **kwargs):
+    """Return mean five-minute LF/HF for each main-sleep cycle."""
+    return _night_statistic_wrapper(
+        loader, HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO, coverage, **kwargs
+    )
+
+
+__all__ = [
+    "HRV_STATISTICS",
+    "compute_hrv_statistics",
+    "compute_pnn20",
+    "compute_pnn50",
+    "compute_rmssd",
+    "compute_sdnn",
+    "get_daily_hrv_statistics",
+    "get_five_minute_hrv_statistics",
+    "get_hrv_statistic",
+    "get_hrv_statistics",
+    "get_night_hrv_hf_power",
+    "get_night_hrv_lf_power",
+    "get_night_hrv_rmssd",
+    "get_night_hrv_sdnn",
+    "get_night_hrv_statistics",
+    "get_night_hrv_vlf_power",
+    "get_night_lfhf",
+]
