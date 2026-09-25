@@ -1,4 +1,21 @@
-"""Data-availability adherence for wearable physiological streams."""
+"""Measure data availability for wearable physiological streams.
+
+The module exposes adherence for heart rate, beat-to-beat intervals (BBI),
+and sleep summaries.  Each stream has a different native availability model:
+
+* heart rate measures the fraction of physical time represented by occupied
+  one-minute bins;
+* BBI measures the positive interval duration represented in a window; and
+* sleep measures the presence of a usable main-sleep summary for each local
+  calendar date.
+
+Scalar resolutions report that native coverage directly.  Resolution chains
+instead turn coverage at each non-final level into a valid/invalid child and
+report the fraction of expected children that remain valid at the final level.
+Unsupported streams and inapplicable metric/resolution combinations are
+represented by missing values, while supported streams with no observations
+have zero adherence.
+"""
 
 from __future__ import annotations
 
@@ -27,6 +44,7 @@ _ADHERENCE_COLUMNS = {
 
 
 def _metric_list(metric) -> list[str]:
+    """Normalize and validate a metric selection while preserving order."""
     if metric is None:
         return list(ADHERENCE_METRICS)
     metrics = [metric] if isinstance(metric, str) else list(metric)
@@ -40,6 +58,7 @@ def _metric_list(metric) -> list[str]:
 
 
 def _metric_loader_kwargs(loader_kwargs, metrics) -> dict[str, dict]:
+    """Return independent loader keyword dictionaries for selected metrics."""
     if loader_kwargs is None:
         return {metric: {} for metric in metrics}
     if not isinstance(loader_kwargs, dict):
@@ -60,6 +79,12 @@ def _metric_loader_kwargs(loader_kwargs, metrics) -> dict[str, dict]:
 
 
 def _resolve_time_col(loader, metrics, chain, time_reference: str) -> str:
+    """Resolve one timestamp column supported by all physical streams.
+
+    Sleep calendar adherence always uses local dates.  Physical streams use
+    UTC for fixed windows and local time for calendar or cycle windows when
+    ``time_reference='auto'``.
+    """
     physiological_chain = _physiological_chain(chain)
     calendar_based = (
         chain[-1] in hierarchy.CALENDAR_RESOLUTIONS or chain[-1] == "nightly"
@@ -103,6 +128,7 @@ def _resolve_time_col(loader, metrics, chain, time_reference: str) -> str:
 
 
 def _physiological_chain(chain):
+    """Translate the public ``nightly`` alias into a physical night cycle."""
     return [
         cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain
     ]
@@ -111,6 +137,7 @@ def _physiological_chain(chain):
 def _windows_for_resolution(
     loader, users, start, end, resolution, cycle_kwargs
 ):
+    """Construct cycle, calendar, or fixed windows for one resolution."""
     if resolution in cycle.CYCLE_TYPES:
         return cycle.get_intervals(
             loader,
@@ -126,6 +153,12 @@ def _windows_for_resolution(
 
 
 def _fixed_cycle_windows(users, intervals, resolution):
+    """Create fixed-grid windows that intersect valid cycle intervals.
+
+    Edge windows retain the full fixed duration.  Samples are separately
+    restricted to the cycle, so a partial edge window can have less than full
+    adherence even when every in-cycle instant is represented.
+    """
     duration = pd.Timedelta(resolution)
     records = []
     for user in users:
@@ -167,6 +200,12 @@ def _fixed_cycle_windows(users, intervals, resolution):
 def _primary_windows(
     loader, users, start, end, chain, cycle_kwargs
 ):
+    """Build primary windows and identify cycle intervals restricting data.
+
+    When a later hierarchy level is a cycle, fixed primary windows are created
+    only around valid instances of the first such cycle.  Each output window
+    stores the physical segment used by the raw adherence calculator.
+    """
     primary = chain[0]
     cycle_target = next(
         (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
@@ -202,6 +241,7 @@ def _primary_windows(
 
 
 def _merged_segments(segments):
+    """Return the union of valid half-open physical segments."""
     ordered = sorted(
         (
             (pd.Timestamp(start), pd.Timestamp(end))
@@ -220,6 +260,7 @@ def _merged_segments(segments):
 
 
 def _physical_bounds(windows, start, end):
+    """Return the smallest load interval covering all window segments."""
     segments = [
         segment
         for row_segments in windows["segments"]
@@ -231,6 +272,7 @@ def _physical_bounds(windows, start, end):
 
 
 def _filter_to_intervals(frame, user, intervals, time_col):
+    """Restrict one user's samples to the union of valid cycle intervals."""
     if frame is None or frame.empty or intervals is None:
         return frame
     if user not in intervals.index.get_level_values(0):
@@ -249,6 +291,13 @@ def _filter_to_intervals(frame, user, intervals, time_col):
 
 
 def _thresholded(value, threshold):
+    """Convert measured coverage into a valid child indicator.
+
+    With no explicit threshold, any positive coverage is valid.  A supplied
+    threshold qualifies values greater than or equal to it.  Failed, absent,
+    or unsupported values become missing so they count as invalid children at
+    the next hierarchy level.
+    """
     if pd.isna(value):
         return np.nan
     if threshold is None:
@@ -270,6 +319,15 @@ def _aggregate_adherence(
     cycle_kwargs,
     cycle_intervals=None,
 ):
+    """Aggregate qualified children and return final valid-child coverage.
+
+    The primary trajectory contains both measured coverage and a binary
+    feature indicating whether each child qualified.  Every non-final level
+    may apply its threshold before feeding the next level.  The final level is
+    intentionally not thresholded because its measured ``valid / expected``
+    child fraction is the requested result.  With a one-level chain, raw
+    coverage is returned directly.
+    """
     if len(chain) == 1:
         return trajectory[f"{feature}__coverage"]
 
@@ -309,6 +367,12 @@ def _aggregate_adherence(
 
 
 def _load_heart_rate(loader, user, start, end, time_col, loader_kwargs):
+    """Load, validate, and clean positive heart-rate samples for one user.
+
+    ``None`` means the loader does not support heart rate; an empty canonical
+    frame means the stream is supported but has no samples in the interval.
+    Two days of padding are requested to support local-time and cycle bounds.
+    """
     kwargs = dict(loader_kwargs)
     if "time_col" in kwargs:
         raise ValueError(
@@ -359,6 +423,11 @@ def _load_heart_rate(loader, user, start, end, time_col, loader_kwargs):
 
 
 def _load_bbi(loader, user, start, end, time_col, loader_kwargs):
+    """Load and normalize raw BBI data, or return ``None`` if unsupported.
+
+    Provider-computed HRV summaries are not treated as evidence that raw BBI
+    exists.  Duplicate timestamps retain the last normalized interval.
+    """
     if getattr(loader, "hrv_source", "bbi") != "bbi":
         return None
     try:
@@ -389,6 +458,13 @@ def _load_bbi(loader, user, start, end, time_col, loader_kwargs):
 
 
 def _heart_rate_adherence(frame, segments, time_col):
+    """Return occupied one-minute time divided by segment duration.
+
+    A minute contributes once when it contains at least one valid sample.
+    Partial minutes at segment boundaries contribute only their overlap with
+    the segment.  ``None`` denotes an unsupported stream; an empty supported
+    frame produces zero.
+    """
     if frame is None:
         return np.nan
     segments = _merged_segments(segments)
@@ -411,6 +487,12 @@ def _heart_rate_adherence(frame, segments, time_col):
 
 
 def _bbi_adherence(frame, segments, time_col):
+    """Return represented positive BBI duration divided by segment duration.
+
+    Each interval is assigned by its timestamp.  Coverage is clipped to one,
+    which protects against overlap, duplicate representation, and intervals
+    extending beyond a window boundary.
+    """
     if frame is None:
         return np.nan
     segments = _merged_segments(segments)
@@ -437,6 +519,13 @@ def _load_sleep_dates(
     loader_kwargs,
     check_sleep_validation,
 ):
+    """Return local dates with usable main-sleep summaries for one user.
+
+    All rows are requested so adherence can decide whether a date is present.
+    When validation checking is enabled, ``MANUAL`` and ``AUTO_MANUAL`` rows
+    are excluded.  ``None`` denotes an unsupported sleep-summary stream,
+    whereas an empty set denotes a supported stream with no usable nights.
+    """
     if "drop_duplicates" in loader_kwargs:
         raise ValueError(
             "sleep adherence always requests one main-sleep summary per date"
@@ -481,6 +570,13 @@ def _stream_adherence(
     loader_kwargs,
     cycle_kwargs,
 ):
+    """Calculate heart-rate or BBI adherence through a resolution chain.
+
+    The function constructs primary windows, loads one stream per user,
+    calculates raw coverage for every valid window, qualifies primary children
+    when the chain has upper levels, and delegates all later aggregation to
+    :func:`_aggregate_adherence`.
+    """
     windows, restricting_intervals = _primary_windows(
         loader, users, start, end, chain, cycle_kwargs
     )
@@ -566,6 +662,12 @@ def _sleep_daily_trajectory(
     loader_kwargs,
     check_sleep_validation,
 ):
+    """Build the native daily sleep-availability trajectory.
+
+    Each expected local date has raw coverage one when at least one usable
+    main-sleep summary exists and zero otherwise.  Only observed dates become
+    valid children for an upper level.
+    """
     feature = _ADHERENCE_COLUMNS[ADHERENCE_SLEEP]
     dates = pd.date_range(
         start.normalize(), end, freq="D", inclusive="left"
@@ -626,6 +728,12 @@ def _sleep_daily_trajectory(
 
 
 def _sleep_levels(chain, coverage_thresholds):
+    """Reduce a requested chain to sleep's daily-and-above native levels.
+
+    Fixed lower levels and cycle labels do not create artificial subdaily sleep
+    observations.  Calendar levels above daily are retained with their
+    corresponding thresholds.
+    """
     native = {
         "daily",
         "nightly",
@@ -658,6 +766,7 @@ def _constant_final_series(
     cycle_kwargs,
     value,
 ):
+    """Return one constant value on the final requested window index."""
     target = chain[-1]
     if target == "nightly":
         target = cycle.CYCLE_NIGHT
@@ -678,6 +787,12 @@ def _sleep_adherence_series(
     cycle_kwargs,
     check_sleep_validation,
 ):
+    """Calculate sleep-summary adherence at applicable final resolutions.
+
+    Awake-cycle adherence is structurally zero.  Fixed and other unsupported
+    final resolutions are inapplicable and therefore missing.  Night, daily,
+    and larger calendar outputs start from native daily summary presence.
+    """
     feature = _ADHERENCE_COLUMNS[ADHERENCE_SLEEP]
     if cycle.CYCLE_AWAKE in chain:
         return _constant_final_series(
@@ -748,20 +863,108 @@ def get_adherence(
     cycle_kwargs: dict | None = None,
     check_sleep_validation: bool = True,
 ) -> pd.DataFrame:
-    """Return final data-availability adherence in the interval ``[start, end)``.
+    """Return final data-availability adherence over ``[start_date, end_date)``.
 
     Heart-rate adherence is the fraction of physical time represented by
-    one-minute bins containing at least one valid sample. BBI adherence is
-    represented positive BBI duration divided by expected physical duration.
-    Sleep adherence is main-sleep-summary availability over expected local
-    calendar dates. Unsupported or inapplicable combinations are missing;
-    supported streams with no observations have zero adherence.
+    one-minute bins containing at least one positive sample.  BBI adherence is
+    positive BBI duration divided by expected physical duration.  Sleep
+    adherence is usable main-sleep-summary presence over expected local dates.
 
-    A resolution sequence applies each non-final coverage threshold before
-    calculating valid/expected child adherence at the next level. Only final
-    adherence is returned. Sleep enters a hierarchy at its native daily grain;
-    lower fixed resolutions are ignored for sleep. Garmin ``MANUAL`` and
-    ``AUTO_MANUAL`` summaries are excluded by default when validation exists.
+    A scalar resolution reports raw coverage directly.  A resolution sequence
+    qualifies children at every non-final level and reports final
+    ``valid children / expected children`` coverage.  Children have equal
+    weight, irrespective of their physical duration.  Sleep enters a hierarchy
+    at its native daily grain, so lower fixed resolutions are ignored rather
+    than populated with artificial observations.
+
+    Parameters
+    ----------
+    loader
+        Loader providing the requested streams and user identifiers.
+    metric
+        One metric name, a sequence of names, or ``None`` for all of
+        ``'heart_rate'``, ``'sleep'``, and ``'bbi'``.  Output columns follow the
+        requested order and are named ``<metric>_adherence``.
+    user_id
+        One user, a sequence of users, ``'all'``, or ``None``.  ``None`` is an
+        alias for ``'all'``.
+    start_date, end_date
+        Required half-open bounds, normalized to the clock selected by
+        ``time_reference``.  Sleep calendar bounds are always local.
+    resolution
+        A fixed resolution, calendar resolution, cycle type, or an ordered
+        resolution chain accepted by
+        :func:`pywearable.hierarchy.normalize_resolution_chain`.  ``'nightly'``
+        is an alias for ``cycle_night`` for physical streams and for
+        date-labelled nightly sleep-summary availability for sleep.
+    time_reference
+        ``'auto'``, ``'local'``, or ``'utc'``.  ``'auto'`` selects UTC for
+        fixed physical windows and local time for calendar or cycle windows.
+        All requested physical metrics must support the selected clock.  UTC
+        cannot represent sleep calendar adherence.
+    min_coverage
+        Optional number or sequence with one entry per requested resolution.
+        On non-final levels, a child qualifies when measured coverage is at
+        least this threshold.  ``None`` qualifies any child with positive
+        coverage.  The final entry is not applied because final coverage is
+        the returned value.  Consequently, this argument has no filtering
+        effect for a scalar resolution.
+    loader_kwargs
+        Optional mapping keyed by metric name.  Each value is forwarded to
+        that metric's loader method.  Heart-rate ``time_col`` is controlled by
+        ``time_reference`` and sleep ``drop_duplicates`` is controlled here,
+        so callers may not override them.
+    cycle_kwargs
+        Optional keyword arguments forwarded to :func:`cycle.get_intervals`.
+    check_sleep_validation
+        If true, sleep-summary rows labelled ``MANUAL`` or ``AUTO_MANUAL`` in
+        the canonical ``validation`` column do not count as observed nights.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Final adherence values indexed by ``(user_id, time)``.  The time index
+        is named ``utc_time`` or ``local_time`` for fixed windows and
+        ``calendar_date`` for calendar or cycle outputs.  Values lie in
+        ``[0, 1]``; missing values indicate an unsupported stream or an
+        inapplicable metric/resolution combination.
+
+    Raises
+    ------
+    ValueError
+        If bounds, metric names, resolutions, thresholds, clocks, or forwarded
+        keyword structures are invalid.
+
+    Notes
+    -----
+    ``resolution='daily'`` measures raw coverage across each day.  In contrast,
+    ``resolution=['5min', 'daily']`` measures the fraction of five-minute
+    children that satisfy the primary threshold.  These quantities coincide
+    only under particular sampling patterns.
+
+    Examples
+    --------
+    Direct five-minute coverage for heart rate and BBI::
+
+        get_adherence(
+            loader,
+            metric=['heart_rate', 'bbi'],
+            user_id='participant-01',
+            start_date='2024-01-01',
+            end_date='2024-01-02',
+            resolution='5min',
+        )
+
+    Fraction of qualifying five-minute heart-rate windows in each night::
+
+        get_adherence(
+            loader,
+            metric='heart_rate',
+            start_date='2024-01-01',
+            end_date='2024-02-01',
+            resolution=['5min', cycle.CYCLE_NIGHT],
+            min_coverage=[0.8, None],
+        )
     """
     if start_date is None or end_date is None:
         raise ValueError("start_date and end_date are required for adherence")
@@ -842,11 +1045,30 @@ def get_daily_wearing_time(
     user_id: str,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
-    loading_days: int = 7,
     ceil_to_24: bool = False,
 ) -> pd.Series:
-    """Return daily hours represented by one-minute heart-rate occupancy."""
-    _ = loading_days
+    """Return daily hours represented by one-minute heart-rate occupancy.
+
+    Each daily adherence fraction is multiplied by the exact requested
+    local-day duration, so partial first and last days remain partial.
+
+    Parameters
+    ----------
+    loader
+        Loader providing timestamped heart-rate samples.
+    user_id
+        One user identifier.
+    start_date, end_date
+        Required half-open local-time bounds.
+    ceil_to_24
+        If true, clip reported daily hours at 24.  Adherence is already capped
+        at one, so this only preserves the historical option.
+
+    Returns
+    -------
+    pandas.Series
+        Local-date-indexed hours named ``'daily-hr'``.
+    """
     result = get_adherence(
         loader,
         metric=ADHERENCE_HEART_RATE,
