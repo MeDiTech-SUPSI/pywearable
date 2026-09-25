@@ -101,6 +101,125 @@ def _sleep_summary(dates, validations=None):
     return frame
 
 
+def _scanned_heart_rate_adherence(frame, segments, time_col):
+    segments = adherence._merged_segments(segments)
+    expected_seconds = sum(
+        (end - start).total_seconds() for start, end in segments
+    )
+    if expected_seconds <= 0:
+        return np.nan
+    observed_seconds = 0.0
+    for start, end in segments:
+        timestamps = frame.loc[
+            frame[time_col].ge(start) & frame[time_col].lt(end), time_col
+        ]
+        for minute in timestamps.dt.floor("1min").drop_duplicates():
+            overlap_start = max(start, minute)
+            overlap_end = min(end, minute + pd.Timedelta(minutes=1))
+            if overlap_end > overlap_start:
+                observed_seconds += (overlap_end - overlap_start).total_seconds()
+    return min(1.0, observed_seconds / expected_seconds)
+
+
+def _scanned_bbi_adherence(frame, segments, time_col):
+    segments = adherence._merged_segments(segments)
+    expected_ms = sum(
+        (end - start).total_seconds() * 1000 for start, end in segments
+    )
+    if expected_ms <= 0:
+        return np.nan
+    observed_ms = 0.0
+    for start, end in segments:
+        observed_ms += frame.loc[
+            frame[time_col].ge(start) & frame[time_col].lt(end), "bbi"
+        ].sum()
+    return min(1.0, observed_ms / expected_ms)
+
+
+def test_binary_search_calculators_match_full_frame_scans():
+    timestamps = pd.date_range("2024-01-01", periods=101, freq="7s")
+    heart_rate = pd.DataFrame(
+        {"local_time": timestamps, "heart_rate": np.arange(len(timestamps)) + 50}
+    )
+    bbi = pd.DataFrame(
+        {"local_time": timestamps, "bbi": np.linspace(750, 1050, len(timestamps))}
+    )
+    segments = [
+        (
+            pd.Timestamp("2024-01-01 00:03:30"),
+            pd.Timestamp("2024-01-01 00:05:10"),
+        ),
+        (
+            pd.Timestamp("2024-01-01 00:00:13"),
+            pd.Timestamp("2024-01-01 00:04:41"),
+        ),
+        (
+            pd.Timestamp("2024-01-01 00:06:05"),
+            pd.Timestamp("2024-01-01 00:09:00"),
+        ),
+    ]
+
+    expected_heart_rate = _scanned_heart_rate_adherence(
+        heart_rate, segments, "local_time"
+    )
+    expected_bbi = _scanned_bbi_adherence(bbi, segments, "local_time")
+
+    assert (
+        adherence._heart_rate_adherence(heart_rate, segments, "local_time")
+        == expected_heart_rate
+    )
+    assert adherence._bbi_adherence(bbi, segments, "local_time") == expected_bbi
+
+
+def test_binary_search_cycle_filter_matches_boolean_interval_mask():
+    frame = pd.DataFrame(
+        {
+            "local_time": pd.date_range(
+                "2024-01-01", periods=21, freq="30s"
+            ),
+            "heart_rate": 60,
+        }
+    )
+    intervals = pd.DataFrame(
+        {
+            "user_id": ["user", "user", "user"],
+            "window_start": pd.to_datetime(
+                ["2024-01-01", "2024-01-02", "2024-01-03"]
+            ),
+            "start_time": pd.to_datetime(
+                [
+                    "2024-01-01 00:01:30",
+                    "2024-01-01 00:03:00",
+                    "2024-01-01 00:08:00",
+                ]
+            ),
+            "end_time": pd.to_datetime(
+                [
+                    "2024-01-01 00:04:00",
+                    "2024-01-01 00:06:30",
+                    "2024-01-01 00:09:00",
+                ]
+            ),
+            "interval_valid": [True, True, False],
+        }
+    ).set_index(["user_id", "window_start"])
+    valid = intervals.xs("user")
+    valid = valid[valid["interval_valid"]]
+    mask = np.zeros(len(frame), dtype=bool)
+    for interval in valid.itertuples():
+        mask |= (
+            frame["local_time"].ge(interval.start_time)
+            & frame["local_time"].lt(interval.end_time)
+        ).to_numpy()
+    expected = frame[mask].copy()
+
+    result = adherence._filter_to_intervals(
+        frame, "user", intervals, "local_time"
+    )
+
+    pd.testing.assert_frame_equal(result, expected)
+
+
 def test_five_minute_adherence_uses_minute_occupancy_and_bbi_duration():
     loader = AdherenceLoader(
         heart_rate=_heart_rate(

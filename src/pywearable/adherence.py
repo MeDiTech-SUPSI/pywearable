@@ -259,6 +259,15 @@ def _merged_segments(segments):
     return [(start, end) for start, end in merged]
 
 
+def _time_slice_bounds(timestamps, start, end):
+    """Locate one half-open interval in sorted datetime64 timestamps."""
+    start = pd.Timestamp(start).to_datetime64()
+    end = pd.Timestamp(end).to_datetime64()
+    left = timestamps.searchsorted(start, side="left")
+    right = timestamps.searchsorted(end, side="left")
+    return int(left), int(right)
+
+
 def _physical_bounds(windows, start, end):
     """Return the smallest load interval covering all window segments."""
     segments = [
@@ -281,13 +290,19 @@ def _filter_to_intervals(frame, user, intervals, time_col):
     valid = valid[valid["interval_valid"]]
     if valid.empty:
         return frame.iloc[0:0]
-    mask = np.zeros(len(frame), dtype=bool)
-    for interval in valid.itertuples():
-        mask |= (
-            frame[time_col].ge(interval.start_time)
-            & frame[time_col].lt(interval.end_time)
-        ).to_numpy()
-    return frame[mask].copy()
+    segments = _merged_segments(
+        (interval.start_time, interval.end_time)
+        for interval in valid.itertuples()
+    )
+    timestamps = frame[time_col].to_numpy(copy=False)
+    pieces = []
+    for start, end in segments:
+        left, right = _time_slice_bounds(timestamps, start, end)
+        if right > left:
+            pieces.append(frame.iloc[left:right])
+    if not pieces:
+        return frame.iloc[0:0].copy()
+    return pd.concat(pieces).copy()
 
 
 def _thresholded(value, threshold):
@@ -473,16 +488,24 @@ def _heart_rate_adherence(frame, segments, time_col):
         return np.nan
     if frame.empty:
         return 0.0
+    timestamps = frame[time_col].to_numpy(copy=False)
     observed_seconds = 0.0
     for start, end in segments:
-        timestamps = frame.loc[
-            frame[time_col].ge(start) & frame[time_col].lt(end), time_col
-        ]
-        for minute in timestamps.dt.floor("1min").drop_duplicates():
-            overlap_start = max(start, minute)
-            overlap_end = min(end, minute + pd.Timedelta(minutes=1))
-            if overlap_end > overlap_start:
-                observed_seconds += (overlap_end - overlap_start).total_seconds()
+        left, right = _time_slice_bounds(timestamps, start, end)
+        if right <= left:
+            continue
+        minutes = timestamps[left:right].astype("datetime64[m]")
+        unique_minutes = np.empty(len(minutes), dtype=bool)
+        unique_minutes[0] = True
+        unique_minutes[1:] = minutes[1:] != minutes[:-1]
+        minute_starts = minutes[unique_minutes].astype("datetime64[ns]")
+        overlap_starts = np.maximum(minute_starts, start.to_datetime64())
+        overlap_ends = np.minimum(
+            minute_starts + np.timedelta64(1, "m"), end.to_datetime64()
+        )
+        observed_seconds += (
+            (overlap_ends - overlap_starts).sum() / np.timedelta64(1, "s")
+        )
     return min(1.0, observed_seconds / expected_seconds)
 
 
@@ -503,11 +526,11 @@ def _bbi_adherence(frame, segments, time_col):
         return np.nan
     if frame.empty:
         return 0.0
+    timestamps = frame[time_col].to_numpy(copy=False)
     observed_ms = 0.0
     for start, end in segments:
-        observed_ms += frame.loc[
-            frame[time_col].ge(start) & frame[time_col].lt(end), schema.BBI_COL
-        ].sum()
+        left, right = _time_slice_bounds(timestamps, start, end)
+        observed_ms += frame[schema.BBI_COL].iloc[left:right].sum()
     return min(1.0, observed_ms / expected_ms)
 
 
