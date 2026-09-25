@@ -13,47 +13,47 @@ import pandas as pd
 from . import hierarchy, schema, utils
 from .loader.base import BaseLoader
 
-SLEEP_STATISTIC_TIB = "TIB"
-SLEEP_STATISTIC_TST = "TST"
-SLEEP_STATISTIC_WASO = "WASO"
-SLEEP_STATISTIC_SPT = "SPT"
-SLEEP_STATISTIC_DEEP_DURATION = "deep"
-SLEEP_STATISTIC_LIGHT_DURATION = "light"
-SLEEP_STATISTIC_REM_DURATION = "REM"
-SLEEP_STATISTIC_NREM_DURATION = "NREM"
-SLEEP_STATISTIC_AWAKE_DURATION = "awake"
-SLEEP_STATISTIC_UNMEASURABLE_DURATION = "unmeasurable"
-SLEEP_STATISTIC_SOL = "SOL"
-SLEEP_STATISTIC_DEEP_LATENCY = "lat_deep"
-SLEEP_STATISTIC_LIGHT_LATENCY = "lat_light"
-SLEEP_STATISTIC_REM_LATENCY = "lat_REM"
-SLEEP_STATISTIC_DEEP_PERCENTAGE = "%_deep"
-SLEEP_STATISTIC_LIGHT_PERCENTAGE = "%_light"
-SLEEP_STATISTIC_NREM_PERCENTAGE = "%_NREM"
-SLEEP_STATISTIC_REM_PERCENTAGE = "%_REM"
-SLEEP_STATISTIC_SE = "SE"
-SLEEP_STATISTIC_SME = "SME"
+SLEEP_STATISTIC_TIB = "sleep_TIB"
+SLEEP_STATISTIC_TST = "sleep_TST"
+SLEEP_STATISTIC_WASO = "sleep_WASO"
+SLEEP_STATISTIC_SPT = "sleep_SPT"
+SLEEP_STATISTIC_DEEP_DURATION = "sleep_deep"
+SLEEP_STATISTIC_LIGHT_DURATION = "sleep_light"
+SLEEP_STATISTIC_REM_DURATION = "sleep_REM"
+SLEEP_STATISTIC_NREM_DURATION = "sleep_NREM"
+SLEEP_STATISTIC_AWAKE_DURATION = "sleep_awake"
+SLEEP_STATISTIC_UNMEASURABLE_DURATION = "sleep_unmeasurable"
+SLEEP_STATISTIC_SOL = "sleep_SOL"
+SLEEP_STATISTIC_DEEP_LATENCY = "sleep_lat_deep"
+SLEEP_STATISTIC_LIGHT_LATENCY = "sleep_lat_light"
+SLEEP_STATISTIC_REM_LATENCY = "sleep_lat_REM"
+SLEEP_STATISTIC_DEEP_PERCENTAGE = "sleep_%_deep"
+SLEEP_STATISTIC_LIGHT_PERCENTAGE = "sleep_%_light"
+SLEEP_STATISTIC_NREM_PERCENTAGE = "sleep_%_NREM"
+SLEEP_STATISTIC_REM_PERCENTAGE = "sleep_%_REM"
+SLEEP_STATISTIC_SE = "sleep_SE"
+SLEEP_STATISTIC_SME = "sleep_SME"
 SLEEP_STATISTIC_SLEEP_SCORE = "sleep_score"
-SLEEP_STATISTIC_AWAKE_COUNT = "count_awake"
-SLEEP_STATISTIC_DEEP_COUNT = "count_deep"
-SLEEP_STATISTIC_LIGHT_COUNT = "count_light"
-SLEEP_STATISTIC_REM_COUNT = "count_REM"
-SLEEP_STATISTIC_BEDTIME = "bedtime"
-SLEEP_STATISTIC_SLEEP_ONSET = "sleep_onset"
-SLEEP_STATISTIC_WAKEUP = "wakeup"
-SLEEP_STATISTIC_GETUP = "getup"
-SLEEP_STATISTIC_MIDPOINT = "midpoint"
-SLEEP_STATISTIC_CPD_MIDPOINT = "cpd_midpoint"
-SLEEP_STATISTIC_CPD_DURATION = "cpd_duration"
-SLEEP_STATISTIC_VALIDATION = "validation"
-SLEEP_STATISTIC_SRI = "SRI"
-SLEEP_STATISTIC_GETUP_LATENCY = "getup_latency"
-SLEEP_STATISTIC_AWAKENING_COUNT = "awakening_count"
-SLEEP_STATISTIC_AWAKENING_INDEX = "awakening_index"
-SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION = "median_awakening_duration"
-SLEEP_STATISTIC_STAGE_TRANSITION_COUNT = "stage_transition_count"
-SLEEP_STATISTIC_STAGE_TRANSITION_INDEX = "stage_transition_index"
-SLEEP_STATISTIC_STAGE_COVERAGE = "stage_coverage"
+SLEEP_STATISTIC_AWAKE_COUNT = "sleep_count_awake"
+SLEEP_STATISTIC_DEEP_COUNT = "sleep_count_deep"
+SLEEP_STATISTIC_LIGHT_COUNT = "sleep_count_light"
+SLEEP_STATISTIC_REM_COUNT = "sleep_count_REM"
+SLEEP_STATISTIC_BEDTIME = "sleep_bedtime"
+SLEEP_STATISTIC_SLEEP_ONSET = "sleep_sleep_onset"
+SLEEP_STATISTIC_WAKEUP = "sleep_wakeup"
+SLEEP_STATISTIC_GETUP = "sleep_getup"
+SLEEP_STATISTIC_MIDPOINT = "sleep_midpoint"
+SLEEP_STATISTIC_CPD_MIDPOINT = "sleep_cpd_midpoint"
+SLEEP_STATISTIC_CPD_DURATION = "sleep_cpd_duration"
+SLEEP_STATISTIC_VALIDATION = "sleep_validation"
+SLEEP_STATISTIC_SRI = "sleep_SRI"
+SLEEP_STATISTIC_GETUP_LATENCY = "sleep_getup_latency"
+SLEEP_STATISTIC_AWAKENING_COUNT = "sleep_awakening_count"
+SLEEP_STATISTIC_AWAKENING_INDEX = "sleep_awakening_index"
+SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION = "sleep_median_awakening_duration"
+SLEEP_STATISTIC_STAGE_TRANSITION_COUNT = "sleep_stage_transition_count"
+SLEEP_STATISTIC_STAGE_TRANSITION_INDEX = "sleep_stage_transition_index"
+SLEEP_STATISTIC_STAGE_COVERAGE = "sleep_stage_coverage"
 
 SLEEP_TEMPORAL_STATISTICS = {
     SLEEP_STATISTIC_BEDTIME,
@@ -508,8 +508,9 @@ def get_sleep_timestamps(
 ) -> pd.DataFrame:
     """Return the main nightly sleep timestamps.
 
-    ``bedtime`` and ``getup`` delimit the provider-recorded sleep session.
-    ``sleep_onset`` and ``wakeup`` delimit observed sleep within that session.
+    ``sleep_bedtime`` and ``sleep_getup`` delimit the provider-recorded sleep
+    session. ``sleep_sleep_onset`` and ``sleep_wakeup`` delimit observed sleep
+    within that session.
 
     Parameters
     ----------
@@ -1136,7 +1137,7 @@ def get_sleep_regularity(
                     schema.USER_COL: user,
                     schema.CALENDAR_DATE_COL: day,
                     SLEEP_STATISTIC_SRI: sri,
-                    "sri_coverage": comparable_count / periods_per_day * 100,
+                    "sleep_sri_coverage": comparable_count / periods_per_day * 100,
                 }
             )
     if not records:
@@ -1144,7 +1145,7 @@ def get_sleep_regularity(
             [[], []], names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
         )
         return pd.DataFrame(
-            columns=[SLEEP_STATISTIC_SRI, "sri_coverage"], index=index
+            columns=[SLEEP_STATISTIC_SRI, "sleep_sri_coverage"], index=index
         )
     return (
         pd.DataFrame(records)
@@ -2585,7 +2586,9 @@ def _compute_sleep_onset(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
 ) -> pd.Series:
     """Return the first observed sleep-stage timestamp for each night."""
-    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["sleep_onset"]
+    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["sleep_onset"].rename(
+        SLEEP_STATISTIC_SLEEP_ONSET
+    )
 
 
 def _compute_wakeup_time(
@@ -2596,7 +2599,9 @@ def _compute_wakeup_time(
     A trailing unmeasurable interval or an unexplained stage gap makes this
     timestamp unavailable rather than treating the session end as wake-up.
     """
-    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["wakeup"]
+    return _compute_sleep_boundaries(sleep_summary, sleep_stages)["wakeup"].rename(
+        SLEEP_STATISTIC_WAKEUP
+    )
 
 
 def _compute_getup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:

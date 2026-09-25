@@ -289,9 +289,9 @@ def test_sleep_regularity_reports_nap_policy_and_comparison_coverage():
         include_naps=False,
     )
 
-    assert with_nap.iloc[0]["SRI"] == pytest.approx(100 - 200 / 24)
-    assert with_nap.iloc[0]["sri_coverage"] == 100
-    assert without_nap.iloc[0]["SRI"] == 100
+    assert with_nap.iloc[0]["sleep_SRI"] == pytest.approx(100 - 200 / 24)
+    assert with_nap.iloc[0]["sleep_sri_coverage"] == 100
+    assert without_nap.iloc[0]["sleep_SRI"] == 100
     assert sleep.get_sleep_regularity_index(
         _trajectory_loader(),
         "person-1",
@@ -310,8 +310,8 @@ def test_sleep_regularity_does_not_fill_missing_session_time_as_wake():
         resolution="1h",
     )
 
-    assert regularity.iloc[0]["SRI"] == 100
-    assert regularity.iloc[0]["sri_coverage"] == pytest.approx(23 / 24 * 100)
+    assert regularity.iloc[0]["sleep_SRI"] == 100
+    assert regularity.iloc[0]["sleep_sri_coverage"] == pytest.approx(23 / 24 * 100)
 
 
 def test_sleep_regularity_requires_a_resolution_dividing_24_hours():

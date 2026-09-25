@@ -313,16 +313,16 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
     assert loaded_stages["timezone_offset_in_ms"].isna().all()
 
     features = sleep.get_sleep_statistics(loader, user_id="person-1")
-    np.testing.assert_allclose(features["TIB"], [75, 70])
-    np.testing.assert_allclose(features["TST"], [60, 60])
-    np.testing.assert_allclose(features["SOL"], [5, 5])
-    np.testing.assert_allclose(features["WASO"], [5, 0])
-    assert features["count_awake"].tolist() == [3, 2]
-    assert features.loc[("person-1", pd.Timestamp("2024-01-02")), "count_REM"] == 2
+    np.testing.assert_allclose(features["sleep_TIB"], [75, 70])
+    np.testing.assert_allclose(features["sleep_TST"], [60, 60])
+    np.testing.assert_allclose(features["sleep_SOL"], [5, 5])
+    np.testing.assert_allclose(features["sleep_WASO"], [5, 0])
+    assert features["sleep_count_awake"].tolist() == [3, 2]
+    assert features.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_count_REM"] == 2
     assert pd.isna(
-        features.loc[("person-1", pd.Timestamp("2024-01-03")), "count_REM"]
+        features.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_count_REM"]
     )
-    assert pd.isna(features.loc[("person-1", pd.Timestamp("2024-01-03")), "%_REM"])
+    assert pd.isna(features.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_%_REM"])
 
 
 def test_lifesnaps_marks_unknown_intervals_unmeasurable(tmp_path, monkeypatch):
@@ -383,9 +383,9 @@ def test_lifesnaps_marks_unknown_intervals_unmeasurable(tmp_path, monkeypatch):
     assert summary.loc[0, "awake_duration_in_ms"] == 10 * 60_000
     assert summary.loc[0, "unmeasurable_sleep_duration_in_ms"] == 10 * 60_000
     assert loaded_stages.iloc[-1]["type"] == "unmeasurable"
-    assert features.iloc[0]["TIB"] == 80
-    assert features.iloc[0]["TST"] == 60
-    assert features.iloc[0]["unmeasurable"] == 10
+    assert features.iloc[0]["sleep_TIB"] == 80
+    assert features.iloc[0]["sleep_TST"] == 60
+    assert features.iloc[0]["sleep_unmeasurable"] == 10
 
 
 def test_lifesnaps_drops_only_incoherent_stages(tmp_path, monkeypatch):
@@ -434,5 +434,5 @@ def test_lifesnaps_drops_only_incoherent_stages(tmp_path, monkeypatch):
         features = sleep.get_sleep_statistics(loader, user_id="person-1")
 
     assert loaded_stages.empty
-    assert features.iloc[0]["TST"] == 60
-    assert pd.isna(features.iloc[0]["SPT"])
+    assert features.iloc[0]["sleep_TST"] == 60
+    assert pd.isna(features.iloc[0]["sleep_SPT"])

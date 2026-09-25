@@ -3,7 +3,16 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from pywearable import sleep, schema
+from pywearable import hierarchy, sleep, schema
+
+
+def test_sleep_feature_names_are_family_prefixed():
+    assert all(name.startswith("sleep_") for name in sleep.SLEEP_STATISTICS_DICT)
+    assert sleep.SLEEP_STATISTIC_SLEEP_ONSET == "sleep_sleep_onset"
+    assert hierarchy.family_statistics(
+        [sleep.SLEEP_STATISTIC_TIB, "spo2_mean", sleep.SLEEP_STATISTIC_SLEEP_SCORE],
+        "sleep",
+    ) == [sleep.SLEEP_STATISTIC_TIB, sleep.SLEEP_STATISTIC_SLEEP_SCORE]
 
 
 def test_legacy_sleep_columns_are_normalized():
@@ -50,13 +59,13 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
         user_id="person-1",
         start_date=None,
         end_date=None,
-        statistic=["sleep_score", "TIB", "TST", "count_awake"],
+        statistic=["sleep_score", "sleep_TIB", "sleep_TST", "sleep_count_awake"],
     )
-    assert list(result) == ["sleep_score", "TIB", "TST", "count_awake"]
-    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TIB"] == 60
-    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "TST"] == 60
+    assert list(result) == ["sleep_score", "sleep_TIB", "sleep_TST", "sleep_count_awake"]
+    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_TIB"] == 60
+    assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_TST"] == 60
     assert pd.isna(
-        result.loc[("person-1", pd.Timestamp("2024-01-02")), "count_awake"]
+        result.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_count_awake"]
     )
     assert pd.isna(result.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_score"])
     score = sleep.get_sleep_statistics(
@@ -69,8 +78,9 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     timestamps = sleep.get_sleep_timestamps(loader, "person-1")
     assert isinstance(timestamps, pd.DataFrame)
     assert timestamps.index.names == ["user_id", "calendar_date"]
-    assert list(timestamps) == ["bedtime", "sleep_onset", "wakeup", "getup"]
-    assert timestamps[["sleep_onset", "wakeup"]].isna().all().all()
+    assert list(timestamps) == ["sleep_bedtime", "sleep_sleep_onset", "sleep_wakeup", "sleep_getup"]
+    assert timestamps[["sleep_sleep_onset", "sleep_wakeup"]].isna().all().all()
+    assert sleep.get_sleep_onset(loader, "person-1").name == "sleep_sleep_onset"
 
     with pytest.raises(ValueError, match="statistic must be one among"):
         sleep.get_sleep_statistics(
@@ -99,15 +109,15 @@ def test_sleep_trajectory_is_sorted_and_accepts_omitted_bounds():
     )
 
     result = sleep.get_sleep_statistics(
-        loader, user_id="person-1", statistic=["TIB", "SPT"]
+        loader, user_id="person-1", statistic=["sleep_TIB", "sleep_SPT"]
     )
 
     assert result.index.tolist() == [
         ("person-1", pd.Timestamp("2024-01-02")),
         ("person-1", pd.Timestamp("2024-01-03")),
     ]
-    assert result["TIB"].tolist() == [60, 60]
-    assert result["SPT"].isna().all()
+    assert result["sleep_TIB"].tolist() == [60, 60]
+    assert result["sleep_SPT"].isna().all()
 
 
 def test_sleep_trajectory_rejects_more_than_one_summary_per_night():
@@ -131,7 +141,7 @@ def test_sleep_trajectory_rejects_more_than_one_summary_per_night():
     )
 
     with pytest.raises(ValueError, match="one row per calendar_date"):
-        sleep.get_sleep_statistics(loader, user_id="person-1", statistic="TIB")
+        sleep.get_sleep_statistics(loader, user_id="person-1", statistic="sleep_TIB")
 
 
 def test_sleep_period_time_uses_datetimes_without_unix_milliseconds():

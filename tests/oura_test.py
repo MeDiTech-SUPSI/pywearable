@@ -99,42 +99,42 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
     )
     assert result.shape == (1, 39)
     assert set(result) == {
-        "TIB", "TST", "SE", "SME", "SPT", "WASO", "SOL", "deep", "light",
-        "REM", "NREM", "awake", "unmeasurable", "%_deep", "%_light",
-        "%_REM", "%_NREM", "lat_deep", "lat_light", "lat_REM",
-        "sleep_score", "count_awake", "count_deep", "count_light", "count_REM",
-        "awakening_count", "awakening_index", "median_awakening_duration",
-        "stage_transition_count", "stage_transition_index", "stage_coverage",
-        "bedtime", "sleep_onset", "wakeup", "getup", "getup_latency",
-        "midpoint", "cpd_midpoint", "cpd_duration",
+        "sleep_TIB", "sleep_TST", "sleep_SE", "sleep_SME", "sleep_SPT", "sleep_WASO", "sleep_SOL", "sleep_deep", "sleep_light",
+        "sleep_REM", "sleep_NREM", "sleep_awake", "sleep_unmeasurable", "sleep_%_deep", "sleep_%_light",
+        "sleep_%_REM", "sleep_%_NREM", "sleep_lat_deep", "sleep_lat_light", "sleep_lat_REM",
+        "sleep_score", "sleep_count_awake", "sleep_count_deep", "sleep_count_light", "sleep_count_REM",
+        "sleep_awakening_count", "sleep_awakening_index", "sleep_median_awakening_duration",
+        "sleep_stage_transition_count", "sleep_stage_transition_index", "sleep_stage_coverage",
+        "sleep_bedtime", "sleep_sleep_onset", "sleep_wakeup", "sleep_getup", "sleep_getup_latency",
+        "sleep_midpoint", "sleep_cpd_midpoint", "sleep_cpd_duration",
     }
-    assert not {"validation", "SRI"} & set(result)
+    assert not {"sleep_validation", "sleep_SRI"} & set(result)
     night = result.iloc[0]
-    assert night["TIB"] == 80
-    assert night["TST"] == 65
-    assert night["SPT"] == 80
-    assert night["WASO"] == 5
-    assert night["SOL"] == 0
-    assert night["SME"] == 93.75
-    assert night["lat_deep"] == 10
-    assert night["lat_light"] == 0
-    assert night["lat_REM"] == 25
-    assert night["count_awake"] == 1
-    assert night["count_deep"] == 1
-    assert night["count_light"] == 1
-    assert night["count_REM"] == 1
-    assert night["bedtime"] == pd.Timestamp("2024-01-01 23:00")
-    assert night["sleep_onset"] == pd.Timestamp("2024-01-01 23:00")
-    assert night["wakeup"] == pd.Timestamp("2024-01-02 00:20")
-    assert night["getup"] == pd.Timestamp("2024-01-02 00:20")
-    assert night["getup_latency"] == 0
-    assert night["midpoint"] == pd.Timestamp("2024-01-01 23:40")
-    assert night["awakening_count"] == 1
-    assert night["awakening_index"] == pytest.approx(60 / 65)
-    assert night["median_awakening_duration"] == 5
-    assert night["stage_transition_count"] == 1
-    assert night["stage_transition_index"] == pytest.approx(60 / 65)
-    assert night["stage_coverage"] == 100
+    assert night["sleep_TIB"] == 80
+    assert night["sleep_TST"] == 65
+    assert night["sleep_SPT"] == 80
+    assert night["sleep_WASO"] == 5
+    assert night["sleep_SOL"] == 0
+    assert night["sleep_SME"] == 93.75
+    assert night["sleep_lat_deep"] == 10
+    assert night["sleep_lat_light"] == 0
+    assert night["sleep_lat_REM"] == 25
+    assert night["sleep_count_awake"] == 1
+    assert night["sleep_count_deep"] == 1
+    assert night["sleep_count_light"] == 1
+    assert night["sleep_count_REM"] == 1
+    assert night["sleep_bedtime"] == pd.Timestamp("2024-01-01 23:00")
+    assert night["sleep_sleep_onset"] == pd.Timestamp("2024-01-01 23:00")
+    assert night["sleep_wakeup"] == pd.Timestamp("2024-01-02 00:20")
+    assert night["sleep_getup"] == pd.Timestamp("2024-01-02 00:20")
+    assert night["sleep_getup_latency"] == 0
+    assert night["sleep_midpoint"] == pd.Timestamp("2024-01-01 23:40")
+    assert night["sleep_awakening_count"] == 1
+    assert night["sleep_awakening_index"] == pytest.approx(60 / 65)
+    assert night["sleep_median_awakening_duration"] == 5
+    assert night["sleep_stage_transition_count"] == 1
+    assert night["sleep_stage_transition_index"] == pytest.approx(60 / 65)
+    assert night["sleep_stage_coverage"] == 100
 
 
 def test_oura_stages_decode_runs_and_filter_by_local_instant(tmp_path):
@@ -302,6 +302,7 @@ def test_oura_vendor_hrv_and_respiration_keep_night_and_sample_grains(tmp_path):
     assert list(samples["oura_rmssd_ms"]) == [40.0, 44.0]
     assert samples.loc[0, "utc_time"] == pd.Timestamp("2024-01-01 22:05")
     assert breaths.loc[0, "oura_average_breaths_per_minute"] == 14.5
+    assert breaths.loc[0, "respiratory_rate_mean"] == 14.5
 
 
 def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
@@ -312,6 +313,7 @@ def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
     loader = OuraLoader(tmp_path)
     assert loader.load_steps_summary("person-1").loc[0, "steps"] == 8021
     assert loader.load_pulse_ox_summary("person-1").loc[0, "oura_daily_spo2_percentage"] == 97.6
+    assert loader.load_spo2_summary("person-1").loc[0, "spo2_mean"] == 97.6
     assert loader.load_readiness("person-1").loc[0, "readiness_hrv_balance"] == 71
     assert loader.load_resilience("person-1").loc[0, "oura_resilience_level"] == "solid"
     assert loader.load_steps_summary("person-1", "2024-01-03", "2024-01-04").empty
