@@ -585,22 +585,16 @@ def get_respiration_line_graph_and_stats(
         Dictionary reporting average breaths per minute during the day and the night
     """
 
-    # get series, note that we're inclusive wrt the whole last day
-    rest_dates, rest_resp = zip(
-        *respiration.get_mean_rest_breaths_per_minute(
-            loader, user_id, start_date, end_date, return_df=False, remove_zero=True
-        )[user_id].items()
-    )
-    waking_dates, waking_resp = zip(
-        *respiration.get_mean_awake_breaths_per_minute(
-            loader,
-            user_id,
-            start_date,
-            end_date,
-            return_df=False,
-            remove_zero=True,
-        )[user_id].items()
-    )
+    rest = respiration.get_night_respiration_statistics(
+        loader, statistic="respiratory_rate_mean", user_id=user_id,
+        start_date=start_date, end_date=end_date,
+    ).xs(user_id)
+    awake = respiration.get_awake_respiration_statistics(
+        loader, statistic="respiratory_rate_mean", user_id=user_id,
+        start_date=start_date, end_date=end_date,
+    ).xs(user_id)
+    rest_dates, rest_resp = zip(*rest.items())
+    waking_dates, waking_resp = zip(*awake.items())
     combined_dates = sorted(
         list(set(rest_dates + waking_dates))
     )  # not always we have waking/rest data, but need consistent x labeling

@@ -13,6 +13,10 @@ class BaseLoader(ABC):
     heart_rate_time_columns = ("utc_time", "local_time")
     hrv_source = "bbi"
     hrv_time_columns = ("utc_time", "local_time")
+    respiratory_rate_source = "samples"
+    respiratory_rate_time_columns = ("utc_time", "local_time")
+    spo2_source = "samples"
+    spo2_time_columns = ("utc_time", "local_time")
 
     def __init__(self):
         pass
@@ -147,16 +151,15 @@ class BaseLoader(ABC):
         """
         pass
 
-    @abstractmethod
     def load_pulse_ox(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        pass
+        """Load oxygen-saturation samples in the shared sample schema."""
+        return schema.empty_spo2_frame()
 
-    @abstractmethod
     def load_respiration(
         self,
         user_id: str,
@@ -183,14 +186,9 @@ class BaseLoader(ABC):
         :class:`pd.DataFrame`
             DataFrame with respiration data.
 
-        Raises
-        ------
-        NotImplementedError
-            Method must be implement by loaders.
         """
-        raise NotImplementedError
+        return schema.empty_respiration_frame()
 
-    @abstractmethod
     def load_sleep_pulse_ox(
         self,
         user_id: str,
@@ -217,14 +215,9 @@ class BaseLoader(ABC):
         :class:`pd.DataFrame`
             DataFrame with sleep pulse ox data.
 
-        Raises
-        ------
-        NotImplementedError
-            Method must be implement by loaders.
         """
-        pass
+        return schema.empty_spo2_frame()
 
-    @abstractmethod
     def load_sleep_respiration(
         self,
         user_id: str,
@@ -251,12 +244,39 @@ class BaseLoader(ABC):
         :class:`pd.DataFrame`
             DataFrame with sleep respiration data.
 
-        Raises
-        ------
-        NotImplementedError
-            Method must be implement by loaders.
         """
-        pass
+        return schema.empty_respiration_frame()
+
+    def load_respiration_summary(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load provider-native nightly respiratory-rate summaries."""
+        return pd.DataFrame(
+            columns=[
+                schema.CALENDAR_DATE_COL,
+                schema.RESPIRATORY_RATE_MEAN_COL,
+                schema.RESPIRATORY_RATE_STD_COL,
+            ]
+        )
+
+    def load_spo2_summary(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        """Load provider-native nightly oxygen-saturation summaries."""
+        return pd.DataFrame(
+            columns=[
+                schema.CALENDAR_DATE_COL,
+                schema.SPO2_MEAN_COL,
+                schema.SPO2_LOWER_BOUND_COL,
+                schema.SPO2_UPPER_BOUND_COL,
+            ]
+        )
 
     def load_stress(
         self,

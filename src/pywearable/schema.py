@@ -39,6 +39,27 @@ HRV_LF_POWER_COL = "hrv_lf_power"
 HRV_HF_POWER_COL = "hrv_hf_power"
 HRV_COVERAGE_COL = "hrv_coverage"
 
+RESPIRATORY_RATE_COL = "respiratory_rate"
+RESPIRATORY_RATE_MEAN_COL = "respiratory_rate_mean"
+RESPIRATORY_RATE_STD_COL = "respiratory_rate_std"
+SPO2_COL = "spo2"
+SPO2_MEAN_COL = "spo2_mean"
+SPO2_LOWER_BOUND_COL = "spo2_lower_bound"
+SPO2_UPPER_BOUND_COL = "spo2_upper_bound"
+RESPIRATION_TIME_COLUMNS = (UTC_TIME_COL, LOCAL_TIME_COL)
+RESPIRATION_SAMPLE_REQUIRED_COLUMNS = (
+    UTC_TIME_COL,
+    LOCAL_TIME_COL,
+    TIMEZONE_COL,
+    RESPIRATORY_RATE_COL,
+)
+SPO2_SAMPLE_REQUIRED_COLUMNS = (
+    UTC_TIME_COL,
+    LOCAL_TIME_COL,
+    TIMEZONE_COL,
+    SPO2_COL,
+)
+
 SLEEP_SUMMARY_ID_COL = "sleep_summary_id"
 SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL = "overall_sleep_score"
 SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL = "light_sleep_duration_in_ms"
@@ -152,6 +173,152 @@ def empty_heart_rate_frame(extra_columns=()) -> pd.DataFrame:
 def empty_bbi_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical BBI columns."""
     return pd.DataFrame(columns=[*BBI_REQUIRED_COLUMNS, *extra_columns])
+
+
+def empty_respiration_frame(extra_columns=()) -> pd.DataFrame:
+    """Return an empty table containing the canonical respiration columns."""
+    return pd.DataFrame(
+        columns=[*RESPIRATION_SAMPLE_REQUIRED_COLUMNS, *extra_columns]
+    )
+
+
+def empty_spo2_frame(extra_columns=()) -> pd.DataFrame:
+    """Return an empty table containing the canonical SpO2 columns."""
+    return pd.DataFrame(columns=[*SPO2_SAMPLE_REQUIRED_COLUMNS, *extra_columns])
+
+
+def _prepare_physiological_samples(frame, value_col, label):
+    """Normalize one timestamped physiological stream into shared columns."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError(f"{label} data must be a pandas DataFrame")
+    frame = frame.copy()
+    if LOCAL_TIME_COL not in frame.columns:
+        frame[LOCAL_TIME_COL] = pd.NaT
+    frame[LOCAL_TIME_COL] = pd.to_datetime(
+        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+    if UTC_TIME_COL not in frame.columns:
+        frame[UTC_TIME_COL] = pd.NaT
+    frame[UTC_TIME_COL] = pd.to_datetime(
+        frame[UTC_TIME_COL], errors="coerce", utc=True
+    ).dt.tz_localize(None)
+    if TIMEZONE_COL not in frame.columns:
+        frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    if value_col not in frame.columns:
+        if frame.empty:
+            frame[value_col] = pd.Series(dtype=float)
+        else:
+            raise ValueError(f"{label} data is missing required column: {value_col}")
+    frame[value_col] = pd.to_numeric(frame[value_col], errors="coerce")
+    if IS_SLEEPING_COL in frame.columns:
+        frame[IS_SLEEPING_COL] = frame[IS_SLEEPING_COL].astype("boolean")
+    if CALENDAR_DATE_COL in frame.columns:
+        frame[CALENDAR_DATE_COL] = pd.to_datetime(
+            frame[CALENDAR_DATE_COL], errors="coerce"
+        ).dt.normalize()
+    frame = frame[
+        frame[value_col].gt(0)
+        & (frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna())
+    ]
+    if value_col == SPO2_COL:
+        frame = frame[frame[value_col].le(100)]
+    order_col = (
+        UTC_TIME_COL if frame[UTC_TIME_COL].notna().any() else LOCAL_TIME_COL
+    )
+    return frame.sort_values(order_col, kind="stable").reset_index(drop=True)
+
+
+def prepare_respiration_samples(frame):
+    """Validate and normalize timestamped respiratory-rate samples."""
+    return _prepare_physiological_samples(
+        frame,
+        RESPIRATORY_RATE_COL,
+        "respiration",
+    )
+
+
+def prepare_spo2_samples(frame):
+    """Validate and normalize timestamped oxygen-saturation samples."""
+    return _prepare_physiological_samples(
+        frame,
+        SPO2_COL,
+        "SpO2",
+    )
+
+
+def _prepare_provider_summary(frame, value_columns, label):
+    """Normalize a canonical summary while preserving additional fields."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError(f"{label} summary must be a pandas DataFrame")
+    frame = frame.copy()
+    if CALENDAR_DATE_COL not in frame.columns:
+        if frame.empty:
+            frame[CALENDAR_DATE_COL] = pd.Series(dtype="datetime64[ns]")
+        else:
+            raise ValueError(
+                f"{label} summary is missing required column: {CALENDAR_DATE_COL}"
+            )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce"
+    ).dt.normalize()
+    for column in value_columns:
+        if column not in frame.columns:
+            frame[column] = pd.Series(float("nan"), index=frame.index, dtype=float)
+        else:
+            frame[column] = pd.to_numeric(frame[column], errors="coerce")
+    for column in (LOCAL_TIME_COL, LOCAL_END_TIME_COL):
+        if column in frame.columns:
+            frame[column] = pd.to_datetime(
+                frame[column], errors="coerce", format="mixed"
+            ).map(
+                lambda value: value.tz_localize(None)
+                if pd.notna(value) and value.tzinfo is not None
+                else value
+            )
+    frame = frame[frame[CALENDAR_DATE_COL].notna()].copy()
+    for column in value_columns:
+        valid = (
+            frame[column].ge(0)
+            if column == RESPIRATORY_RATE_STD_COL
+            else frame[column].gt(0)
+        )
+        if column in (SPO2_MEAN_COL, SPO2_LOWER_BOUND_COL, SPO2_UPPER_BOUND_COL):
+            valid &= frame[column].le(100)
+        frame.loc[~valid, column] = float("nan")
+    if frame[CALENDAR_DATE_COL].duplicated().any():
+        raise ValueError(
+            f"{label} summary must contain at most one row per calendar_date"
+        )
+    return frame.sort_values(CALENDAR_DATE_COL, kind="stable").reset_index(drop=True)
+
+
+def prepare_respiration_summary(frame):
+    """Validate provider-native nightly respiratory-rate summaries."""
+    return _prepare_provider_summary(
+        frame,
+        (RESPIRATORY_RATE_MEAN_COL, RESPIRATORY_RATE_STD_COL),
+        "respiration",
+    )
+
+
+def prepare_spo2_summary(frame):
+    """Validate provider-native nightly oxygen-saturation summaries."""
+    return _prepare_provider_summary(
+        frame,
+        (SPO2_MEAN_COL, SPO2_LOWER_BOUND_COL, SPO2_UPPER_BOUND_COL),
+        "SpO2",
+    )
 
 
 def prepare_bbi(frame):

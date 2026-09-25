@@ -41,6 +41,8 @@ class OuraLoader(BaseLoader):
 
     hrv_source = "provider_samples"
     hrv_time_columns = ("utc_time", "local_time")
+    respiratory_rate_source = "provider_summary"
+    spo2_source = "provider_summary"
 
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)
@@ -504,16 +506,41 @@ class OuraLoader(BaseLoader):
 
     def load_sleep_respiration_summary(self, user_id, start_date=None, end_date=None):
         """Return Oura's nightly respiratory-rate estimate, not a continuous signal."""
-        rows = [
-            {
-                "sleep_summary_id": record["id"],
-                "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                "oura_average_breaths_per_minute": record.get("average_breath"),
-            }
-            for record in self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
-            if record.get("type") == "long_sleep"
+        rows = []
+        for record in self._day_filter(
+            self._read_records(user_id, "sleep"), start_date, end_date
+        ):
+            if record.get("type") != "long_sleep":
+                continue
+            start = pd.Timestamp(record["bedtime_start"])
+            end = pd.Timestamp(record["bedtime_end"])
+            rows.append(
+                {
+                    "sleep_summary_id": record["id"],
+                    "calendar_date": pd.Timestamp(record["day"]).normalize(),
+                    "local_time": start.tz_localize(None),
+                    "local_end_time": end.tz_localize(None),
+                    "oura_average_breaths_per_minute": record.get(
+                        "average_breath"
+                    ),
+                    schema.RESPIRATORY_RATE_MEAN_COL: record.get("average_breath"),
+                    "source": "oura_sleep",
+                }
+            )
+        columns = [
+            "sleep_summary_id",
+            "calendar_date",
+            "local_time",
+            "local_end_time",
+            "oura_average_breaths_per_minute",
+            schema.RESPIRATORY_RATE_MEAN_COL,
+            "source",
         ]
-        return pd.DataFrame(rows, columns=["sleep_summary_id", "calendar_date", "oura_average_breaths_per_minute"])
+        return schema.prepare_respiration_summary(pd.DataFrame(rows, columns=columns))
+
+    def load_respiration_summary(self, user_id, start_date=None, end_date=None):
+        """Return Oura's provider-native nightly respiratory-rate summary."""
+        return self.load_sleep_respiration_summary(user_id, start_date, end_date)
 
     def load_steps_summary(self, user_id, start_date=None, end_date=None):
         """Return Oura daily steps keyed by its local calendar day."""
@@ -537,23 +564,38 @@ class OuraLoader(BaseLoader):
         rows = [
             {
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                "oura_daily_spo2_percentage": (
-                    pd.NA
-                    if (record.get("spo2_percentage") or {}).get("average") == 0
-                    else (record.get("spo2_percentage") or {}).get("average")
-                ),
-            }
+                    "oura_daily_spo2_percentage": (
+                        pd.NA
+                        if (record.get("spo2_percentage") or {}).get("average") == 0
+                        else (record.get("spo2_percentage") or {}).get("average")
+                    ),
+                    schema.SPO2_MEAN_COL: (
+                        pd.NA
+                        if (record.get("spo2_percentage") or {}).get("average") == 0
+                        else (record.get("spo2_percentage") or {}).get("average")
+                    ),
+                }
             for record in self._day_filter(
                 self._read_records(user_id, "daily_spo2"), start_date, end_date
             )
         ]
         frame = pd.DataFrame(
-            rows, columns=["calendar_date", "oura_daily_spo2_percentage"]
+            rows,
+            columns=[
+                "calendar_date",
+                "oura_daily_spo2_percentage",
+                schema.SPO2_MEAN_COL,
+            ],
         )
         frame["oura_daily_spo2_percentage"] = frame[
             "oura_daily_spo2_percentage"
         ].astype("Float64")
-        return frame
+        frame["source"] = "oura_daily_spo2"
+        return schema.prepare_spo2_summary(frame)
+
+    def load_spo2_summary(self, user_id, start_date=None, end_date=None):
+        """Return Oura's sleep-derived daily oxygen-saturation summary."""
+        return self.load_pulse_ox_summary(user_id, start_date, end_date)
 
     def load_readiness(self, user_id, start_date=None, end_date=None):
         """Return Oura's daily readiness score and vendor contributor scores."""
@@ -613,13 +655,13 @@ class OuraLoader(BaseLoader):
         raise NotImplementedError("Oura activity intensity is not mapped yet")
 
     def load_pulse_ox(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame(columns=["utc_time", "pulse_ox"])
+        return schema.empty_spo2_frame()
 
     def load_respiration(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame(columns=["utc_time", "breaths_per_minute"])
+        return schema.empty_respiration_frame()
 
     def load_sleep_pulse_ox(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame(columns=["utc_time", "pulse_ox"])
+        return schema.empty_spo2_frame()
 
     def load_sleep_respiration(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame(columns=["utc_time", "breaths_per_minute"])
+        return schema.empty_respiration_frame()

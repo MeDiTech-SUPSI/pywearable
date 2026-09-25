@@ -66,6 +66,8 @@ class LabfrontLoader(BaseLoader):
     """
 
     hrv_source = "bbi"
+    respiratory_rate_source = "samples"
+    spo2_source = "samples"
 
     def __init__(
         self,
@@ -1411,7 +1413,7 @@ class LabfrontLoader(BaseLoader):
             else:
                 return sleep_data
         else:
-            daily_data[daily_data[constants.IS_SLEEPING_COL]] = False
+            daily_data[constants.IS_SLEEPING_COL] = False
             return daily_data
 
     def load_garmin_connect_respiration(
@@ -2399,6 +2401,60 @@ class LabfrontLoader(BaseLoader):
             .reset_index(drop=True)
         )
 
+    @staticmethod
+    def _prepare_respiratory_samples(
+        data: pd.DataFrame,
+        provider_value_col: str,
+        canonical_value_col: str,
+    ) -> pd.DataFrame:
+        """Translate one Labfront stream into the shared sample schema."""
+        data = data.copy()
+        if (
+            schema.LOCAL_TIME_COL not in data.columns
+            and constants.ISODATE_COL in data.columns
+        ):
+            data[schema.LOCAL_TIME_COL] = data[constants.ISODATE_COL]
+        if (
+            schema.UTC_TIME_COL not in data.columns
+            and constants.UNIXTIMESTAMP_IN_MS_COL in data.columns
+        ):
+            data[schema.UTC_TIME_COL] = pd.to_datetime(
+                data[constants.UNIXTIMESTAMP_IN_MS_COL],
+                unit="ms",
+                errors="coerce",
+                utc=True,
+            ).dt.tz_localize(None)
+        if schema.TIMEZONE_COL in data.columns and not pd.api.types.is_timedelta64_dtype(
+            data[schema.TIMEZONE_COL]
+        ):
+            data = data.rename(columns={schema.TIMEZONE_COL: "timezone_name"})
+        if (
+            schema.TIMEZONE_COL not in data.columns
+            and constants.TIMEZONEOFFSET_IN_MS_COL in data.columns
+        ):
+            data[schema.TIMEZONE_COL] = pd.to_timedelta(
+                pd.to_numeric(
+                    data[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                ),
+                unit="ms",
+            )
+        if (
+            canonical_value_col not in data.columns
+            and provider_value_col in data.columns
+        ):
+            data[canonical_value_col] = data[provider_value_col]
+        if (
+            schema.IS_SLEEPING_COL not in data.columns
+            and constants.IS_SLEEPING_COL in data.columns
+        ):
+            data[schema.IS_SLEEPING_COL] = data[constants.IS_SLEEPING_COL]
+        if (
+            schema.CALENDAR_DATE_COL not in data.columns
+            and constants.CALENDAR_DATE_COL in data.columns
+        ):
+            data[schema.CALENDAR_DATE_COL] = data[constants.CALENDAR_DATE_COL]
+        return data
+
     def load_pulse_ox(
         self,
         user_id: str,
@@ -2407,17 +2463,25 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_pulse_ox(
+            data = self.load_garmin_connect_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_pulse_ox(
+            data = self.load_garmin_device_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            constants.SPO2_SPO2_COL,
+            schema.SPO2_COL,
+        )
+        return schema.prepare_spo2_samples(data)
 
     def load_questionnaire(
         self,
@@ -2469,17 +2533,25 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_respiration(
+            data = self.load_garmin_connect_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_respiration(
+            data = self.load_garmin_device_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
+            schema.RESPIRATORY_RATE_COL,
+        )
+        return schema.prepare_respiration_samples(data)
 
     def load_sleep_pulse_ox(
         self,
@@ -2489,17 +2561,25 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_sleep_pulse_ox(
+            data = self.load_garmin_connect_sleep_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_sleep_pulse_ox(
+            data = self.load_garmin_device_sleep_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            constants.SPO2_SPO2_COL,
+            schema.SPO2_COL,
+        )
+        return schema.prepare_spo2_samples(data)
 
     def load_sleep_respiration(
         self,
@@ -2509,17 +2589,25 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_sleep_respiration(
+            data = self.load_garmin_connect_sleep_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_sleep_respiration(
+            data = self.load_garmin_device_sleep_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
+            schema.RESPIRATORY_RATE_COL,
+        )
+        return schema.prepare_respiration_samples(data)
 
     def _load_sleep_stage_raw(
         self,

@@ -35,6 +35,8 @@ class LifeSnapsParquetLoader(BaseLoader):
     heart_rate_time_columns = ("local_time",)
     hrv_source = "provider_samples"
     hrv_time_columns = ("local_time",)
+    respiratory_rate_source = "provider_summary"
+    spo2_source = "provider_summary"
 
     def __init__(self, root_folder: os.PathLike):
         root_folder = Path(root_folder)
@@ -81,7 +83,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             Empty dataframe.
         """
         self._check_user_id(user_id)
-        return pd.DataFrame(columns=["utc_time", "local_time", "breaths_per_minute"])
+        return schema.empty_respiration_frame()
 
     def load_sleep_respiration(
         self,
@@ -112,7 +114,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             Empty dataframe.
         """
         self._check_user_id(user_id)
-        return pd.DataFrame(columns=["utc_time", "local_time", "breaths_per_minute"])
+        return schema.empty_respiration_frame()
 
     def load_pulse_ox(
         self,
@@ -137,7 +139,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             Empty dataframe.
         """
         self._check_user_id(user_id)
-        return pd.DataFrame(columns=["utc_time", "local_time", "spo2"])
+        return schema.empty_spo2_frame()
 
     def load_sleep_pulse_ox(
         self,
@@ -162,7 +164,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             Empty dataframe.
         """
         self._check_user_id(user_id)
-        return pd.DataFrame(columns=["utc_time", "local_time", "spo2"])
+        return schema.empty_spo2_frame()
 
     def load_bbi(
         self,
@@ -259,50 +261,113 @@ class LifeSnapsParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
-        """_summary_
-
-        _extended_summary_
-
-        Parameters
-        ----------
-        user_id : _type_
-            _description_
-        start_date : :class:`pandas.Timestamp` or ``None``, optional
-            Start date for respiration data retrieval, by default ``None``
-        end_date : :class:`pandas.Timestamp` or ``None``, optional
-            End date for respiration data retrieval, by default ``None``
-
-        Returns
-        -------
-        :class:`pandas.DataFrame`
-            _description_
-        """
+        """Return Fitbit's provider-native nightly respiratory-rate summary."""
+        self._check_user_id(user_id)
         file_path = self.root_folder / user_id / "respiratory_rate_summary.parquet"
-        if file_path.exists():
-            respiration = pd.read_parquet(file_path)
-            respiration["timestamp"] = pd.to_datetime(respiration["timestamp"])
+        if not file_path.exists():
+            return schema.prepare_respiration_summary(pd.DataFrame())
 
-            # We need to merge it with sleep_summary to get the exact date
-            sleep_summary = self.load_sleep_summary(user_id=user_id)
-            if len(sleep_summary) > 0:
-                respiration = pd.merge(
-                    left=respiration,
-                    right=sleep_summary.loc[:, ["calendar_date", "utc_end_time"]],
-                    left_on="timestamp",
-                    right_on="utc_end_time",
-                ).drop(["utc_end_time"], axis=1)
+        respiration = (
+            pd.read_parquet(file_path).drop_duplicates().reset_index(drop=True)
+        )
+        for source, target in {
+            "mean": schema.RESPIRATORY_RATE_MEAN_COL,
+            "standard_deviation": schema.RESPIRATORY_RATE_STD_COL,
+            "full_sleep_breathing_rate": schema.RESPIRATORY_RATE_MEAN_COL,
+            "full_sleep_standard_deviation": schema.RESPIRATORY_RATE_STD_COL,
+        }.items():
+            if source in respiration.columns and target not in respiration.columns:
+                respiration[target] = respiration[source]
+        respiration["timestamp"] = pd.to_datetime(
+            respiration["timestamp"], errors="coerce"
+        )
+        respiration["calendar_date"] = respiration["timestamp"].dt.normalize()
+        sleep_summary = self.load_sleep_summary(user_id=user_id)
+        if sleep_summary.empty:
+            return schema.prepare_respiration_summary(pd.DataFrame())
+        sleep_summary = schema.prepare_sleep_summary(sleep_summary)
+        candidates = sleep_summary.dropna(subset=[schema.LOCAL_END_TIME_COL])[
+            [
+                schema.CALENDAR_DATE_COL,
+                schema.LOCAL_TIME_COL,
+                schema.LOCAL_END_TIME_COL,
+                schema.SLEEP_SUMMARY_ID_COL,
+            ]
+        ].sort_values(schema.LOCAL_END_TIME_COL)
+        if candidates.empty:
+            return schema.prepare_respiration_summary(pd.DataFrame())
+        matched = respiration.merge(
+            candidates,
+            left_on="timestamp",
+            right_on=schema.LOCAL_END_TIME_COL,
+            how="left",
+            suffixes=("", "_sleep"),
+            validate="many_to_one",
+        )
+        matched = matched[matched[schema.SLEEP_SUMMARY_ID_COL].notna()].copy()
+        matched_date = matched[f"{schema.CALENDAR_DATE_COL}_sleep"]
+        matched[schema.CALENDAR_DATE_COL] = matched_date.fillna(
+            matched[schema.CALENDAR_DATE_COL]
+        )
+        respiration = matched.drop(columns=[f"{schema.CALENDAR_DATE_COL}_sleep"])
+        respiration["source"] = "fitbit_respiratory_rate_summary"
+        respiration = schema.prepare_respiration_summary(respiration)
+        if start_date is not None:
+            respiration = respiration[
+                respiration[schema.CALENDAR_DATE_COL]
+                >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            respiration = respiration[
+                respiration[schema.CALENDAR_DATE_COL]
+                < pd.Timestamp(end_date).normalize()
+            ]
+        return respiration.reset_index(drop=True)
 
-            respiration = respiration.rename(columns={"timestamp": "isoDate"})
-            if not (start_date is None):
-                respiration = respiration[
-                    respiration["isoDate"] >= pd.Timestamp(start_date)
-                ]
-            if not (end_date is None):
-                respiration = respiration[
-                    respiration["isoDate"] < pd.Timestamp(end_date)
-                ]
-            return respiration
-        return pd.DataFrame()
+    def load_spo2_summary(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return Fitbit's provider-native sleep-derived SpO2 summary."""
+        self._check_user_id(user_id)
+        file_path = self.root_folder / user_id / "daily_spo2.parquet"
+        if not file_path.exists():
+            return schema.prepare_spo2_summary(pd.DataFrame())
+        spo2 = pd.read_parquet(file_path).drop_duplicates().reset_index(drop=True)
+        for source, target in {
+            "average_value": schema.SPO2_MEAN_COL,
+            "lower_bound": schema.SPO2_LOWER_BOUND_COL,
+            "upper_bound": schema.SPO2_UPPER_BOUND_COL,
+        }.items():
+            if source in spo2.columns and target not in spo2.columns:
+                spo2[target] = spo2[source]
+        spo2[schema.CALENDAR_DATE_COL] = pd.to_datetime(
+            spo2["timestamp"], errors="coerce"
+        ).dt.normalize()
+        spo2["source"] = "fitbit_daily_spo2"
+        spo2 = schema.prepare_spo2_summary(spo2)
+        if start_date is not None:
+            spo2 = spo2[
+                spo2[schema.CALENDAR_DATE_COL]
+                >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            spo2 = spo2[
+                spo2[schema.CALENDAR_DATE_COL]
+                < pd.Timestamp(end_date).normalize()
+            ]
+        return spo2.reset_index(drop=True)
+
+    def load_pulse_ox_summary(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Compatibility alias for :meth:`load_spo2_summary`."""
+        return self.load_spo2_summary(user_id, start_date, end_date)
 
     def load_calories(
         self,
