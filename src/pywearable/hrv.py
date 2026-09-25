@@ -272,67 +272,8 @@ def _statistics_list(statistic) -> list[str]:
 
 def _resolve_time_col(loader, time_reference: str, chain) -> str:
     """Select the available clock appropriate for the requested hierarchy."""
-    if time_reference not in {"auto", "local", "utc"}:
-        raise ValueError("time_reference must be 'auto', 'local', or 'utc'")
-    has_local_parent = any(
-        value in cycle.CYCLE_TYPES or value in hierarchy.CALENDAR_RESOLUTIONS
-        for value in chain[1:]
-    )
-    if time_reference == "utc" and any(value in cycle.CYCLE_TYPES for value in chain):
-        raise ValueError("sleep-defined HRV cycles require local time")
-    requested = (
-        schema.LOCAL_TIME_COL
-        if has_local_parent and time_reference == "auto"
-        else f"{time_reference}_time"
-        if time_reference != "auto"
-        else schema.UTC_TIME_COL
-    )
     available = getattr(loader, "hrv_time_columns", schema.BBI_TIME_COLUMNS)
-    if requested in available:
-        return requested
-    if time_reference == "auto" and schema.LOCAL_TIME_COL in available:
-        warnings.warn(
-            "UTC HRV timestamps are unavailable; using local-time windows instead.",
-            UserWarning,
-            stacklevel=3,
-        )
-        return schema.LOCAL_TIME_COL
-    raise ValueError(f"The loader does not provide HRV timestamps in {requested}.")
-
-
-def _empty_primary(
-    statistics, time_col="window_start", include_coverage=False
-) -> pd.DataFrame:
-    """Return an empty primary trajectory with the normal index and columns."""
-    index = pd.MultiIndex.from_arrays([[], []], names=[schema.USER_COL, time_col])
-    return pd.DataFrame(
-        columns=[
-            "period_start",
-            "period_end",
-            *statistics,
-            *(
-                [f"{name}__coverage" for name in statistics]
-                if include_coverage
-                else []
-            ),
-        ],
-        index=index,
-    )
-
-
-def _window_bounds(frame, time_col, start_date, end_date, resolution):
-    """Normalize explicit bounds and infer missing bounds from observed samples."""
-    start = schema.normalize_time_bound(start_date, time_col)
-    end = schema.normalize_time_bound(end_date, time_col)
-    if start is None and not frame.empty:
-        start = frame[time_col].min().floor(resolution)
-    if end is None and not frame.empty:
-        end = frame[time_col].max().floor(resolution) + pd.Timedelta(resolution)
-    if start is None or end is None:
-        return None
-    if end <= start:
-        raise ValueError("end_date must be after start_date")
-    return start, end
+    return hierarchy.resolve_time_col(available, time_reference, chain, "HRV")
 
 
 def _interval_mask(timestamps: pd.Series, intervals: pd.DataFrame) -> np.ndarray:
@@ -443,9 +384,11 @@ def _raw_bbi_frame_trajectory(
 ):
     bbi = schema.prepare_bbi(bbi)
     bbi = bbi[bbi[time_col].notna()].sort_values(time_col, kind="stable")
-    bounds = _window_bounds(bbi, time_col, start_date, end_date, HRV_PRIMARY_RESOLUTION)
+    bounds = hierarchy.observed_bounds(
+        bbi, time_col, start_date, end_date, HRV_PRIMARY_RESOLUTION
+    )
     if bounds is None:
-        return _empty_primary(statistics, include_coverage=return_coverage)
+        return hierarchy.empty_trajectory(statistics, include_coverage=return_coverage)
     start, end = bounds
     bbi = bbi[bbi[time_col].ge(start) & bbi[time_col].lt(end)].reset_index(drop=True)
 
@@ -592,11 +535,11 @@ def _provider_primary_trajectory(
         loader.load_hrv_samples(user_id, load_start, load_end, **loader_kwargs)
     )
     samples = samples[samples[time_col].notna()].sort_values(time_col, kind="stable")
-    bounds = _window_bounds(
+    bounds = hierarchy.observed_bounds(
         samples, time_col, start_date, end_date, HRV_PRIMARY_RESOLUTION
     )
     if bounds is None:
-        return _empty_primary(statistics, include_coverage=return_coverage)
+        return hierarchy.empty_trajectory(statistics, include_coverage=return_coverage)
     start, end = bounds
     samples = samples[
         samples[time_col].ge(start) & samples[time_col].lt(end)
@@ -741,7 +684,7 @@ def _primary_trajectory(
     return (
         pd.concat(frames).sort_index()
         if frames
-        else _empty_primary(statistics, include_coverage=return_coverage)
+        else hierarchy.empty_trajectory(statistics, include_coverage=return_coverage)
     )
 
 
@@ -847,54 +790,22 @@ def _hierarchical_hrv_statistics(
     )
     for level_index, target in enumerate(chain[1:]):
         lower = chain[level_index]
-        if target in cycle.CYCLE_TYPES:
-            parent = cycle_parent
-            if parent is None or target != cycle_target:
-                parent = cycle.get_intervals(
-                    loader,
-                    cycle_type=target,
-                    user_id=users,
-                    start_date=start_date,
-                    end_date=end_date,
-                    **cycle_kwargs,
-                )
-            parent = parent.rename_axis(index={"calendar_date": "window_start"})
-            membership = "majority_overlap"
-        else:
-            bounds = {}
-            active_users = []
-            available_users = set(trajectory.index.get_level_values(0))
-            for user in users:
-                rows = trajectory.xs(user) if user in available_users else trajectory.iloc[0:0]
-                if rows.empty and (start_date is None or end_date is None):
-                    continue
-                lower_bound = (
-                    pd.Timestamp(start_date)
-                    if start_date is not None
-                    else rows["period_start"].min()
-                )
-                upper_bound = (
-                    pd.Timestamp(end_date)
-                    if end_date is not None
-                    else rows["period_end"].max()
-                )
-                if lower in cycle.CYCLE_TYPES:
-                    lower_bound = lower_bound.normalize()
-                    upper_bound = upper_bound.normalize()
-                if pd.isna(lower_bound) or pd.isna(upper_bound):
-                    continue
-                bounds[user] = (lower_bound, upper_bound)
-                active_users.append(user)
-            if not active_users:
-                return trajectory.iloc[0:0].rename_axis(
-                    index={"window_start": schema.CALENDAR_DATE_COL}
-                )
-            parent = hierarchy.windows_for_resolution(active_users, target, bounds)
-            membership = (
-                "majority_overlap"
-                if lower not in hierarchy.CALENDAR_RESOLUTIONS
-                and lower not in cycle.CYCLE_TYPES
-                else "label"
+        parent, membership = hierarchy.parent_windows_from_trajectory(
+            loader,
+            users,
+            trajectory,
+            target,
+            lower,
+            start_date,
+            end_date,
+            cycle_kwargs,
+            cycle_parent if target == cycle_target else None,
+            prefer_explicit_bounds=True,
+            cycle_label_bounds=False,
+        )
+        if parent is None:
+            return trajectory.iloc[0:0].rename_axis(
+                index={"window_start": schema.CALENDAR_DATE_COL}
             )
         trajectory, _ = hierarchy.aggregate_level(
             trajectory,

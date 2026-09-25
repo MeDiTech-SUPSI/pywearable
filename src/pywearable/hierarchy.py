@@ -17,7 +17,8 @@ from numbers import Integral, Real
 import numpy as np
 import pandas as pd
 
-from .cycle import CYCLE_TYPES
+from . import schema
+from .cycle import CYCLE_TYPES, get_intervals
 from .utils import time as time_utils
 
 
@@ -118,6 +119,22 @@ def is_percentile(operation: str) -> bool:
         and operation[1:].isdigit()
         and 0 <= int(operation[1:]) <= 100
     )
+
+
+def feature_percentile(statistic: str, family: str) -> float | None:
+    """Return the quantile for a family-prefixed percentile feature."""
+    prefix = f"{family}_"
+    if not statistic.startswith(prefix):
+        return None
+    operation = statistic[len(prefix) :]
+    if len(operation) > 4 or not is_percentile(operation):
+        return None
+    return int(operation[1:]) / 100
+
+
+def family_statistics(statistics, family: str) -> list[str]:
+    """Select validated feature names belonging to one prefixed family."""
+    return [name for name in statistics if name.startswith(f"{family}_")]
 
 
 def _normalize_operations(value) -> list[str]:
@@ -421,6 +438,150 @@ def windows_for_resolution(users, resolution: str, user_bounds: dict) -> pd.Data
     if resolution in CALENDAR_RESOLUTIONS:
         return calendar_windows(users, resolution, user_bounds)
     return fixed_windows(users, resolution, user_bounds)
+
+
+def observed_bounds(frame, time_col, start_date, end_date, resolution):
+    """Use explicit bounds, or infer complete fixed/calendar periods from data."""
+    start = schema.normalize_time_bound(start_date, time_col)
+    end = schema.normalize_time_bound(end_date, time_col)
+    resolution = canonical_resolution(resolution)
+    if resolution in CALENDAR_RESOLUTIONS:
+        spec = time_utils.get_resampling_spec(resolution, time_reference="local")
+
+        def period_start(value):
+            return time_utils.get_calendar_period_start(value, spec.rule)
+
+        def period_end(value):
+            beginning = period_start(value)
+            return (
+                beginning + pd.Timedelta(days=1)
+                if spec.rule == "d"
+                else pd.date_range(beginning, periods=2, freq=spec.rule)[1]
+            )
+
+    else:
+        duration = pd.Timedelta(resolution)
+
+        def period_start(value):
+            return value.floor(duration)
+
+        def period_end(value):
+            return period_start(value) + duration
+
+    if start is None and not frame.empty:
+        start = period_start(frame[time_col].min())
+    if end is None and not frame.empty:
+        end = period_end(frame[time_col].max())
+    if start is None or end is None:
+        return None
+    if end <= start:
+        raise ValueError("end_date must be after start_date")
+    return start, end
+
+
+def empty_trajectory(statistics, include_coverage=False, time_col="window_start"):
+    """Return an empty feature table using the shared hierarchy row shape."""
+    index = pd.MultiIndex.from_arrays([[], []], names=[schema.USER_COL, time_col])
+    columns = ["period_start", "period_end", *statistics]
+    if include_coverage:
+        columns.extend(f"{name}__coverage" for name in statistics)
+    return pd.DataFrame(columns=columns, index=index)
+
+
+def resolve_time_col(available, time_reference, chain, signal_name):
+    """Choose a supported clock for fixed, calendar, or sleep-cycle windows."""
+    if time_reference not in {"auto", "local", "utc"}:
+        raise ValueError("time_reference must be 'auto', 'local', or 'utc'")
+    if time_reference == "utc" and any(value in CYCLE_TYPES for value in chain):
+        raise ValueError(f"sleep-defined {signal_name} cycles require local time")
+    local_windows = any(
+        value in CYCLE_TYPES or value in CALENDAR_RESOLUTIONS for value in chain
+    )
+    requested = (
+        schema.LOCAL_TIME_COL
+        if time_reference == "local" or (time_reference == "auto" and local_windows)
+        else schema.UTC_TIME_COL
+    )
+    if requested in available:
+        return requested
+    if time_reference == "auto" and schema.LOCAL_TIME_COL in available:
+        warnings.warn(
+            f"UTC {signal_name} timestamps are unavailable; using local-time windows instead.",
+            UserWarning,
+            stacklevel=3,
+        )
+        return schema.LOCAL_TIME_COL
+    raise ValueError(
+        f"The loader does not provide {signal_name} timestamps in {requested}."
+    )
+
+
+def parent_windows_from_trajectory(
+    loader,
+    users,
+    trajectory,
+    target,
+    lower,
+    start_date=None,
+    end_date=None,
+    cycle_kwargs=None,
+    cycle_intervals=None,
+    prefer_explicit_bounds=False,
+    cycle_label_bounds=True,
+):
+    """Build parent windows and choose how children belong to them."""
+    if target in CYCLE_TYPES:
+        parent = cycle_intervals
+        if parent is None:
+            parent = get_intervals(
+                loader,
+                cycle_type=target,
+                user_id=users,
+                start_date=start_date,
+                end_date=end_date,
+                **(cycle_kwargs or {}),
+            )
+        return (
+            parent.rename_axis(index={schema.CALENDAR_DATE_COL: "window_start"}),
+            "majority_overlap",
+        )
+
+    bounds = {}
+    available = set(trajectory.index.get_level_values(0))
+    for user in users:
+        rows = trajectory.xs(user) if user in available else trajectory.iloc[0:0]
+        if rows.empty and not (
+            prefer_explicit_bounds and start_date is not None and end_date is not None
+        ):
+            continue
+        if lower in CYCLE_TYPES and cycle_label_bounds and not rows.empty:
+            lower_bound = pd.Timestamp(rows.index.min()).normalize()
+            upper_bound = pd.Timestamp(rows.index.max()).normalize() + pd.Timedelta(
+                days=1
+            )
+        else:
+            lower_bound = rows["period_start"].min()
+            upper_bound = rows["period_end"].max()
+        if prefer_explicit_bounds:
+            if start_date is not None:
+                lower_bound = pd.Timestamp(start_date)
+            if end_date is not None:
+                upper_bound = pd.Timestamp(end_date)
+            if lower in CYCLE_TYPES:
+                lower_bound = lower_bound.normalize()
+                upper_bound = upper_bound.normalize()
+        if pd.isna(lower_bound) or pd.isna(upper_bound):
+            continue
+        bounds[user] = (lower_bound, upper_bound)
+    if not bounds:
+        return None, "label"
+    parent = windows_for_resolution(list(bounds), target, bounds)
+    membership = (
+        "majority_overlap"
+        if lower not in CALENDAR_RESOLUTIONS and lower not in CYCLE_TYPES
+        else "label"
+    )
+    return parent, membership
 
 
 def _majority_overlap_assignments(

@@ -350,44 +350,29 @@ def _prepare_heart_rate_samples(
     return heart_rate.drop_duplicates(subset=duplicate_time_col)
 
 
-def _infer_heart_rate_cadence(timestamps) -> Union[pd.Timedelta, None]:
-    """Infer a nominal cadence when one clustered difference is prevalent."""
-    timestamps = pd.Series(pd.to_datetime(timestamps, errors="coerce")).dropna()
-    differences = (
-        timestamps.drop_duplicates()
-        .sort_values()
-        .diff()
-        .dt.total_seconds()
-        .dropna()
-    )
-    differences = differences[differences > 0]
-    if len(differences) < 10:
-        return None
-
-    values = differences.to_numpy(dtype=float)
-    rounded = np.where(values < 10, np.round(values, 2), np.round(values))
-    mode = float(pd.Series(rounded).value_counts().index[0])
-    tolerance = max(0.05, mode * 0.1)
-    cluster = values[np.abs(values - mode) <= tolerance]
-    if len(cluster) / len(values) < 0.2:
-        return None
-
-    cadence = float(np.median(cluster))
-    median_difference = float(np.median(values))
-    if not 0.5 <= cadence / median_difference <= 2:
-        return None
-    return pd.Timedelta(seconds=cadence)
-
-
 def _heart_rate_cadences(heart_rate: pd.DataFrame, time_col: str):
     """Return the optional source column and inferred cadence per stream."""
     source_col = "source" if "source" in heart_rate.columns else None
     if source_col is None or heart_rate[source_col].isna().all():
-        return None, {"heart_rate": _infer_heart_rate_cadence(heart_rate[time_col])}
+        return None, {
+            "heart_rate": time_utils.infer_cadence(
+                heart_rate[time_col],
+                min_gaps=10,
+                min_cluster_fraction=0.2,
+                round_long_gaps=True,
+                median_ratio_bounds=(0.5, 2),
+            )
+        }
 
     streams = heart_rate[source_col].astype("string").fillna("unknown")
     cadences = {
-        source: _infer_heart_rate_cadence(heart_rate.loc[streams.eq(source), time_col])
+        source: time_utils.infer_cadence(
+            heart_rate.loc[streams.eq(source), time_col],
+            min_gaps=10,
+            min_cluster_fraction=0.2,
+            round_long_gaps=True,
+            median_ratio_bounds=(0.5, 2),
+        )
         for source in streams.unique()
     }
     return source_col, cadences
@@ -462,13 +447,8 @@ def _heart_rate_window_coverage(
             return np.nan, unresolved or {"mixed_cadence"}
         cadence = next(iter(known))
 
-    if cadence is None or end <= start:
-        return np.nan, unresolved
-    expected = (end - start) / cadence
-    if expected <= 0:
-        return np.nan, unresolved
-    observed = sum(counts.values())
-    return min(1.0, observed / expected), set()
+    coverage = time_utils.sample_coverage(sum(counts.values()), start, end, cadence)
+    return coverage, unresolved if pd.isna(coverage) else set()
 
 
 def _heart_rate_period_end(start, resolution):

@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from pywearable import heart_rate
+from pywearable.utils import time as time_utils
 
 
 class HeartRateLoader:
@@ -289,8 +290,12 @@ def test_cadence_inference_accepts_missed_multiples_but_not_irregular_streams():
         [0, 1, 3, 6, 10, 15, 21, 28, 36, 45, 55], unit="s"
     )
 
-    assert heart_rate._infer_heart_rate_cadence(regular) == pd.Timedelta(seconds=5)
-    assert heart_rate._infer_heart_rate_cadence(irregular) is None
+    policy = dict(
+        min_gaps=10, min_cluster_fraction=0.2,
+        round_long_gaps=True, median_ratio_bounds=(0.5, 2),
+    )
+    assert time_utils.infer_cadence(regular, **policy) == pd.Timedelta(seconds=5)
+    assert time_utils.infer_cadence(irregular, **policy) is None
 
 
 def test_requested_statistics_and_invalid_name():

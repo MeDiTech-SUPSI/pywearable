@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import numpy as np
 import pandas as pd
 
 
@@ -8,6 +9,46 @@ class ResamplingSpec:
     rule: str
     time_col: str
     calendar_based: bool
+
+
+def infer_cadence(
+    timestamps,
+    *,
+    min_gaps: int,
+    min_cluster_fraction: float,
+    round_long_gaps: bool = False,
+    median_ratio_bounds: tuple[float, float] | None = None,
+) -> pd.Timedelta | None:
+    """Infer nominal spacing from a prevalent cluster of positive time gaps."""
+    values = pd.Series(pd.to_datetime(timestamps, errors="coerce")).dropna()
+    gaps = values.drop_duplicates().sort_values().diff().dt.total_seconds().dropna()
+    gaps = gaps[gaps > 0]
+    if len(gaps) < min_gaps:
+        return None
+    seconds = gaps.to_numpy(dtype=float)
+    rounded = (
+        np.where(seconds < 10, np.round(seconds, 2), np.round(seconds))
+        if round_long_gaps
+        else np.round(seconds, 2)
+    )
+    mode = float(pd.Series(rounded).value_counts().index[0])
+    cluster = seconds[np.abs(seconds - mode) <= max(0.05, mode * 0.1)]
+    if len(cluster) / len(seconds) < min_cluster_fraction:
+        return None
+    cadence = float(np.median(cluster))
+    if median_ratio_bounds is not None:
+        ratio = cadence / float(np.median(seconds))
+        if not median_ratio_bounds[0] <= ratio <= median_ratio_bounds[1]:
+            return None
+    return pd.Timedelta(seconds=cadence)
+
+
+def sample_coverage(observed_count, start, end, cadence) -> float:
+    """Estimate observed/expected samples for one regularly sampled stream."""
+    if cadence is None or end <= start:
+        return np.nan
+    expected = (end - start) / cadence
+    return min(1.0, observed_count / expected) if expected > 0 else np.nan
 
 
 def get_resampling_spec(
