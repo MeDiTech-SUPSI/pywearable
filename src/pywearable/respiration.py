@@ -11,6 +11,7 @@ import pandas as pd
 from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 from .utils import time as time_utils
+from .utils.legacy import get_user_ids
 
 
 RESPIRATORY_RATE_STATISTIC_MEAN = "respiratory_rate_mean"
@@ -440,37 +441,6 @@ def _summary_family_trajectory(
     )
 
 
-def _combine_trajectories(frames, statistics, return_coverage):
-    """Align family trajectories by user/window and return one feature table.
-
-    Missing family values remain missing; period bounds are taken from the
-    available family rows, and coverage columns are included when requested.
-    """
-    nonempty = [frame for frame in frames if not frame.empty]
-    if not nonempty:
-        return hierarchy.empty_trajectory(statistics, return_coverage)
-    index = nonempty[0].index
-    for frame in nonempty[1:]:
-        index = index.union(frame.index)
-    result = pd.DataFrame(index=index)
-    for metadata in ("period_start", "period_end"):
-        values = pd.Series(pd.NaT, index=index, dtype="datetime64[ns]")
-        for frame in nonempty:
-            values = values.fillna(frame[metadata].reindex(index))
-        result[metadata] = values
-    for frame in frames:
-        for column in frame.columns:
-            if column not in {"period_start", "period_end"}:
-                result[column] = frame[column].reindex(index)
-    for statistic in statistics:
-        if statistic not in result:
-            result[statistic] = np.nan
-        coverage_col = f"{statistic}__coverage"
-        if return_coverage and coverage_col not in result:
-            result[coverage_col] = np.nan
-    return result.sort_index()
-
-
 def get_respiration_statistics(
     loader: BaseLoader,
     statistic: Union[str, list, tuple, None] = None,
@@ -533,13 +503,7 @@ def get_respiration_statistics(
         from summary means. Below-threshold duration is in seconds.
     """
     statistics = _statistics_list(statistic)
-    users = (
-        list(loader.get_user_ids())
-        if user_id == "all" or user_id is None
-        else [user_id]
-        if isinstance(user_id, str)
-        else list(user_id)
-    )
+    users = get_user_ids(loader, user_id)
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
     if not 0 <= spo2_threshold <= 100:
@@ -646,7 +610,7 @@ def get_respiration_statistics(
                 unresolved_coverage,
             )
         family_frames.append(frame)
-    trajectory = _combine_trajectories(
+    trajectory = hierarchy.combine_trajectories(
         family_frames, statistics, min_coverage is not None
     )
 

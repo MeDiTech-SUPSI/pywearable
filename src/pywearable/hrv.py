@@ -9,8 +9,9 @@ import numpy as np
 import pandas as pd
 from scipy import integrate, interpolate, signal
 
-from . import cycle, hierarchy, schema, utils
+from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
+from .utils.legacy import get_user_ids
 
 
 HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES = "hrv_rmssd"
@@ -881,7 +882,7 @@ def get_hrv_statistics(
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
     statistics = _statistics_list(statistic)
-    users = list(utils.get_user_ids(loader, "all" if user_id is None else user_id))
+    users = get_user_ids(loader, user_id)
 
     if not hierarchical:
         threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]

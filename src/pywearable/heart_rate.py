@@ -13,6 +13,7 @@ import pandas as pd
 from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 from .utils import time as time_utils
+from .utils.legacy import get_user_ids
 
 HEART_RATE_STATISTIC_COUNT = "heart_rate_count"
 HEART_RATE_STATISTIC_MAX = "heart_rate_max"
@@ -1054,11 +1055,7 @@ def _get_heart_rate_statistics_single_resolution(
     :class:`pandas.DataFrame` or :class:`pandas.Series`
         Heart rate statistics at the defined resolution.
     """
-    # Get user id from the loader
-    if user_id == "all" or user_id is None:
-        user_id = loader.get_user_ids()
-    if type(user_id) is str:
-        user_id = [user_id]
+    user_id = get_user_ids(loader, user_id)
 
     # Convert to datetime
     start_date = None if start_date is None else pd.Timestamp(start_date)
@@ -1871,14 +1868,7 @@ def get_heart_rate_statistics(
             _warn_unknown_primary_coverage(unresolved_streams)
         return result
 
-    users = (
-        loader.get_user_ids()
-        if user_id == "all" or user_id is None
-        else user_id
-    )
-    if isinstance(users, str):
-        users = [users]
-    users = list(users)
+    users = get_user_ids(loader, user_id)
     statistics = _heart_rate_statistics_list(
         statistic, allow_rest=chain[0] in cycle.CYCLE_TYPES or chain[0] == "daily"
     )

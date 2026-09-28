@@ -14,7 +14,6 @@ import pandas as pd
 import scipy.stats
 
 from .. import constants
-
 _LABFRONT_LAST_SAMPLE_UNIX_TIMESTAMP_IN_MS_KEY = "lastSampleUnixTimestampInMs"
 _LABFRONT_QUESTIONNAIRE_STRING = "questionnaire"
 _LABFRONT_TODO_STRING = "todo"
@@ -90,31 +89,27 @@ def check_is_df(input, raise_name="input"):
     return input
 
 
-def get_user_ids(loader, user_id: Union[str, list] = "all"):
+def get_user_ids(loader, user_id: Union[str, list, tuple, None] = "all"):
     """Returns user ids in the appropriate format required by pywearable functions
 
     Parameters
     ----------
     loader : :class:`loader.base.BaseLoader`
         An instance of a data loader.
-    user_id : :class:`str` or :class:`list`, optional
-        The id(s) of the user(s) of interest, by default "all".
+    user_id : str, sequence of str, or None, optional
+        The participant(s) of interest. ``"all"`` and ``None`` select every
+        participant exposed by the loader.
 
     Returns
     -------
     list
         List of all the full user ids of interest.
     """
-    if user_id == "all":
-        user_id = loader.get_user_ids()
-
-    elif isinstance(user_id, str):
-        user_id = [user_id]
-
-    elif not isinstance(user_id, list):
-        raise TypeError("user_id has to be a list.")
-
-    return user_id
+    if user_id == "all" or user_id is None:
+        return list(loader.get_user_ids())
+    if isinstance(user_id, str):
+        return [user_id]
+    return list(user_id)
 
 
 def return_multiindex_df(

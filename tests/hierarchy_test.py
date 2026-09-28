@@ -48,6 +48,48 @@ def test_single_item_resolution_sequence_is_not_a_hierarchy():
     assert hierarchy.normalize_resolution_chain(["1h"]) == (["1h"], False)
 
 
+def test_combine_trajectories_aligns_features_by_user_and_window():
+    respiratory_rate = _trajectory(
+        [15.0, 16.0],
+        ["2024-01-01 00:00", "2024-01-01 00:05"],
+        ["2024-01-01 00:05", "2024-01-01 00:10"],
+        feature="respiratory_rate_mean",
+    )
+    spo2_index = pd.MultiIndex.from_tuples(
+        [
+            ("user-1", pd.Timestamp("2024-01-01 00:00")),
+            ("user-2", pd.Timestamp("2024-01-01 00:00")),
+        ],
+        names=["user_id", "window_start"],
+    )
+    spo2 = pd.DataFrame(
+        {
+            "period_start": pd.to_datetime(
+                ["2024-01-01 00:00", "2024-01-01 00:00"]
+            ),
+            "period_end": pd.to_datetime(
+                ["2024-01-01 00:05", "2024-01-01 00:05"]
+            ),
+            "spo2_mean": [97.0, 95.0],
+        },
+        index=spo2_index,
+    )
+
+    result = hierarchy.combine_trajectories(
+        [respiratory_rate, spo2],
+        ["respiratory_rate_mean", "spo2_mean"],
+    )
+
+    assert result.loc[("user-1", "2024-01-01 00:00"), "spo2_mean"] == 97
+    assert pd.isna(result.loc[("user-1", "2024-01-01 00:05"), "spo2_mean"])
+    assert pd.isna(
+        result.loc[("user-2", "2024-01-01 00:00"), "respiratory_rate_mean"]
+    )
+    assert result.loc[("user-2", "2024-01-01 00:00"), "period_end"] == pd.Timestamp(
+        "2024-01-01 00:05"
+    )
+
+
 def test_calendar_aggregation_equal_weights_children_and_reports_coverage():
     trajectory = _trajectory(
         [10.0, 20.0, np.nan],

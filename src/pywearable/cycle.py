@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Union
 import pandas as pd
 
 from . import schema
+from .utils.legacy import get_user_ids
 
 if TYPE_CHECKING:
     from .loader.base import BaseLoader
@@ -137,12 +138,7 @@ def get_intervals(
         raise ValueError(
             f"cycle_type must be one of {sorted(CYCLE_TYPES)}, not {cycle_type!r}"
         )
-    if user_id == "all" or user_id is None:
-        users = loader.get_user_ids()
-    elif isinstance(user_id, str):
-        users = [user_id]
-    else:
-        users = list(user_id)
+    users = get_user_ids(loader, user_id)
 
     frames = {}
     for user in users:

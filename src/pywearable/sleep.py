@@ -1043,12 +1043,7 @@ def get_sleep_wake_trajectory(
     missing. Non-main sessions are included when the loader exposes them and
     ``include_naps`` is true.
     """
-    if user_id == "all" or user_id is None:
-        users = loader.get_user_ids()
-    elif isinstance(user_id, str):
-        users = [user_id]
-    else:
-        users = list(user_id)
+    users = utils.get_user_ids(loader, user_id)
     trajectories = [
         _get_user_sleep_wake_trajectory(
             loader,

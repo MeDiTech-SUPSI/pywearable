@@ -488,6 +488,41 @@ def empty_trajectory(statistics, include_coverage=False, time_col="window_start"
     return pd.DataFrame(columns=columns, index=index)
 
 
+def combine_trajectories(frames, features, include_coverage=False):
+    """Merge independently built feature trajectories into one aligned table.
+
+    Rows are matched by their complete ``(user_id, window_start)`` index, so
+    data from different participants are never combined. For each matched row,
+    ``period_start`` and ``period_end`` are taken from the first trajectory
+    that supplies them. Feature and coverage columns are then aligned to the
+    union of all rows, leaving missing values where a stream has no matching
+    participant/window.
+    """
+    nonempty = [frame for frame in frames if not frame.empty]
+    if not nonempty:
+        return empty_trajectory(features, include_coverage)
+    index = nonempty[0].index
+    for frame in nonempty[1:]:
+        index = index.union(frame.index)
+    result = pd.DataFrame(index=index)
+    for metadata in ("period_start", "period_end"):
+        values = pd.Series(pd.NaT, index=index, dtype="datetime64[ns]")
+        for frame in nonempty:
+            values = values.fillna(frame[metadata].reindex(index))
+        result[metadata] = values
+    for frame in frames:
+        for column in frame.columns:
+            if column not in {"period_start", "period_end"}:
+                result[column] = frame[column].reindex(index)
+    for feature in features:
+        if feature not in result:
+            result[feature] = np.nan
+        coverage_col = f"{feature}__coverage"
+        if include_coverage and coverage_col not in result:
+            result[coverage_col] = np.nan
+    return result.sort_index()
+
+
 def resolve_time_col(available, time_reference, chain, signal_name):
     """Choose a supported clock for fixed, calendar, or sleep-cycle windows."""
     if time_reference not in {"auto", "local", "utc"}:
