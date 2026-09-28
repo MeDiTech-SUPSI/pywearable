@@ -133,10 +133,6 @@ class LabfrontLoader(BaseLoader):
             )
         self.file_index = self.get_file_index(reindex_files=reindex_files)
 
-        # self.tasks_dict = self.get_available_questionnaires(
-        #    return_dict=True
-        # ) | self.get_available_todos(return_dict=True)
-
     def get_user_id(self, full_id: str) -> str:
         """Extract user ID from full ID.
 
@@ -276,7 +272,7 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"Could not get full_id from {id}")
 
     def get_available_questionnaires(
-        self, user_id: Union[str, list] = "all", return_dict: bool = False
+        self, user_id: Union[str, list] = "all"
     ) -> list:
         """Get the list of available questionnaires.
 
@@ -284,27 +280,29 @@ class LabfrontLoader(BaseLoader):
         ----------
             user_id: str or list, optional
                 IDs of the users for which to return available questionnaires, by default "all".
-            return_dict: bool, optional
-                Whether to return a dictionary of the name of the questionnaires and their full ids,
-                or simply a sorted list of the available questionnaires, by default False.
-
         Returns
         -------
-            list
-                alphabetically sorted names of the questionnaires for the user(s).
+        list
+            Alphabetically sorted questionnaire names for the selected users.
         """
-        if lf_constants.FILE_INDEX_TASK_NAME_KEY in self.file_index.columns:
-            return (
-                self.file_index.loc[
-                    self.file_index[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY]
-                    == True,
-                    lf_constants.FILE_INDEX_TASK_NAME_KEY,
-                ]
-                .unique()
-                .tolist()
-            )
-        else:
+        required = {
+            lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY,
+            lf_constants.FILE_INDEX_TASK_NAME_KEY,
+        }
+        if not required.issubset(self.file_index.columns):
             return []
+
+        if user_id == "all":
+            participant_ids = self.get_full_ids()
+        else:
+            requested_ids = [user_id] if isinstance(user_id, str) else list(user_id)
+            participant_ids = [self.get_full_id(value) for value in requested_ids]
+        questionnaires = self.file_index.loc[participant_ids, :]
+        questionnaires = questionnaires.loc[
+            questionnaires[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY].eq(True),
+            lf_constants.FILE_INDEX_TASK_NAME_KEY,
+        ].dropna()
+        return sorted(questionnaires.astype(str).unique().tolist())
 
     def get_available_todos(
         self, user_id: Union[str, list] = "all", return_dict: bool = False
@@ -1135,7 +1133,6 @@ class LabfrontLoader(BaseLoader):
         ValueError
             if questionnaire name does not exist
         """
-        no_user_id = True
         full_task_id = self.get_task_full_id(questionnaire_name)
 
         if (
@@ -1186,7 +1183,7 @@ class LabfrontLoader(BaseLoader):
         # For each row, we need to get the question and all the options
         option_cols = []
         for col in questions_df.columns:
-            regex_match = re.search("option\dName", col)
+            regex_match = re.search(r"option\dName", col)
             if regex_match:
                 option_cols.append(col)
         for idx, row in questions_df.iterrows():

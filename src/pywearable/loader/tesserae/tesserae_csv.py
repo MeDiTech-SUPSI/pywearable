@@ -316,7 +316,10 @@ class TesseraeCSVLoader(BaseLoader):
         return normalize_sleep_columns(sleep_stage)
 
     def load_daily_survey(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
@@ -361,19 +364,19 @@ class TesseraeCSVLoader(BaseLoader):
             daily_survey = daily_survey.rename(columns=col_dict).drop(
                 "Timestamp", axis=1
             )
-            # Filter by isoDate
-            daily_survey = daily_survey.loc[
-                (daily_survey["calendarDate"] >= pd.Timestamp(start_date))
-                & (daily_survey["calendarDate"] < pd.Timestamp(end_date)),
-                :,
-            ]
-            return daily_survey
+            if start_date is not None:
+                daily_survey = daily_survey.loc[
+                    daily_survey["calendarDate"] >= pd.Timestamp(start_date)
+                ]
+            if end_date is not None:
+                daily_survey = daily_survey.loc[
+                    daily_survey["calendarDate"] < pd.Timestamp(end_date)
+                ]
+            return daily_survey.reset_index(drop=True)
         else:
             return pd.DataFrame()
 
-    def load_demographics_raw(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
-    ) -> pd.DataFrame:
+    def load_demographics_raw(self, user_id: str) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
         # Load all files
@@ -412,12 +415,9 @@ class TesseraeCSVLoader(BaseLoader):
                 col_dict[col] = "demographics_" + col
         demographics["calendarDate"] = demographics["isoDate"].dt.normalize()
         demographics = demographics.rename(columns=col_dict).drop("Timestamp", axis=1)
+        return demographics.reset_index(drop=True)
 
-        return demographics
-
-    def load_demographics_scored(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
-    ) -> pd.DataFrame:
+    def load_demographics_scored(self, user_id: str) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
         # Load all files
@@ -456,8 +456,7 @@ class TesseraeCSVLoader(BaseLoader):
                 col_dict[col] = "demographics_" + col
         demographics["calendarDate"] = demographics["isoDate"].dt.normalize()
         demographics = demographics.rename(columns=col_dict).drop("Timestamp", axis=1)
-
-        return demographics
+        return demographics.reset_index(drop=True)
 
     def load_stress(
         self,
@@ -649,9 +648,7 @@ class TesseraeCSVLoader(BaseLoader):
         return self.user_ids
 
     def get_user_start_date(self, user_id: str) -> pd.Timestamp:
-        raw_demographics = self.load_demographics_raw(
-            user_id=user_id, start_date="1900-01-01", end_date="2300-01-01"
-        )
+        raw_demographics = self.load_demographics_raw(user_id=user_id)
         if len(raw_demographics) > 0:
             return raw_demographics["calendarDate"].min()
         else:

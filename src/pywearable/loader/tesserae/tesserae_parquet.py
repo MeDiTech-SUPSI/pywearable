@@ -493,6 +493,165 @@ class TesseraeParquetLoader(BaseLoader):
     #       Use information
     ##########################################
 
+    def load_daily_survey(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        """Load Tesserae daily survey scores for one participant."""
+        if user_id not in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        path = (
+            self.root_folder
+            / "_global_metrics"
+            / "GroundTruthSurvey"
+            / "DailiesScored.parquet"
+        )
+        if not path.exists():
+            return pd.DataFrame()
+
+        daily_survey = pd.read_parquet(path)
+        daily_survey = daily_survey[
+            daily_survey["ParticipantID"] == user_id
+        ].copy()
+        daily_survey["date"] = pd.to_datetime(daily_survey["date"])
+        daily_survey = daily_survey.rename(columns={"date": "calendarDate"})
+        for column in (
+            "survey_sent_datetime",
+            "survey_start_datetime",
+            "survey_end_datetime",
+        ):
+            daily_survey[column] = pd.to_datetime(
+                daily_survey[column], errors="coerce"
+            )
+        utc_time = pd.to_datetime(
+            daily_survey["Timestamp"], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+        daily_survey["timezoneOffsetInMs"] = (
+            daily_survey["survey_sent_datetime"] - utc_time
+        ).dt.total_seconds() * 1000
+        text_columns = daily_survey.select_dtypes(include=["object", "string"]).columns
+        for column in text_columns:
+            daily_survey[column] = daily_survey[column].mask(
+                daily_survey[column].eq("NULL")
+            )
+
+        excluded = {
+            "ParticipantID",
+            "Timestamp",
+            "timezone_change",
+            "calendarDate",
+            "timezoneOffsetInMs",
+        }
+        response_columns = [
+            column
+            for column in daily_survey.columns
+            if column not in excluded and "survey" not in column
+        ]
+        for column in response_columns:
+            daily_survey[column] = pd.to_numeric(
+                daily_survey[column], errors="coerce"
+            )
+        daily_survey = daily_survey.rename(
+            columns={column: f"survey_{column}" for column in response_columns}
+        ).drop(
+            ["ParticipantID", "Timestamp", "timezone_change"], axis=1
+        )
+        if start_date is not None:
+            daily_survey = daily_survey.loc[
+                daily_survey["calendarDate"] >= pd.Timestamp(start_date)
+            ]
+        if end_date is not None:
+            daily_survey = daily_survey.loc[
+                daily_survey["calendarDate"] < pd.Timestamp(end_date)
+            ]
+        return daily_survey.reset_index(drop=True)
+
+    def load_demographics_raw(self, user_id: str) -> pd.DataFrame:
+        """Load Tesserae demographic responses for one participant."""
+        return self._load_demographics_survey(
+            user_id,
+            "IGTBDemographics.parquet",
+            numeric=False,
+        )
+
+    def load_demographics_scored(self, user_id: str) -> pd.DataFrame:
+        """Load Tesserae scored demographic instruments for one participant."""
+        return self._load_demographics_survey(
+            user_id,
+            "IGTBScored.parquet",
+            numeric=True,
+        )
+
+    def _load_demographics_survey(
+        self,
+        user_id: str,
+        filename: str,
+        *,
+        numeric: bool,
+    ) -> pd.DataFrame:
+        if user_id not in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        path = (
+            self.root_folder
+            / "_global_metrics"
+            / "GroundTruthSurvey"
+            / filename
+        )
+        if not path.exists():
+            return pd.DataFrame()
+
+        demographics = pd.read_parquet(path)
+        demographics = demographics[
+            demographics["ParticipantID"] == user_id
+        ].copy()
+        demographics["igtb.datetime"] = pd.to_datetime(
+            demographics["igtb.datetime"], errors="coerce"
+        )
+        demographics = demographics.rename(columns={"igtb.datetime": "isoDate"})
+        utc_time = pd.to_datetime(
+            demographics["Timestamp"], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+        demographics["timezoneOffsetInMs"] = (
+            demographics["isoDate"] - utc_time
+        ).dt.total_seconds() * 1000
+        text_columns = demographics.select_dtypes(include=["object", "string"]).columns
+        for column in text_columns:
+            demographics[column] = demographics[column].mask(
+                demographics[column].eq("NULL")
+            )
+
+        excluded = {
+            "ParticipantID",
+            "Timestamp",
+            "timezone_change",
+            "isoDate",
+            "timezoneOffsetInMs",
+        }
+        response_columns = [
+            column for column in demographics.columns if column not in excluded
+        ]
+        if numeric:
+            for column in response_columns:
+                demographics[column] = pd.to_numeric(
+                    demographics[column], errors="coerce"
+                )
+        demographics["calendarDate"] = demographics["isoDate"].dt.normalize()
+        demographics = demographics.rename(
+            columns={
+                column: f"demographics_{column}" for column in response_columns
+            }
+        ).drop(
+            [
+                "ParticipantID",
+                "Timestamp",
+                "timezone_change",
+            ],
+            axis=1,
+        )
+        return demographics.reset_index(drop=True)
+
     def get_all_user_dailies(self):
         if self.dailies is None:
             path_to_dailies = (

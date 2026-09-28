@@ -987,56 +987,57 @@ class LifeSnapsParquetLoader(BaseLoader):
         result.loc[~valid, feature] = np.nan
         return schema.prepare_provider_feature_summary(result, feature)
 
-    def load_survey(self, survey_name: str) -> pd.DataFrame:
-        return pd.read_parquet(self.root_folder / f"{survey_name}.parquet")
+    @staticmethod
+    def _filter_survey_rows(
+        survey: pd.DataFrame,
+        user_id: Union[str, None],
+        start_date,
+        end_date,
+        time_col: str,
+    ) -> pd.DataFrame:
+        if user_id is not None:
+            survey = survey[survey["user_id"] == user_id]
+        if start_date is not None:
+            survey = survey[survey[time_col] >= pd.Timestamp(start_date)]
+        if end_date is not None:
+            survey = survey[survey[time_col] < pd.Timestamp(end_date)]
+        return survey.reset_index(drop=True)
 
-    def load_survey_scored(self, survey_name: str) -> pd.DataFrame:
-        scored_survey = pd.read_parquet(
+    def load_survey(
+        self,
+        survey_name: str,
+        user_id: Union[str, None] = None,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Load native LifeSnaps responses for one named survey."""
+        survey = pd.read_parquet(self.root_folder / f"{survey_name}.parquet").copy()
+        for column in ("submitdate", "startdate", "datestamp"):
+            if column in survey:
+                survey[column] = pd.to_datetime(
+                    survey[column], errors="coerce", dayfirst=True
+                )
+        return self._filter_survey_rows(
+            survey, user_id, start_date, end_date, "submitdate"
+        )
+
+    def load_survey_scored(
+        self,
+        survey_name: str,
+        user_id: Union[str, None] = None,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Load provider-supplied LifeSnaps scores for one named survey."""
+        survey = pd.read_parquet(
             self.root_folder / f"{survey_name}_scored.parquet"
-        ).drop("type", axis=1)
-        if survey_name == "personality":
-            raw_survey = pd.read_parquet(self.root_folder / f"bfpt.parquet")
-        elif survey_name == "ttm":
-            raw_survey = pd.read_parquet(self.root_folder / f"ttmspbf.parquet")
-        else:
-            raw_survey = pd.read_parquet(self.root_folder / f"{survey_name}.parquet")
-
-        scored_survey["submitdate"] = pd.to_datetime(scored_survey["submitdate"])
-        raw_survey["submitdate"] = pd.to_datetime(
-            raw_survey["submitdate"], format="%d/%m/%Y %H:%M"
+        ).copy()
+        survey["submitdate"] = pd.to_datetime(
+            survey["submitdate"], errors="coerce"
         )
-
-        scored_survey = scored_survey.sort_values(["user_id", "submitdate"])
-        raw_survey = raw_survey.sort_values(["user_id", "submitdate"])
-        raw_survey["calendarDate"] = raw_survey["submitdate"].dt.normalize()
-        # We need to merge to have the exact filling time
-        scored_survey_list: list[pd.DataFrame] = []
-        for user in scored_survey["user_id"].unique():
-            scored_survey_list.append(
-                pd.merge_asof(
-                    left=scored_survey[scored_survey["user_id"] == user].drop(
-                        "user_id", axis=1
-                    ),
-                    right=raw_survey.loc[
-                        raw_survey["user_id"] == user,
-                        ["submitdate", "datestamp"],
-                    ],
-                    on="submitdate",
-                    allow_exact_matches=True,
-                    direction="forward",
-                    tolerance=pd.Timedelta(hours=24),
-                ).assign(user_id=user)
-            )
-
-        scored_survey = pd.concat(scored_survey_list, axis=0).rename(
-            columns={"datestamp": "utc_time"}
+        return self._filter_survey_rows(
+            survey, user_id, start_date, end_date, "submitdate"
         )
-        scored_survey["utc_time"] = pd.to_datetime(
-            scored_survey["utc_time"], format="%d/%m/%Y %H:%M"
-        )
-        scored_survey["local_time"] = scored_survey["utc_time"]
-
-        return scored_survey
 
     def load_profile(self, user_id: str) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "profile.parquet"
@@ -1045,7 +1046,13 @@ class LifeSnapsParquetLoader(BaseLoader):
         else:
             return pd.DataFrame()
 
-    def load_ema(self, user_id: Union[str, None] = None) -> pd.DataFrame:
+    def load_ema(
+        self,
+        user_id: Union[str, None] = None,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Load native LifeSnaps EMA records, optionally filtering creation time."""
         file_path = self.root_folder / "sema.parquet"
         if not (file_path.exists()):
             raise FileNotFoundError(f"Couldn't find file {file_path}")
@@ -1059,6 +1066,6 @@ class LifeSnapsParquetLoader(BaseLoader):
             "UPLOADED_TS",
         ]:
             sema[col] = pd.to_datetime(sema[col])
-        if not (user_id is None):
-            sema = sema[sema["user_id"] == user_id]
-        return sema
+        return self._filter_survey_rows(
+            sema, user_id, start_date, end_date, "CREATED_TS"
+        )
