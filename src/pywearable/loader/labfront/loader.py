@@ -16,6 +16,7 @@ import pandas as pd
 
 from ... import constants, schema, sleep, utils
 from ..base import BaseLoader
+from ..garmin import prepare_epoch_activity_samples
 from . import constants as lf_constants
 
 _LABFRONT_METRICS_DICT = {
@@ -68,6 +69,9 @@ class LabfrontLoader(BaseLoader):
     hrv_source = "bbi"
     respiratory_rate_source = "samples"
     spo2_source = "samples"
+    activity_source = "samples"
+    activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+    activity_primary_resolution = "15min"
     provider_features = frozenset(
         {
             "garmin_stress_level",
@@ -3156,3 +3160,40 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"Source {source} not supported.")
 
         return data
+
+    def load_activity_samples(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Return Garmin Health API epochs as canonical step intervals.
+
+        Category rows sharing one epoch are collapsed by summing their
+        incremental step counts while counting the epoch duration once.
+        """
+        epochs = self.load_garmin_connect_epoch(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).copy()
+        if epochs.empty:
+            return schema.empty_activity_frame(extra_columns=("source",))
+        epochs[schema.LOCAL_TIME_COL] = pd.to_datetime(
+            epochs[constants.ISODATE_COL], errors="coerce"
+        )
+        epochs[schema.UTC_TIME_COL] = pd.to_datetime(
+            epochs[constants.UNIXTIMESTAMP_IN_MS_COL],
+            unit="ms",
+            errors="coerce",
+            utc=True,
+        ).dt.tz_localize(None)
+        epochs[schema.TIMEZONE_COL] = pd.to_timedelta(
+            pd.to_numeric(epochs[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
+            unit="ms",
+        )
+        epochs[schema.DURATION_IN_MS_COL] = epochs[constants.DURATION_IN_MS_COL]
+        epochs[schema.ACTIVITY_STEPS_COL] = epochs[lf_constants.ACTIVITY_STEPS_COL]
+        if "activityType" in epochs:
+            epochs = epochs.rename(columns={"activityType": "activity_type"})
+        return prepare_epoch_activity_samples(epochs)

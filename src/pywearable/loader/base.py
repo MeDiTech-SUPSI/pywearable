@@ -17,6 +17,9 @@ class BaseLoader(ABC):
     respiratory_rate_time_columns = ("utc_time", "local_time")
     spo2_source = "samples"
     spo2_time_columns = ("utc_time", "local_time")
+    activity_source = None
+    activity_time_columns = ("utc_time", "local_time")
+    activity_primary_resolution = None
     provider_features = frozenset()
     provider_feature_time_columns = ("utc_time", "local_time")
 
@@ -161,6 +164,26 @@ class BaseLoader(ABC):
     ) -> pd.DataFrame:
         """Load oxygen-saturation samples in the shared sample schema."""
         return schema.empty_spo2_frame()
+
+    def load_activity_samples(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Load incremental step intervals in the shared activity schema."""
+        return schema.empty_activity_frame()
+
+    def load_activity_summary(
+        self,
+        user_id: str,
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Load calendar-day step totals in the shared activity schema."""
+        return schema.empty_activity_summary()
 
     def load_respiration(
         self,

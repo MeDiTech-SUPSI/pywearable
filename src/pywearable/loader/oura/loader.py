@@ -43,6 +43,9 @@ class OuraLoader(BaseLoader):
     hrv_time_columns = ("utc_time", "local_time")
     respiratory_rate_source = "provider_summary"
     spo2_source = "provider_summary"
+    activity_source = "daily_summary"
+    activity_time_columns = (schema.LOCAL_TIME_COL,)
+    activity_primary_resolution = "daily"
     provider_features = frozenset(
         {
             "oura_readiness_score",
@@ -233,7 +236,7 @@ class OuraLoader(BaseLoader):
         rows = [
             {
                 "id": record["id"],
-                "calendar_date": pd.Timestamp(record["day"]).normalize(),
+                    "calendar_date": pd.Timestamp(record["day"]).normalize(),
                 "type": record.get("type"),
                 "main_sleep": record.get("type") == "long_sleep",
                 "local_time": self._local_time(record["bedtime_start"]),
@@ -532,7 +535,7 @@ class OuraLoader(BaseLoader):
             rows.append(
                 {
                     "sleep_summary_id": record["id"],
-                    "calendar_date": pd.Timestamp(record["day"]).normalize(),
+                "calendar_date": pd.Timestamp(record["day"]).normalize(),
                     "local_time": start.tz_localize(None),
                     "local_end_time": end.tz_localize(None),
                     "oura_average_breaths_per_minute": record.get(
@@ -562,17 +565,16 @@ class OuraLoader(BaseLoader):
         rows = [
             {
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                "steps": (
-                    pd.NA if record.get("steps") == 0 else record.get("steps")
-                ),
+                schema.ACTIVITY_STEPS_COL: record.get("steps"),
             }
             for record in self._day_filter(
                 self._read_records(user_id, "daily_activity"), start_date, end_date
             )
         ]
-        frame = pd.DataFrame(rows, columns=["calendar_date", "steps"])
-        frame["steps"] = frame["steps"].astype("Int64")
-        return frame
+        frame = pd.DataFrame(
+            rows, columns=[schema.CALENDAR_DATE_COL, schema.ACTIVITY_STEPS_COL]
+        )
+        return schema.prepare_activity_summary(frame)
 
     def load_pulse_ox_summary(self, user_id, start_date=None, end_date=None):
         """Return Oura's provider daily SpO2 percentage, not raw pulse-ox samples."""
@@ -695,8 +697,8 @@ class OuraLoader(BaseLoader):
         raise NotImplementedError("Oura readiness is vendor-specific; use load_readiness")
 
     def load_activity_summary(self, user_id, start_date=None, end_date=None):
-        # TODO: map Oura activity dimensions to generic pywearable features.
-        raise NotImplementedError("Oura activity features are not mapped yet")
+        """Return Oura's calendar-day step totals."""
+        return self.load_steps_summary(user_id, start_date, end_date)
 
     def load_intensity(self, user_id, start_date=None, end_date=None):
         # TODO: decode Oura's five-minute activity class series.

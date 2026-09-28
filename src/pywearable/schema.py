@@ -60,6 +60,20 @@ SPO2_SAMPLE_REQUIRED_COLUMNS = (
     SPO2_COL,
 )
 
+ACTIVITY_STEPS_COL = "activity_steps"
+ACTIVITY_TIME_COLUMNS = (UTC_TIME_COL, LOCAL_TIME_COL)
+ACTIVITY_SAMPLE_REQUIRED_COLUMNS = (
+    UTC_TIME_COL,
+    LOCAL_TIME_COL,
+    TIMEZONE_COL,
+    DURATION_IN_MS_COL,
+    ACTIVITY_STEPS_COL,
+)
+ACTIVITY_SUMMARY_REQUIRED_COLUMNS = (
+    CALENDAR_DATE_COL,
+    ACTIVITY_STEPS_COL,
+)
+
 SLEEP_SUMMARY_ID_COL = "sleep_summary_id"
 SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL = "overall_sleep_score"
 SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL = "light_sleep_duration_in_ms"
@@ -185,6 +199,16 @@ def empty_respiration_frame(extra_columns=()) -> pd.DataFrame:
 def empty_spo2_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical SpO2 columns."""
     return pd.DataFrame(columns=[*SPO2_SAMPLE_REQUIRED_COLUMNS, *extra_columns])
+
+
+def empty_activity_frame(extra_columns=()) -> pd.DataFrame:
+    """Return an empty table containing the canonical activity-sample columns."""
+    return pd.DataFrame(columns=[*ACTIVITY_SAMPLE_REQUIRED_COLUMNS, *extra_columns])
+
+
+def empty_activity_summary(extra_columns=()) -> pd.DataFrame:
+    """Return an empty table containing the canonical daily-activity columns."""
+    return pd.DataFrame(columns=[*ACTIVITY_SUMMARY_REQUIRED_COLUMNS, *extra_columns])
 
 
 def _prepare_physiological_samples(frame, value_col, label):
@@ -319,6 +343,123 @@ def prepare_spo2_summary(frame):
         (SPO2_MEAN_COL, SPO2_LOWER_BOUND_COL, SPO2_UPPER_BOUND_COL),
         "SpO2",
     )
+
+
+def prepare_activity_samples(frame) -> pd.DataFrame:
+    """Normalize canonical timestamped incremental step intervals.
+
+    Each row represents a half-open interval beginning at ``utc_time`` or
+    ``local_time`` with ``duration_in_ms`` and an incremental
+    ``activity_steps`` count. Zero-step intervals are valid observations.
+    Exact duplicates are coalesced; conflicting duplicate intervals retain one
+    row with a missing step count.
+    """
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("activity samples must be a pandas DataFrame")
+    frame = frame.copy()
+    for column in (UTC_TIME_COL, LOCAL_TIME_COL):
+        if column not in frame.columns:
+            frame[column] = pd.NaT
+    frame[UTC_TIME_COL] = pd.to_datetime(
+        frame[UTC_TIME_COL], errors="coerce", utc=True
+    ).dt.tz_localize(None)
+    frame[LOCAL_TIME_COL] = pd.to_datetime(
+        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+    if TIMEZONE_COL not in frame.columns:
+        frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    if DURATION_IN_MS_COL not in frame.columns:
+        if frame.empty:
+            frame[DURATION_IN_MS_COL] = pd.Series(dtype=float)
+        else:
+            raise ValueError(
+                "activity samples are missing required column: duration_in_ms"
+            )
+    if ACTIVITY_STEPS_COL not in frame.columns:
+        if frame.empty:
+            frame[ACTIVITY_STEPS_COL] = pd.Series(dtype=float)
+        else:
+            raise ValueError(
+                "activity samples are missing required column: activity_steps"
+            )
+    frame[DURATION_IN_MS_COL] = pd.to_numeric(
+        frame[DURATION_IN_MS_COL], errors="coerce"
+    )
+    frame[ACTIVITY_STEPS_COL] = pd.to_numeric(
+        frame[ACTIVITY_STEPS_COL], errors="coerce"
+    )
+    frame.loc[frame[ACTIVITY_STEPS_COL].lt(0), ACTIVITY_STEPS_COL] = float("nan")
+    frame = frame[
+        frame[DURATION_IN_MS_COL].gt(0)
+        & (frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna())
+    ].copy()
+    order_col = "__activity_time"
+    frame[order_col] = frame[UTC_TIME_COL].where(
+        frame[UTC_TIME_COL].notna(), frame[LOCAL_TIME_COL]
+    )
+    frame = frame.sort_values(order_col, kind="stable")
+    interval_versions = frame.groupby(order_col, dropna=False)[
+        [ACTIVITY_STEPS_COL, DURATION_IN_MS_COL]
+    ].nunique(dropna=True)
+    conflicting_times = interval_versions.index[
+        interval_versions.gt(1).any(axis=1)
+    ]
+    frame.loc[
+        frame[order_col].isin(conflicting_times), ACTIVITY_STEPS_COL
+    ] = float("nan")
+    return (
+        frame.drop_duplicates(order_col, keep="last")
+        .drop(columns=order_col)
+        .reset_index(drop=True)
+    )
+
+
+def prepare_activity_summary(frame) -> pd.DataFrame:
+    """Normalize canonical calendar-day step totals."""
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("activity summary must be a pandas DataFrame")
+    frame = frame.copy()
+    if CALENDAR_DATE_COL not in frame.columns:
+        if frame.empty:
+            frame[CALENDAR_DATE_COL] = pd.Series(dtype="datetime64[ns]")
+        else:
+            raise ValueError(
+                "activity summary is missing required column: calendar_date"
+            )
+    if ACTIVITY_STEPS_COL not in frame.columns:
+        if frame.empty:
+            frame[ACTIVITY_STEPS_COL] = pd.Series(dtype=float)
+        else:
+            raise ValueError(
+                "activity summary is missing required column: activity_steps"
+            )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: (
+            value.tz_localize(None)
+            if pd.notna(value) and value.tzinfo is not None
+            else value
+        )
+    )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce"
+    ).dt.normalize()
+    frame[ACTIVITY_STEPS_COL] = pd.to_numeric(
+        frame[ACTIVITY_STEPS_COL], errors="coerce"
+    )
+    frame.loc[frame[ACTIVITY_STEPS_COL].lt(0), ACTIVITY_STEPS_COL] = float("nan")
+    frame = frame[frame[CALENDAR_DATE_COL].notna()].copy()
+    frame = frame.drop_duplicates([CALENDAR_DATE_COL, ACTIVITY_STEPS_COL], keep="last")
+    if frame[CALENDAR_DATE_COL].duplicated().any():
+        raise ValueError(
+            "activity summary must contain at most one step total per calendar_date"
+        )
+    return frame.sort_values(CALENDAR_DATE_COL, kind="stable").reset_index(drop=True)
 
 
 def prepare_provider_feature_samples(frame, feature: str) -> pd.DataFrame:

@@ -37,6 +37,9 @@ class LifeSnapsParquetLoader(BaseLoader):
     hrv_time_columns = ("local_time",)
     respiratory_rate_source = "provider_summary"
     spo2_source = "provider_summary"
+    activity_source = "samples"
+    activity_time_columns = (schema.LOCAL_TIME_COL,)
+    activity_primary_resolution = "1min"
     provider_features = frozenset(
         {
             "fitbit_stress_management_score",
@@ -873,24 +876,37 @@ class LifeSnapsParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
+        """Return Fitbit minute steps in the canonical activity schema."""
+        return self.load_activity_samples(user_id, start_date, end_date)
+
+    def load_activity_samples(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return Fitbit minute step counts indexed by local time."""
         file_path = self.root_folder / user_id / "steps.parquet"
         if file_path.exists():
             steps = pd.read_parquet(file_path).rename(
-                columns={"dateTime": "utc_time", "value": "steps"}
+                columns={
+                    "dateTime": schema.LOCAL_TIME_COL,
+                    "value": schema.ACTIVITY_STEPS_COL,
+                }
             )
-            steps["steps"] = steps["steps"].astype(float)
-            steps["utc_time"] = pd.to_datetime(steps["utc_time"])
-            steps["local_time"] = steps["utc_time"]
-            steps["timezone_offset"] = pd.Timedelta(0)
+            steps[schema.LOCAL_TIME_COL] = pd.to_datetime(
+                steps[schema.LOCAL_TIME_COL], errors="coerce"
+            )
+            steps[schema.UTC_TIME_COL] = pd.NaT
+            steps[schema.TIMEZONE_COL] = pd.NaT
+            steps[schema.DURATION_IN_MS_COL] = 60_000
+            steps["source"] = "fitbit_intraday_steps"
             if not (start_date is None):
-                steps = steps[steps["local_time"] >= pd.Timestamp(start_date)]
+                steps = steps[steps[schema.LOCAL_TIME_COL] >= pd.Timestamp(start_date)]
             if not (end_date is None):
-                steps = steps[steps["local_time"] < pd.Timestamp(end_date)]
-            return steps
-        else:
-            return pd.DataFrame(
-                columns=["local_time", "utc_time", "timezone_offset", "steps"]
-            )
+                steps = steps[steps[schema.LOCAL_TIME_COL] < pd.Timestamp(end_date)]
+            return schema.prepare_activity_samples(steps)
+        return schema.empty_activity_frame(extra_columns=("source",))
 
     def load_stress(
         self,

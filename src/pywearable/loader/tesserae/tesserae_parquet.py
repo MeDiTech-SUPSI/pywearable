@@ -8,6 +8,7 @@ import pandas as pd
 
 from ... import schema
 from ..base import BaseLoader
+from ..garmin import prepare_epoch_activity_samples
 
 
 class TesseraeParquetLoader(BaseLoader):
@@ -21,6 +22,9 @@ class TesseraeParquetLoader(BaseLoader):
     """
 
     hrv_source = "bbi"
+    activity_source = "samples"
+    activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+    activity_primary_resolution = "15min"
     provider_features = frozenset({"garmin_stress_level"})
     provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
 
@@ -442,68 +446,39 @@ class TesseraeParquetLoader(BaseLoader):
         user_id: str,
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
-        backend: str = "health_api",
     ) -> pd.DataFrame:
-        if backend == "health_api":
-            path_to_file = (
-                self.root_folder / user_id / "GarminHealthAPI" / "Epochs.parquet"
-            )
-        elif backend == "pa":
-            path_to_file = self.root_folder / user_id / "GarminPA" / "Steps.parquet"
-        else:
-            raise ValueError(f"backend must be either health_api or pa, not {backend}")
+        """Return Garmin Health API step intervals."""
+        return self.load_activity_samples(user_id, start_date, end_date)
+
+    def load_activity_samples(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Return Garmin Health API epochs as canonical step intervals."""
+        path_to_file = self.root_folder / user_id / "GarminHealthAPI" / "Epochs.parquet"
         if not path_to_file.exists():
-            return pd.DataFrame(
-                columns=["local_time", "utc_time", "timezone_offset", "steps"]
-            )
-
-        steps = (
-            pd.read_parquet(
-                path_to_file,
-            )
-            .sort_values(by="Timestamp", ignore_index=True)
-            .rename(
-                columns={
-                    "Timestamp": "utc_time",
-                }
-            )
-            .drop("tz_source", axis=1)
+            return schema.empty_activity_frame(extra_columns=("source",))
+        epochs = pd.read_parquet(path_to_file).copy()
+        epochs[schema.LOCAL_TIME_COL] = pd.to_datetime(
+            epochs["local_time"], errors="coerce"
         )
-        steps["local_time"] = pd.to_datetime(steps["local_time"])
-
-        steps["utc_time"] = steps["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
-        steps["timezone_offset"] = steps["local_time"] - steps["utc_time"]
-
-        # Filter by isoDate
-        if not (start_date is None):
-            steps = steps.loc[
-                (steps["local_time"] >= start_date),
-                :,
-            ]
-        if not (end_date is None):
-            steps = steps.loc[
-                (steps["local_time"] < end_date),
-                :,
-            ]
-
-        # Let's convert them on a 5-sec resolution
-        # starting from 15-minute resolution
-        steps = steps.sort_values(
-            ["utc_time", "steps"], ascending=True
-        ).drop_duplicates(["utc_time", "intensity"], keep="last")
-
-        steps = steps[steps["steps"] > 0]
-
-        steps = (
-            steps.set_index("utc_time")
-            .resample(rule="5s")["steps"]
-            .mean()
-            .ffill(limit=179)
-            / 180
-        ).reset_index()
-
-        steps = steps.drop_duplicates("utc_time")
-        return steps
+        epochs[schema.UTC_TIME_COL] = pd.to_datetime(
+            epochs["Timestamp"], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+        epochs[schema.TIMEZONE_COL] = (
+            epochs[schema.LOCAL_TIME_COL] - epochs[schema.UTC_TIME_COL]
+        )
+        epochs[schema.DURATION_IN_MS_COL] = (
+            pd.to_numeric(epochs["duration_seconds"], errors="coerce") * 1000
+        )
+        epochs[schema.ACTIVITY_STEPS_COL] = epochs["steps"]
+        if start_date is not None:
+            epochs = epochs[epochs[schema.LOCAL_TIME_COL] >= pd.Timestamp(start_date)]
+        if end_date is not None:
+            epochs = epochs[epochs[schema.LOCAL_TIME_COL] < pd.Timestamp(end_date)]
+        return prepare_epoch_activity_samples(epochs)
 
     def load_pulse_ox(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame()

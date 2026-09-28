@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from pywearable import heart_rate, provider_features, sleep
+from pywearable import heart_rate, provider_features, schema, sleep
 from pywearable.loader import OuraLoader
 
 
@@ -311,7 +311,7 @@ def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
     _page(tmp_path, "daily_readiness", "data.json", [{"id": "ready-1", "day": "2024-01-02", "score": 82, "contributors": {"hrv_balance": 71}}])
     _page(tmp_path, "daily_resilience", "data.json", [{"id": "resilient-1", "day": "2024-01-02", "level": "solid", "contributors": {"stress": 65}}])
     loader = OuraLoader(tmp_path)
-    assert loader.load_steps_summary("person-1").loc[0, "steps"] == 8021
+    assert loader.load_steps_summary("person-1").loc[0, schema.ACTIVITY_STEPS_COL] == 8021
     assert loader.load_pulse_ox_summary("person-1").loc[0, "oura_daily_spo2_percentage"] == 97.6
     assert loader.load_spo2_summary("person-1").loc[0, "spo2_mean"] == 97.6
     assert loader.load_readiness("person-1").loc[0, "readiness_hrv_balance"] == 71
@@ -357,7 +357,7 @@ def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
         loader.load_recovery("person-1")
 
 
-def test_oura_zero_steps_and_spo2_are_missing(tmp_path):
+def test_oura_zero_steps_are_observed_but_zero_spo2_is_missing(tmp_path):
     _page(
         tmp_path,
         "daily_activity",
@@ -381,8 +381,8 @@ def test_oura_zero_steps_and_spo2_are_missing(tmp_path):
     steps = loader.load_steps_summary("person-1")
     pulse_ox = loader.load_pulse_ox_summary("person-1")
 
-    assert pd.isna(steps.loc[0, "steps"])
-    assert str(steps["steps"].dtype) == "Int64"
+    assert steps.loc[0, schema.ACTIVITY_STEPS_COL] == 0
+    assert pd.api.types.is_numeric_dtype(steps[schema.ACTIVITY_STEPS_COL])
     assert pd.isna(
         pulse_ox.loc[0, "oura_daily_spo2_percentage"]
     )

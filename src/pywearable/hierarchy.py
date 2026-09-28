@@ -59,7 +59,7 @@ def normalize_resolution_chain(resolution) -> tuple[list[str], bool]:
     return chain, len(chain) > 1
 
 
-def _fixed_duration(resolution: str) -> pd.Timedelta | None:
+def fixed_duration(resolution: str) -> pd.Timedelta | None:
     """Return a fixed duration, or ``None`` for calendar and cycle windows."""
     if (
         resolution == "nightly"
@@ -78,7 +78,7 @@ def _fixed_duration(resolution: str) -> pd.Timedelta | None:
 
 def _validate_resolution_chain(chain: list[str]) -> None:
     """Reject unsupported or non-increasing multi-resolution chains."""
-    fixed = [_fixed_duration(value) for value in chain]
+    fixed = [fixed_duration(value) for value in chain]
     if len(chain) == 1:
         return
     if "nightly" in chain[1:]:
@@ -137,7 +137,7 @@ def family_statistics(statistics, family: str) -> list[str]:
     return [name for name in statistics if name.startswith(f"{family}_")]
 
 
-def _normalize_operations(value) -> list[str]:
+def _normalize_operations(value, allow_sum: bool = False) -> list[str]:
     """Return a unique ordered list of supported aggregation operation names."""
     if value is None:
         return list(STANDARD_AGGREGATIONS)
@@ -148,13 +148,19 @@ def _normalize_operations(value) -> list[str]:
     else:
         raise ValueError("aggregation operations must be strings or lists")
     operations = [operation.lower() for operation in operations]
+    supported = (*STANDARD_AGGREGATIONS, "sum") if allow_sum else STANDARD_AGGREGATIONS
     if not operations or any(
-        operation not in STANDARD_AGGREGATIONS and not is_percentile(operation)
+        operation not in supported and not is_percentile(operation)
         for operation in operations
     ):
+        supported_message = (
+            "mean, std, median, min, max, sum"
+            if allow_sum
+            else "mean, std, median, min, or max"
+        )
         raise ValueError(
-            "aggregation operations must be mean, std, median, min, max, "
-            "or percentiles such as p10 and p90"
+            f"aggregation operations must be {supported_message}, or percentiles "
+            "such as p10 and p90"
         )
     return list(dict.fromkeys(operations))
 
@@ -267,9 +273,9 @@ def normalize_valid_child_thresholds(min_valid_children, level_count: int):
     return [None if value is None else int(value) for value in thresholds]
 
 
-def resolve_feature_operations(features, specification):
+def resolve_feature_operations(features, specification, allow_sum: bool = False):
     """Apply one operation specification to every feature at the current level."""
-    operations = _normalize_operations(specification)
+    operations = _normalize_operations(specification, allow_sum=allow_sum)
     return {feature: operations for feature in features}
 
 
@@ -699,6 +705,7 @@ def aggregate_level(
     membership: str = "label",
     min_coverage: float | None = None,
     min_valid_children: int | None = None,
+    allow_sum: bool = False,
 ):
     """Aggregate one child trajectory into one larger resolution.
 
@@ -735,7 +742,7 @@ def aggregate_level(
         for column in trajectory.columns
         if column not in metadata and not column.endswith("__coverage")
     ]
-    operations = resolve_feature_operations(features, aggregation)
+    operations = resolve_feature_operations(features, aggregation, allow_sum=allow_sum)
     records = []
     next_temporal = set()
     empty_children = trajectory.iloc[0:0]
