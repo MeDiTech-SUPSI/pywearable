@@ -3,7 +3,7 @@ import json
 import pandas as pd
 import pytest
 
-from pywearable import heart_rate, sleep
+from pywearable import heart_rate, provider_features, sleep
 from pywearable.loader import OuraLoader
 
 
@@ -315,6 +315,42 @@ def test_oura_daily_provider_tables_use_day_and_keep_vendor_labels(tmp_path):
     assert loader.load_pulse_ox_summary("person-1").loc[0, "oura_daily_spo2_percentage"] == 97.6
     assert loader.load_spo2_summary("person-1").loc[0, "spo2_mean"] == 97.6
     assert loader.load_readiness("person-1").loc[0, "readiness_hrv_balance"] == 71
+    assert provider_features.get_available_provider_features(loader) == sorted(
+        loader.provider_features
+    )
+    readiness = provider_features.get_provider_features(
+        loader,
+        feature=[
+            provider_features.OURA_READINESS_SCORE,
+            provider_features.OURA_READINESS_HRV_BALANCE,
+            provider_features.OURA_READINESS_SLEEP_BALANCE,
+        ],
+        user_id="person-1",
+    )
+    assert readiness.loc[
+        ("person-1", pd.Timestamp("2024-01-02")),
+        provider_features.OURA_READINESS_SCORE,
+    ] == 82
+    assert readiness.loc[
+        ("person-1", pd.Timestamp("2024-01-02")),
+        provider_features.OURA_READINESS_HRV_BALANCE,
+    ] == 71
+    assert pd.isna(
+        readiness.loc[
+            ("person-1", pd.Timestamp("2024-01-02")),
+            provider_features.OURA_READINESS_SLEEP_BALANCE,
+        ]
+    )
+    monthly_readiness = provider_features.get_provider_features(
+        loader,
+        feature=provider_features.OURA_READINESS_SCORE,
+        user_id="person-1",
+        resolution="monthly",
+        aggregation="mean",
+    )
+    assert monthly_readiness[
+        "oura_readiness_score__daily__monthly_mean"
+    ].iloc[0] == 82
     assert loader.load_resilience("person-1").loc[0, "oura_resilience_level"] == "solid"
     assert loader.load_steps_summary("person-1", "2024-01-03", "2024-01-04").empty
     with pytest.raises(NotImplementedError, match="vendor-specific"):

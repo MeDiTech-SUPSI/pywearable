@@ -12,6 +12,9 @@ from ..base import BaseLoader
 
 class TesseraeCSVLoader(BaseLoader):
     # TODO use DuckDB here
+    provider_features = frozenset({"garmin_stress_level"})
+    provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+
     def __init__(self, root_folder: Path):
         """
         Loader for Tesserae dataset in CSV format (as provided by data provider)
@@ -453,7 +456,10 @@ class TesseraeCSVLoader(BaseLoader):
         return demographics
 
     def load_stress(
-        self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
@@ -481,15 +487,39 @@ class TesseraeCSVLoader(BaseLoader):
                 lambda x: self._convert_timezone_offset(x)
             )
 
-            # Filter by isoDate
-            stress = stress.loc[
-                (stress["isoDate"] >= pd.Timestamp(start_date))
-                & (stress["isoDate"] < pd.Timestamp(end_date)),
-                :,
-            ]
+            if start_date is not None:
+                stress = stress[stress["isoDate"] >= pd.Timestamp(start_date)]
+            if end_date is not None:
+                stress = stress[stress["isoDate"] < pd.Timestamp(end_date)]
             return stress
         else:
             return pd.DataFrame()
+
+    def load_provider_feature(
+        self, feature: str, user_id: str, start_date=None, end_date=None, **kwargs
+    ) -> pd.DataFrame:
+        """Translate Tesserae's Garmin stress stream to canonical samples."""
+        if feature != "garmin_stress_level":
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date, **kwargs
+            )
+        stress = self.load_stress(user_id, start_date, end_date).copy()
+        if stress.empty:
+            return schema.prepare_provider_feature_samples(
+                pd.DataFrame(columns=[feature]), feature
+            )
+        stress[schema.LOCAL_TIME_COL] = pd.to_datetime(
+            stress["isoDate"], errors="coerce"
+        )
+        stress[schema.UTC_TIME_COL] = pd.to_datetime(
+            stress["Timestamp"], errors="coerce", utc=True
+        ).dt.tz_localize(None)
+        stress[schema.TIMEZONE_COL] = pd.to_timedelta(
+            pd.to_numeric(stress["timezoneOffsetInMs"], errors="coerce"), unit="ms"
+        )
+        stress[feature] = pd.to_numeric(stress["stressLevel"], errors="coerce")
+        stress.loc[~stress[feature].between(0, 100), feature] = pd.NA
+        return schema.prepare_provider_feature_samples(stress, feature)
 
     def load_epochs(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp
@@ -592,9 +622,6 @@ class TesseraeCSVLoader(BaseLoader):
             return schema.empty_heart_rate_frame(
                 ["timezone_offset", "tz_source", "beats_per_minute"]
             )
-
-    def load_stress(self, user_id, start_date, end_date):
-        raise
 
     # Utility functions
     def get_user_list(self) -> list:

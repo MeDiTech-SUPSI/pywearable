@@ -43,6 +43,21 @@ class OuraLoader(BaseLoader):
     hrv_time_columns = ("utc_time", "local_time")
     respiratory_rate_source = "provider_summary"
     spo2_source = "provider_summary"
+    provider_features = frozenset(
+        {
+            "oura_readiness_score",
+            "oura_readiness_temperature_deviation",
+            "oura_readiness_temperature_trend_deviation",
+            "oura_readiness_activity_balance",
+            "oura_readiness_body_temperature",
+            "oura_readiness_hrv_balance",
+            "oura_readiness_previous_day_activity",
+            "oura_readiness_previous_night",
+            "oura_readiness_recovery_index",
+            "oura_readiness_resting_heart_rate",
+            "oura_readiness_sleep_balance",
+        }
+    )
 
     def __init__(self, data_dir):
         self.data_dir = Path(data_dir)
@@ -622,6 +637,39 @@ class OuraLoader(BaseLoader):
             )
             rows.append(row)
         return pd.DataFrame(rows, columns=columns)
+
+    def load_provider_feature(
+        self, feature: str, user_id: str, start_date=None, end_date=None, **kwargs
+    ) -> pd.DataFrame:
+        """Translate one Oura readiness field to canonical native-day rows."""
+        columns = {
+            "oura_readiness_score": "oura_readiness_score",
+            "oura_readiness_temperature_deviation": "temperature_deviation",
+            "oura_readiness_temperature_trend_deviation": (
+                "temperature_trend_deviation"
+            ),
+            "oura_readiness_activity_balance": "readiness_activity_balance",
+            "oura_readiness_body_temperature": "readiness_body_temperature",
+            "oura_readiness_hrv_balance": "readiness_hrv_balance",
+            "oura_readiness_previous_day_activity": (
+                "readiness_previous_day_activity"
+            ),
+            "oura_readiness_previous_night": "readiness_previous_night",
+            "oura_readiness_recovery_index": "readiness_recovery_index",
+            "oura_readiness_resting_heart_rate": (
+                "readiness_resting_heart_rate"
+            ),
+            "oura_readiness_sleep_balance": "readiness_sleep_balance",
+        }
+        if feature not in columns:
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date, **kwargs
+            )
+        readiness = self.load_readiness(user_id, start_date, end_date)
+        result = readiness[[schema.CALENDAR_DATE_COL, columns[feature]]].rename(
+            columns={columns[feature]: feature}
+        )
+        return schema.prepare_provider_feature_summary(result, feature)
 
     def load_resilience(self, user_id, start_date=None, end_date=None):
         """Return Oura's categorical daily resilience and vendor contributors."""

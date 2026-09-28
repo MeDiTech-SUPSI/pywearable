@@ -17,6 +17,8 @@ class BaseLoader(ABC):
     respiratory_rate_time_columns = ("utc_time", "local_time")
     spo2_source = "samples"
     spo2_time_columns = ("utc_time", "local_time")
+    provider_features = frozenset()
+    provider_feature_time_columns = ("utc_time", "local_time")
 
     def __init__(self):
         pass
@@ -301,6 +303,24 @@ class BaseLoader(ABC):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         raise NotImplementedError
+
+    def load_provider_feature(
+        self,
+        feature: str,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+        **kwargs,
+    ) -> pd.DataFrame:
+        """Load one provider-native feature in its canonical row schema.
+
+        Implementations translate vendor fields, units, and missing-value
+        conventions only. Windowing, aggregation, and derived features belong
+        to :mod:`pywearable.provider_features`.
+        """
+        raise ValueError(
+            f"{type(self).__name__} does not provide feature {feature!r}"
+        )
 
     def load_hrv_samples(
         self,

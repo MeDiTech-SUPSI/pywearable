@@ -68,6 +68,22 @@ class LabfrontLoader(BaseLoader):
     hrv_source = "bbi"
     respiratory_rate_source = "samples"
     spo2_source = "samples"
+    provider_features = frozenset(
+        {
+            "garmin_stress_level",
+            "garmin_body_battery",
+            "garmin_daily_average_stress",
+            "garmin_daily_max_stress",
+            "garmin_daily_stress_duration_seconds",
+            "garmin_daily_rest_stress_duration_seconds",
+            "garmin_daily_activity_stress_duration_seconds",
+            "garmin_daily_low_stress_duration_seconds",
+            "garmin_daily_medium_stress_duration_seconds",
+            "garmin_daily_high_stress_duration_seconds",
+            "garmin_daily_stress_qualifier",
+        }
+    )
+    provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
 
     def __init__(
         self,
@@ -2983,140 +2999,122 @@ class LabfrontLoader(BaseLoader):
             source=source,
         )
 
-    def load_recovery(
+    def load_provider_feature(
         self,
+        feature: str,
         user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        start_date=None,
+        end_date=None,
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ):
-        """Load recovery data.
+    ) -> pd.DataFrame:
+        """Load one Garmin feature in the shared provider-feature schema.
 
-        This function returns Garmin Body Battery Recovery data from the
-        given ``user_id`` with the time window defined by ``start_date``
-        and ``end_date``. Recovery is computed considering body battery
-        values at wake up and bedtime, and by comparing the total charge
-        with respect to the available charge.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            Unique user identifier for recovery data retrieval.
-        start_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
-            Start date for recovery data retrieval.
-        end_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
-            End date for recovery data retrieval.
-
-        Returns
-        -------
-        :class:`pd.DataFrame`
-            Formatted :class:`pd.DataFrame` with recovery data.
+        Stress and Body Battery samples are translated from Garmin's stress
+        stream, including its negative sentinel values. Daily stress fields
+        are translated from Garmin daily summaries, with durations converted
+        from milliseconds to seconds. This method does not aggregate samples
+        or calculate sleep recovery.
         """
-        sleep_summary = self._load_sleep_summary_raw(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-            drop_duplicates=True,
-        )
-        if len(sleep_summary) > 0:
-            # We need to get body battery data for each sleep
-            # Let's retrieve sleep timestamps
-            sleep_summary["wakeup"] = pd.to_datetime(
-                sleep_summary[constants.UNIXTIMESTAMP_IN_MS_COL]
-                + sleep_summary[constants.TIMEZONEOFFSET_IN_MS_COL]
-                + sleep_summary[constants.DURATION_IN_MS_COL]
-                + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
-                utc=True,
-                unit="ms",
-            ).dt.tz_localize(None)
-            sleep_timestamps = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.ISODATE_COL, "wakeup"]
-            ]
-            # Load body battery for all sleep sessions with 5 minute tolerance
-            min_time = sleep_timestamps[constants.ISODATE_COL].min() - pd.Timedelta(
-                minutes=5
-            )
-            max_time = sleep_timestamps["wakeup"].max() + pd.Timedelta(minutes=5)
-            body_battery = self.load_stress(
-                user_id=user_id,
-                start_date=min_time.to_pydatetime(),
-                end_date=max_time.to_pydatetime(),
+        sample_columns = {
+            "garmin_stress_level": constants.STRESS_STRESS_LEVEL_COL,
+            "garmin_body_battery": constants.STRESS_BODY_BATTERY_COL,
+        }
+        daily_columns = {
+            "garmin_daily_average_stress": (
+                constants.DAILY_SUMMARY_AVG_STRESS_IN_STRESS_LVL_COL
+            ),
+            "garmin_daily_max_stress": (
+                constants.DAILY_SUMMARY_MAX_STRESS_IN_STRESS_LVL_COL
+            ),
+            "garmin_daily_stress_duration_seconds": "stressDurationInMs",
+            "garmin_daily_rest_stress_duration_seconds": (
+                constants.DAILY_SUMMARY_REST_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_activity_stress_duration_seconds": (
+                constants.DAILY_SUMMARY_UNRELIABLE_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_low_stress_duration_seconds": (
+                constants.DAILY_SUMMARY_LOW_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_medium_stress_duration_seconds": (
+                constants.DAILY_SUMMARY_MEDIUM_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_high_stress_duration_seconds": (
+                constants.DAILY_SUMMARY_HIGH_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_stress_qualifier": constants.DAILY_SUMMARY_STRESS_SCORE_COL,
+        }
+        if feature in sample_columns:
+            data = self.load_stress(
+                user_id,
+                start_date=start_date,
+                end_date=end_date,
                 source=source,
+            ).copy()
+            if data.empty:
+                return schema.prepare_provider_feature_samples(
+                    pd.DataFrame(columns=[feature]), feature
+                )
+            data[schema.LOCAL_TIME_COL] = pd.to_datetime(
+                data[constants.ISODATE_COL], errors="coerce"
             )
-            if len(body_battery) > 0:
-                if constants.STRESS_BODY_BATTERY_COL in body_battery.columns:
-                    body_battery = body_battery.loc[
-                        :,
-                        [
-                            constants.ISODATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    # Labfront has several duplicates, we take the mean by isoDate and make sure isoDate is monotonic increasing
-                    body_battery = (
-                        body_battery.groupby(constants.ISODATE_COL)[
-                            constants.STRESS_BODY_BATTERY_COL
-                        ]
-                        .mean()
-                        .sort_index()
-                        .reset_index()
-                    )
-                    body_battery_bedtime = pd.merge_asof(
-                        sleep_timestamps,
-                        body_battery,
-                        on=constants.ISODATE_COL,
-                        direction="backward",
-                        tolerance=pd.Timedelta(minutes=5),
-                    ).loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    body_battery_wakeup = pd.merge_asof(
-                        sleep_timestamps,
-                        body_battery,
-                        left_on="wakeup",
-                        right_on=constants.ISODATE_COL,
-                        direction="forward",
-                        tolerance=pd.Timedelta(minutes=5),
-                    ).loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    sleep_timestamps = pd.merge(
-                        left=body_battery_bedtime,
-                        right=body_battery_wakeup,
-                        how="inner",
-                        on=constants.CALENDAR_DATE_COL,
-                        suffixes=["Bedtime", "Wakeup"],
-                    )
-                    sleep_timestamps[constants.RECOVERY_RECOVERY_COL] = (
-                        sleep_timestamps[constants.STRESS_BODY_BATTERY_WAKING_COL]
-                        - sleep_timestamps[constants.STRESS_BODY_BATTERY_BEDTIME_COL]
-                    ) / (
-                        100
-                        - sleep_timestamps[constants.STRESS_BODY_BATTERY_BEDTIME_COL]
-                    )
-                    # make sure recovery isn't negative, set it to zero if it is
-                    sleep_timestamps[constants.RECOVERY_RECOVERY_COL] = np.maximum(
-                        sleep_timestamps[constants.RECOVERY_RECOVERY_COL], 0
-                    )
-                    sleep_timestamps = sleep_timestamps.reset_index(drop=True)
-                    return sleep_timestamps.loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.RECOVERY_RECOVERY_COL,
-                            constants.STRESS_BODY_BATTERY_BEDTIME_COL,
-                            constants.STRESS_BODY_BATTERY_WAKING_COL,
-                        ],
-                    ]
-        return pd.DataFrame()
+            data[schema.UTC_TIME_COL] = pd.to_datetime(
+                data[constants.UNIXTIMESTAMP_IN_MS_COL],
+                unit="ms",
+                errors="coerce",
+                utc=True,
+            ).dt.tz_localize(None)
+            data[schema.TIMEZONE_COL] = pd.to_timedelta(
+                pd.to_numeric(
+                    data[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                ),
+                unit="ms",
+            )
+            data[feature] = pd.to_numeric(
+                data[sample_columns[feature]], errors="coerce"
+            )
+            if feature == "garmin_stress_level":
+                # Garmin uses -1 for unavailable stress and -2 for activity.
+                data.loc[data[feature].lt(0), feature] = np.nan
+            data.loc[data[feature].gt(100), feature] = np.nan
+            if feature == "garmin_body_battery":
+                data.loc[data[feature].lt(0), feature] = np.nan
+            return schema.prepare_provider_feature_samples(data, feature)
+        if feature not in daily_columns:
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date
+            )
+        data = self.load_daily_summary(user_id, start_date, end_date).copy()
+        if data.empty:
+            return schema.prepare_provider_feature_summary(
+                pd.DataFrame(columns=[schema.CALENDAR_DATE_COL, feature]),
+                feature,
+                numeric=feature != "garmin_daily_stress_qualifier",
+            )
+        order_col = (
+            constants.ISODATE_COL
+            if constants.ISODATE_COL in data.columns
+            else constants.CALENDAR_DATE_COL
+        )
+        data = data.sort_values(order_col, kind="stable").drop_duplicates(
+            constants.CALENDAR_DATE_COL, keep="last"
+        )
+        result = pd.DataFrame(
+            {
+                schema.CALENDAR_DATE_COL: data[constants.CALENDAR_DATE_COL],
+                feature: data[daily_columns[feature]],
+            }
+        )
+        numeric = feature != "garmin_daily_stress_qualifier"
+        if numeric:
+            result[feature] = pd.to_numeric(result[feature], errors="coerce")
+            if feature.endswith("_seconds"):
+                result[feature] = result[feature] / 1000
+            else:
+                result.loc[result[feature].lt(0), feature] = np.nan
+        return schema.prepare_provider_feature_summary(
+            result, feature, numeric=numeric
+        )
 
     def load_steps(
         self,

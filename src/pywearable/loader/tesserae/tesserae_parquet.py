@@ -21,6 +21,8 @@ class TesseraeParquetLoader(BaseLoader):
     """
 
     hrv_source = "bbi"
+    provider_features = frozenset({"garmin_stress_level"})
+    provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
 
     def __init__(self, root_folder: os.PathLike):
         self.root_folder = Path(root_folder)
@@ -92,16 +94,33 @@ class TesseraeParquetLoader(BaseLoader):
         if not (end_date is None):
             filters.append((("local_time", "<", pd.Timestamp(end_date))))
 
-        stress = pd.read_parquet(
-            path_to_file,
-            filters=[filters],
-        ).rename(columns={"Timestamp": "utc_time", "hr": "stress"})
+        read_kwargs = {"filters": [filters]} if filters else {}
+        stress = pd.read_parquet(path_to_file, **read_kwargs).rename(
+            columns={"Timestamp": "utc_time", "hr": "stress"}
+        )
         stress["utc_time"] = (
             stress["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
         )
         stress["timezone_offset"] = stress["local_time"] - stress["utc_time"]
         stress = stress.drop_duplicates(subset="utc_time", keep="last")
         return stress
+
+    def load_provider_feature(
+        self, feature: str, user_id: str, start_date=None, end_date=None, **kwargs
+    ) -> pd.DataFrame:
+        """Translate Tesserae's Garmin stress stream to canonical samples."""
+        if feature != "garmin_stress_level":
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date, **kwargs
+            )
+        stress = self.load_stress(user_id, start_date, end_date).rename(
+            columns={"stress": feature, "timezone_offset": schema.TIMEZONE_COL}
+        )
+        if feature not in stress:
+            stress[feature] = pd.Series(dtype=float)
+        stress[feature] = pd.to_numeric(stress[feature], errors="coerce")
+        stress.loc[~stress[feature].between(0, 100), feature] = np.nan
+        return schema.prepare_provider_feature_samples(stress, feature)
 
     def load_sleep_stage(
         self,

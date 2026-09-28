@@ -37,6 +37,17 @@ class LifeSnapsParquetLoader(BaseLoader):
     hrv_time_columns = ("local_time",)
     respiratory_rate_source = "provider_summary"
     spo2_source = "provider_summary"
+    provider_features = frozenset(
+        {
+            "fitbit_stress_management_score",
+            "fitbit_stress_sleep_points",
+            "fitbit_stress_max_sleep_points",
+            "fitbit_stress_responsiveness_points",
+            "fitbit_stress_max_responsiveness_points",
+            "fitbit_stress_exertion_points",
+            "fitbit_stress_max_exertion_points",
+        }
+    )
 
     def __init__(self, root_folder: os.PathLike):
         root_folder = Path(root_folder)
@@ -912,6 +923,53 @@ class LifeSnapsParquetLoader(BaseLoader):
                     "max_sleep_points",
                 ]
             )
+
+    def load_provider_feature(
+        self, feature: str, user_id: str, start_date=None, end_date=None, **kwargs
+    ) -> pd.DataFrame:
+        """Translate one Fitbit Stress Management field to native daily grain."""
+        columns = {
+            "fitbit_stress_management_score": "stress_score",
+            "fitbit_stress_sleep_points": "sleep_points",
+            "fitbit_stress_max_sleep_points": "max_sleep_points",
+            "fitbit_stress_responsiveness_points": "responsiveness_points",
+            "fitbit_stress_max_responsiveness_points": "max_responsiveness_points",
+            "fitbit_stress_exertion_points": "exertion_points",
+            "fitbit_stress_max_exertion_points": "max_exertion_points",
+        }
+        if feature not in columns:
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date, **kwargs
+            )
+        stress = self.load_stress(user_id, start_date, end_date).drop_duplicates()
+        if stress.empty:
+            return schema.prepare_provider_feature_summary(
+                pd.DataFrame(columns=[schema.CALENDAR_DATE_COL, feature]), feature
+            )
+        stress = stress.rename(columns={"calendarDate": schema.CALENDAR_DATE_COL})
+        if stress[schema.CALENDAR_DATE_COL].duplicated().any():
+            raise ValueError(
+                "conflicting Fitbit stress summaries remain for one calendar date"
+            )
+        # The LifeSnaps Fitbit export uses READY for finalized daily scores.
+        # NO_DATA and IN_PROGRESS rows identify dates but do not contain a usable
+        # score. Older exports may omit these lifecycle fields.
+        calculation_ready = (
+            stress["status"].eq("READY")
+            if "status" in stress
+            else pd.Series(True, index=stress.index)
+        )
+        calculation_succeeded = (
+            ~stress["calculation_failed"].fillna(True)
+            if "calculation_failed" in stress
+            else pd.Series(True, index=stress.index)
+        )
+        valid = calculation_ready & calculation_succeeded
+        result = stress[[schema.CALENDAR_DATE_COL, columns[feature]]].rename(
+            columns={columns[feature]: feature}
+        )
+        result.loc[~valid, feature] = np.nan
+        return schema.prepare_provider_feature_summary(result, feature)
 
     def load_survey(self, survey_name: str) -> pd.DataFrame:
         return pd.read_parquet(self.root_folder / f"{survey_name}.parquet")

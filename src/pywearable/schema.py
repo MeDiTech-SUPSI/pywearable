@@ -321,6 +321,109 @@ def prepare_spo2_summary(frame):
     )
 
 
+def prepare_provider_feature_samples(frame, feature: str) -> pd.DataFrame:
+    """Validate canonical timestamped samples for one provider-native feature.
+
+    Loaders must translate vendor columns before calling this function. Exact
+    timestamp duplicates collapse to one row. If repeated rows disagree about
+    the feature value, one row is retained with that value missing; downstream
+    coverage therefore records the conflict without selecting an arbitrary
+    export revision.
+    """
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("provider feature samples must be a pandas DataFrame")
+    frame = frame.copy()
+    if feature not in frame.columns:
+        if frame.empty:
+            frame[feature] = pd.Series(dtype=float)
+        else:
+            raise ValueError(
+                f"provider feature samples are missing required column: {feature}"
+            )
+    for column in (UTC_TIME_COL, LOCAL_TIME_COL):
+        if column not in frame.columns:
+            frame[column] = pd.NaT
+    frame[UTC_TIME_COL] = pd.to_datetime(
+        frame[UTC_TIME_COL], errors="coerce", utc=True
+    ).dt.tz_localize(None)
+    frame[LOCAL_TIME_COL] = pd.to_datetime(
+        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+    if TIMEZONE_COL not in frame.columns:
+        frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    frame[feature] = pd.to_numeric(frame[feature], errors="coerce")
+    frame = frame[
+        frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna()
+    ].copy()
+    order_col = "__provider_feature_time"
+    frame[order_col] = frame[UTC_TIME_COL].where(
+        frame[UTC_TIME_COL].notna(), frame[LOCAL_TIME_COL]
+    )
+    frame = frame.sort_values(order_col, kind="stable")
+    conflicts = frame.groupby(order_col, dropna=False)[feature].transform(
+        lambda values: values.dropna().nunique() > 1
+    )
+    frame.loc[conflicts, feature] = float("nan")
+    return (
+        frame.drop_duplicates(order_col, keep="last")
+        .drop(columns=order_col)
+        .reset_index(drop=True)
+    )
+
+
+def prepare_provider_feature_summary(
+    frame, feature: str, *, numeric: bool = True
+) -> pd.DataFrame:
+    """Validate one canonical provider feature at native daily grain.
+
+    The input must already use ``calendar_date`` and the canonical feature
+    name. The loader must resolve exact export duplicates or revisions first;
+    this validator rejects any remaining duplicate date rather than choosing
+    one provider value silently.
+    """
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("provider feature summary must be a pandas DataFrame")
+    frame = frame.copy()
+    if CALENDAR_DATE_COL not in frame.columns:
+        if frame.empty:
+            frame[CALENDAR_DATE_COL] = pd.Series(dtype="datetime64[ns]")
+        else:
+            raise ValueError(
+                "provider feature summary is missing required column: "
+                f"{CALENDAR_DATE_COL}"
+            )
+    if feature not in frame.columns:
+        if frame.empty:
+            frame[feature] = pd.Series(dtype=float if numeric else object)
+        else:
+            raise ValueError(
+                f"provider feature summary is missing required column: {feature}"
+            )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
+    ).map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+    frame[CALENDAR_DATE_COL] = pd.to_datetime(
+        frame[CALENDAR_DATE_COL], errors="coerce"
+    ).dt.normalize()
+    frame = frame[frame[CALENDAR_DATE_COL].notna()].copy()
+    if numeric:
+        frame[feature] = pd.to_numeric(frame[feature], errors="coerce")
+    if frame[CALENDAR_DATE_COL].duplicated().any():
+        raise ValueError(
+            "provider feature summary must contain at most one row per "
+            "calendar_date"
+        )
+    return frame.sort_values(CALENDAR_DATE_COL, kind="stable").reset_index(drop=True)
+
+
 def prepare_bbi(frame):
     """Validate and order beat-to-beat intervals in the shared schema."""
     if not isinstance(frame, pd.DataFrame):
