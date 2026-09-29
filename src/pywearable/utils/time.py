@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 
 
+SECONDS_PER_DAY = 24 * 60 * 60
+
+
 def clock_seconds(value) -> float:
     """Convert a timestamp or clock time to seconds since midnight.
 
@@ -40,6 +43,53 @@ def clock_time(seconds):
     minute, remainder = divmod(remainder, 60 * 1_000_000)
     second, microsecond = divmod(remainder, 1_000_000)
     return datetime.time(hour, minute, second, microsecond)
+
+
+def circular_mean_seconds(seconds) -> float:
+    """Return the circular mean of clock seconds, wrapped to one day."""
+    values = np.asarray(seconds, dtype=float)
+    values = values[np.isfinite(values)]
+    if not len(values):
+        return np.nan
+    angles = values / SECONDS_PER_DAY * 2 * np.pi
+    mean_sine = np.sin(angles).mean()
+    mean_cosine = np.cos(angles).mean()
+    if np.hypot(mean_sine, mean_cosine) < 1e-12:
+        return np.nan
+    angle = np.arctan2(mean_sine, mean_cosine) % (2 * np.pi)
+    return float(angle / (2 * np.pi) * SECONDS_PER_DAY)
+
+
+def circular_std_minutes(seconds) -> float:
+    """Return circular clock-time dispersion in minutes."""
+    values = np.asarray(seconds, dtype=float)
+    values = values[np.isfinite(values)]
+    if not len(values):
+        return np.nan
+    angles = values / SECONDS_PER_DAY * 2 * np.pi
+    resultant = np.hypot(np.sin(angles).mean(), np.cos(angles).mean())
+    if resultant < 1e-12:
+        return np.nan
+    resultant = min(1.0, float(resultant))
+    return float(
+        np.sqrt(-2 * np.log(resultant))
+        * (SECONDS_PER_DAY / 60)
+        / (2 * np.pi)
+    )
+
+
+def unwrap_clock_seconds(seconds, anchor_seconds=0) -> float:
+    """Place clock seconds in the day beginning at ``anchor_seconds``.
+
+    For example, an anchor at noon maps 01:00 to hour 25, which keeps a
+    night spanning midnight continuous on an elapsed-time axis.
+    """
+    if pd.isna(seconds):
+        return np.nan
+    anchor = float(anchor_seconds)
+    if not 0 <= anchor < SECONDS_PER_DAY:
+        raise ValueError("anchor_seconds must lie in [0, 86400)")
+    return (float(seconds) - anchor) % SECONDS_PER_DAY + anchor
 
 
 @dataclass

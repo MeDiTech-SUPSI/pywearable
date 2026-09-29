@@ -326,16 +326,10 @@ def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
         [time_utils.clock_seconds(value) for value in values], dtype=float
     )
     if operation in {"mean", "std"}:
-        angles = seconds / (24 * 60 * 60) * 2 * np.pi
-        mean_sine = np.sin(angles).mean()
-        mean_cosine = np.cos(angles).mean()
-        resultant = np.hypot(mean_sine, mean_cosine)
-        if resultant < 1e-12:
-            return np.nan if operation == "std" else None
         if operation == "std":
-            return np.sqrt(-2 * np.log(resultant)) * (24 * 60) / (2 * np.pi)
-        angle = np.arctan2(mean_sine, mean_cosine) % (2 * np.pi)
-        return time_utils.clock_time(angle / (2 * np.pi) * 24 * 60 * 60)
+            return time_utils.circular_std_minutes(seconds)
+        center = time_utils.circular_mean_seconds(seconds)
+        return None if pd.isna(center) else time_utils.clock_time(center)
 
     # Ordered sleep times use a noon-to-noon sleep-day clock so values around
     # midnight remain adjacent without allowing calendar dates to order them.

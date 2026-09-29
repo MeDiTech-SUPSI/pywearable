@@ -399,14 +399,7 @@ def _whole_center(values, temporal, method):
     if statistic == "median":
         ordered = observed.where(observed >= 12 * 3_600, observed + 86_400)
         return float(ordered.median() % 86_400)
-    angles = observed / 86_400 * 2 * np.pi
-    sine = np.sin(angles).mean()
-    cosine = np.cos(angles).mean()
-    if np.hypot(sine, cosine) < 1e-12:
-        return np.nan
-    return float(
-        np.arctan2(sine, cosine) % (2 * np.pi) / (2 * np.pi) * 86_400
-    )
+    return time_utils.circular_mean_seconds(observed)
 
 
 def _source_values(frame, feature, temporal, positions=None, include_imputed=False):
