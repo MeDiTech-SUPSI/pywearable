@@ -221,16 +221,38 @@ def test_valid_child_threshold_propagates_to_the_next_sleep_level():
     assert result.iloc[0][f"{monthly}__coverage"] == 0
 
 
-def test_sleep_hierarchy_rejects_primary_nightly_coverage_threshold():
-    with pytest.raises(ValueError, match="primary nightly coverage is not defined"):
-        sleep.get_sleep_statistics(
-            _sleep_loader(),
-            user_id="person-1",
-            statistic="sleep_TST",
-            resolution=["nightly", "weekly"],
-            aggregation="mean",
-            min_coverage=[0.7, None],
-        )
+def test_nightly_sleep_coverage_is_binary_feature_availability():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic=["sleep_TST", "sleep_bedtime"],
+        resolution="nightly",
+        start_date="2024-01-16",
+        end_date="2024-01-21",
+    ).xs("person-1")
+
+    assert result.index.tolist() == pd.date_range(
+        "2024-01-16", "2024-01-21", inclusive="left"
+    ).tolist()
+    assert result["sleep_TST__coverage"].tolist() == [1, 1, 0, 0, 0]
+    assert result["sleep_bedtime__coverage"].tolist() == [1, 1, 0, 0, 1]
+
+
+def test_sleep_hierarchy_accepts_primary_availability_threshold():
+    result = sleep.get_sleep_statistics(
+        _sleep_loader(),
+        user_id="person-1",
+        statistic="sleep_TST",
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
+        min_coverage=[0.7, None],
+        start_date="2024-01-16",
+        end_date="2024-01-22",
+    )
+
+    assert result.iloc[0][
+        "sleep_TST__nightly__weekly_mean__coverage"
+    ] == pytest.approx(2 / 6)
 
 
 def test_unbounded_empty_sleep_hierarchy_preserves_index_contract():
@@ -378,7 +400,7 @@ def test_daily_sleep_statistics_are_the_nightly_trajectory():
         end_date="2024-01-19",
     )
 
-    pd.testing.assert_series_equal(daily, nightly)
+    pd.testing.assert_frame_equal(daily, nightly)
 
 
 def test_monthly_sleep_statistics_return_both_requested_partial_months():

@@ -71,12 +71,11 @@ def get_time_in_bed(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly time in bed.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -94,12 +93,11 @@ def get_sleep_period_time(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly sleep period time.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -117,12 +115,11 @@ def get_total_sleep_time(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly total sleep time.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -140,12 +137,11 @@ def get_sleep_efficiency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly sleep efficiency.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -163,12 +159,11 @@ def get_sleep_maintenance_efficiency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly sleep maintenance efficiency.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -186,12 +181,11 @@ def get_deep_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly deep latency.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistics(
         loader=loader,
@@ -209,7 +203,7 @@ def get_light_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistics(
         loader=loader,
         user_id=user_id,
@@ -226,12 +220,11 @@ def get_rem_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly rem latency.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -249,12 +242,11 @@ def get_light_sleep_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly light sleep duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -272,12 +264,11 @@ def get_deep_sleep_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly deep sleep duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -295,12 +286,11 @@ def get_rem_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly rem duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -318,12 +308,11 @@ def get_nrem_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly nrem duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -341,12 +330,11 @@ def get_awake_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly awake duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -364,12 +352,11 @@ def get_unmeasurable_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly unmeasurable duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -387,7 +374,7 @@ def get_light_sleep_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -404,7 +391,7 @@ def get_deep_sleep_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -421,7 +408,7 @@ def get_rem_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -438,7 +425,7 @@ def get_nrem_percentage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -455,7 +442,7 @@ def get_wake_after_sleep_onset(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -472,7 +459,7 @@ def get_sleep_onset_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -489,7 +476,7 @@ def get_sleep_score(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -549,12 +536,11 @@ def get_bedtime(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly bedtime.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -572,12 +558,11 @@ def get_wakeup_time(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly wakeup time.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -595,12 +580,11 @@ def get_sleep_midpoint(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly sleep midpoint.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -618,12 +602,11 @@ def get_awake_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly awake count.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
 
     return get_sleep_statistic(
@@ -642,12 +625,11 @@ def get_light_sleep_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly light sleep count.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
 
     return get_sleep_statistic(
@@ -666,12 +648,11 @@ def get_deep_sleep_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly deep sleep count.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
 
     return get_sleep_statistic(
@@ -690,12 +671,11 @@ def get_rem_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly rem count.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
 
     return get_sleep_statistic(
@@ -715,12 +695,11 @@ def get_cpd_midpoint(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype_dict: dict = {},
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly cpd midpoint.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -1155,7 +1134,7 @@ def get_awakening_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return the number of internal awake bouts for each night."""
     return get_sleep_statistic(
         loader=loader,
@@ -1173,7 +1152,7 @@ def get_awakening_index(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return internal awakenings per hour of total sleep time."""
     return get_sleep_statistic(
         loader=loader,
@@ -1191,7 +1170,7 @@ def get_median_awakening_duration(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return the median duration in minutes of internal awake bouts."""
     return get_sleep_statistic(
         loader=loader,
@@ -1209,7 +1188,7 @@ def get_stage_transition_count(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return direct transitions between detailed sleep stages."""
     return get_sleep_statistic(
         loader=loader,
@@ -1227,7 +1206,7 @@ def get_stage_transition_index(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return direct detailed-stage transitions per hour of total sleep time."""
     return get_sleep_statistic(
         loader=loader,
@@ -1245,7 +1224,7 @@ def get_stage_coverage(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return the percentage of time in bed with a measurable stage label."""
     return get_sleep_statistic(
         loader=loader,
@@ -1263,7 +1242,7 @@ def get_sleep_onset(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return the start of the first observed sleep stage for each night."""
     return get_sleep_statistic(
         loader=loader,
@@ -1281,7 +1260,7 @@ def get_getup_time(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return the provider-recorded sleep-session end for each night."""
     return get_sleep_statistic(
         loader=loader,
@@ -1299,7 +1278,7 @@ def get_getup_latency(
     start_date: Union[datetime.datetime, datetime.date, str, None] = None,
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return minutes from final observed sleep offset to session end."""
     return get_sleep_statistic(
         loader=loader,
@@ -1318,12 +1297,11 @@ def get_cpd_duration(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     chronotype_dict: dict = {},
     loader_kwargs={},
-) -> pd.Series:
+) -> pd.DataFrame:
     """Return nightly cpd duration.
 
-    The result is a :class:`pandas.Series` with one value per night,
-    indexed by ``user_id`` and ``calendar_date``. Aggregation across
-    nights is intentionally handled outside this extraction function.
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
     return get_sleep_statistic(
         loader=loader,
@@ -3108,12 +3086,11 @@ def get_sleep_statistic(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return one sleep feature at nightly or calendar resolution.
 
     This convenience wrapper delegates to :func:`get_sleep_statistics` and
-    returns a nightly :class:`pandas.Series` or an aggregated
-    :class:`pandas.DataFrame` with coverage information.
+    returns a :class:`pandas.DataFrame` with coverage information.
     """
     return get_sleep_statistics(
         loader=loader,
@@ -3141,7 +3118,7 @@ def get_daily_sleep_statistics(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return the nightly main-sleep trajectory keyed by local calendar day."""
     return get_sleep_statistics(
         loader=loader,
@@ -3169,7 +3146,7 @@ def get_weekly_sleep_statistics(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return sleep statistics aggregated across local calendar weeks."""
     return get_sleep_statistics(
         loader=loader,
@@ -3197,7 +3174,7 @@ def get_monthly_sleep_statistics(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return sleep statistics aggregated across local calendar months."""
     return get_sleep_statistics(
         loader=loader,
@@ -3225,7 +3202,7 @@ def get_yearly_sleep_statistics(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return sleep statistics aggregated across local calendar years."""
     return get_sleep_statistics(
         loader=loader,
@@ -3250,8 +3227,14 @@ def _nightly_sleep_statistics(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: Union[dict, None] = None,
     chronotype: Union[dict, None] = None,
-) -> Union[pd.Series, pd.DataFrame]:
-    """Return one main-sleep feature row per participant calendar date."""
+    min_coverage=None,
+) -> pd.DataFrame:
+    """Return one main-sleep feature row per participant calendar date.
+
+    Nightly coverage is binary feature availability. Requested or inferred
+    calendar dates with a non-missing feature have coverage ``1``; dates with
+    a missing feature have coverage ``0``.
+    """
 
     # Get user id from the loader
     users = utils.get_user_ids(loader, user_id)
@@ -3260,6 +3243,9 @@ def _nightly_sleep_statistics(
     end_date = None if end_date is None else pd.Timestamp(end_date)
 
     statistics = _sleep_statistics_list(statistic)
+    coverage_threshold = hierarchy.normalize_coverage_thresholds(
+        min_coverage, 1
+    )[0]
 
     if loader_kwargs is None:
         loader_kwargs = {}
@@ -3324,20 +3310,63 @@ def _nightly_sleep_statistics(
                 ).reindex(sleep_summary.index)
 
                 user_statistics_list.append(ser.rename(statistic))
-            user_frames[user] = pd.concat(user_statistics_list, axis=1)
+            user_frame = pd.concat(user_statistics_list, axis=1)
+        else:
+            user_frame = pd.DataFrame(
+                columns=statistics,
+                index=pd.DatetimeIndex([], name=schema.CALENDAR_DATE_COL),
+            )
+
+        user_start = (
+            pd.Timestamp(start_date).normalize()
+            if start_date is not None
+            else user_frame.index.min().normalize()
+            if not user_frame.empty
+            else None
+        )
+        user_end = (
+            pd.Timestamp(end_date).normalize()
+            if end_date is not None
+            else user_frame.index.max().normalize() + pd.Timedelta(days=1)
+            if not user_frame.empty
+            else None
+        )
+        if user_start is not None and user_end is not None:
+            expected = pd.date_range(
+                user_start, user_end, freq="D", inclusive="left"
+            )
+            user_frame = user_frame.reindex(expected)
+            user_frame.index.name = schema.CALENDAR_DATE_COL
+        if user_frame.empty:
+            continue
+        for name in statistics:
+            coverage_col = f"{name}__coverage"
+            user_frame[coverage_col] = user_frame[name].notna().astype(float)
+            if coverage_threshold is not None:
+                user_frame.loc[
+                    user_frame[coverage_col] < coverage_threshold, name
+                ] = np.nan
+        user_frames[user] = user_frame
     if not user_frames:
         empty_index = pd.MultiIndex.from_arrays(
             [[], []], names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
         )
-        empty = pd.DataFrame(columns=statistics, index=empty_index)
-        return empty[statistics[0]] if len(statistics) == 1 else empty
+        columns = [
+            column
+            for name in statistics
+            for column in (name, f"{name}__coverage")
+        ]
+        return pd.DataFrame(columns=columns, index=empty_index)
     sleep_stats_df = pd.concat(
         user_frames, names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
     ).sort_index()
 
-    if len(statistics) == 1:
-        return sleep_stats_df[statistics[0]]
-    return sleep_stats_df
+    columns = [
+        column
+        for name in statistics
+        for column in (name, f"{name}__coverage")
+    ]
+    return sleep_stats_df[columns]
 
 
 def _hierarchical_sleep_statistics(
@@ -3368,10 +3397,6 @@ def _hierarchical_sleep_statistics(
     valid_child_thresholds = hierarchy.normalize_valid_child_thresholds(
         min_valid_children, len(chain)
     )
-    if coverage_thresholds[0] is not None:
-        raise ValueError(
-            "primary nightly coverage is not defined; use None for the nightly level"
-        )
     hierarchy.warn_if_wide(statistics, aggregation_levels)
     nightly = _nightly_sleep_statistics(
         loader=loader,
@@ -3381,10 +3406,8 @@ def _hierarchical_sleep_statistics(
         end_date=end_date,
         loader_kwargs=loader_kwargs,
         chronotype=chronotype,
+        min_coverage=coverage_thresholds[0],
     )
-    if isinstance(nightly, pd.Series):
-        nightly = nightly.to_frame()
-
     frames = {}
     bounds = {}
     for user in users:
@@ -3457,7 +3480,7 @@ def get_sleep_statistics(
     aggregation=None,
     min_coverage=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return main-sleep features at night level or along a hierarchy.
 
     A scalar weekly, monthly, or yearly resolution is shorthand for a
@@ -3465,16 +3488,18 @@ def get_sleep_statistics(
     sequences explicitly define each increasingly larger level, for example
     ``["nightly", "weekly", "monthly"]``. Upper levels give each valid child
     row equal weight and return immediate ``valid / expected`` coverage in
-    ``[0, 1]``.
+    ``[0, 1]``. Nightly coverage is binary feature availability: ``1`` when
+    the feature is present and ``0`` when it is missing on an expected
+    calendar date. At upper levels, coverage is the fraction of expected
+    nights containing a valid feature.
 
     ``aggregation`` selects the operation or branching operations at each
     upper level; ``None`` uses the shared standard operations. A
-    ``min_coverage`` sequence supplies one threshold per resolution. Primary
-    nightly adherence has no generic denominator yet, so its entry must be
-    ``None``. A scalar threshold on a scalar calendar request applies to that
-    calendar level. ``min_valid_children`` independently requires an absolute
-    number of valid child windows at each upper level; a scalar applies to
-    every upper level, while a sequence uses ``None`` for the nightly level.
+    ``min_coverage`` sequence supplies one threshold per resolution. A scalar
+    threshold on a scalar calendar request applies to that calendar level.
+    ``min_valid_children`` independently requires an absolute number of valid
+    child windows at each upper level; a scalar applies to every upper level,
+    while a sequence uses ``None`` for the nightly level.
     """
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
     if start_date is not None and end_date is not None:
@@ -3488,8 +3513,6 @@ def get_sleep_statistics(
         if target in SLEEP_NIGHTLY_RESOLUTIONS or target == "daily":
             if aggregation is not None:
                 raise ValueError("aggregation requires an upper sleep resolution")
-            if min_coverage is not None:
-                raise ValueError("primary nightly coverage is not defined")
             if min_valid_children is not None:
                 raise ValueError("min_valid_children requires an upper resolution")
             return _nightly_sleep_statistics(
@@ -3500,6 +3523,7 @@ def get_sleep_statistics(
                 end_date=end_date,
                 loader_kwargs=loader_kwargs,
                 chronotype=chronotype,
+                min_coverage=min_coverage,
             )
         if target not in {"weekly", "monthly", "yearly"}:
             raise ValueError(

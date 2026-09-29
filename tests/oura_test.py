@@ -97,8 +97,7 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
     result = sleep.get_sleep_statistics(
         OuraLoader(tmp_path), user_id="person-1", start_date=None, end_date=None
     )
-    assert result.shape == (1, 39)
-    assert set(result) == {
+    expected_features = {
         "sleep_TIB", "sleep_TST", "sleep_SE", "sleep_SME", "sleep_SPT", "sleep_WASO", "sleep_SOL", "sleep_deep", "sleep_light",
         "sleep_REM", "sleep_NREM", "sleep_awake", "sleep_unmeasurable", "sleep_%_deep", "sleep_%_light",
         "sleep_%_REM", "sleep_%_NREM", "sleep_lat_deep", "sleep_lat_light", "sleep_lat_REM",
@@ -107,6 +106,10 @@ def test_default_oura_sleep_extraction_returns_shared_features(tmp_path):
         "sleep_stage_transition_count", "sleep_stage_transition_index", "sleep_stage_coverage",
         "sleep_bedtime", "sleep_sleep_onset", "sleep_wakeup", "sleep_getup", "sleep_getup_latency",
         "sleep_midpoint", "sleep_cpd_midpoint", "sleep_cpd_duration",
+    }
+    assert result.shape == (1, 2 * len(expected_features))
+    assert set(result) == expected_features | {
+        f"{feature}__coverage" for feature in expected_features
     }
     assert not {"sleep_validation", "sleep_SRI"} & set(result)
     night = result.iloc[0]

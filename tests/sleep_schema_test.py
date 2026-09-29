@@ -61,7 +61,16 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
         end_date=None,
         statistic=["sleep_score", "sleep_TIB", "sleep_TST", "sleep_count_awake"],
     )
-    assert list(result) == ["sleep_score", "sleep_TIB", "sleep_TST", "sleep_count_awake"]
+    assert list(result) == [
+        "sleep_score",
+        "sleep_score__coverage",
+        "sleep_TIB",
+        "sleep_TIB__coverage",
+        "sleep_TST",
+        "sleep_TST__coverage",
+        "sleep_count_awake",
+        "sleep_count_awake__coverage",
+    ]
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_TIB"] == 60
     assert result.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_TST"] == 60
     assert pd.isna(
@@ -71,16 +80,31 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     score = sleep.get_sleep_statistics(
         loader, statistic="sleep_score", user_id="person-1"
     )
-    assert isinstance(score, pd.Series)
+    assert isinstance(score, pd.DataFrame)
     assert score.index.names == ["user_id", "calendar_date"]
-    assert score.loc[("person-1", pd.Timestamp("2024-01-02"))] == 80
+    assert (
+        score.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_score"]
+        == 80
+    )
 
     timestamps = sleep.get_sleep_timestamps(loader, "person-1")
     assert isinstance(timestamps, pd.DataFrame)
     assert timestamps.index.names == ["user_id", "calendar_date"]
-    assert list(timestamps) == ["sleep_bedtime", "sleep_sleep_onset", "sleep_wakeup", "sleep_getup"]
+    assert list(timestamps) == [
+        "sleep_bedtime",
+        "sleep_bedtime__coverage",
+        "sleep_sleep_onset",
+        "sleep_sleep_onset__coverage",
+        "sleep_wakeup",
+        "sleep_wakeup__coverage",
+        "sleep_getup",
+        "sleep_getup__coverage",
+    ]
     assert timestamps[["sleep_sleep_onset", "sleep_wakeup"]].isna().all().all()
-    assert sleep.get_sleep_onset(loader, "person-1").name == "sleep_sleep_onset"
+    assert list(sleep.get_sleep_onset(loader, "person-1")) == [
+        "sleep_sleep_onset",
+        "sleep_sleep_onset__coverage",
+    ]
 
     with pytest.raises(ValueError, match="statistic must be one among"):
         sleep.get_sleep_statistics(

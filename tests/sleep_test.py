@@ -143,8 +143,11 @@ SLEEP_STAGES_SERIES_INDEX = pd.Index(
 
 def test_get_sleep_score(base_loader):
     sleep_score = pywearable.sleep.get_sleep_score(base_loader, user_id="1")
-    assert type(sleep_score) is pd.Series
-    assert sleep_score.name == pywearable.sleep.SLEEP_STATISTIC_SLEEP_SCORE
+    assert type(sleep_score) is pd.DataFrame
+    assert list(sleep_score) == [
+        pywearable.sleep.SLEEP_STATISTIC_SLEEP_SCORE,
+        f"{pywearable.sleep.SLEEP_STATISTIC_SLEEP_SCORE}__coverage",
+    ]
     assert len(sleep_score) == len(SLEEP_SERIES_INDEX)
     assert sleep_score.index.names == ["user_id", "calendar_date"]
 
@@ -152,8 +155,11 @@ def test_get_sleep_score(base_loader):
 def test_get_time_in_bed(base_loader):
     # Check with default options
     tib = pywearable.sleep.get_time_in_bed(base_loader, user_id="1")
-    assert type(tib) is pd.Series
-    assert tib.name == pywearable.sleep.SLEEP_STATISTIC_TIB
+    assert type(tib) is pd.DataFrame
+    assert list(tib) == [
+        pywearable.sleep.SLEEP_STATISTIC_TIB,
+        f"{pywearable.sleep.SLEEP_STATISTIC_TIB}__coverage",
+    ]
 
     assert tib.index.names == ["user_id", "calendar_date"]
 
@@ -166,8 +172,11 @@ def test_get_total_sleep_time(base_loader):
     """
     # Test with default parameters
     tst = pywearable.sleep.get_total_sleep_time(base_loader, user_id="1")
-    assert type(tst) is pd.Series
-    assert tst.name == pywearable.sleep.SLEEP_STATISTIC_TST
+    assert type(tst) is pd.DataFrame
+    assert list(tst) == [
+        pywearable.sleep.SLEEP_STATISTIC_TST,
+        f"{pywearable.sleep.SLEEP_STATISTIC_TST}__coverage",
+    ]
     assert tst.index.names == ["user_id", "calendar_date"]
 
 
@@ -197,7 +206,9 @@ def test_get_sleep_period_time(base_loader):
         ),
         name=pywearable.sleep.SLEEP_STATISTIC_SPT,
     )
-    pd.testing.assert_series_equal(spt, spt_true)
+    pd.testing.assert_series_equal(
+        spt[pywearable.sleep.SLEEP_STATISTIC_SPT], spt_true
+    )
 
 
 def test_get_sleep_efficiency(base_loader):
@@ -207,7 +218,7 @@ def test_get_sleep_efficiency(base_loader):
     is reindex correctly
     """
     sleep_eff = pywearable.sleep.get_sleep_efficiency(loader=base_loader, user_id="1")
-    assert type(sleep_eff) is pd.Series
+    assert type(sleep_eff) is pd.DataFrame
     assert len(sleep_eff) > 0
 
     # Sleep efficiency is computed as the ratio
@@ -225,7 +236,9 @@ def test_get_sleep_efficiency(base_loader):
         name=pywearable.sleep.SLEEP_STATISTIC_SE,
     )
 
-    pd.testing.assert_series_equal(sleep_eff, true_sleep_eff)
+    pd.testing.assert_series_equal(
+        sleep_eff[pywearable.sleep.SLEEP_STATISTIC_SE], true_sleep_eff
+    )
 
 
 def test_get_sleep_maintenance_efficiency(base_loader):
@@ -236,14 +249,14 @@ def test_get_sleep_maintenance_efficiency(base_loader):
     sleep_me = pywearable.sleep.get_sleep_maintenance_efficiency(
         loader=base_loader, user_id=["1"]
     )
-    assert type(sleep_me) is pd.Series
+    assert type(sleep_me) is pd.DataFrame
     assert len(sleep_me) > 0
 
     # Check that the values are
 
     # Sleep maintenance efficiency is computed as
     # the ratio between TST (light+deep+rem) and SPT (overall sleep)
-    assert sleep_me.notna().any()
+    assert sleep_me[pywearable.sleep.SLEEP_STATISTIC_SME].notna().any()
 
 ######################################################
 #              Compute Functions Tests               #
