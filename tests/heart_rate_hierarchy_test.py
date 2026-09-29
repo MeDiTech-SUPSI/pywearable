@@ -175,11 +175,7 @@ def test_scalar_heart_rate_does_not_load_sleep_sessions():
     assert loader.session_calls == 0
 
 
-def test_default_extraction_skips_raw_coverage_work(monkeypatch):
-    def fail_if_called(*args, **kwargs):
-        raise AssertionError("raw coverage should not be computed by default")
-
-    monkeypatch.setattr(heart_rate, "_heart_rate_cadences", fail_if_called)
+def test_default_extraction_returns_coverage_without_filtering():
     loader = HeartRateCycleLoader()
 
     scalar = heart_rate.get_heart_rate_statistics(
@@ -213,6 +209,9 @@ def test_default_extraction_skips_raw_coverage_work(monkeypatch):
     assert not scalar.empty
     assert not hierarchical.empty
     assert not cycle_result.empty
+    assert "heart_rate_mean__coverage" in scalar
+    assert "heart_rate_mean__1h__daily_mean__coverage" in hierarchical
+    assert "heart_rate_mean__coverage" in cycle_result
 
 
 def test_fixed_windows_can_be_aggregated_through_cycles_and_calendar_periods():
@@ -492,7 +491,7 @@ def test_cycle_bounds_select_labels_without_clipping_physical_intervals():
     )
 
     assert result.index.tolist() == [("user-1", pd.Timestamp("2024-01-10"))]
-    assert result.iloc[0] == 70
+    assert result.iloc[0]["heart_rate_mean"] == 70
 
     monthly = heart_rate.get_heart_rate_statistics(
         HeartRateCycleLoader(),
@@ -567,8 +566,8 @@ def test_cycle_kwargs_forward_the_midnight_missing_end_policy():
         cycle_kwargs={"missing_end": "midnight"},
     )
 
-    assert pd.isna(default.iloc[0])
-    assert fallback.iloc[0] == 0
+    assert pd.isna(default.iloc[0]["heart_rate_count"])
+    assert fallback.iloc[0]["heart_rate_count"] == 0
 
 
 def test_invalid_cycle_can_be_aggregated_without_bounds():
@@ -609,12 +608,12 @@ def test_heart_rate_std_is_available_for_scalar_and_cycle_windows():
     )
 
     expected = pd.Series([60, 80]).std()
-    assert scalar.loc[("user-1", pd.Timestamp("2024-01-10"))] == pytest.approx(
-        expected
-    )
-    assert cycle_result.loc[("user-1", pd.Timestamp("2024-01-10"))] == pytest.approx(
-        expected
-    )
+    assert scalar.loc[
+        ("user-1", pd.Timestamp("2024-01-10")), "heart_rate_std"
+    ] == pytest.approx(expected)
+    assert cycle_result.loc[
+        ("user-1", pd.Timestamp("2024-01-10")), "heart_rate_std"
+    ] == pytest.approx(expected)
 
 
 def test_fixed_windows_feeding_cycles_use_each_users_own_bounds():

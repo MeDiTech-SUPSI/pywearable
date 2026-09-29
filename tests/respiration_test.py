@@ -105,7 +105,6 @@ def test_raw_five_minute_statistics_coverage_and_threshold_duration():
         user_id="u1",
         start_date="2024-01-01 00:00",
         end_date="2024-01-01 00:10",
-        min_coverage=0.8,
         spo2_threshold=90,
     )
     first = result.loc[("u1", pd.Timestamp("2024-01-01 00:00"))]
@@ -217,8 +216,12 @@ def test_raw_night_and_awake_shortcuts_use_the_intended_cycles():
         start_date="2024-01-01",
         end_date="2024-01-02",
     )
-    assert nightly.loc[("u1", pd.Timestamp("2024-01-01"))] == 12
-    assert awake.loc[("u1", pd.Timestamp("2024-01-01"))] == 17
+    assert nightly.loc[
+        ("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"
+    ] == 12
+    assert awake.loc[
+        ("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"
+    ] == 17
 
 
 def test_combined_raw_night_features_share_cycle_lookup(monkeypatch):

@@ -305,7 +305,8 @@ def test_unknown_provider_coverage_warns_and_rejects_only_when_requested():
         resolution="5min",
         time_reference="local",
     )
-    assert baseline.notna().all()
+    assert baseline["hrv_rmssd"].notna().all()
+    assert baseline["hrv_rmssd__coverage"].isna().all()
     with pytest.warns(UserWarning, match="Primary HRV coverage could not be determined"):
         strict = hrv.get_hrv_statistics(
             loader,

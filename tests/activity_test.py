@@ -79,9 +79,12 @@ def test_hourly_coverage_combines_hr_presence_and_positive_steps():
         start_date="2024-01-01 00:00",
         end_date="2024-01-01 01:00",
         resolution="1h",
-        min_coverage=0,
     )
 
+    assert list(result) == [
+        activity.ACTIVITY_STATISTIC_STEPS,
+        f"{activity.ACTIVITY_STATISTIC_STEPS}__coverage",
+    ]
     row = result.iloc[0]
     assert row[activity.ACTIVITY_STATISTIC_STEPS] == 25
     assert row[f"{activity.ACTIVITY_STATISTIC_STEPS}__coverage"] == pytest.approx(
@@ -168,7 +171,7 @@ def test_daily_peak_requires_a_complete_hour_and_returns_earliest_maximum():
         start_date="2024-01-01",
         end_date="2024-01-02",
     )
-    assert result.iloc[0] < 120
+    assert result.iloc[0][activity.ACTIVITY_STATISTIC_PEAK_60MIN_STEPS] < 120
 
 
 def test_native_daily_zero_is_valid_and_weekly_defaults_to_sum():

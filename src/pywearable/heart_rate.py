@@ -59,7 +59,7 @@ def get_daily_rest_heart_rate(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """Get daily rest heart rate (RHR).
 
     This function computes the resting heart rate statistic.
@@ -72,15 +72,8 @@ def get_daily_rest_heart_rate(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a :class:`pandas.Series` with a :class:`pandas.MultiIndex`
-    as index, with the two levels of the index being
-    ``user_id`` and ``local_time``::
-
-        user_id         local_time
-        user_id_0       2023-05-18      41.0
-                        2023-05-19      40.0
-                        2023-05-20      37.0
-        Name: heart_rate_rest, dtype: float64
+    The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
+    ``local_time``, with the feature and its ``__coverage`` column.
 
     Parameters
     ----------
@@ -98,7 +91,7 @@ def get_daily_rest_heart_rate(
 
     Returns
     -------
-    :class:`pandas.Series`
+    :class:`pandas.DataFrame`
         Rest heart rate at the daily level.
     """
 
@@ -123,7 +116,7 @@ def get_daily_max_heart_rate(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """Get daily maximum heart rate.
 
     This function computes the maximum heart rate.
@@ -136,15 +129,8 @@ def get_daily_max_heart_rate(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    he function returns a :class:`pandas.Series` with a :class:`pandas.MultiIndex`
-    as index, with the two levels of the index being
-    ``user_id`` and ``local_time``::
-
-        user_id         local_time
-        userId0         2023-05-18      155.0
-                        2023-05-19      132.0
-                        2023-05-20      91.0
-        Name: heart_rate_max, dtype: float64
+    The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
+    ``local_time``, with the feature and its ``__coverage`` column.
 
 
     Parameters
@@ -163,7 +149,7 @@ def get_daily_max_heart_rate(
 
     Returns
     -------
-    :class:`pandas.Series`
+    :class:`pandas.DataFrame`
         Daily maximum heart rate.
     """
 
@@ -188,7 +174,7 @@ def get_daily_min_heart_rate(
     loader_kwargs={},
     time_reference: str = "auto",
     min_coverage=None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """Get daily minimum heart rate.
 
     This function computes the minimum heart rate statistic.
@@ -201,16 +187,8 @@ def get_daily_min_heart_rate(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``local_time``::
-
-        user_id         local_time
-        user_id_0       2023-05-18      38.0
-                        2023-05-19      38.0
-                        2023-05-20      34.0
-        Name: heart_rate_min, dtype: float64
+    The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
+    ``local_time``, with the feature and its ``__coverage`` column.
 
 
     Parameters
@@ -229,7 +207,7 @@ def get_daily_min_heart_rate(
 
     Returns
     -------
-    :class:`pandas.Series`
+    :class:`pandas.DataFrame`
         Daily minimum heart rate.
     """
     return get_heart_rate_statistics(
@@ -252,7 +230,7 @@ def get_daily_mean_heart_rate(
     loader_kwargs={},
     time_reference: str = "auto",
     min_coverage=None,
-) -> pd.Series:
+) -> pd.DataFrame:
     """Get daily mean heart rate.
 
     This function computes the mean heart rate statistic.
@@ -265,16 +243,8 @@ def get_daily_mean_heart_rate(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``local_time``::
-
-        user_id         local_time
-        user_id_0       2023-05-18      52.0
-                        2023-05-19      54.0
-                        2023-05-20      55.0
-        Name: heart_rate_mean, dtype: float64
+    The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
+    ``local_time``, with the feature and its ``__coverage`` column.
 
 
     Parameters
@@ -293,7 +263,7 @@ def get_daily_mean_heart_rate(
 
     Returns
     -------
-    :class:`pandas.Series`
+    :class:`pandas.DataFrame`
         Daily mean heart rate.
     """
     return get_heart_rate_statistics(
@@ -639,7 +609,7 @@ def get_minute_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get heart rate statistics at a minute level.
 
     This function computes the specified heart rate statistics
@@ -653,10 +623,8 @@ def get_minute_heart_rate_statistics(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` or :class:`pandas.DataFrame` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``utc_time``.
+    The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
+    and ``utc_time``.
 
     Parameters
     ----------
@@ -676,7 +644,7 @@ def get_minute_heart_rate_statistics(
 
     Returns
     -------
-    :class:`pandas.Series` or :class:`pandas.DataFrame`
+    :class:`pandas.DataFrame`
         Minute-level heart rate statistics.
     """
     return get_heart_rate_statistics(
@@ -701,7 +669,7 @@ def get_hourly_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get heart rate statistics at a hourly level.
 
     This function computes the specified heart rate statistics
@@ -715,10 +683,8 @@ def get_hourly_heart_rate_statistics(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` or :class:`pandas.DataFrame` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``utc_time``.
+    The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
+    and ``utc_time``.
 
     Parameters
     ----------
@@ -738,7 +704,7 @@ def get_hourly_heart_rate_statistics(
 
     Returns
     -------
-    :class:`pandas.Series` or :class:`pandas.DataFrame`
+    :class:`pandas.DataFrame`
         Hour-level heart rate statistics.
     """
     return get_heart_rate_statistics(
@@ -763,7 +729,7 @@ def get_daily_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get heart rate statistics at a daily level.
 
     This function computes the specified heart rate statistics
@@ -776,10 +742,8 @@ def get_daily_heart_rate_statistics(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` or :class:`pandas.DataFrame` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``local_time``.
+    The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
+    and ``local_time``.
 
     Parameters
     ----------
@@ -799,7 +763,7 @@ def get_daily_heart_rate_statistics(
 
     Returns
     -------
-    :class:`pandas.Series` or :class:`pandas.DataFrame`
+    :class:`pandas.DataFrame`
         Daily-level heart rate statistics.
     """
     return get_heart_rate_statistics(
@@ -824,7 +788,7 @@ def get_weekly_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get heart rate statistics at a weekly level.
 
     This function computes the specified heart rate statistics
@@ -837,10 +801,8 @@ def get_weekly_heart_rate_statistics(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` or :class:`pandas.DataFrame` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``local_time``.
+    The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
+    and ``local_time``.
 
     Parameters
     ----------
@@ -860,7 +822,7 @@ def get_weekly_heart_rate_statistics(
 
     Returns
     -------
-    :class:`pandas.Series` or :class:`pandas.DataFrame`
+    :class:`pandas.DataFrame`
         Week-level heart rate statistics.
     """
     return get_heart_rate_statistics(
@@ -885,7 +847,7 @@ def get_monthly_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Get heart rate statistics at a monthly level.
 
     This function computes the specified heart rate statistics
@@ -897,10 +859,8 @@ def get_monthly_heart_rate_statistics(
     :func:`~loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
-    The function returns a
-    :class:`pandas.Series` or :class:`pandas.DataFrame` with a :class:`pandas.MultiIndex` as index,
-    with the two levels of the index being
-    ``user_id`` and ``local_time``.
+    The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
+    and ``local_time``.
 
 
     Parameters
@@ -921,7 +881,7 @@ def get_monthly_heart_rate_statistics(
 
     Returns
     -------
-    :class:`pandas.Series` or :class:`pandas.DataFrame`
+    :class:`pandas.DataFrame`
         Monthly-level heart rate statistics.
     """
     return get_heart_rate_statistics(
@@ -946,7 +906,7 @@ def get_yearly_heart_rate_statistics(
     loader_kwargs: dict = {},
     time_reference: str = "auto",
     min_coverage=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     return get_heart_rate_statistics(
         loader=loader,
         statistic=statistic,
@@ -1466,18 +1426,25 @@ def _single_resolution_hr_trajectory(
         loader_kwargs=loader_kwargs,
         time_reference=time_reference,
         primary_min_coverage=primary_min_coverage,
-        return_primary_coverage=primary_min_coverage is not None,
+        return_primary_coverage=True,
         unresolved_streams=unresolved_streams,
     )
-    if isinstance(result, pd.Series):
-        result = result.to_frame()
     result = result.copy()
     if not isinstance(result.index, pd.MultiIndex) or result.index.nlevels < 2:
         index = pd.MultiIndex.from_arrays(
             [[], []], names=["user_id", "window_start"]
         )
         return pd.DataFrame(
-            columns=["period_start", "period_end", *statistics], index=index
+            columns=[
+                "period_start",
+                "period_end",
+                *[
+                    column
+                    for name in statistics
+                    for column in (name, f"{name}__coverage")
+                ],
+            ],
+            index=index,
         )
     while result.index.nlevels > 2:
         result = result.droplevel(-1)
@@ -1756,7 +1723,7 @@ def get_heart_rate_statistics(
     min_coverage=None,
     cycle_kwargs=None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return heart-rate features at one resolution or along a hierarchy.
 
     A scalar ``resolution`` preserves the ordinary heart-rate extraction API.
@@ -1812,11 +1779,10 @@ def get_heart_rate_statistics(
 
     Returns
     -------
-    pandas.Series or pandas.DataFrame
-        A ``(user_id, time)`` trajectory. Hierarchical output names retain the
-        full calculation path and include immediate child coverage columns.
-        A single-resolution request with ``min_coverage`` returns a DataFrame
-        containing each requested feature and its ``__coverage`` column.
+    pandas.DataFrame
+        A ``(user_id, time)`` trajectory containing each requested feature and
+        its ``__coverage`` column. Hierarchical output names retain the full
+        calculation path and include immediate child coverage columns.
 
     Examples
     --------
@@ -1861,7 +1827,7 @@ def get_heart_rate_statistics(
             loader_kwargs=loader_kwargs,
             time_reference=time_reference,
             primary_min_coverage=threshold,
-            return_primary_coverage=min_coverage is not None,
+            return_primary_coverage=True,
             unresolved_streams=unresolved_streams,
         )
         if threshold is not None:
@@ -1885,20 +1851,21 @@ def get_heart_rate_statistics(
             loader_kwargs,
             cycle_kwargs,
             primary_min_coverage=threshold,
-            return_primary_coverage=min_coverage is not None,
+            return_primary_coverage=True,
             unresolved_streams=unresolved_streams,
         )
         if threshold is not None:
             _warn_unknown_primary_coverage(unresolved_streams)
-        result_columns = list(statistics)
-        if min_coverage is not None:
-            result_columns.extend(
-                f"{statistic_name}__coverage" for statistic_name in statistics
+        result_columns = [
+            column
+            for statistic_name in statistics
+            for column in (
+                statistic_name,
+                f"{statistic_name}__coverage",
             )
+        ]
         result = trajectory[result_columns].copy()
         result.index = result.index.set_names(["user_id", "calendar_date"])
-        if len(statistics) == 1 and min_coverage is None:
-            return result[statistics[0]]
         return result
 
     return _hierarchical_heart_rate_statistics(

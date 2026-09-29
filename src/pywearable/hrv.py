@@ -704,7 +704,13 @@ def compute_hrv_statistics(
         raise ValueError("window_size must currently be five minutes")
     frame = schema.prepare_bbi(bbi)
     if frame.empty:
-        return pd.DataFrame(columns=statistics)
+        return pd.DataFrame(
+            columns=[
+                column
+                for name in statistics
+                for column in (name, f"{name}__coverage")
+            ]
+        )
     trajectory = _raw_bbi_frame_trajectory(
         frame,
         "user",
@@ -714,7 +720,7 @@ def compute_hrv_statistics(
         time_col,
         backend,
         coverage,
-        coverage is not None,
+        True,
     )
     return trajectory.droplevel(schema.USER_COL)
 
@@ -781,7 +787,7 @@ def _hierarchical_hrv_statistics(
         loader_kwargs,
         backend,
         coverage_thresholds[0],
-        coverage_thresholds[0] is not None,
+        True,
         cycle_parent=cycle_parent,
         sleep_only=cycle_target == cycle.CYCLE_NIGHT
         and getattr(loader, "hrv_source", "bbi") == "bbi",
@@ -840,7 +846,7 @@ def get_hrv_statistics(
     cycle_kwargs: dict | None = None,
     min_valid_children=None,
     backend: Literal["pywearable", "neurokit"] = "pywearable",
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Return HRV features at five minutes or along a resolution hierarchy.
 
     Raw-BBI loaders calculate non-overlapping five-minute features. Provider
@@ -897,14 +903,14 @@ def get_hrv_statistics(
             loader_kwargs,
             backend,
             threshold,
-            min_coverage is not None,
+            True,
         )
-        columns = list(statistics)
-        if min_coverage is not None:
-            columns.extend(f"{name}__coverage" for name in statistics)
+        columns = [
+            column
+            for name in statistics
+            for column in (name, f"{name}__coverage")
+        ]
         result = result[columns].rename_axis(index={"window_start": time_col})
-        if len(statistics) == 1 and min_coverage is None:
-            return result[statistics[0]]
         return result
 
     return _hierarchical_hrv_statistics(

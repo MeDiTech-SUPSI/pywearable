@@ -239,9 +239,17 @@ def test_hourly_hr_uses_utc_hour_boundaries_and_requested_columns(tmp_path):
         start_date="2024-01-01 00:17", end_date="2024-01-01 01:17",
         statistic=["heart_rate_mean", "heart_rate_max"],
     )
-    assert list(result) == ["heart_rate_mean", "heart_rate_max"]
+    assert list(result) == [
+        "heart_rate_mean",
+        "heart_rate_mean__coverage",
+        "heart_rate_max",
+        "heart_rate_max__coverage",
+    ]
     assert result.index.get_level_values("utc_time")[0] == pd.Timestamp("2024-01-01 00:00")
-    assert result.iloc[0].to_dict() == {"heart_rate_mean": 70.0, "heart_rate_max": 80.0}
+    assert result.iloc[0][["heart_rate_mean", "heart_rate_max"]].to_dict() == {
+        "heart_rate_mean": 70.0,
+        "heart_rate_max": 80.0,
+    }
     offset_aware = heart_rate.get_heart_rate_statistics(
         OuraLoader(tmp_path), user_id="person-1", resolution="1h",
         start_date="2024-01-01T01:17:00+01:00",

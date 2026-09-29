@@ -455,7 +455,7 @@ def get_respiration_statistics(
     cycle_kwargs: dict | None = None,
     min_valid_children=None,
     spo2_threshold: float = 90.0,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Extract respiratory-rate and SpO2 features at the requested resolution.
 
     Parameters
@@ -495,12 +495,12 @@ def get_respiration_statistics(
 
     Returns
     -------
-    pandas.Series or pandas.DataFrame
-        Indexed by ``(user_id, utc_time/local_time/calendar_date)``. One
-        statistic without coverage returns a Series; otherwise a DataFrame.
-        Hierarchical column names include each resolution and aggregation.
-        Unsupported provider-summary features are missing, never inferred
-        from summary means. Below-threshold duration is in seconds.
+    pandas.DataFrame
+        Indexed by ``(user_id, utc_time/local_time/calendar_date)`` with one
+        ``__coverage`` column per requested feature. Hierarchical column names
+        include each resolution and aggregation. Unsupported provider-summary
+        features are missing, never inferred from summary means.
+        Below-threshold duration is in seconds.
     """
     statistics = _statistics_list(statistic)
     users = get_user_ids(loader, user_id)
@@ -589,7 +589,7 @@ def get_respiration_statistics(
                 end_date,
                 loader_kwargs,
                 coverage_thresholds[0],
-                min_coverage is not None,
+                True,
                 unresolved_coverage,
             )
         else:
@@ -604,14 +604,14 @@ def get_respiration_statistics(
                 time_reference,
                 loader_kwargs,
                 coverage_thresholds[0],
-                min_coverage is not None,
+                True,
                 cycle_intervals,
                 spo2_threshold,
                 unresolved_coverage,
             )
         family_frames.append(frame)
     trajectory = hierarchy.combine_trajectories(
-        family_frames, statistics, min_coverage is not None
+        family_frames, statistics, include_coverage=True
     )
 
     if coverage_thresholds[0] is not None and unresolved_coverage:
@@ -660,9 +660,11 @@ def get_respiration_statistics(
         )
         return trajectory.rename_axis(index={"window_start": index_name})
 
-    columns = list(statistics)
-    if min_coverage is not None:
-        columns.extend(f"{name}__coverage" for name in statistics)
+    columns = [
+        column
+        for name in statistics
+        for column in (name, f"{name}__coverage")
+    ]
     result = trajectory[columns].copy()
     index_name = (
         schema.CALENDAR_DATE_COL
@@ -672,8 +674,6 @@ def get_respiration_statistics(
         else _resolve_time_col(loader, families[0], time_reference, chain)
     )
     result = result.rename_axis(index={"window_start": index_name})
-    if len(statistics) == 1 and min_coverage is None:
-        return result[statistics[0]]
     return result
 
 
@@ -682,8 +682,7 @@ def get_respiration_statistic(loader: BaseLoader, statistic: str, **kwargs):
 
     ``loader`` and ``kwargs`` have the same meaning as in
     :func:`get_respiration_statistics`. A direct single-feature request
-    without coverage returns a Series; hierarchical requests return a
-    DataFrame with aggregation columns.
+    always includes the feature's coverage column.
     """
     return get_respiration_statistics(loader, statistic=statistic, **kwargs)
 
@@ -693,7 +692,7 @@ def get_five_minute_respiration_statistics(loader: BaseLoader, **kwargs):
 
     Pass feature, user, date, and coverage options via ``kwargs`` as in
     :func:`get_respiration_statistics`. Provider-only nightly summaries cannot
-    produce this resolution. Output is a Series or DataFrame by user and time.
+    produce this resolution. Output is a DataFrame by user and time.
     """
     return get_respiration_statistics(loader, resolution="5min", **kwargs)
 

@@ -570,7 +570,7 @@ def get_provider_features(
     min_coverage=None,
     cycle_kwargs: dict | None = None,
     min_valid_children=None,
-) -> Union[pd.Series, pd.DataFrame]:
+) -> pd.DataFrame:
     """Extract provider-native features without equating vendors' metrics.
 
     Parameters
@@ -607,10 +607,10 @@ def get_provider_features(
 
     Returns
     -------
-    pandas.Series or pandas.DataFrame
-        Indexed by participant and time/date. One direct feature without
-        coverage returns a Series; all other requests return a DataFrame.
-        Hierarchical column names encode resolutions and operations.
+    pandas.DataFrame
+        Indexed by participant and time/date, with one ``__coverage`` column
+        per output feature. Hierarchical column names encode resolutions and
+        operations.
     """
     features = _requested_features(loader, feature)
     users = get_user_ids(loader, user_id)
@@ -674,7 +674,7 @@ def get_provider_features(
         if cycle_target is not None
         else None
     )
-    include_coverage = min_coverage is not None
+    include_coverage = True
     unresolved_coverage = set()
     if grain == "samples":
         frames = [
@@ -782,9 +782,11 @@ def get_provider_features(
         )
         return trajectory.rename_axis(index={"window_start": index_name})
 
-    columns = list(outputs)
-    if include_coverage:
-        columns.extend(f"{name}__coverage" for name in outputs)
+    columns = [
+        column
+        for name in outputs
+        for column in (name, f"{name}__coverage")
+    ]
     result = trajectory[columns].copy()
     if (
         grain == "samples"
@@ -804,8 +806,6 @@ def get_provider_features(
     else:
         index_name = schema.CALENDAR_DATE_COL
     result = result.rename_axis(index={"window_start": index_name})
-    if len(outputs) == 1 and not include_coverage:
-        return result[outputs[0]]
     return result
 
 

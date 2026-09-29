@@ -620,12 +620,11 @@ def get_activity_statistics(
 
     Returns
     -------
-    pandas.Series or pandas.DataFrame
-        A ``(user_id, time)`` trajectory. A single non-hierarchical feature
-        without a coverage threshold is returned as a Series; otherwise a
-        DataFrame is returned. An interval contributes when it is fully
-        contained in the requested window. Peak 60-minute values require one
-        completely observed contiguous hour inside the requested window.
+    pandas.DataFrame
+        A ``(user_id, time)`` trajectory containing every requested feature
+        and its ``__coverage`` column. An interval contributes when it is
+        fully contained in the requested window. Peak 60-minute values require
+        one completely observed contiguous hour inside the requested window.
     """
     source = getattr(loader, "activity_source", None)
     if source not in {"samples", "daily_summary"}:
@@ -665,7 +664,7 @@ def get_activity_statistics(
         if cycle_target is not None
         else None
     )
-    include_coverage = min_coverage is not None
+    include_coverage = True
     if source == "samples":
         trajectory = _sample_primary_trajectory(
             loader,
@@ -759,9 +758,11 @@ def get_activity_statistics(
         )
         return trajectory.rename_axis(index={"window_start": index_name})
 
-    columns = list(statistics)
-    if include_coverage:
-        columns.extend(f"{name}__coverage" for name in statistics)
+    columns = [
+        column
+        for name in statistics
+        for column in (name, f"{name}__coverage")
+    ]
     result = trajectory[columns].copy()
     index_name = (
         schema.CALENDAR_DATE_COL
@@ -774,8 +775,6 @@ def get_activity_statistics(
         )
     )
     result = result.rename_axis(index={"window_start": index_name})
-    if len(statistics) == 1 and not include_coverage:
-        return result[statistics[0]]
     return result
 
 

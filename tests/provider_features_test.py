@@ -122,6 +122,22 @@ def test_sample_features_support_statistics_coverage_and_multiple_streams():
     assert first[f"{provider_features.GARMIN_BODY_BATTERY}_mean__coverage"] == 1
 
 
+def test_single_sample_feature_returns_coverage_without_a_threshold():
+    result = provider_features.get_provider_features(
+        ProviderFeatureLoader(),
+        feature=provider_features.GARMIN_STRESS_LEVEL,
+        statistic="mean",
+        user_id="person",
+        start_date="2024-01-01 00:00",
+        end_date="2024-01-01 00:10",
+        resolution="5min",
+    )
+
+    feature = f"{provider_features.GARMIN_STRESS_LEVEL}_mean"
+    assert list(result) == [feature, f"{feature}__coverage"]
+    assert result.iloc[0][f"{feature}__coverage"] == 0.8
+
+
 def test_sample_hierarchy_uses_equal_primary_window_weights():
     loader = ProviderFeatureLoader()
 

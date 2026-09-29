@@ -67,7 +67,7 @@ def test_daily_statistics_use_local_calendar_days():
     )
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
-    assert result.dropna().to_dict() == {
+    assert result["heart_rate_mean"].dropna().to_dict() == {
         ("person-1", pd.Timestamp("2024-01-01")): 60.0,
         ("person-1", pd.Timestamp("2024-01-02")): 75.0,
     }
@@ -84,7 +84,7 @@ def test_subdaily_statistics_can_use_local_clock_windows():
     )
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
-    assert result.tolist() == [60, 70, 80]
+    assert result["heart_rate_mean"].tolist() == [60, 70, 80]
 
 
 def test_auto_subdaily_statistics_warn_and_fall_back_to_available_local_time():
@@ -101,7 +101,7 @@ def test_auto_subdaily_statistics_warn_and_fall_back_to_available_local_time():
 
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
-    assert result.tolist() == [60, 70, 80]
+    assert result["heart_rate_mean"].tolist() == [60, 70, 80]
 
 
 def test_explicit_utc_statistics_reject_local_only_loader():
@@ -130,7 +130,7 @@ def test_calendar_statistics_can_use_utc_days():
     )
     assert loader.requested_time_cols == ["utc_time"]
     assert result.index.names == ["user_id", "utc_time"]
-    assert result.to_dict() == {
+    assert result["heart_rate_mean"].to_dict() == {
         ("person-1", pd.Timestamp("2024-01-01")): 65.0,
         ("person-1", pd.Timestamp("2024-01-02")): 80.0,
     }
@@ -256,7 +256,8 @@ def test_unknown_primary_coverage_only_excludes_when_threshold_is_requested():
             statistic="heart_rate_mean",
             time_reference="local",
         )
-    assert retained.iloc[0] == 60
+    assert retained.iloc[0]["heart_rate_mean"] == 60
+    assert pd.isna(retained.iloc[0]["heart_rate_mean__coverage"])
     assert not caught
 
     with warnings.catch_warnings(record=True) as caught:
@@ -305,7 +306,14 @@ def test_requested_statistics_and_invalid_name():
         user_id="person-1",
         statistic=["heart_rate_count", "heart_rate_min", "heart_rate_p90"],
     )
-    assert list(result) == ["heart_rate_count", "heart_rate_min", "heart_rate_p90"]
+    assert list(result) == [
+        "heart_rate_count",
+        "heart_rate_count__coverage",
+        "heart_rate_min",
+        "heart_rate_min__coverage",
+        "heart_rate_p90",
+        "heart_rate_p90__coverage",
+    ]
     with pytest.raises(ValueError, match="statistic must be one among"):
         heart_rate.get_heart_rate_statistics(
             loader, user_id="person-1", statistic="not_a_statistic"
@@ -323,7 +331,7 @@ def test_unrequested_resting_heart_rate_is_not_calculated(monkeypatch):
         statistic="heart_rate_mean",
     )
 
-    assert result.notna().all()
+    assert result["heart_rate_mean"].notna().all()
 
 
 def test_non_daily_defaults_exclude_daily_rest_heart_rate():
@@ -356,7 +364,8 @@ def test_resolution_convenience_functions_remain_available(
     result = function(
         loader, user_id="person-1", statistic="heart_rate_mean"
     )
-    assert isinstance(result, pd.Series)
+    assert isinstance(result, pd.DataFrame)
+    assert list(result) == ["heart_rate_mean", "heart_rate_mean__coverage"]
     assert loader.requested_time_cols == [expected_time_col]
 
 
@@ -396,7 +405,7 @@ def test_resolution_wrapper_exposes_primary_coverage():
 )
 def test_daily_statistic_convenience_functions_remain_available(function):
     result = function(HeartRateLoader(_samples()), user_id="person-1")
-    assert isinstance(result, pd.Series)
+    assert isinstance(result, pd.DataFrame)
 
 
 def test_conflicting_timestamps_are_excluded():
@@ -410,7 +419,7 @@ def test_conflicting_timestamps_are_excluded():
             user_id="person-1",
             statistic="heart_rate_count",
         )
-    assert result.sum() == 2
+    assert result["heart_rate_count"].sum() == 2
 
 
 def test_identical_duplicate_timestamps_are_removed_for_every_statistic():
@@ -454,7 +463,7 @@ def test_resting_heart_rate_uses_local_days_and_twenty_valid_minutes():
         HeartRateLoader(samples), user_id="person-1"
     )
 
-    assert result.to_dict() == {
+    assert result["heart_rate_rest"].to_dict() == {
         ("person-1", pd.Timestamp("2024-01-01")): 50.0,
         ("person-1", pd.Timestamp("2024-01-02")): 70.0,
     }
@@ -486,7 +495,7 @@ def test_weekly_statistics_use_monday_boundaries_and_partial_edge_periods():
         statistic="heart_rate_mean",
     )
 
-    assert result.to_dict() == {
+    assert result["heart_rate_mean"].to_dict() == {
         ("person-1", pd.Timestamp("2024-01-16")): 60.0,
         ("person-1", pd.Timestamp("2024-01-22")): 100.0,
     }
@@ -513,7 +522,7 @@ def test_monthly_statistics_keep_both_partial_months_and_exact_bounds():
         statistic="heart_rate_mean",
     )
 
-    assert result.to_dict() == {
+    assert result["heart_rate_mean"].to_dict() == {
         ("person-1", pd.Timestamp("2024-01-15")): 60.0,
         ("person-1", pd.Timestamp("2024-02-01")): 100.0,
     }
@@ -545,7 +554,7 @@ def test_daily_statistics_respect_datetime_bounds_on_partial_days():
         statistic="heart_rate_mean",
     )
 
-    assert result.to_dict() == {
+    assert result["heart_rate_mean"].to_dict() == {
         ("person-1", pd.Timestamp("2024-01-01 12:00")): 60.0,
         ("person-1", pd.Timestamp("2024-01-02 00:00")): 100.0,
     }
