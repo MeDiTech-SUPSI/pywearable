@@ -392,3 +392,43 @@ def test_trajectory_analysis_requires_explicit_coverage_columns():
 
     with pytest.raises(ValueError, match="missing coverage columns"):
         trajectory.impute_trajectory(frame, features="metric")
+
+
+def test_weekday_aggregation_is_participant_specific_and_reports_support():
+    frame = _trajectory(np.arange(14, dtype=float))
+
+    result = trajectory.aggregate_trajectory_by_weekday(frame, "metric")
+
+    monday = result.loc[("user", "Monday")]
+    assert monday["metric"] == pytest.approx(3.5)
+    assert monday["metric__support"] == 2
+    assert monday["metric__coverage"] == pytest.approx(
+        frame["metric__coverage"].iloc[[0, 7]].mean()
+    )
+    assert list(result.xs("user").index) == [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ]
+
+
+def test_weekday_aggregation_uses_circular_clock_means():
+    frame = _trajectory(
+        [pd.Timestamp("2023-12-31 23:30"), pd.Timestamp("2024-01-08 00:30")],
+        feature="sleep_bedtime",
+    )
+    frame.index = pd.MultiIndex.from_arrays(
+        [
+            ["user", "user"],
+            pd.to_datetime(["2024-01-01", "2024-01-08"]),
+        ],
+        names=["user_id", "calendar_date"],
+    )
+
+    result = trajectory.aggregate_trajectory_by_weekday(frame, "sleep_bedtime")
+
+    assert result.loc[("user", "Monday"), "sleep_bedtime"] == datetime.time(0, 0)

@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_datetime64_any_dtype
 
-from . import schema
+from . import hierarchy, schema
 from .utils import time as time_utils
 
 
@@ -37,6 +37,15 @@ _METHOD_ALIASES = {
     "exponential_moving_average": "ema",
     "expanding_mean": "cumulative_mean",
 }
+_WEEKDAY_NAMES = (
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday",
+)
 
 
 def _normalize_method(method: str, allowed) -> str:
@@ -778,7 +787,101 @@ def compute_trajectory_trend(
     return result
 
 
+def aggregate_trajectory_by_weekday(
+    trajectory: pd.DataFrame,
+    features: str | Sequence[str] | None = None,
+    *,
+    aggregation: str = "mean",
+    include_imputed: bool = False,
+    temporal_features: str | Sequence[str] | None = None,
+) -> pd.DataFrame:
+    """Aggregate repeated calendar weekdays within each participant.
+
+    This operation is intentionally separate from resolution hierarchies:
+    Mondays across different weeks are a descriptive group, not one
+    chronological parent window.
+
+    Parameters
+    ----------
+    trajectory
+        Canonical ``(user_id, time)`` trajectory with feature coverage columns.
+        Daily, nightly, cycle, and subdaily trajectories are all accepted.
+    features
+        Feature name or names. By default, every value column paired with a
+        ``__coverage`` column is selected.
+    aggregation
+        ``"mean"``, ``"median"``, ``"min"``, ``"max"``, ``"std"``, or a
+        percentile such as ``"p90"``. Clock features use circular operations.
+    include_imputed
+        Include values marked by ``<feature>__is_imputed``. They are excluded
+        by default.
+    temporal_features
+        Additional selected columns to interpret as clock-valued features.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row for every participant and Monday-through-Sunday label. Each
+        feature is accompanied by ``__support`` and mean input ``__coverage``.
+    """
+    selected = _trajectory_features(trajectory, features)
+    temporal = _clock_features(trajectory, selected, temporal_features)
+    if (
+        aggregation not in {"mean", "median", "min", "max", "std"}
+        and not hierarchy.is_percentile(aggregation)
+    ):
+        raise ValueError("aggregation must be mean, median, min, max, std, or pXX")
+
+    times = _time_values(trajectory)
+    users = trajectory.index.get_level_values(schema.USER_COL)
+    records = []
+    for user in pd.Index(users).unique():
+        user_positions = np.flatnonzero(np.asarray(users == user))
+        user_weekdays = times[user_positions].weekday
+        for weekday, label in enumerate(_WEEKDAY_NAMES):
+            positions = user_positions[user_weekdays == weekday]
+            record = {schema.USER_COL: user, "weekday": label}
+            for feature in selected:
+                values = trajectory[feature].iloc[positions].copy()
+                flag = f"{feature}__is_imputed"
+                if flag in trajectory and not include_imputed:
+                    imputed = (
+                        trajectory[flag]
+                        .iloc[positions]
+                        .fillna(False)
+                        .astype(bool)
+                    )
+                    values = values.mask(imputed.to_numpy())
+                record[feature] = hierarchy.aggregate_values(
+                    values,
+                    aggregation,
+                    temporal=feature in temporal,
+                )
+                record[f"{feature}__support"] = int(values.notna().sum())
+                record[f"{feature}__coverage"] = pd.to_numeric(
+                    trajectory[f"{feature}__coverage"].iloc[positions],
+                    errors="coerce",
+                ).mean()
+            records.append(record)
+
+    columns = [
+        column
+        for feature in selected
+        for column in (
+            feature,
+            f"{feature}__support",
+            f"{feature}__coverage",
+        )
+    ]
+    result = pd.DataFrame(records)
+    result["weekday"] = pd.Categorical(
+        result["weekday"], categories=_WEEKDAY_NAMES, ordered=True
+    )
+    return result.set_index([schema.USER_COL, "weekday"])[columns].sort_index()
+
+
 __all__ = [
+    "aggregate_trajectory_by_weekday",
     "compute_trajectory_trend",
     "impute_trajectory",
 ]
