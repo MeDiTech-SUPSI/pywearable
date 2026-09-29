@@ -1,7 +1,45 @@
+import datetime
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
+
+
+def clock_seconds(value) -> float:
+    """Convert a timestamp or clock time to seconds since midnight.
+
+    Calendar dates are intentionally discarded so clock-valued features can
+    be compared or aggregated by time of day.
+    """
+    if pd.isna(value):
+        return np.nan
+    if isinstance(value, datetime.time):
+        return (
+            value.hour * 3600
+            + value.minute * 60
+            + value.second
+            + value.microsecond / 1_000_000
+        )
+    timestamp = pd.Timestamp(value)
+    return (
+        timestamp.hour * 3600
+        + timestamp.minute * 60
+        + timestamp.second
+        + timestamp.microsecond / 1_000_000
+    )
+
+
+def clock_time(seconds):
+    """Convert seconds since midnight to a wrapped :class:`datetime.time`."""
+    if pd.isna(seconds):
+        return None
+    microseconds = int(round(float(seconds) * 1_000_000)) % (
+        24 * 60 * 60 * 1_000_000
+    )
+    hour, remainder = divmod(microseconds, 3_600 * 1_000_000)
+    minute, remainder = divmod(remainder, 60 * 1_000_000)
+    second, microsecond = divmod(remainder, 1_000_000)
+    return datetime.time(hour, minute, second, microsecond)
 
 
 @dataclass

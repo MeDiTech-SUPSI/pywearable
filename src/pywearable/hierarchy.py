@@ -303,37 +303,6 @@ def warn_if_wide(features, aggregation_levels, threshold: int = 500) -> int:
     return width
 
 
-def _clock_seconds(value):
-    """Convert a timestamp or clock time to seconds since midnight."""
-    if pd.isna(value):
-        return np.nan
-    if isinstance(value, datetime.time):
-        return (
-            value.hour * 3600
-            + value.minute * 60
-            + value.second
-            + value.microsecond / 1_000_000
-        )
-    timestamp = pd.Timestamp(value)
-    return (
-        timestamp.hour * 3600
-        + timestamp.minute * 60
-        + timestamp.second
-        + timestamp.microsecond / 1_000_000
-    )
-
-
-def _clock_time(seconds):
-    """Convert seconds since midnight to a wrapped :class:`datetime.time`."""
-    if pd.isna(seconds):
-        return None
-    seconds = float(seconds) % (24 * 60 * 60)
-    whole = int(round(seconds)) % (24 * 60 * 60)
-    hour, remainder = divmod(whole, 3600)
-    minute, second = divmod(remainder, 60)
-    return datetime.time(hour, minute, second)
-
-
 def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
     """Aggregate one feature over one parent window.
 
@@ -353,7 +322,9 @@ def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
             return numeric.quantile(int(operation[1:]) / 100)
         return getattr(numeric, operation)()
 
-    seconds = np.asarray([_clock_seconds(value) for value in values], dtype=float)
+    seconds = np.asarray(
+        [time_utils.clock_seconds(value) for value in values], dtype=float
+    )
     if operation in {"mean", "std"}:
         angles = seconds / (24 * 60 * 60) * 2 * np.pi
         mean_sine = np.sin(angles).mean()
@@ -364,7 +335,7 @@ def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
         if operation == "std":
             return np.sqrt(-2 * np.log(resultant)) * (24 * 60) / (2 * np.pi)
         angle = np.arctan2(mean_sine, mean_cosine) % (2 * np.pi)
-        return _clock_time(angle / (2 * np.pi) * 24 * 60 * 60)
+        return time_utils.clock_time(angle / (2 * np.pi) * 24 * 60 * 60)
 
     # Ordered sleep times use a noon-to-noon sleep-day clock so values around
     # midnight remain adjacent without allowing calendar dates to order them.
@@ -379,7 +350,7 @@ def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
         result = np.percentile(ordered, int(operation[1:]))
     else:
         raise ValueError(f"unsupported temporal operation {operation!r}")
-    return _clock_time(result)
+    return time_utils.clock_time(result)
 
 
 def calendar_windows(

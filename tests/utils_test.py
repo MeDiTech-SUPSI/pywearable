@@ -1,7 +1,19 @@
+import datetime
+
 import pandas as pd
 import pytest
 
 import pywearable.utils
+from pywearable.utils import time as time_utils
+
+
+def test_clock_conversion_round_trip_preserves_subseconds():
+    value = datetime.time(23, 59, 59, 123456)
+
+    seconds = time_utils.clock_seconds(value)
+
+    assert time_utils.clock_time(seconds) == value
+    assert time_utils.clock_time(seconds + 24 * 60 * 60) == value
 
 
 @pytest.mark.parametrize(
