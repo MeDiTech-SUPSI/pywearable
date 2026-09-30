@@ -32,6 +32,33 @@ CURATED_MODULES = (
     "pywearable.visualization",
 )
 
+FIRST_RELEASE_MODULES = tuple(
+    module_name
+    for module_name in CURATED_MODULES
+    if not module_name.startswith("pywearable.loader.sphyncs")
+)
+
+PORTABLE_LOADER_METHODS = (
+    "get_user_ids",
+    "resolve_user_ids",
+    "load_sleep_summary",
+    "load_sleep_stage",
+    "load_sleep_sessions",
+    "load_sleep_session_stages",
+    "load_heart_rate",
+    "load_bbi",
+    "load_hrv_samples",
+    "load_hrv_summary",
+    "load_activity_samples",
+    "load_activity_summary",
+    "load_respiration",
+    "load_respiration_summary",
+    "load_pulse_ox",
+    "load_spo2_summary",
+    "load_provider_feature",
+)
+
+
 @pytest.mark.parametrize("module_name", CURATED_MODULES)
 def test_curated_exports_resolve(module_name):
     module = importlib.import_module(module_name)
@@ -57,6 +84,29 @@ def test_non_private_callables_are_classified(module_name):
     }
 
     assert defined_callables == exported_callables
+
+
+@pytest.mark.parametrize("module_name", FIRST_RELEASE_MODULES)
+def test_exported_callables_are_documented(module_name):
+    module = importlib.import_module(module_name)
+    undocumented = [
+        name
+        for name in module.__all__
+        if (
+            inspect.isfunction(getattr(module, name))
+            or inspect.isclass(getattr(module, name))
+        )
+        and not getattr(module, name).__doc__
+    ]
+
+    assert undocumented == []
+
+
+@pytest.mark.parametrize("method_name", PORTABLE_LOADER_METHODS)
+def test_portable_loader_methods_are_documented(method_name):
+    base_loader = importlib.import_module("pywearable.loader.base").BaseLoader
+
+    assert getattr(base_loader, method_name).__doc__
 
 
 def test_loader_package_exports_only_first_release_loaders():

@@ -12,7 +12,14 @@ from ..garmin import _normalize_garmin_sleep_columns, prepare_epoch_activity_sam
 
 
 class TesseraeCSVLoader(BaseLoader):
-    # TODO use DuckDB here
+    """Load a local Tesserae dataset in its published CSV layout.
+
+    Parameters
+    ----------
+    root_folder
+        Directory containing one Tesserae data folder per participant.
+    """
+
     activity_source = "samples"
     activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
     activity_primary_resolution = "15min"
@@ -20,9 +27,6 @@ class TesseraeCSVLoader(BaseLoader):
     provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
 
     def __init__(self, root_folder: Path):
-        """
-        Loader for Tesserae dataset in CSV format (as provided by data provider)
-        """
         if not Path(root_folder).exists():
             raise ValueError(f"Folder {root_folder} does not exist.")
         self.root_folder = Path(root_folder)

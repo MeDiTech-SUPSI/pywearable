@@ -12,13 +12,12 @@ from ..garmin import prepare_epoch_activity_samples
 
 
 class TesseraeParquetLoader(BaseLoader):
-    """
-    Loader for Tesserae dataset converted in parqeut format.
+    """Load a local Tesserae dataset converted from CSV to Parquet.
 
-    You can use this loader if you have previously converted
-    the Tesserae dataset, which is provided in plain CSV files,
-    to Parquet using the script available in the CLI
-    of the package.
+    Parameters
+    ----------
+    root_folder
+        Directory containing the converted Tesserae Parquet files.
     """
 
     hrv_source = "bbi"

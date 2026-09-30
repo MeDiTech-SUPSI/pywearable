@@ -212,6 +212,11 @@ def get_light_latency(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
 ) -> pd.DataFrame:
+    """Return nightly light-sleep latency.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistics(
         loader=loader,
         user_id=user_id,
@@ -383,6 +388,11 @@ def get_light_sleep_percentage(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
 ) -> pd.DataFrame:
+    """Return the nightly percentage of light sleep.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -400,6 +410,11 @@ def get_deep_sleep_percentage(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
 ) -> pd.DataFrame:
+    """Return the nightly percentage of deep sleep.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -417,6 +432,11 @@ def get_rem_percentage(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
 ) -> pd.DataFrame:
+    """Return the nightly percentage of REM sleep.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -434,6 +454,11 @@ def get_nrem_percentage(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
 ) -> pd.DataFrame:
+    """Return the nightly percentage of NREM sleep.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -451,6 +476,11 @@ def get_wake_after_sleep_onset(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
 ) -> pd.DataFrame:
+    """Return nightly wake after sleep onset.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -468,6 +498,11 @@ def get_sleep_onset_latency(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs: dict = {},
 ) -> pd.DataFrame:
+    """Return nightly sleep-onset latency.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -485,6 +520,11 @@ def get_sleep_score(
     end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     loader_kwargs={},
 ) -> pd.DataFrame:
+    """Return the provider-reported nightly sleep score.
+
+    The result is a :class:`pandas.DataFrame` with the feature and its
+    ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
+    """
     return get_sleep_statistic(
         loader=loader,
         user_id=user_id,
@@ -3077,9 +3117,6 @@ def _sleep_statistics_list(statistic):
             f"{list(SLEEP_STATISTICS_DICT)}, not {sorted(unknown)}"
         )
     return statistics
-
-
-# TODO reduce repeated sleep-feature calculations
 
 
 def get_sleep_statistic(

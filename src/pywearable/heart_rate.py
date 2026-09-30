@@ -906,6 +906,12 @@ def get_yearly_heart_rate_statistics(
     time_reference: str = "auto",
     min_coverage=None,
 ) -> pd.DataFrame:
+    """Get heart-rate statistics over participant-local calendar years.
+
+    This convenience wrapper delegates to :func:`get_heart_rate_statistics`
+    with ``resolution="yearly"``. The result follows the canonical trajectory,
+    half-open date-bound, coverage, and missingness contracts of that function.
+    """
     return get_heart_rate_statistics(
         loader=loader,
         statistic=statistic,
@@ -1068,8 +1074,6 @@ def _get_heart_rate_statistics_single_resolution(
     unresolved_streams = set() if unresolved_streams is None else unresolved_streams
     for user in user_id:
 
-        # TODO we may need to split the computation in chuncks if
-        # window is too long
         loaded_heart_rate = loader.load_heart_rate(
             user_id=user,
             start_date=(

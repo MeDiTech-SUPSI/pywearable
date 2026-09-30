@@ -11,21 +11,12 @@ from ..base import BaseLoader
 
 
 class LifeSnapsParquetLoader(BaseLoader):
-    """Loader for the LifeSnaps dataset.
-
-    Before using this code, make sure to convert
-    the LifeSnaps dataset in Parquet format
-    using the tool available as:
-
-    ``
-    pywearable convert lifesnaps-to-parquet --help
-    ``
+    """Load a local LifeSnaps dataset converted to Parquet.
 
     Parameters
     ----------
     root_folder : :class:`os.PathLike`
-        Path to the folder containing LifeSnaps data in
-        parquet format.
+        Directory containing the converted LifeSnaps Parquet files.
     """
 
     heart_rate_time_columns = ("local_time",)

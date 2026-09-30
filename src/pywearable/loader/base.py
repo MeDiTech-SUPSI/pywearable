@@ -8,7 +8,18 @@ from .. import schema
 
 
 class BaseLoader(ABC):
-    """Abstract class for the implementation of loader classes."""
+    """Portable interface for project- and provider-specific data loaders.
+
+    Loader authors translate source fields into the canonical schemas defined
+    in :mod:`pywearable.schema`. Required streams are implemented by the
+    abstract methods below. Optional streams may retain the default typed
+    empty result, while capability attributes describe which clocks and
+    source grains are available to the domain modules.
+
+    Date bounds are half-open: ``[start_date, end_date)``. Implementations
+    should return an empty DataFrame with the canonical columns when a
+    supported stream has no rows in the requested interval.
+    """
 
     heart_rate_time_columns = schema.HEART_RATE_TIME_COLUMNS
     hrv_source = "bbi"
@@ -26,15 +37,6 @@ class BaseLoader(ABC):
     def __init__(self):
         pass
 
-    # @abstractmethod
-    # def load_daily_summary(
-    #    self,
-    #    user_id: str,
-    #    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    #    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    # ) -> pd.DataFrame:
-    #    pass
-
     @abstractmethod
     def load_sleep_summary(
         self,
@@ -43,6 +45,13 @@ class BaseLoader(ABC):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
+        """Load canonical main-sleep summaries.
+
+        Return columns accepted by :func:`pywearable.schema.prepare_sleep_summary`,
+        with one row per participant-local ``calendar_date`` when
+        ``drop_duplicates`` is true. Bounds select calendar dates and do not
+        clip the physical sleep session.
+        """
         pass
 
     @abstractmethod
@@ -52,6 +61,12 @@ class BaseLoader(ABC):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        """Load canonical intervals for main-sleep stages.
+
+        Return columns accepted by :func:`pywearable.schema.prepare_sleep_stages`.
+        Every interval must reference its parent ``sleep_summary_id`` and
+        retain its native positive duration.
+        """
         pass
 
     def load_sleep_sessions(
@@ -251,6 +266,13 @@ class BaseLoader(ABC):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
+        """Load canonical beat-to-beat interval samples.
+
+        Implement this method when ``hrv_source == "bbi"`` and return columns
+        accepted by :func:`pywearable.schema.prepare_bbi`. Loaders exposing
+        provider-computed HRV instead should set ``hrv_source`` to
+        ``"provider_samples"`` and implement :meth:`load_hrv_samples`.
+        """
         raise NotImplementedError
 
     def load_provider_feature(
