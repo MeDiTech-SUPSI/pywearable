@@ -13,7 +13,6 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 
-from .. import constants
 _LABFRONT_LAST_SAMPLE_UNIX_TIMESTAMP_IN_MS_KEY = "lastSampleUnixTimestampInMs"
 _LABFRONT_QUESTIONNAIRE_STRING = "questionnaire"
 _LABFRONT_TODO_STRING = "todo"
@@ -110,83 +109,6 @@ def get_user_ids(loader, user_id: Union[str, list, tuple, None] = "all"):
     if isinstance(user_id, str):
         return [user_id]
     return list(user_id)
-
-
-def return_multiindex_df(
-    df: pd.DataFrame, return_df: bool, return_multi_index: bool
-) -> Union[dict, pd.DataFrame]:
-    # Check if df is pd.DataFrame
-    if not (type(df) == pd.DataFrame):
-        raise ValueError(f"df must be of type pd.DataFrame, not of {type(df)}")
-    # Check if we have multilevel index
-    if not (type(df.index) == pd.MultiIndex):
-        raise ValueError(
-            f"df.index must be of type pd.MultiIndex, not of {type(df.index)}"
-        )
-    if not return_df:
-        # We need to perform some changes to return dictionary with dates
-        # and not pd.Timestamp as keys
-        if len(df.columns) > 1:
-            """
-            More than one column, dictionary will be:
-            {
-                user_id1: {
-                    datetime.date1: {
-                        metric1: value1,
-                        metric2: value2,
-                        ...
-                    },
-                    datetime.date2: {
-                        metric1: value1,
-                        metric2: value2,
-                    }
-                },
-                user_id2: {
-                    datetime.date1: {
-                        ...
-                    }
-                }
-            }
-
-            """
-            return {
-                user: {
-                    date.to_pydatetime().date(): df.xs((user, date)).to_dict()
-                    for date in df.index.levels[1]
-                }
-                for user in df.index.levels[0]
-            }
-        else:
-            """
-            Single metric, dictionary will be:
-            {
-                user_id1: {
-                    datetime.date1: value1,
-                    datetime.date2: value2
-                },
-                user_id2: {
-                    datetime.date1: value1,
-                    datetime.date2: value2
-                }
-            }
-            """
-            return {
-                level: {
-                    k.to_pydatetime().date(): v
-                    for k, v in df.xs(level).loc[:, df.columns[0]].to_dict().items()
-                }
-                for level in df.index.levels[0]
-            }
-    else:
-        # We return a dataframe
-        if return_multi_index:
-            # Standard multi-index dataframe
-            return df
-        else:
-            # Single index dataframe
-            return df.reset_index(
-                level=[constants.USER_COL, constants.CALENDAR_DATE_COL]
-            )
 
 
 def get_summary(loader, comparison_date=_clock_time.time()):
@@ -609,122 +531,10 @@ def std_time(times):
     return "%02i:%02i" % (h_std, m_std)
 
 
-def filter_out_sleep_stages(
-    df: pd.DataFrame,
-    stages_to_filter: Union[list, str],
-    loader=None,
-    user_id: str = None,
-    sleep_stages=None,
-):
-    """Filters out night data relative to periods where the user was awake
-
-    Parameters
-    ----------
-    loader : :class:`pywearable.loader.base.BaseLoader`
-        Initialized instance of data loader.
-    user : class:`str`
-        ID of the user for which data has to be filtered.
-    df : class:`pandas.DataFrame`
-        DataFrame of the data to filter, must contain an isoDate column
-    date : class:`datetime.date`
-        Date relative to the night in consideration.
-    resolution : class:`int`, optional
-        Resolution of the hypnogram used to find awake periods, by default 1
-
-    Returns
-    -------
-    :class:`pandas.DataFrame`
-        Filtered version of the original `df`, including only data of periods when the participant is asleep.
-    """
-    # Check stages to filter
-    if type(stages_to_filter) == str:
-        stages_to_filter = [stages_to_filter]
-    assert type(stages_to_filter) is list
-    for stage in stages_to_filter:
-        if not stage in [
-            constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-            constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
-            constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
-            constants.SLEEP_STAGE_REM_STAGE_VALUE,
-            constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-        ]:
-            raise ValueError(f"Sleep stage {stage} is not valid")
-    if sleep_stages is None:
-
-        sleep_stages: pd.DataFrame = loader.load_sleep_stage(
-            user_id=user_id,
-            start_date=df[constants.ISODATE_COL].min() - pd.Timedelta(hours=24),
-            end_date=df[constants.ISODATE_COL].max() + pd.Timedelta(hours=24),
-        )
-        sleep_stages[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stages[
-            constants.SLEEP_STAGE_SLEEP_TYPE_COL
-        ].str.lower()
-    else:
-        sleep_stages = sleep_stages.copy()
-
-    resampled_sleep_stages = resample_sleep_stages(
-        sleep_stages=sleep_stages, resolution="30s"
-    )
-
-    df = pd.merge_asof(
-        left=df.sort_values(by=constants.ISODATE_COL),
-        right=resampled_sleep_stages.drop(
-            constants.UNIXTIMESTAMP_IN_MS_COL, axis=1
-        ).sort_values(constants.ISODATE_COL),
-        left_on=constants.ISODATE_COL,
-        right_on=constants.ISODATE_COL,
-        direction="nearest",
-        tolerance=pd.Timedelta(seconds=60),
-    )
-    df = df.loc[
-        ~df[constants.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_filter),
-        :,
-    ].rename(columns={constants.SLEEP_STAGE_SLEEP_TYPE_COL: "sleep_stage"})
-    return df
-
-
-def resample_sleep_stages(sleep_stages: pd.DataFrame, resolution: str) -> pd.DataFrame:
-    sleep_stages["endIsoDate"] = sleep_stages[constants.ISODATE_COL] + pd.to_timedelta(
-        sleep_stages[constants.DURATION_IN_MS_COL] - 1, unit="ms"
-    )
-
-    sleep_stages = sleep_stages.drop_duplicates(
-        subset=[
-            constants.UNIXTIMESTAMP_IN_MS_COL,
-            constants.SLEEP_SUMMARY_ID_COL,
-        ],
-        keep="last",
-    )
-    sleep_stages = (
-        pd.melt(
-            frame=sleep_stages,
-            id_vars=[
-                constants.UNIXTIMESTAMP_IN_MS_COL,
-                constants.SLEEP_SUMMARY_ID_COL,
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL,
-            ],
-            value_vars=[constants.ISODATE_COL, "endIsoDate"],
-        )
-        .set_index("value")
-        .sort_index(ascending=True)
-    )
-    resampled_sleep_stages = (
-        sleep_stages.groupby(constants.UNIXTIMESTAMP_IN_MS_COL)
-        .resample(rule=resolution, include_groups=False)
-        .ffill()
-        .reset_index(names=[constants.UNIXTIMESTAMP_IN_MS_COL, constants.ISODATE_COL])
-    )
-    resampled_sleep_stages = resampled_sleep_stages.drop_duplicates(
-        subset=constants.ISODATE_COL, keep="first"
-    )
-    return resampled_sleep_stages
-
-
 __all__ = [
     "check_date",
     "check_is_df",
     "check_start_and_end_dates",
-    "filter_out_sleep_stages",
     "find_nearest_timestamp",
     "get_earliest_bedtime",
     "get_earliest_wakeup_time",
@@ -736,8 +546,6 @@ __all__ = [
     "is_weekend",
     "mean_angle",
     "mean_time",
-    "resample_sleep_stages",
-    "return_multiindex_df",
     "std_time",
     "trend_analysis",
 ]

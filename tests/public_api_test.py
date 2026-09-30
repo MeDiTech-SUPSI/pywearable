@@ -7,7 +7,6 @@ import pytest
 CURATED_MODULES = (
     "pywearable.activity",
     "pywearable.adherence",
-    "pywearable.constants",
     "pywearable.cycle",
     "pywearable.heart_rate",
     "pywearable.hrv",

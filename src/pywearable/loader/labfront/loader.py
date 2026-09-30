@@ -14,25 +14,25 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import constants, schema, sleep, utils
+from ... import schema, sleep, utils
 from ..base import BaseLoader
 from ..garmin import prepare_epoch_activity_samples
 from . import constants as lf_constants
 
 _LABFRONT_METRICS_DICT = {
-    constants.METRIC_HEART_RATE: {
+    lf_constants.METRIC_HEART_RATE: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
     },
-    constants.METRIC_STRESS: {
+    lf_constants.METRIC_STRESS: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_STRESS_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
     },
-    constants.METRIC_PULSE_OX: {
+    lf_constants.METRIC_PULSE_OX: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
     },
-    constants.METRIC_RESPIRATION: {
+    lf_constants.METRIC_RESPIRATION: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
     },
@@ -630,18 +630,18 @@ class LabfrontLoader(BaseLoader):
             )
         except pd.errors.EmptyDataError:
             return pd.NaT, pd.NaT
-        if constants.CALENDAR_DATE_COL in temp_df:
-            column = constants.CALENDAR_DATE_COL
+        if lf_constants.CALENDAR_DATE_COL in temp_df:
+            column = lf_constants.CALENDAR_DATE_COL
             temp_df[column] = pd.to_datetime(
                 temp_df[column], format="%Y-%m-%d"
             ).dt.tz_localize(None)
             first_date = temp_df[column].min()
             last_date = temp_df[column].max()
-        elif constants.ISODATE_COL in temp_df:
-            column = constants.ISODATE_COL
+        elif lf_constants.ISODATE_COL in temp_df:
+            column = lf_constants.ISODATE_COL
             try:
                 temp_df[column] = pd.to_datetime(
-                    temp_df[constants.ISODATE_COL].str[:-6],
+                    temp_df[lf_constants.ISODATE_COL].str[:-6],
                     utc=True,
                 ).dt.tz_localize(None)
             except:
@@ -649,8 +649,8 @@ class LabfrontLoader(BaseLoader):
                 raise
             first_date = temp_df[column].min().normalize()
             last_date = temp_df[column].max().normalize()
-        elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
-            column = constants.UNIXTIMESTAMP_IN_MS_COL
+        elif lf_constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
+            column = lf_constants.UNIXTIMESTAMP_IN_MS_COL
             temp_df[column] = pd.to_datetime(
                 temp_df[column], unit="ms", utc=True
             ).dt.tz_localize(None)
@@ -658,7 +658,7 @@ class LabfrontLoader(BaseLoader):
             last_date = temp_df[column].max() + pd.Timedelta(hours=14)
         else:
             raise ValueError(
-                f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
+                f"Could not find column {lf_constants.ISODATE_COL} or {lf_constants.CALENDAR_DATE_COL} or {lf_constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
             )
 
         return first_date, last_date
@@ -931,28 +931,28 @@ class LabfrontLoader(BaseLoader):
 
         # Convert columns to datetime
         cols_to_sort = []
-        if constants.ISODATE_COL in data.columns:
-            data[constants.ISODATE_COL] = pd.to_datetime(
-                data[constants.ISODATE_COL].str[:-6],
+        if lf_constants.ISODATE_COL in data.columns:
+            data[lf_constants.ISODATE_COL] = pd.to_datetime(
+                data[lf_constants.ISODATE_COL].str[:-6],
                 utc=True,
             ).dt.tz_localize(tz=None)
 
-        if constants.CALENDAR_DATE_COL in data.columns:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
+        if lf_constants.CALENDAR_DATE_COL in data.columns:
+            data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[lf_constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
             )
-            cols_to_sort.append(constants.CALENDAR_DATE_COL)
+            cols_to_sort.append(lf_constants.CALENDAR_DATE_COL)
         data = data.sort_values(by=cols_to_sort, ignore_index=True)
         # Get data only from given start and end dates
         if not filter_rows or ((start_date is None) and (end_date is None)):
             return data
         elif not (
-            constants.ISODATE_COL in data.columns
-            or constants.CALENDAR_DATE_COL in data.columns
+            lf_constants.ISODATE_COL in data.columns
+            or lf_constants.CALENDAR_DATE_COL in data.columns
         ):
             return data
         else:
-            date_filter_col = constants.ISODATE_COL
+            date_filter_col = lf_constants.ISODATE_COL
             if filter_on_calendar_date:
                 start_date = (
                     None
@@ -962,7 +962,7 @@ class LabfrontLoader(BaseLoader):
                 end_date = (
                     None if (end_date is None) else pd.Timestamp(end_date).normalize()
                 )
-                date_filter_col = constants.CALENDAR_DATE_COL
+                date_filter_col = lf_constants.CALENDAR_DATE_COL
             if (start_date is None) and (not (end_date is None)):
                 return data[(data[date_filter_col] < end_date)].reset_index(drop=True)
             elif (not (start_date is None)) and (end_date is None):
@@ -1192,7 +1192,7 @@ class LabfrontLoader(BaseLoader):
                 "type": row["questionType"],
                 "description": row["questionDescription"],
             }
-            if row["questionType"] == constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
+            if row["questionType"] == lf_constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
                 continue
             question_options = {}
             for col in option_cols:
@@ -1388,17 +1388,17 @@ class LabfrontLoader(BaseLoader):
                 drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
             ]
 
             sleep_data = sleep_data.merge(
                 right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
+                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
                 how="left",
             )
 
-            sleep_data[constants.IS_SLEEPING_COL] = True
+            sleep_data[lf_constants.IS_SLEEPING_COL] = True
 
             # Merge dataframes
             # We need to merge the dataframes because the daily_data already contain sleep_data
@@ -1411,9 +1411,9 @@ class LabfrontLoader(BaseLoader):
                             not x
                             in (
                                 [
-                                    constants.ISODATE_COL,
-                                    constants.CALENDAR_DATE_COL,
-                                    constants.IS_SLEEPING_COL,
+                                    lf_constants.ISODATE_COL,
+                                    lf_constants.CALENDAR_DATE_COL,
+                                    lf_constants.IS_SLEEPING_COL,
                                 ]
                             )
                         )
@@ -1421,16 +1421,16 @@ class LabfrontLoader(BaseLoader):
                     axis=1,
                 )
                 merged_data = daily_data.merge(
-                    sleep_data, on=constants.ISODATE_COL, how="left"
+                    sleep_data, on=lf_constants.ISODATE_COL, how="left"
                 )
-                merged_data[constants.IS_SLEEPING_COL] = merged_data[
-                    constants.IS_SLEEPING_COL
+                merged_data[lf_constants.IS_SLEEPING_COL] = merged_data[
+                    lf_constants.IS_SLEEPING_COL
                 ].fillna(value=False)
                 return merged_data
             else:
                 return sleep_data
         else:
-            daily_data[constants.IS_SLEEPING_COL] = False
+            daily_data[lf_constants.IS_SLEEPING_COL] = False
             return daily_data
 
     def load_garmin_connect_respiration(
@@ -1490,25 +1490,25 @@ class LabfrontLoader(BaseLoader):
             sleep_summary = sleep_summary.loc[
                 :,
                 [
-                    constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                    constants.CALENDAR_DATE_COL,
+                    lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
+                    lf_constants.CALENDAR_DATE_COL,
                 ],
             ]
 
         if len(sleep_data) > 0:
             sleep_data = sleep_data[
-                sleep_data[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summary[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].unique()
+                sleep_data[lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
+                    sleep_summary[lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].unique()
                 )
             ].reset_index(drop=True)
             sleep_data = pd.merge(
                 left=sleep_data,
                 right=sleep_summary,
-                on=constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
+                on=lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
                 how="outer",
             )
 
-            sleep_data.loc[:, constants.IS_SLEEPING_COL] = True
+            sleep_data.loc[:, lf_constants.IS_SLEEPING_COL] = True
             sleep_data = sleep_data.drop(
                 [
                     x
@@ -1517,10 +1517,10 @@ class LabfrontLoader(BaseLoader):
                         not x
                         in (
                             [
-                                constants.ISODATE_COL,
-                                constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                                constants.CALENDAR_DATE_COL,
-                                constants.IS_SLEEPING_COL,
+                                lf_constants.ISODATE_COL,
+                                lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
+                                lf_constants.CALENDAR_DATE_COL,
+                                lf_constants.IS_SLEEPING_COL,
                             ]
                         )
                     )
@@ -1530,19 +1530,19 @@ class LabfrontLoader(BaseLoader):
             # Merge dataframes
             # We need to merge the dataframes because the daily_data already contain sleep_data
             merged_data = daily_data.merge(
-                sleep_data, on=constants.ISODATE_COL, how="left"
+                sleep_data, on=lf_constants.ISODATE_COL, how="left"
             )
             merged_data.loc[
-                merged_data[constants.IS_SLEEPING_COL] != True,
-                constants.IS_SLEEPING_COL,
+                merged_data[lf_constants.IS_SLEEPING_COL] != True,
+                lf_constants.IS_SLEEPING_COL,
             ] = False
-            merged_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                merged_data[constants.CALENDAR_DATE_COL]
+            merged_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                merged_data[lf_constants.CALENDAR_DATE_COL]
             )
             return merged_data
         else:
-            daily_data[constants.CALENDAR_DATE_COL] = pd.NaT
-            daily_data[constants.IS_SLEEPING_COL] = False
+            daily_data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
+            daily_data[lf_constants.IS_SLEEPING_COL] = False
             return daily_data
 
     def load_garmin_connect_sleep_pulse_ox(
@@ -1567,21 +1567,21 @@ class LabfrontLoader(BaseLoader):
                 drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
             ]
 
             sleep_data = sleep_data.merge(
                 right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
+                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
                 how="left",
             )
 
-            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
+            sleep_data = sleep_data.drop([lf_constants.SLEEP_SUMMARY_ID_COL], axis=1)
             # Convert calendar date to pd.Timestamp
             # TODO remove since sleep_summary already has Timestamp on calendarDate
-            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                sleep_data[constants.CALENDAR_DATE_COL]
+            sleep_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_data[lf_constants.CALENDAR_DATE_COL]
             )
         return sleep_data
 
@@ -1607,20 +1607,20 @@ class LabfrontLoader(BaseLoader):
                 drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
             ]
 
             sleep_data = sleep_data.merge(
                 right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
+                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
                 how="left",
             )
 
-            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
+            sleep_data = sleep_data.drop([lf_constants.SLEEP_SUMMARY_ID_COL], axis=1)
             # Convert calendar date to pd.Timestamp
-            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                sleep_data[constants.CALENDAR_DATE_COL]
+            sleep_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_data[lf_constants.CALENDAR_DATE_COL]
             )
         return sleep_data
 
@@ -1747,18 +1747,18 @@ class LabfrontLoader(BaseLoader):
                 end_date=end_date,
             )
             # Prepare columns for sleep information
-            data[constants.IS_SLEEPING_COL] = False
-            data[constants.CALENDAR_DATE_COL] = pd.NaT
+            data[lf_constants.IS_SLEEPING_COL] = False
+            data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
             for (_, calendar_date), row in sleep_timestamps.iterrows():
                 bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
                 wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
-                sleeping = (data[constants.ISODATE_COL] >= bedtime) & (
-                    data[constants.ISODATE_COL] <= wakeup
+                sleeping = (data[lf_constants.ISODATE_COL] >= bedtime) & (
+                    data[lf_constants.ISODATE_COL] <= wakeup
                 )
-                data.loc[sleeping, constants.CALENDAR_DATE_COL] = pd.Timestamp(
+                data.loc[sleeping, lf_constants.CALENDAR_DATE_COL] = pd.Timestamp(
                     calendar_date
                 )
-                data.loc[sleeping, constants.IS_SLEEPING_COL] = True
+                data.loc[sleeping, lf_constants.IS_SLEEPING_COL] = True
         return data
 
     def load_garmin_device_pulse_ox(
@@ -1790,8 +1790,8 @@ class LabfrontLoader(BaseLoader):
             user_id=user_id, start_date=start_date, end_date=end_date
         )
         # Keep isSleeping information and remove other columns
-        if constants.CALENDAR_DATE_COL in data.columns:
-            data = data.drop(constants.CALENDAR_DATE_COL, axis=1)
+        if lf_constants.CALENDAR_DATE_COL in data.columns:
+            data = data.drop(lf_constants.CALENDAR_DATE_COL, axis=1)
         return data
 
     def load_garmin_device_sleep_pulse_ox(
@@ -1824,9 +1824,9 @@ class LabfrontLoader(BaseLoader):
         data = self._load_garmin_device_all_pulse_ox(
             user_id=user_id, start_date=start_date, end_date=end_date
         )
-        if constants.IS_SLEEPING_COL in data.columns:
-            data = data[data[constants.IS_SLEEPING_COL] == True]
-            data = data.drop(constants.IS_SLEEPING_COL, axis=1)
+        if lf_constants.IS_SLEEPING_COL in data.columns:
+            data = data[data[lf_constants.IS_SLEEPING_COL] == True]
+            data = data.drop(lf_constants.IS_SLEEPING_COL, axis=1)
         return data
 
     def _load_garmin_device_all_respiration(
@@ -1845,8 +1845,8 @@ class LabfrontLoader(BaseLoader):
         # We need to add information about sleep
         if len(data) > 0:
             # Let's prepare the columns for sleep information
-            data[constants.IS_SLEEPING_COL] = False
-            data[constants.CALENDAR_DATE_COL] = pd.NaT
+            data[lf_constants.IS_SLEEPING_COL] = False
+            data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
             # Let's load sleep timestamps
             # We need to add calendarDate from sleep summaries
             sleep_timestamps = sleep.get_sleep_timestamps(
@@ -1858,13 +1858,13 @@ class LabfrontLoader(BaseLoader):
             for (_, calendar_date), row in sleep_timestamps.iterrows():
                 bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
                 wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
-                sleeping = (data[constants.ISODATE_COL] >= bedtime) & (
-                    data[constants.ISODATE_COL] <= wakeup
+                sleeping = (data[lf_constants.ISODATE_COL] >= bedtime) & (
+                    data[lf_constants.ISODATE_COL] <= wakeup
                 )
-                data.loc[sleeping, constants.CALENDAR_DATE_COL] = pd.Timestamp(
+                data.loc[sleeping, lf_constants.CALENDAR_DATE_COL] = pd.Timestamp(
                     calendar_date
                 )
-                data.loc[sleeping, constants.IS_SLEEPING_COL] = True
+                data.loc[sleeping, lf_constants.IS_SLEEPING_COL] = True
         return data
 
     def load_garmin_device_respiration(
@@ -1899,8 +1899,8 @@ class LabfrontLoader(BaseLoader):
         )
         # We need to remove calendarDate
         if len(data) > 0:
-            if constants.CALENDAR_DATE_COL in data.columns:
-                data = data.drop(constants.CALENDAR_DATE_COL, axis=1)
+            if lf_constants.CALENDAR_DATE_COL in data.columns:
+                data = data.drop(lf_constants.CALENDAR_DATE_COL, axis=1)
         return data
 
     def load_garmin_device_sleep_respiration(
@@ -1934,9 +1934,9 @@ class LabfrontLoader(BaseLoader):
             user_id=user_id, start_date=start_date, end_date=end_date
         )
         if len(data) > 0:
-            if constants.IS_SLEEPING_COL in data.columns:
-                data = data[data[constants.IS_SLEEPING_COL] == True]
-                data = data.drop(constants.IS_SLEEPING_COL, axis=1)
+            if lf_constants.IS_SLEEPING_COL in data.columns:
+                data = data[data[lf_constants.IS_SLEEPING_COL] == True]
+                data = data.drop(lf_constants.IS_SLEEPING_COL, axis=1)
         return data
 
     def load_garmin_device_step(
@@ -2039,9 +2039,9 @@ class LabfrontLoader(BaseLoader):
         if data.empty:
             return schema.empty_bbi_frame(["source", "timezone_name"])
         data = data.copy()
-        data[schema.LOCAL_TIME_COL] = pd.to_datetime(data[constants.ISODATE_COL])
+        data[schema.LOCAL_TIME_COL] = pd.to_datetime(data[lf_constants.ISODATE_COL])
         data[schema.UTC_TIME_COL] = pd.to_datetime(
-            data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+            data[lf_constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
         ).dt.tz_localize(None)
         if "timezone" in data.columns:
             data = data.rename(columns={"timezone": "timezone_name"})
@@ -2148,193 +2148,30 @@ class LabfrontLoader(BaseLoader):
 
         df = self.load_garmin_connect_epoch(user_id, start_date, end_date)
         steps_df = (
-            df.groupby(constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
+            df.groupby(lf_constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
             .sum()
             .reset_index()
         )
         # add back the most frequent timezone offset
-        steps_df[constants.TIMEZONEOFFSET_IN_MS_COL] = (
-            df.groupby(constants.ISODATE_COL)[constants.TIMEZONEOFFSET_IN_MS_COL]
+        steps_df[lf_constants.TIMEZONEOFFSET_IN_MS_COL] = (
+            df.groupby(lf_constants.ISODATE_COL)[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
             .mean()
-            .reset_index()[constants.TIMEZONEOFFSET_IN_MS_COL]
+            .reset_index()[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
         )
         # add the unix timestamp column
-        steps_df[constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
-            constants.ISODATE_COL
+        steps_df[lf_constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
+            lf_constants.ISODATE_COL
         ].apply(lambda x: int(x.timestamp() * 1000))
         # add sampling frequency column durationInMs
-        steps_df[constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
+        steps_df[lf_constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
         # add a column for calendar date
-        steps_df[constants.CALENDAR_DATE_COL] = steps_df[constants.ISODATE_COL].dt.date
+        steps_df[lf_constants.CALENDAR_DATE_COL] = steps_df[lf_constants.ISODATE_COL].dt.date
         # add a column for cumulative steps at a daily level
         steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(
-            constants.CALENDAR_DATE_COL
+            lf_constants.CALENDAR_DATE_COL
         )[lf_constants.ACTIVITY_STEPS_COL].cumsum()
 
         return steps_df
-
-    def load_hypnogram(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.datetime],
-        end_date: Union[str, datetime.date, datetime.datetime, None],
-        resolution: float = 1,
-        map_hypnogram: bool = True,
-    ) -> pd.DataFrame:
-        """Load hypnogram for given user for a given day.
-
-        This function allows to load sleep hypnograms starting from sleep data
-        with a given resolution in minutes. The function returns a
-        dictionary, with each key being a :class:`datetime.date`, and each value
-        a :class:`numpy.array` that contains the hypnogram values.
-        The hypnogram can be kept with standard Garmin values for sleep stages,
-        or these values can be mapped to number according to the following
-        convention:
-
-            - unmeasurable -> -1
-            - awake -> 0
-            - light -> 1
-            - deep -> 3
-            - rem -> 4
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            Unique identifier of the user.
-        start_date : str or datetime.date or datetime.date or None
-            Start date for hypnogram loading.
-        end_date : str or datetime.date or datetime.date or None
-            End date for hypnogram loading.
-        resolution : int, optional
-            Desired resolution (in minutes) requested for the hypnogram, by default 1
-
-        Returns
-        -------
-        dict
-            Dictionary with hypnogram values, one per each day.
-
-        Raises
-        ------
-        ValueError
-            If date is passed as str and cannot be parsed.
-        """
-
-        # Load sleep summary and sleep stages data
-        sleep_summaries = self._load_sleep_summary_raw(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if len(sleep_summaries) == 0:
-            return {}
-
-        sleep_start_time = sleep_summaries.iloc[0][constants.ISODATE_COL]
-
-        sleep_end_time = pd.to_datetime(
-            (
-                sleep_summaries.iloc[-1][constants.UNIXTIMESTAMP_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants.TIMEZONEOFFSET_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                + sleep_summaries.iloc[-1][
-                    constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
-                ]
-            ),
-            unit="ms",
-            utc=True,
-        ).tz_localize(None)
-
-        sleep_start_time = sleep_start_time.to_pydatetime()
-        sleep_end_time = sleep_end_time.to_pydatetime()
-
-        sleep_stages = self._load_sleep_stage_raw(
-            user_id=user_id,
-            start_date=sleep_start_time,
-            end_date=sleep_end_time,
-        )
-
-        # Keep only sleep stages with correct sleep summaries
-        sleep_stages = (
-            sleep_stages[
-                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summaries[
-                        constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
-                    ].unique()
-                )
-            ]
-            .sort_values(by=[constants.UNIXTIMESTAMP_IN_MS_COL])
-            .reset_index(drop=True)
-        )
-        # set index on sleep summaries
-        sleep_summaries = sleep_summaries.set_index(
-            constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
-        )
-        hypnograms = {}
-        for sleep_summary_id, sleep_summary in sleep_summaries.iterrows():
-            calendar_day = sleep_summary[constants.CALENDAR_DATE_COL]
-            sleep_start_time = sleep_summary[constants.ISODATE_COL]
-            sleep_end_time = pd.to_datetime(
-                (
-                    sleep_summary[constants.UNIXTIMESTAMP_IN_MS_COL]
-                    + sleep_summary[
-                        lf_constants.GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL
-                    ]
-                    + sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                    + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
-                ),
-                unit="ms",
-                utc=True,
-            ).tz_localize(None)
-
-            intervals = int(
-                divmod(
-                    (sleep_end_time - sleep_start_time).total_seconds(), 60 * resolution
-                )[0]
-            )
-            time_delta_intervals = [
-                sleep_start_time + i * datetime.timedelta(minutes=resolution)
-                for i in range(intervals)
-            ]
-
-            daily_sleep_stages = sleep_stages.loc[
-                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL]
-                == sleep_summary_id
-            ]
-
-            hypnogram = pd.DataFrame(data={constants.ISODATE_COL: time_delta_intervals})
-
-            hypnogram = hypnogram.merge(
-                daily_sleep_stages.loc[
-                    :,
-                    [
-                        constants.ISODATE_COL,
-                        constants.SLEEP_STAGE_SLEEP_TYPE_COL,
-                    ],
-                ],
-                how="left",
-                on=constants.ISODATE_COL,
-            )
-
-            hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram.loc[
-                :, constants.SLEEP_STAGE_SLEEP_TYPE_COL
-            ].ffill()
-            if map_hypnogram:
-                hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram[
-                    constants.SLEEP_STAGE_SLEEP_TYPE_COL
-                ].map(
-                    {
-                        constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_DEEP_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_LIGHT_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
-                    }
-                )
-            hypnograms[calendar_day] = {}
-            hypnograms[calendar_day]["start_time"] = sleep_start_time.to_pydatetime()
-            hypnograms[calendar_day]["end_time"] = sleep_end_time.to_pydatetime()
-            hypnograms[calendar_day]["values"] = hypnogram[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
-            ].values
-
-        return hypnograms
 
     def load_garmin_metric(
         self,
@@ -2371,7 +2208,7 @@ class LabfrontLoader(BaseLoader):
         requested_start = schema.normalize_time_bound(start_date, time_col)
         requested_end = schema.normalize_time_bound(end_date, time_col)
         data = self.load_garmin_metric(
-            metric=constants.METRIC_HEART_RATE,
+            metric=lf_constants.METRIC_HEART_RATE,
             user_id=user_id,
             # Labfront's file index and row filter use local ISO timestamps.
             # Read a wider interval, then apply the requested clock exactly.
@@ -2392,9 +2229,9 @@ class LabfrontLoader(BaseLoader):
             )
 
         data = data.copy()
-        data["local_time"] = pd.to_datetime(data[constants.ISODATE_COL])
+        data["local_time"] = pd.to_datetime(data[lf_constants.ISODATE_COL])
         data["utc_time"] = pd.to_datetime(
-            data[constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+            data[lf_constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
         ).dt.tz_localize(None)
         if "timezone" in data.columns:
             data = data.rename(columns={"timezone": "timezone_name"})
@@ -2428,15 +2265,15 @@ class LabfrontLoader(BaseLoader):
         data = data.copy()
         if (
             schema.LOCAL_TIME_COL not in data.columns
-            and constants.ISODATE_COL in data.columns
+            and lf_constants.ISODATE_COL in data.columns
         ):
-            data[schema.LOCAL_TIME_COL] = data[constants.ISODATE_COL]
+            data[schema.LOCAL_TIME_COL] = data[lf_constants.ISODATE_COL]
         if (
             schema.UTC_TIME_COL not in data.columns
-            and constants.UNIXTIMESTAMP_IN_MS_COL in data.columns
+            and lf_constants.UNIXTIMESTAMP_IN_MS_COL in data.columns
         ):
             data[schema.UTC_TIME_COL] = pd.to_datetime(
-                data[constants.UNIXTIMESTAMP_IN_MS_COL],
+                data[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
                 unit="ms",
                 errors="coerce",
                 utc=True,
@@ -2447,11 +2284,11 @@ class LabfrontLoader(BaseLoader):
             data = data.rename(columns={schema.TIMEZONE_COL: "timezone_name"})
         if (
             schema.TIMEZONE_COL not in data.columns
-            and constants.TIMEZONEOFFSET_IN_MS_COL in data.columns
+            and lf_constants.TIMEZONEOFFSET_IN_MS_COL in data.columns
         ):
             data[schema.TIMEZONE_COL] = pd.to_timedelta(
                 pd.to_numeric(
-                    data[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                    data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
                 ),
                 unit="ms",
             )
@@ -2462,14 +2299,14 @@ class LabfrontLoader(BaseLoader):
             data[canonical_value_col] = data[provider_value_col]
         if (
             schema.IS_SLEEPING_COL not in data.columns
-            and constants.IS_SLEEPING_COL in data.columns
+            and lf_constants.IS_SLEEPING_COL in data.columns
         ):
-            data[schema.IS_SLEEPING_COL] = data[constants.IS_SLEEPING_COL]
+            data[schema.IS_SLEEPING_COL] = data[lf_constants.IS_SLEEPING_COL]
         if (
             schema.CALENDAR_DATE_COL not in data.columns
-            and constants.CALENDAR_DATE_COL in data.columns
+            and lf_constants.CALENDAR_DATE_COL in data.columns
         ):
-            data[schema.CALENDAR_DATE_COL] = data[constants.CALENDAR_DATE_COL]
+            data[schema.CALENDAR_DATE_COL] = data[lf_constants.CALENDAR_DATE_COL]
         return data
 
     def load_pulse_ox(
@@ -2495,7 +2332,7 @@ class LabfrontLoader(BaseLoader):
         data["source"] = source
         data = self._prepare_respiratory_samples(
             data,
-            constants.SPO2_SPO2_COL,
+            lf_constants.SPO2_SPO2_COL,
             schema.SPO2_COL,
         )
         return schema.prepare_spo2_samples(data)
@@ -2565,7 +2402,7 @@ class LabfrontLoader(BaseLoader):
         data["source"] = source
         data = self._prepare_respiratory_samples(
             data,
-            constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
+            lf_constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
             schema.RESPIRATORY_RATE_COL,
         )
         return schema.prepare_respiration_samples(data)
@@ -2593,7 +2430,7 @@ class LabfrontLoader(BaseLoader):
         data["source"] = source
         data = self._prepare_respiratory_samples(
             data,
-            constants.SPO2_SPO2_COL,
+            lf_constants.SPO2_SPO2_COL,
             schema.SPO2_COL,
         )
         return schema.prepare_spo2_samples(data)
@@ -2621,7 +2458,7 @@ class LabfrontLoader(BaseLoader):
         data["source"] = source
         data = self._prepare_respiratory_samples(
             data,
-            constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
+            lf_constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
             schema.RESPIRATORY_RATE_COL,
         )
         return schema.prepare_respiration_samples(data)
@@ -2681,22 +2518,22 @@ class LabfrontLoader(BaseLoader):
                 on_conflict=conflict_policy,
             )
             # Change sleep stage values
-            data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
+            data[lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
+                lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL
             ].map(
                 {
-                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: lf_constants.SLEEP_STAGE_REM_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
                 }
             )
 
             if requested_start is not None:
-                data = data[data[constants.ISODATE_COL] >= requested_start]
+                data = data[data[lf_constants.ISODATE_COL] >= requested_start]
             if requested_end is not None:
-                data = data[data[constants.ISODATE_COL] < requested_end]
+                data = data[data[lf_constants.ISODATE_COL] < requested_end]
 
         return data.reset_index(drop=True)
 
@@ -2743,7 +2580,7 @@ class LabfrontLoader(BaseLoader):
             on_conflict
         )
         source_col = _LABFRONT_SOURCE_FILE_COL
-        id_col = constants.SLEEP_SUMMARY_ID_COL
+        id_col = lf_constants.SLEEP_SUMMARY_ID_COL
         record_cols = [col for col in sleep_stages if col != source_col]
         if sleep_stages.empty:
             return sleep_stages.drop(columns=source_col, errors="ignore")
@@ -2802,7 +2639,7 @@ class LabfrontLoader(BaseLoader):
                     [
                         id_col,
                         "__validation_rank",
-                        constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                        lf_constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
                     ]
                 )
                 .groupby(id_col, as_index=False)
@@ -2810,16 +2647,16 @@ class LabfrontLoader(BaseLoader):
                 .set_index(id_col)
             )
         stage_summary_cols = {
-            lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-            lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-            lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-            lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-            lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
         }
 
         def matches(snapshot, summary):
-            actual = snapshot.groupby(constants.SLEEP_STAGE_SLEEP_TYPE_COL)[
-                constants.SLEEP_STAGE_DURATION_IN_MS_COL
+            actual = snapshot.groupby(lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL)[
+                lf_constants.SLEEP_STAGE_DURATION_IN_MS_COL
             ].sum()
             return all(
                 pd.notna(summary[column]) and int(actual.get(stage, 0)) == int(summary[column])
@@ -2883,7 +2720,7 @@ class LabfrontLoader(BaseLoader):
         return (
             pd.concat(chosen, ignore_index=True)
             .drop(columns=source_col)
-            .sort_values(constants.ISODATE_COL)
+            .sort_values(lf_constants.ISODATE_COL)
             .reset_index(drop=True)
         )
 
@@ -2926,8 +2763,8 @@ class LabfrontLoader(BaseLoader):
         )
 
         if len(data) > 0:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL],
+            data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[lf_constants.CALENDAR_DATE_COL],
                 format="%Y-%m-%d",
             ).dt.date
 
@@ -2944,14 +2781,14 @@ class LabfrontLoader(BaseLoader):
                     data.sort_values(
                         by=(
                             [
-                                constants.CALENDAR_DATE_COL,
+                                lf_constants.CALENDAR_DATE_COL,
                                 "validationMap",
-                                constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                                lf_constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
                             ]
                         ),
                         ascending=True,
                     )
-                    .groupby(constants.CALENDAR_DATE_COL)
+                    .groupby(lf_constants.CALENDAR_DATE_COL)
                     .tail(1)
                 )
                 data = data.drop(["validationMap"], axis=1)
@@ -2959,11 +2796,11 @@ class LabfrontLoader(BaseLoader):
             # Rename columns based on pywearable specs
             data = data.rename(
                 columns={
-                    lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
                 }
             )
 
@@ -2993,7 +2830,7 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         return self.load_garmin_metric(
-            metric=constants.METRIC_STRESS,
+            metric=lf_constants.METRIC_STRESS,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -3017,33 +2854,33 @@ class LabfrontLoader(BaseLoader):
         or calculate sleep recovery.
         """
         sample_columns = {
-            "garmin_stress_level": constants.STRESS_STRESS_LEVEL_COL,
-            "garmin_body_battery": constants.STRESS_BODY_BATTERY_COL,
+            "garmin_stress_level": lf_constants.STRESS_STRESS_LEVEL_COL,
+            "garmin_body_battery": lf_constants.STRESS_BODY_BATTERY_COL,
         }
         daily_columns = {
             "garmin_daily_average_stress": (
-                constants.DAILY_SUMMARY_AVG_STRESS_IN_STRESS_LVL_COL
+                lf_constants.DAILY_SUMMARY_AVG_STRESS_IN_STRESS_LVL_COL
             ),
             "garmin_daily_max_stress": (
-                constants.DAILY_SUMMARY_MAX_STRESS_IN_STRESS_LVL_COL
+                lf_constants.DAILY_SUMMARY_MAX_STRESS_IN_STRESS_LVL_COL
             ),
             "garmin_daily_stress_duration_seconds": "stressDurationInMs",
             "garmin_daily_rest_stress_duration_seconds": (
-                constants.DAILY_SUMMARY_REST_STRESS_DURATION_IN_MS_COL
+                lf_constants.DAILY_SUMMARY_REST_STRESS_DURATION_IN_MS_COL
             ),
             "garmin_daily_activity_stress_duration_seconds": (
-                constants.DAILY_SUMMARY_UNRELIABLE_STRESS_DURATION_IN_MS_COL
+                lf_constants.DAILY_SUMMARY_UNRELIABLE_STRESS_DURATION_IN_MS_COL
             ),
             "garmin_daily_low_stress_duration_seconds": (
-                constants.DAILY_SUMMARY_LOW_STRESS_DURATION_IN_MS_COL
+                lf_constants.DAILY_SUMMARY_LOW_STRESS_DURATION_IN_MS_COL
             ),
             "garmin_daily_medium_stress_duration_seconds": (
-                constants.DAILY_SUMMARY_MEDIUM_STRESS_DURATION_IN_MS_COL
+                lf_constants.DAILY_SUMMARY_MEDIUM_STRESS_DURATION_IN_MS_COL
             ),
             "garmin_daily_high_stress_duration_seconds": (
-                constants.DAILY_SUMMARY_HIGH_STRESS_DURATION_IN_MS_COL
+                lf_constants.DAILY_SUMMARY_HIGH_STRESS_DURATION_IN_MS_COL
             ),
-            "garmin_daily_stress_qualifier": constants.DAILY_SUMMARY_STRESS_SCORE_COL,
+            "garmin_daily_stress_qualifier": lf_constants.DAILY_SUMMARY_STRESS_SCORE_COL,
         }
         if feature in sample_columns:
             data = self.load_stress(
@@ -3057,17 +2894,17 @@ class LabfrontLoader(BaseLoader):
                     pd.DataFrame(columns=[feature]), feature
                 )
             data[schema.LOCAL_TIME_COL] = pd.to_datetime(
-                data[constants.ISODATE_COL], errors="coerce"
+                data[lf_constants.ISODATE_COL], errors="coerce"
             )
             data[schema.UTC_TIME_COL] = pd.to_datetime(
-                data[constants.UNIXTIMESTAMP_IN_MS_COL],
+                data[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
                 unit="ms",
                 errors="coerce",
                 utc=True,
             ).dt.tz_localize(None)
             data[schema.TIMEZONE_COL] = pd.to_timedelta(
                 pd.to_numeric(
-                    data[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                    data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
                 ),
                 unit="ms",
             )
@@ -3093,16 +2930,16 @@ class LabfrontLoader(BaseLoader):
                 numeric=feature != "garmin_daily_stress_qualifier",
             )
         order_col = (
-            constants.ISODATE_COL
-            if constants.ISODATE_COL in data.columns
-            else constants.CALENDAR_DATE_COL
+            lf_constants.ISODATE_COL
+            if lf_constants.ISODATE_COL in data.columns
+            else lf_constants.CALENDAR_DATE_COL
         )
         data = data.sort_values(order_col, kind="stable").drop_duplicates(
-            constants.CALENDAR_DATE_COL, keep="last"
+            lf_constants.CALENDAR_DATE_COL, keep="last"
         )
         result = pd.DataFrame(
             {
-                schema.CALENDAR_DATE_COL: data[constants.CALENDAR_DATE_COL],
+                schema.CALENDAR_DATE_COL: data[lf_constants.CALENDAR_DATE_COL],
                 feature: data[daily_columns[feature]],
             }
         )
@@ -3177,19 +3014,19 @@ class LabfrontLoader(BaseLoader):
         if epochs.empty:
             return schema.empty_activity_frame(extra_columns=("source",))
         epochs[schema.LOCAL_TIME_COL] = pd.to_datetime(
-            epochs[constants.ISODATE_COL], errors="coerce"
+            epochs[lf_constants.ISODATE_COL], errors="coerce"
         )
         epochs[schema.UTC_TIME_COL] = pd.to_datetime(
-            epochs[constants.UNIXTIMESTAMP_IN_MS_COL],
+            epochs[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
             unit="ms",
             errors="coerce",
             utc=True,
         ).dt.tz_localize(None)
         epochs[schema.TIMEZONE_COL] = pd.to_timedelta(
-            pd.to_numeric(epochs[constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
+            pd.to_numeric(epochs[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
             unit="ms",
         )
-        epochs[schema.DURATION_IN_MS_COL] = epochs[constants.DURATION_IN_MS_COL]
+        epochs[schema.DURATION_IN_MS_COL] = epochs[lf_constants.DURATION_IN_MS_COL]
         epochs[schema.ACTIVITY_STEPS_COL] = epochs[lf_constants.ACTIVITY_STEPS_COL]
         if "activityType" in epochs:
             epochs = epochs.rename(columns={"activityType": "activity_type"})

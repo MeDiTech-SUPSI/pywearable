@@ -5,7 +5,6 @@ from typing import Union
 import click
 import pandas as pd
 
-from ... import constants
 from ...loader.labfront import constants as lf_constants
 
 LABFRONT_METRICS_SPLIT_BY_DAY_DICT = {
@@ -84,14 +83,6 @@ def get_csv_file_header(path_to_csv_file: Union[str, Path]) -> str:
     return "".join(processed_head)
 
 
-def read_csv_file_keys(path_to_csv_file: Union[str, Path]) -> pd.DataFrame:
-    pass
-
-
-def read_csv_data(path_to_csv_file: Union[str, Path]) -> pd.DataFrame:
-    pass
-
-
 def write_new_metric_csv_file(output_folder, participant_id, metric, old_csv_paths):
     # Read and process csv header
     header = get_csv_file_header(path_to_csv_file=old_csv_paths[0])
@@ -101,22 +92,22 @@ def write_new_metric_csv_file(output_folder, participant_id, metric, old_csv_pat
         for csv_file in old_csv_paths
     ]
     df = pd.concat(data_list, axis=0, ignore_index=True)
-    if constants.ISODATE_COL in df.columns:
-        df[constants.ISODATE_COL] = pd.to_datetime(
-            df[constants.ISODATE_COL].str.rsplit("+", expand=True)[0], utc=True
+    if lf_constants.ISODATE_COL in df.columns:
+        df[lf_constants.ISODATE_COL] = pd.to_datetime(
+            df[lf_constants.ISODATE_COL].str.rsplit("+", expand=True)[0], utc=True
         ).dt.tz_localize(tz=None)
-        df[constants.CALENDAR_DATE_COL] = df[constants.ISODATE_COL].dt.normalize()
-        for calendar_date in df[constants.CALENDAR_DATE_COL].unique():
+        df[lf_constants.CALENDAR_DATE_COL] = df[lf_constants.ISODATE_COL].dt.normalize()
+        for calendar_date in df[lf_constants.CALENDAR_DATE_COL].unique():
             daily_data = df.loc[
-                (df[constants.ISODATE_COL] > calendar_date)
+                (df[lf_constants.ISODATE_COL] > calendar_date)
                 & (
                     (
-                        df[constants.ISODATE_COL]
+                        df[lf_constants.ISODATE_COL]
                         <= calendar_date + datetime.timedelta(days=1)
                     )
                 ),
                 :,
-            ].drop(constants.CALENDAR_DATE_COL, axis=1)
+            ].drop(lf_constants.CALENDAR_DATE_COL, axis=1)
             path_to_metric_folder = Path(output_folder) / participant_id / metric
             if not path_to_metric_folder.exists():
                 path_to_metric_folder.mkdir(exist_ok=True, parents=True)

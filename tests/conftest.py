@@ -14,50 +14,50 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-import pywearable.constants
 from pywearable.loader import BaseLoader
+from pywearable.loader.labfront import constants as lf_constants
 
 BASE_PATH = Path(__file__).parent / "mock_values"
 
 MOCK_FILES_DICT = {
-    pywearable.constants.METRIC_BBI: BASE_PATH / "bbi.csv",
-    pywearable.constants.METRIC_DAILY_SUMMARY: BASE_PATH / "daily_summary.csv",
-    pywearable.constants.METRIC_HEART_RATE: BASE_PATH / "heart_rate.csv",
-    pywearable.constants.METRIC_SLEEP_RESPIRATION: BASE_PATH / "sleep_respiration.csv",
-    pywearable.constants.METRIC_SLEEP_STAGE: BASE_PATH / "sleep_stage.csv",
-    pywearable.constants.METRIC_SLEEP_SUMMARY: BASE_PATH / "sleep_summary.csv",
+    lf_constants.METRIC_BBI: BASE_PATH / "bbi.csv",
+    lf_constants.METRIC_DAILY_SUMMARY: BASE_PATH / "daily_summary.csv",
+    lf_constants.METRIC_HEART_RATE: BASE_PATH / "heart_rate.csv",
+    lf_constants.METRIC_SLEEP_RESPIRATION: BASE_PATH / "sleep_respiration.csv",
+    lf_constants.METRIC_SLEEP_STAGE: BASE_PATH / "sleep_stage.csv",
+    lf_constants.METRIC_SLEEP_SUMMARY: BASE_PATH / "sleep_summary.csv",
 }
 
 
 def load_sleep_stage() -> pd.DataFrame:
     sleep_stage = pd.read_csv(
-        MOCK_FILES_DICT[pywearable.constants.METRIC_SLEEP_STAGE],
-        parse_dates=[pywearable.constants.ISODATE_COL],
+        MOCK_FILES_DICT[lf_constants.METRIC_SLEEP_STAGE],
+        parse_dates=[lf_constants.ISODATE_COL],
     )
-    sleep_stage[pywearable.constants.ISODATE_COL] = sleep_stage[
-        pywearable.constants.ISODATE_COL
+    sleep_stage[lf_constants.ISODATE_COL] = sleep_stage[
+        lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
     return sleep_stage
 
 
 def load_sleep_respiration() -> pd.DataFrame:
     sleep_respiration = pd.read_csv(
-        MOCK_FILES_DICT[pywearable.constants.METRIC_SLEEP_RESPIRATION],
-        parse_dates=[pywearable.constants.ISODATE_COL],
+        MOCK_FILES_DICT[lf_constants.METRIC_SLEEP_RESPIRATION],
+        parse_dates=[lf_constants.ISODATE_COL],
     )
-    sleep_respiration[pywearable.constants.ISODATE_COL] = sleep_respiration[
-        pywearable.constants.ISODATE_COL
+    sleep_respiration[lf_constants.ISODATE_COL] = sleep_respiration[
+        lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
     return sleep_respiration
 
 
 def load_heart_rate() -> pd.DataFrame:
     heart_rate = pd.read_csv(
-        MOCK_FILES_DICT[pywearable.constants.METRIC_HEART_RATE],
-        parse_dates=[pywearable.constants.ISODATE_COL],
+        MOCK_FILES_DICT[lf_constants.METRIC_HEART_RATE],
+        parse_dates=[lf_constants.ISODATE_COL],
     )
-    heart_rate[pywearable.constants.ISODATE_COL] = heart_rate[
-        pywearable.constants.ISODATE_COL
+    heart_rate[lf_constants.ISODATE_COL] = heart_rate[
+        lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
     return heart_rate
 
@@ -69,10 +69,10 @@ def base_loader(session_mocker):
     session_mocker.patch(
         "pywearable.loader.BaseLoader.load_daily_summary",
         return_value=pd.read_csv(
-            MOCK_FILES_DICT[pywearable.constants.METRIC_DAILY_SUMMARY],
+            MOCK_FILES_DICT[lf_constants.METRIC_DAILY_SUMMARY],
             parse_dates=[
-                pywearable.constants.CALENDAR_DATE_COL,
-                pywearable.constants.ISODATE_COL,
+                lf_constants.CALENDAR_DATE_COL,
+                lf_constants.ISODATE_COL,
             ],
         ),
     )
@@ -85,11 +85,11 @@ def base_loader(session_mocker):
     )
     # load_bbi
     bbi = pd.read_csv(
-        MOCK_FILES_DICT[pywearable.constants.METRIC_BBI],
-        parse_dates=[pywearable.constants.ISODATE_COL],
+        MOCK_FILES_DICT[lf_constants.METRIC_BBI],
+        parse_dates=[lf_constants.ISODATE_COL],
     )
-    bbi[pywearable.constants.ISODATE_COL] = bbi[
-        pywearable.constants.ISODATE_COL
+    bbi[lf_constants.ISODATE_COL] = bbi[
+        lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
     session_mocker.patch(
         "pywearable.loader.BaseLoader.load_bbi",
@@ -98,17 +98,17 @@ def base_loader(session_mocker):
 
     # load_sleep_summary
     sleep_summary = pd.read_csv(
-        MOCK_FILES_DICT[pywearable.constants.METRIC_SLEEP_SUMMARY],
+        MOCK_FILES_DICT[lf_constants.METRIC_SLEEP_SUMMARY],
         parse_dates=[
-            pywearable.constants.ISODATE_COL,
-            pywearable.constants.CALENDAR_DATE_COL,
+            lf_constants.ISODATE_COL,
+            lf_constants.CALENDAR_DATE_COL,
         ],
     )
-    sleep_summary[pywearable.constants.ISODATE_COL] = sleep_summary[
-        pywearable.constants.ISODATE_COL
+    sleep_summary[lf_constants.ISODATE_COL] = sleep_summary[
+        lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
-    sleep_summary[pywearable.constants.CALENDAR_DATE_COL] = sleep_summary[
-        pywearable.constants.CALENDAR_DATE_COL
+    sleep_summary[lf_constants.CALENDAR_DATE_COL] = sleep_summary[
+        lf_constants.CALENDAR_DATE_COL
     ].dt.tz_localize(None)
     session_mocker.patch(
         "pywearable.loader.BaseLoader.load_sleep_summary", return_value=sleep_summary

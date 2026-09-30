@@ -363,13 +363,6 @@ def _asleep_stage_membership(loader, user_id, timestamps, start_date, end_date):
     return mask, segment_ids
 
 
-def _asleep_stage_mask(loader, user_id, timestamps, start_date, end_date):
-    """Mark samples in sleep stages, retaining all samples if stages are absent."""
-    return _asleep_stage_membership(
-        loader, user_id, timestamps, start_date, end_date
-    )[0]
-
-
 def _raw_bbi_frame_trajectory(
     bbi,
     user_id,
