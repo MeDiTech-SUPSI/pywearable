@@ -95,37 +95,6 @@ class LifeSnapsParquetLoader(BaseLoader):
         self._check_user_id(user_id)
         return schema.empty_respiration_frame()
 
-    def load_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[pd.Timestamp, None] = None,
-        end_date: Union[pd.Timestamp, None] = None,
-    ):
-        """Load sleep respiration data.
-
-        .. warning::
-
-            LifeSnaps dataset doesn't have raw sleep respiration data. Therefore
-            this function will always return an empty :class:`pd.DataFrame`.
-            You can use the function :func:`load_respiration_summary` that
-            returns a summary of night respiration data.
-
-
-        Parameters
-        ----------
-        user_id : str
-            Unique user identifier.
-        start_date : :class:`pandas.Timestamp` or ``None``, optional
-        end_date : :class:`pandas.Timestamp` or ``None``, optional
-
-        Returns
-        -------
-        :class:`pandas.DataFrame`
-            Empty dataframe.
-        """
-        self._check_user_id(user_id)
-        return schema.empty_respiration_frame()
-
     def load_pulse_ox(
         self,
         user_id: str,
@@ -133,31 +102,6 @@ class LifeSnapsParquetLoader(BaseLoader):
         end_date: Union[pd.Timestamp, None] = None,
     ):
         """Load pulse oximetry data.
-
-        Parameters
-        ----------
-        user_id : str
-            Unique user identifier.
-        start_date : :class:`pandas.Timestamp` or ``None``, optional
-
-        end_date : :class:`pandas.Timestamp` or ``None``, optional
-
-
-        Returns
-        -------
-        :class:`pandas.DataFrame`
-            Empty dataframe.
-        """
-        self._check_user_id(user_id)
-        return schema.empty_spo2_frame()
-
-    def load_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[pd.Timestamp, None] = None,
-        end_date: Union[pd.Timestamp, None] = None,
-    ):
-        """Load pulse oximetry data during sleep.
 
         Parameters
         ----------

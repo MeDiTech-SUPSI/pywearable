@@ -480,12 +480,6 @@ class TesseraeParquetLoader(BaseLoader):
     def load_pulse_ox(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame()
 
-    def load_sleep_pulse_ox(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame()
-
-    def load_sleep_respiration(self, user_id, start_date=None, end_date=None):
-        return pd.DataFrame()
-
     ##########################################
     #       Use information
     ##########################################

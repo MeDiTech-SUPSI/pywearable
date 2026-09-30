@@ -55,7 +55,6 @@ _FAMILY_CONFIG = {
         "source_attr": "respiratory_rate_source",
         "time_columns_attr": "respiratory_rate_time_columns",
         "sample_loader": "load_respiration",
-        "sleep_sample_loader": "load_sleep_respiration",
         "summary_loader": "load_respiration_summary",
     },
     "spo2": {
@@ -63,7 +62,6 @@ _FAMILY_CONFIG = {
         "source_attr": "spo2_source",
         "time_columns_attr": "spo2_time_columns",
         "sample_loader": "load_pulse_ox",
-        "sleep_sample_loader": "load_sleep_pulse_ox",
         "summary_loader": "load_spo2_summary",
     },
 }
@@ -170,19 +168,10 @@ def _prepare_samples(frame, family):
     return schema.prepare_spo2_samples(frame)
 
 
-def _load_sample_family(
-    loader, family, user, start_date, end_date, loader_kwargs, sleep_only=False
-):
-    """Load and normalize one user's dated samples for ``family``.
-
-    ``sleep_only`` selects the loader's sleep-filtered stream; the result is a
-    canonical timestamped DataFrame.
-    """
+def _load_sample_family(loader, family, user, start_date, end_date, loader_kwargs):
+    """Load and normalize one user's dated samples for ``family``."""
     config = _FAMILY_CONFIG[family]
-    method_name = (
-        config["sleep_sample_loader"] if sleep_only else config["sample_loader"]
-    )
-    frame = getattr(loader, method_name)(
+    frame = getattr(loader, config["sample_loader"])(
         user_id=user,
         start_date=start_date,
         end_date=end_date,
@@ -248,7 +237,6 @@ def _sample_family_trajectory(
             load_start,
             load_end,
             loader_kwargs,
-            sleep_only=cycle.CYCLE_NIGHT in chain,
         )
         frame = frame[frame[time_col].notna()].sort_values(time_col, kind="stable")
         cadence = time_utils.infer_cadence(

@@ -505,18 +505,6 @@ class SphyncsDataLoader(BaseLoader):
         """Return empty DataFrame - not available in SPHYNCS dataset."""
         return pd.DataFrame()
 
-    def load_sleep_pulse_ox(
-        self, user_id: str, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        """Return empty DataFrame - not available in SPHYNCS dataset."""
-        return pd.DataFrame()
-
-    def load_sleep_respiration(
-        self, user_id: str, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        """Return empty DataFrame - not available in SPHYNCS dataset."""
-        return pd.DataFrame()
-
     def load_bbi(
         self, user_id: str, start_date=None, end_date=None
     ) -> pd.DataFrame:

@@ -14,7 +14,7 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import schema, sleep
+from ... import schema
 from ..base import BaseLoader, resolve_user_ids
 from ..garmin import (
     _normalize_garmin_sleep_columns,
@@ -1364,77 +1364,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing Garmin Connect pulse ox data.
         """
-        # We need to load both sleep and daily pulse ox
-        daily_data = self.get_data_from_datetime(
+        return self.get_data_from_datetime(
             user_id=user_id,
             metric=lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
             start_date=start_date,
             end_date=end_date,
             filter_on_calendar_date=False,
         ).reset_index(drop=True)
-        # Load sleep pulse ox data
-        sleep_data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_CONNECT_SLEEP_PULSE_OX_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        ).reset_index(drop=True)
-
-        if len(sleep_data) > 0:
-            # Set information about sleep
-            # We need to add information about sleep summaries
-            sleep_summary = self._load_sleep_summary_raw(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-                drop_duplicates=False,
-            )
-            sleep_summary = sleep_summary.loc[
-                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
-            ]
-
-            sleep_data = sleep_data.merge(
-                right=sleep_summary,
-                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
-                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
-                how="left",
-            )
-
-            sleep_data[lf_constants.IS_SLEEPING_COL] = True
-
-            # Merge dataframes
-            # We need to merge the dataframes because the daily_data already contain sleep_data
-            if len(daily_data) > 0:
-                sleep_data = sleep_data.drop(
-                    [
-                        x
-                        for x in sleep_data.columns
-                        if (
-                            not x
-                            in (
-                                [
-                                    lf_constants.ISODATE_COL,
-                                    lf_constants.CALENDAR_DATE_COL,
-                                    lf_constants.IS_SLEEPING_COL,
-                                ]
-                            )
-                        )
-                    ],
-                    axis=1,
-                )
-                merged_data = daily_data.merge(
-                    sleep_data, on=lf_constants.ISODATE_COL, how="left"
-                )
-                merged_data[lf_constants.IS_SLEEPING_COL] = merged_data[
-                    lf_constants.IS_SLEEPING_COL
-                ].fillna(value=False)
-                return merged_data
-            else:
-                return sleep_data
-        else:
-            daily_data[lf_constants.IS_SLEEPING_COL] = False
-            return daily_data
 
     def load_garmin_connect_respiration(
         self,
@@ -1444,11 +1380,8 @@ class LabfrontLoader(BaseLoader):
     ) -> pd.DataFrame:
         """Load Garmin Connect respiratory data.
 
-        This function loads Garmin Connect respiratory data from a given
-        participant and within a specified date and time range. This
-        function loads both daily and sleep respiratory data. The
-        resulting data frame contains an additional column named 'sleep',
-        equal to 1 for respiratory data acquired during sleep.
+        This function loads Garmin Connect respiratory samples from a given
+        participant and within a specified date and time range.
 
         Parameters
         ----------
@@ -1466,87 +1399,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
              Dataframe containing Garmin Connect respiration data.
         """
-        # We need to load both sleep and daily respiration
-        daily_data = self.get_data_from_datetime(
+        return self.get_data_from_datetime(
             user_id=user_id,
             metric=lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
             start_date=start_date,
             end_date=end_date,
             filter_on_calendar_date=False,
         ).reset_index(drop=True)
-
-        # Get sleep data
-        sleep_data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_CONNECT_SLEEP_RESPIRATION_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        ).reset_index(drop=True)
-
-        # Add calendar date from sleep summary
-        sleep_summary = self._load_sleep_summary_raw(
-            user_id, start_date, end_date, drop_duplicates=True
-        ).reset_index(drop=True)
-
-        if len(sleep_summary) > 0:
-            sleep_summary = sleep_summary.loc[
-                :,
-                [
-                    lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                    lf_constants.CALENDAR_DATE_COL,
-                ],
-            ]
-
-        if len(sleep_data) > 0:
-            sleep_data = sleep_data[
-                sleep_data[lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summary[lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].unique()
-                )
-            ].reset_index(drop=True)
-            sleep_data = pd.merge(
-                left=sleep_data,
-                right=sleep_summary,
-                on=lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                how="outer",
-            )
-
-            sleep_data.loc[:, lf_constants.IS_SLEEPING_COL] = True
-            sleep_data = sleep_data.drop(
-                [
-                    x
-                    for x in sleep_data.columns
-                    if (
-                        not x
-                        in (
-                            [
-                                lf_constants.ISODATE_COL,
-                                lf_constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                                lf_constants.CALENDAR_DATE_COL,
-                                lf_constants.IS_SLEEPING_COL,
-                            ]
-                        )
-                    )
-                ],
-                axis=1,
-            )
-            # Merge dataframes
-            # We need to merge the dataframes because the daily_data already contain sleep_data
-            merged_data = daily_data.merge(
-                sleep_data, on=lf_constants.ISODATE_COL, how="left"
-            )
-            merged_data.loc[
-                merged_data[lf_constants.IS_SLEEPING_COL] != True,
-                lf_constants.IS_SLEEPING_COL,
-            ] = False
-            merged_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                merged_data[lf_constants.CALENDAR_DATE_COL]
-            )
-            return merged_data
-        else:
-            daily_data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
-            daily_data[lf_constants.IS_SLEEPING_COL] = False
-            return daily_data
 
     def load_garmin_connect_sleep_pulse_ox(
         self,
@@ -1727,43 +1586,6 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def _load_garmin_device_all_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        )
-        if len(data) > 0:
-            # We need to add calendarDate from sleep summaries
-            # TODO probably better not to depend on sleep module here
-            sleep_timestamps = sleep.get_sleep_timestamps(
-                self,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            # Prepare columns for sleep information
-            data[lf_constants.IS_SLEEPING_COL] = False
-            data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
-            for (_, calendar_date), row in sleep_timestamps.iterrows():
-                bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
-                wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
-                sleeping = (data[lf_constants.ISODATE_COL] >= bedtime) & (
-                    data[lf_constants.ISODATE_COL] <= wakeup
-                )
-                data.loc[sleeping, lf_constants.CALENDAR_DATE_COL] = pd.Timestamp(
-                    calendar_date
-                )
-                data.loc[sleeping, lf_constants.IS_SLEEPING_COL] = True
-        return data
-
     def load_garmin_device_pulse_ox(
         self,
         user_id: str,
@@ -1789,86 +1611,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing pulse ox data.
         """
-        data = self._load_garmin_device_all_pulse_ox(
-            user_id=user_id, start_date=start_date, end_date=end_date
+        return self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         )
-        # Keep isSleeping information and remove other columns
-        if lf_constants.CALENDAR_DATE_COL in data.columns:
-            data = data.drop(lf_constants.CALENDAR_DATE_COL, axis=1)
-        return data
-
-    def load_garmin_device_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device (SDK) sleep pulse ox data.
-
-        This function loads pulse ox data from a given
-        user and within a specified date and time range,
-        and uses information from :func:`load_sleep_summary`
-        to return values only collected during sleep periods.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None.
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None.
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing sleep pulse ox data.
-        """
-        data = self._load_garmin_device_all_pulse_ox(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if lf_constants.IS_SLEEPING_COL in data.columns:
-            data = data[data[lf_constants.IS_SLEEPING_COL] == True]
-            data = data.drop(lf_constants.IS_SLEEPING_COL, axis=1)
-        return data
-
-    def _load_garmin_device_all_respiration(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device respiration data."""
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
-            start_date,
-            end_date,
-        )
-        # We need to add information about sleep
-        if len(data) > 0:
-            # Let's prepare the columns for sleep information
-            data[lf_constants.IS_SLEEPING_COL] = False
-            data[lf_constants.CALENDAR_DATE_COL] = pd.NaT
-            # Let's load sleep timestamps
-            # We need to add calendarDate from sleep summaries
-            sleep_timestamps = sleep.get_sleep_timestamps(
-                self,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            for (_, calendar_date), row in sleep_timestamps.iterrows():
-                bedtime = row[sleep.SLEEP_STATISTIC_BEDTIME]
-                wakeup = row[sleep.SLEEP_STATISTIC_WAKEUP]
-                sleeping = (data[lf_constants.ISODATE_COL] >= bedtime) & (
-                    data[lf_constants.ISODATE_COL] <= wakeup
-                )
-                data.loc[sleeping, lf_constants.CALENDAR_DATE_COL] = pd.Timestamp(
-                    calendar_date
-                )
-                data.loc[sleeping, lf_constants.IS_SLEEPING_COL] = True
-        return data
 
     def load_garmin_device_respiration(
         self,
@@ -1878,7 +1627,7 @@ class LabfrontLoader(BaseLoader):
     ) -> pd.DataFrame:
         """Load Garmin Device respiration data.
 
-        This function loads steps data from a given
+        This function loads respiratory data from a given
         user and within a specified date and time range.
 
         Parameters
@@ -1895,52 +1644,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing respiration data.
         """
-        data = self._load_garmin_device_all_respiration(
+        return self.get_data_from_datetime(
             user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
             start_date=start_date,
             end_date=end_date,
+            filter_on_calendar_date=False,
         )
-        # We need to remove calendarDate
-        if len(data) > 0:
-            if lf_constants.CALENDAR_DATE_COL in data.columns:
-                data = data.drop(lf_constants.CALENDAR_DATE_COL, axis=1)
-        return data
-
-    def load_garmin_device_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device (SDK) sleep respiration data.
-
-        This function loads respiration data from a given
-        user and within a specified date and time range,
-        and uses information from :func:`load_sleep_summary`
-        to return values only collected during sleep periods.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None.
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None.
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing sleep pulse ox data.
-        """
-        data = self._load_garmin_device_all_respiration(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if len(data) > 0:
-            if lf_constants.IS_SLEEPING_COL in data.columns:
-                data = data[data[lf_constants.IS_SLEEPING_COL] == True]
-                data = data.drop(lf_constants.IS_SLEEPING_COL, axis=1)
-        return data
 
     def load_garmin_device_step(
         self,
@@ -2398,62 +2108,6 @@ class LabfrontLoader(BaseLoader):
             )
         else:
             data = self.load_garmin_device_respiration(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        data = data.copy()
-        data["source"] = source
-        data = self._prepare_respiratory_samples(
-            data,
-            lf_constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
-            schema.RESPIRATORY_RATE_COL,
-        )
-        return schema.prepare_respiration_samples(data)
-
-    def load_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            data = self.load_garmin_connect_sleep_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            data = self.load_garmin_device_sleep_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        data = data.copy()
-        data["source"] = source
-        data = self._prepare_respiratory_samples(
-            data,
-            lf_constants.SPO2_SPO2_COL,
-            schema.SPO2_COL,
-        )
-        return schema.prepare_spo2_samples(data)
-
-    def load_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            data = self.load_garmin_connect_sleep_respiration(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            data = self.load_garmin_device_sleep_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,

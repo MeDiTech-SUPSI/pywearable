@@ -23,7 +23,6 @@ MOCK_FILES_DICT = {
     lf_constants.METRIC_BBI: BASE_PATH / "bbi.csv",
     lf_constants.METRIC_DAILY_SUMMARY: BASE_PATH / "daily_summary.csv",
     lf_constants.METRIC_HEART_RATE: BASE_PATH / "heart_rate.csv",
-    lf_constants.METRIC_SLEEP_RESPIRATION: BASE_PATH / "sleep_respiration.csv",
     lf_constants.METRIC_SLEEP_STAGE: BASE_PATH / "sleep_stage.csv",
     lf_constants.METRIC_SLEEP_SUMMARY: BASE_PATH / "sleep_summary.csv",
 }
@@ -38,17 +37,6 @@ def load_sleep_stage() -> pd.DataFrame:
         lf_constants.ISODATE_COL
     ].dt.tz_localize(None)
     return sleep_stage
-
-
-def load_sleep_respiration() -> pd.DataFrame:
-    sleep_respiration = pd.read_csv(
-        MOCK_FILES_DICT[lf_constants.METRIC_SLEEP_RESPIRATION],
-        parse_dates=[lf_constants.ISODATE_COL],
-    )
-    sleep_respiration[lf_constants.ISODATE_COL] = sleep_respiration[
-        lf_constants.ISODATE_COL
-    ].dt.tz_localize(None)
-    return sleep_respiration
 
 
 def load_heart_rate() -> pd.DataFrame:

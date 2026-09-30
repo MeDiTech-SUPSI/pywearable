@@ -54,7 +54,7 @@ in the owning function's docstring.
 | `hrv.compute_rmssd`, `compute_sdnn`, `compute_pnn20`, `compute_pnn50`, `compute_hrv_statistics` | Public | Scalar computations from BBI values; `compute_hrv_statistics` returns a statistic mapping | Not applicable | Invalid BBI values and discontinuities follow the function contracts | `hrv` | Current docstrings; direct numerical tests |
 | `hrv.get_hrv_statistics` and HRV feature identifiers | Public | Canonical trajectory from raw BBI or provider HRV data | Shared contract | Raw coverage is represented BBI duration; provider coverage remains unknown when absent and is never invented | `hrv` | Current docstring; extensive direct tests |
 | `hrv.get_hrv_statistic`, resolution helpers, and named nightly helpers | Public | Permanent convenience entry points; DataFrame helpers return canonical trajectories and named nightly helpers return a `Series` | Forwarded unchanged | Forwarded unchanged | `hrv` | Current short docstrings; direct wrapper tests |
-| `respiration.get_respiration_statistics` and respiratory/SpO2 feature identifiers | Public | Canonical trajectory from samples or provider nightly summaries | Shared contract | Sample cadence coverage or provider-supplied coverage; unsupported summary features remain missing | `respiration` | Current docstring; extensive direct tests |
+| `respiration.get_respiration_statistics` and respiratory/SpO2 feature identifiers | Public | Canonical trajectory from ordinary sample streams or provider nightly summaries; sleep cycles are applied in the domain layer | Shared contract | Sample cadence coverage or provider-supplied coverage; unsupported summary features remain missing | `respiration` | Current docstring; extensive direct tests |
 | `respiration.get_respiration_statistic`, `get_five_minute_respiration_statistics`, `get_night_respiration_statistics`, `get_awake_respiration_statistics` | Public | Permanent convenience entry points returning the same trajectory as the canonical function | Forwarded unchanged | Forwarded unchanged | `respiration` | Current short docstrings; direct wrapper tests |
 | `sleep.get_sleep_statistics` and sleep feature identifiers | Public | Canonical nightly or calendar hierarchy trajectory from main-sleep summaries and stages | Half-open local calendar-date bounds | Nightly coverage is binary feature availability; parent coverage is valid expected nights | `sleep` | Core docstring and extensive direct tests |
 | `sleep.get_sleep_wake_trajectory`, `sleep.get_sleep_regularity` | Public | Sleep/wake trajectory indexed by `(user_id, local_time)`; regularity is indexed by `(user_id, calendar_date)` | Half-open local bounds; regularity reads the preceding day for comparison | Unknown stages and missing nights remain missing; SRI exposes comparison coverage | `sleep` | Current docstrings; direct tests |
@@ -129,8 +129,7 @@ declared by `BaseLoader`: `get_user_ids`, `resolve_user_ids`, `load_sleep_summar
 `load_heart_rate`, `load_bbi`, `load_hrv_samples`, `load_hrv_summary`,
 `load_activity_samples`, `load_activity_summary`, `load_respiration`,
 `load_respiration_summary`, `load_pulse_ox`, `load_spo2_summary`,
-`load_sleep_respiration`, `load_sleep_pulse_ox`, and
-`load_provider_feature`.
+and `load_provider_feature`.
 
 Provider-specific discovery, questionnaire, survey, demographic, raw-table,
 and conversion methods remain available on their loaders but are compatibility

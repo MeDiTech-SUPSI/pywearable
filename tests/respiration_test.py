@@ -32,13 +32,7 @@ class SampleRespirationLoader(pywearable.loader.BaseLoader):
     def load_respiration(self, user_id, start_date=None, end_date=None):
         return self.respiration.copy()
 
-    def load_sleep_respiration(self, user_id, start_date=None, end_date=None):
-        return self.respiration.copy()
-
     def load_pulse_ox(self, user_id, start_date=None, end_date=None):
-        return self.spo2.copy()
-
-    def load_sleep_pulse_ox(self, user_id, start_date=None, end_date=None):
         return self.spo2.copy()
 
     def load_sleep_sessions(self, user_id, start_date=None, end_date=None):
@@ -155,23 +149,18 @@ def test_raw_five_minute_to_day_uses_local_calendar():
     assert result.loc[("u1", pd.Timestamp("2024-01-02")), column] == 14
 
 
-def test_raw_five_minute_to_night_uses_local_sleep_samples(monkeypatch):
+def test_raw_five_minute_to_night_filters_ordinary_samples(monkeypatch):
     loader = SampleRespirationLoader()
-    local_times = pd.date_range("2024-01-01 23:55", periods=10, freq="1min")
+    local_times = pd.date_range("2024-01-01 23:50", periods=20, freq="1min")
     samples = pd.DataFrame(
         {
             "local_time": local_times,
             "utc_time": local_times - pd.Timedelta(hours=1),
             "timezone": pd.Timedelta(hours=1),
-            "respiratory_rate": [100] * 10,
+            "respiratory_rate": [100] * 5 + [10] * 5 + [20] * 5 + [100] * 5,
         }
     )
-    sleeping = samples.copy()
-    sleeping["respiratory_rate"] = [10] * 5 + [20] * 5
     monkeypatch.setattr(loader, "load_respiration", lambda **kwargs: samples.copy())
-    monkeypatch.setattr(
-        loader, "load_sleep_respiration", lambda **kwargs: sleeping.copy()
-    )
     monkeypatch.setattr(
         loader,
         "load_sleep_sessions",
@@ -442,9 +431,9 @@ def test_lifesnaps_respiration_without_matched_sleep_is_not_a_night(tmp_path):
     assert loader.load_respiration_summary("u1").empty
 
 
-def test_labfront_connect_pulse_ox_handles_missing_sleep_stream(monkeypatch):
+def test_labfront_connect_samples_do_not_load_sleep_streams(monkeypatch):
     loader = LabfrontLoader.__new__(LabfrontLoader)
-    daily = pd.DataFrame(
+    pulse_ox = pd.DataFrame(
         {
             "isoDate": pd.to_datetime(["2024-01-01 12:00"]),
             "unixTimestampInMs": [1_704_110_400_000],
@@ -452,15 +441,27 @@ def test_labfront_connect_pulse_ox_handles_missing_sleep_stream(monkeypatch):
             "spo2": [97],
         }
     )
+    respiration = pulse_ox.drop(columns="spo2").assign(breathsPerMinute=14)
+    requested_metrics = []
 
     def load_data(*args, metric, **kwargs):
+        requested_metrics.append(metric)
         if metric == labfront_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER:
-            return daily.copy()
-        return pd.DataFrame()
+            return pulse_ox.copy()
+        if metric == labfront_constants.GARMIN_CONNECT_RESPIRATION_FOLDER:
+            return respiration.copy()
+        raise AssertionError(f"unexpected stream: {metric}")
 
     monkeypatch.setattr(loader, "get_data_from_datetime", load_data)
-    result = loader.load_garmin_connect_pulse_ox("u1")
-    assert result["isSleeping"].eq(False).all()
+    pulse_result = loader.load_garmin_connect_pulse_ox("u1")
+    respiration_result = loader.load_garmin_connect_respiration("u1")
+
+    assert pulse_result["spo2"].tolist() == [97]
+    assert respiration_result["breathsPerMinute"].tolist() == [14]
+    assert requested_metrics == [
+        labfront_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
+        labfront_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
+    ]
 
 
 def test_labfront_loader_translates_provider_respiration_columns(monkeypatch):

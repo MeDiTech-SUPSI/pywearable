@@ -223,64 +223,6 @@ class BaseLoader(ABC):
         """
         return schema.empty_respiration_frame()
 
-    def load_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    ) -> pd.DataFrame:
-        """Load sleep pulse ox data.
-
-        This function loads sleep pulse ox data from
-        a given user and for a given time frame, from
-        ``start_date`` to ``end_date``.
-
-        Parameters
-        ----------
-        user_id : str
-            User id for which data have to be loaded.
-        start_date : datetime.datetime or datetime.date or str or None, optional
-            Start date for data retrieval, by default None
-        end_date : datetime.datetime or datetime.date or str or None, optional
-            End date for data retrieval, by default None
-
-        Returns
-        -------
-        :class:`pd.DataFrame`
-            DataFrame with sleep pulse ox data.
-
-        """
-        return schema.empty_spo2_frame()
-
-    def load_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    ) -> pd.DataFrame:
-        """Load sleep respiration data.
-
-        This function loads sleep respiration data from
-        a given user and for a given time frame, from
-        ``start_date`` to ``end_date``.
-
-        Parameters
-        ----------
-        user_id : str
-            User id for which data have to be loaded.
-        start_date : datetime.datetime or datetime.date or str or None, optional
-            Start date for data retrieval, by default None
-        end_date : datetime.datetime or datetime.date or str or None, optional
-            End date for data retrieval, by default None
-
-        Returns
-        -------
-        :class:`pd.DataFrame`
-            DataFrame with sleep respiration data.
-
-        """
-        return schema.empty_respiration_frame()
-
     def load_respiration_summary(
         self,
         user_id: str,

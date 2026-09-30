@@ -38,19 +38,7 @@ class TesseraeCSVLoader(BaseLoader):
             columns=["utc_time", "local_time", "timezone", "breaths_per_minute"]
         )
 
-    def load_sleep_respiration(
-        self, user_id=None, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        return pd.DataFrame(
-            columns=["utc_time", "local_time", "timezone", "breaths_per_minute"]
-        )
-
     def load_pulse_ox(
-        self, user_id=None, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        return pd.DataFrame(columns=["utc_time", "local_time", "timezone", "pulse_ox"])
-
-    def load_sleep_pulse_ox(
         self, user_id=None, start_date=None, end_date=None
     ) -> pd.DataFrame:
         return pd.DataFrame(columns=["utc_time", "local_time", "timezone", "pulse_ox"])
