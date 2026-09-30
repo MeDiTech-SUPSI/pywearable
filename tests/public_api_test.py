@@ -29,7 +29,6 @@ CURATED_MODULES = (
     "pywearable.sleep",
     "pywearable.trajectory",
     "pywearable.utils",
-    "pywearable.utils.legacy",
     "pywearable.visualization",
 )
 

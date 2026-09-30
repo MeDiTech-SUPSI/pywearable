@@ -1,2 +1,3 @@
-from .legacy import *
-from .legacy import __all__
+from . import time
+
+__all__ = ["time"]

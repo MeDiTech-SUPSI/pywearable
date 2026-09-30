@@ -7,6 +7,15 @@ import pandas as pd
 from .. import schema
 
 
+def resolve_user_ids(loader, user_id: Union[str, list, tuple, None] = "all") -> list:
+    """Return the requested participant IDs as a list."""
+    if user_id == "all" or user_id is None:
+        return list(loader.get_user_ids())
+    if isinstance(user_id, str):
+        return [user_id]
+    return list(user_id)
+
+
 class BaseLoader(ABC):
     """Abstract class for the implementation of loader classes."""
 
@@ -377,5 +386,11 @@ class BaseLoader(ABC):
         """
         pass
 
+    def resolve_user_ids(
+        self, user_id: Union[str, list, tuple, None] = "all"
+    ) -> list:
+        """Return the requested participant IDs as a list."""
+        return resolve_user_ids(self, user_id)
 
-__all__ = ["BaseLoader"]
+
+__all__ = ["BaseLoader", "resolve_user_ids"]

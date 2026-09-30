@@ -9,9 +9,8 @@ import numpy as np
 import pandas as pd
 
 from . import cycle, hierarchy, schema
-from .loader.base import BaseLoader
+from .loader.base import BaseLoader, resolve_user_ids
 from .utils import time as time_utils
-from .utils.legacy import get_user_ids
 
 
 RESPIRATORY_RATE_STATISTIC_MEAN = "respiratory_rate_mean"
@@ -503,7 +502,7 @@ def get_respiration_statistics(
         Below-threshold duration is in seconds.
     """
     statistics = _statistics_list(statistic)
-    users = get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
     if not 0 <= spo2_threshold <= 100:

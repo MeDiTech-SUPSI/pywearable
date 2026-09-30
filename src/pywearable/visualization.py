@@ -37,7 +37,7 @@ from . import (
     sleep,
     trajectory as trajectory_analysis,
 )
-from .utils import get_user_ids
+from .loader.base import resolve_user_ids
 from .utils import time as time_utils
 
 # Okabe-Ito colors, with neutral greys for missing and contextual layers.
@@ -2985,7 +2985,7 @@ def _adherence_study_periods(
     include_without_evidence,
 ):
     """Infer aligned participant periods and their shared follow-up length."""
-    users = get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     if not users:
         raise ValueError("no participants were requested")
     evidence = {

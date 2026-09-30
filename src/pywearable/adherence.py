@@ -25,8 +25,7 @@ import numpy as np
 import pandas as pd
 
 from . import cycle, hierarchy, schema
-from .loader.base import BaseLoader
-from .utils.legacy import get_user_ids
+from .loader.base import BaseLoader, resolve_user_ids
 
 
 ADHERENCE_HEART_RATE = "heart_rate"
@@ -993,7 +992,7 @@ def get_adherence(
     if start_date is None or end_date is None:
         raise ValueError("start_date and end_date are required for adherence")
     metrics = _metric_list(metric)
-    users = get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     chain, _ = hierarchy.normalize_resolution_chain(resolution)
     physiological_chain = _physiological_chain(chain)
     time_col = _resolve_time_col(loader, metrics, chain, time_reference)

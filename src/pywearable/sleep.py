@@ -10,8 +10,9 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from . import hierarchy, schema, utils
-from .loader.base import BaseLoader
+from . import hierarchy, schema
+from .loader.base import BaseLoader, resolve_user_ids
+from .utils import time as time_utils
 
 SLEEP_STATISTIC_TIB = "sleep_TIB"
 SLEEP_STATISTIC_TST = "sleep_TST"
@@ -63,6 +64,23 @@ SLEEP_TEMPORAL_STATISTICS = {
     SLEEP_STATISTIC_MIDPOINT,
 }
 SLEEP_NIGHTLY_RESOLUTIONS = {"night", "nightly", "natural"}
+
+
+def _require_dataframe(value, name):
+    """Return ``value`` after validating that it is a DataFrame."""
+    if not isinstance(value, pd.DataFrame):
+        raise ValueError(f"{name} must be a pandas DataFrame")
+    return value
+
+
+def _mean_clock_time(values) -> str:
+    """Return the circular mean of clock-like values as ``HH:MM``."""
+    seconds = [
+        time_utils.clock_seconds(value) for value in values if pd.notna(value)
+    ]
+    return time_utils.clock_time(
+        time_utils.circular_mean_seconds(seconds)
+    ).strftime("%H:%M")
 
 
 def get_time_in_bed(
@@ -1022,7 +1040,7 @@ def get_sleep_wake_trajectory(
     missing. Non-main sessions are included when the loader exposes them and
     ``include_naps`` is true.
     """
-    users = utils.get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     trajectories = [
         _get_user_sleep_wake_trajectory(
             loader,
@@ -1335,7 +1353,7 @@ def _compute_sleep_score(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     ValueError
         If `sleep_summary` is not a :class:`pandas.DataFrame` .
     """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
     if schema.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL in sleep_summary.columns:
         sleep_score = sleep_summary[schema.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL]
     else:
@@ -1364,7 +1382,7 @@ def _compute_time_in_bed(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     ValueError
         If `sleep_summary` is not a :class:`pd.DataFrame`.
     """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
     # TIB = SLEEP_DURATION + AWAKE_DURATION in minutes
     if (schema.DURATION_IN_MS_COL in sleep_summary.columns) and (
         schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL in sleep_summary.columns
@@ -1874,8 +1892,8 @@ def _compute_sleep_period_time(
         Series with sleep period time as values, and sleep summary ids as index.
     """
     # Check inputs
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
 
     if len(sleep_summary) == 0:
         return pd.Series()
@@ -1941,8 +1959,8 @@ def _compute_sleep_onset_latency(
     :class:`pd.Series`
         Series with sleep onset latency.
     """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
     if len(sleep_summary) == 0:
         return pd.Series()
     if len(sleep_stages) == 0:
@@ -1981,8 +1999,8 @@ def _compute_wake_after_sleep_onset(
     :class:`pd.Series`
         Series with wake after sleep onset data.
     """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
     if len(sleep_summary) == 0:
         return pd.Series()
     if len(sleep_stages) == 0:
@@ -2138,8 +2156,8 @@ def _compute_latencies(
         If `sleep_summary` or `sleep_stages` are not of type :class:`pd.DataFrame`
     """
     # Check input
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
     # Check lenght of input
     if len(sleep_summary) == 0:
         return pd.DataFrame(
@@ -2287,8 +2305,8 @@ def _compute_stage_count(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame, **kwargs
 ) -> pd.DataFrame:
     # Check is dataframe
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
     # Check that we have data
     if len(sleep_summary) == 0:
         return pd.DataFrame()
@@ -2400,8 +2418,8 @@ def _compute_sleep_boundaries(
     sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
 ) -> pd.DataFrame:
     """Derive observed sleep onset/offset while retaining session boundaries."""
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
-    sleep_stages = utils.check_is_df(sleep_stages, "sleep_stages")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
+    sleep_stages = _require_dataframe(sleep_stages, "sleep_stages")
     boundaries = pd.DataFrame(index=sleep_summary.index)
     for column in [
         "sleep_onset",
@@ -2547,7 +2565,7 @@ def _compute_bedtime(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     ValueError
         If `sleep_summary` is not a :class:`pandas.DataFrame` .
     """
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
     if schema.LOCAL_TIME_COL in sleep_summary.columns:
         bedtime = pd.to_datetime(sleep_summary[schema.LOCAL_TIME_COL])
     else:
@@ -2579,7 +2597,7 @@ def _compute_wakeup_time(
 
 def _compute_getup_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Series:
     """Return the provider sleep-session end as a proxy for get-up time."""
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
     getup = _compute_summary_end_time(sleep_summary, schema.LOCAL_TIME_COL)
     getup.name = SLEEP_STATISTIC_GETUP
     return getup
@@ -2644,7 +2662,7 @@ def _compute_cpd_midpoint(
         If `sleep_summary` is not a :class:`pandas.DataFrame` .
     """
     # Check is dataframe
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
 
     calendar_dates = _get_sleep_calendar_dates(sleep_summary)
     chronological_index = calendar_dates.sort_values(kind="stable").index
@@ -2659,9 +2677,9 @@ def _compute_cpd_midpoint(
     if (
         chronotype is None
     ):  # if chronotype isn't explicitely given, calculate the midpoint from the available data
-        chronotype_midpoint = utils.mean_time(midpoints)
+        chronotype_midpoint = _mean_clock_time(midpoints)
     else:  # from specified times
-        chronotype_midpoint = utils.mean_time(chronotype)
+        chronotype_midpoint = _mean_clock_time(chronotype)
 
     previous_midpoint = None
     previous_calendar_date = None
@@ -2740,7 +2758,7 @@ def _compute_cpd_duration(
         If `sleep_summary` is not a :class:`pandas.DataFrame` .
     """
     # Check is dataframe
-    sleep_summary = utils.check_is_df(sleep_summary, "sleep_summary")
+    sleep_summary = _require_dataframe(sleep_summary, "sleep_summary")
 
     calendar_dates = _get_sleep_calendar_dates(sleep_summary)
     chronological_index = calendar_dates.sort_values(kind="stable").index
@@ -3237,7 +3255,7 @@ def _nightly_sleep_statistics(
     """
 
     # Get user id from the loader
-    users = utils.get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     # Convert to datetime
     start_date = None if start_date is None else pd.Timestamp(start_date)
     end_date = None if end_date is None else pd.Timestamp(end_date)
@@ -3551,7 +3569,7 @@ def get_sleep_statistics(
         else:
             min_valid_children = [None, min_valid_children]
 
-    users = utils.get_user_ids(loader, user_id)
+    users = resolve_user_ids(loader, user_id)
     statistics = _sleep_statistics_list(statistic)
     return _hierarchical_sleep_statistics(
         loader,

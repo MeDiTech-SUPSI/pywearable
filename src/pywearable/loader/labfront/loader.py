@@ -14,8 +14,8 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import schema, sleep, utils
-from ..base import BaseLoader
+from ... import schema, sleep
+from ..base import BaseLoader, resolve_user_ids
 from ..garmin import (
     _normalize_garmin_sleep_columns,
     prepare_epoch_activity_samples,
@@ -1036,7 +1036,7 @@ class LabfrontLoader(BaseLoader):
         list
             alphabetically sorted names of the metrics for the participant(s).
         """
-        participant_ids = utils.get_user_ids(self, user_id)
+        participant_ids = resolve_user_ids(self, user_id)
         return sorted(
             self.file_index.loc[participant_ids, :]
             .index.get_level_values(lf_constants.FILE_INDEX_METRIC_KEY)
