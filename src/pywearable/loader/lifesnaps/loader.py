@@ -6,8 +6,8 @@ from typing import Union
 import numpy as np
 import pandas as pd
 
-from .. import schema
-from .base import BaseLoader
+from ... import schema
+from ..base import BaseLoader
 
 
 class LifeSnapsParquetLoader(BaseLoader):
