@@ -23,9 +23,10 @@ from typing import Union
 
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_datetime64_any_dtype
 
 from . import cycle, hierarchy, schema
-from .loader.base import BaseLoader, resolve_user_ids
+from .loader.base import BaseLoader
 
 
 ADHERENCE_HEART_RATE = "heart_rate"
@@ -41,6 +42,392 @@ _ADHERENCE_COLUMNS = {
     ADHERENCE_SLEEP: "sleep_adherence",
     ADHERENCE_BBI: "bbi_adherence",
 }
+
+
+def _naive_local_datetimes(values):
+    """Normalize clock-like values to naive local datetimes."""
+    parsed = pd.to_datetime(pd.Series(values), errors="coerce", format="mixed")
+    if isinstance(parsed.dtype, pd.DatetimeTZDtype):
+        return parsed.dt.tz_localize(None)
+    if is_datetime64_any_dtype(parsed.dtype):
+        return parsed
+    return parsed.map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+
+
+def _local_date_bounds(values):
+    """Return the first and last valid local calendar dates."""
+    parsed = _naive_local_datetimes(values).dropna()
+    if parsed.empty:
+        return None
+    return parsed.min().normalize(), parsed.max().normalize()
+
+
+class _CachedAdherenceLoader:
+    """Reuse unbounded stream loads across adherence resolutions."""
+
+    def __init__(self, loader):
+        self._loader = loader
+        self._heart_rate = {}
+        self._bbi = {}
+        self._sleep_summary = {}
+
+    def __getattr__(self, name):
+        return getattr(self._loader, name)
+
+    @staticmethod
+    def _slice(frame, column, start_date, end_date, *, normalize=False):
+        if frame is None or frame.empty or column not in frame:
+            return None if frame is None else frame.copy()
+        if start_date is None and end_date is None:
+            return frame
+        values = _naive_local_datetimes(frame[column])
+        if normalize:
+            values = pd.to_datetime(values, errors="coerce").dt.normalize()
+        selected = values.notna()
+        if start_date is not None:
+            selected &= values.ge(pd.Timestamp(start_date))
+        if end_date is not None:
+            selected &= values.lt(pd.Timestamp(end_date))
+        return frame.loc[selected].copy().reset_index(drop=True)
+
+    def load_heart_rate(
+        self,
+        user_id,
+        start_date=None,
+        end_date=None,
+        time_col=schema.LOCAL_TIME_COL,
+        **kwargs,
+    ):
+        key = (user_id, time_col)
+        if key not in self._heart_rate:
+            self._heart_rate[key] = self._loader.load_heart_rate(
+                user_id,
+                start_date=None,
+                end_date=None,
+                time_col=time_col,
+                **kwargs,
+            )
+        return self._slice(
+            self._heart_rate[key], time_col, start_date, end_date
+        )
+
+    def load_bbi(self, user_id, start_date=None, end_date=None, **kwargs):
+        if user_id not in self._bbi:
+            self._bbi[user_id] = self._loader.load_bbi(
+                user_id,
+                None,
+                None,
+                **kwargs,
+            )
+        return self._slice(
+            self._bbi[user_id],
+            schema.LOCAL_TIME_COL,
+            start_date,
+            end_date,
+        )
+
+    def load_sleep_summary(
+        self,
+        user_id,
+        start_date=None,
+        end_date=None,
+        drop_duplicates=True,
+        **kwargs,
+    ):
+        key = (user_id, bool(drop_duplicates))
+        if key not in self._sleep_summary:
+            self._sleep_summary[key] = self._loader.load_sleep_summary(
+                user_id=user_id,
+                start_date=None,
+                end_date=None,
+                drop_duplicates=drop_duplicates,
+                **kwargs,
+            )
+        return self._slice(
+            self._sleep_summary[key],
+            schema.CALENDAR_DATE_COL,
+            start_date,
+            end_date,
+            normalize=True,
+        )
+
+
+def _adherence_evidence_bounds(loader, user, metric):
+    """Return first and last dates with primary-stream or usable-night evidence."""
+    evidence = []
+    if metric == ADHERENCE_HEART_RATE:
+        try:
+            frame = loader.load_heart_rate(
+                user,
+                start_date=None,
+                end_date=None,
+                time_col=schema.LOCAL_TIME_COL,
+            )
+        except NotImplementedError:
+            frame = None
+        if frame is not None:
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("heart-rate data must be a pandas DataFrame")
+            if not frame.empty:
+                missing = {schema.LOCAL_TIME_COL, schema.HEART_RATE_COL}.difference(
+                    frame.columns
+                )
+                if missing:
+                    raise ValueError(
+                        "heart-rate data is missing required columns: "
+                        + ", ".join(sorted(missing))
+                    )
+                valid = pd.to_numeric(
+                    frame[schema.HEART_RATE_COL], errors="coerce"
+                ).gt(0)
+                bounds = _local_date_bounds(
+                    frame.loc[valid, schema.LOCAL_TIME_COL]
+                )
+                if bounds is not None:
+                    evidence.append(bounds)
+    elif getattr(loader, "hrv_source", "bbi") == "bbi":
+        try:
+            frame = loader.load_bbi(user, None, None)
+        except NotImplementedError:
+            frame = None
+        if frame is not None:
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("BBI data must be a pandas DataFrame")
+            frame = schema.prepare_bbi(frame)
+            if schema.LOCAL_TIME_COL in frame:
+                bounds = _local_date_bounds(frame[schema.LOCAL_TIME_COL])
+                if bounds is not None:
+                    evidence.append(bounds)
+
+    try:
+        summaries = loader.load_sleep_summary(
+            user_id=user,
+            start_date=None,
+            end_date=None,
+            drop_duplicates=False,
+        )
+    except NotImplementedError:
+        summaries = None
+    if summaries is not None:
+        if not isinstance(summaries, pd.DataFrame):
+            raise ValueError("sleep summary data must be a pandas DataFrame")
+        summaries = summaries.copy()
+        if not summaries.empty:
+            if schema.CALENDAR_DATE_COL not in summaries:
+                raise ValueError("sleep summary data is missing calendar_date")
+            if "validation" in summaries:
+                validation = summaries["validation"].astype("string").str.upper()
+                summaries = summaries[
+                    ~validation.isin({"MANUAL", "AUTO_MANUAL"})
+                ]
+            bounds = _local_date_bounds(summaries[schema.CALENDAR_DATE_COL])
+            if bounds is not None:
+                evidence.append(bounds)
+    if not evidence:
+        return None
+    return min(value[0] for value in evidence), max(value[1] for value in evidence)
+
+
+def _adherence_study_periods(
+    loader,
+    user_id,
+    metric,
+    follow_up_days,
+    include_without_evidence,
+):
+    """Infer aligned participant periods and their shared follow-up length."""
+    users = loader.resolve_user_ids(user_id)
+    if not users:
+        raise ValueError("no participants were requested")
+    evidence = {
+        user: _adherence_evidence_bounds(loader, user, metric) for user in users
+    }
+    observed = {user: bounds for user, bounds in evidence.items() if bounds is not None}
+    if not observed:
+        raise ValueError("no requested participant has adherence evidence")
+    if follow_up_days is None:
+        follow_up_days = max(
+            int((bounds[1] - bounds[0]).days) + 1
+            for bounds in observed.values()
+        )
+    elif (
+        not isinstance(follow_up_days, (int, np.integer))
+        or isinstance(follow_up_days, (bool, np.bool_))
+        or follow_up_days <= 0
+    ):
+        raise ValueError("follow_up_days must be a positive integer or None")
+    follow_up_days = int(follow_up_days)
+    fallback_start = min(bounds[0] for bounds in observed.values())
+    periods = {}
+    for user in users:
+        if evidence[user] is not None:
+            participant_start = evidence[user][0]
+        elif include_without_evidence:
+            participant_start = fallback_start
+        else:
+            continue
+        periods[user] = (
+            participant_start,
+            participant_start + pd.Timedelta(days=follow_up_days),
+        )
+    return periods, follow_up_days
+
+
+def _hourly_adherence(loader, users, start, end, metric):
+    """Calculate vectorized local hourly adherence for monitoring views."""
+    hours = pd.date_range(start, end, freq="1h", inclusive="left")
+    column = _ADHERENCE_COLUMNS[metric]
+    values = np.full((len(users), len(hours)), np.nan)
+    for user_position, user in enumerate(users):
+        if metric == ADHERENCE_HEART_RATE:
+            try:
+                frame = loader.load_heart_rate(
+                    user,
+                    start_date=start,
+                    end_date=end,
+                    time_col=schema.LOCAL_TIME_COL,
+                )
+            except NotImplementedError:
+                continue
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("heart-rate data must be a pandas DataFrame")
+            supported = not frame.empty or {
+                schema.LOCAL_TIME_COL,
+                schema.HEART_RATE_COL,
+            }.issubset(frame.columns)
+            if not supported:
+                continue
+            values[user_position] = 0.0
+            if frame.empty:
+                continue
+            missing = {schema.LOCAL_TIME_COL, schema.HEART_RATE_COL}.difference(
+                frame.columns
+            )
+            if missing:
+                raise ValueError(
+                    "heart-rate data is missing required columns: "
+                    + ", ".join(sorted(missing))
+                )
+            timestamps = _naive_local_datetimes(frame[schema.LOCAL_TIME_COL])
+            heart_values = pd.to_numeric(frame[schema.HEART_RATE_COL], errors="coerce")
+            valid = timestamps.notna() & np.isfinite(heart_values) & heart_values.gt(0)
+            minute_starts = timestamps.loc[valid].dt.floor("min").drop_duplicates()
+            grouped = minute_starts.dt.floor("h").value_counts().sort_index() / 60
+        else:
+            if getattr(loader, "hrv_source", "bbi") != "bbi":
+                continue
+            try:
+                frame = loader.load_bbi(user, start, end)
+            except NotImplementedError:
+                continue
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("BBI data must be a pandas DataFrame")
+            supported = not frame.empty or {
+                schema.LOCAL_TIME_COL,
+                schema.BBI_COL,
+            }.issubset(frame.columns)
+            if not supported:
+                continue
+            values[user_position] = 0.0
+            if frame.empty:
+                continue
+            frame = schema.prepare_bbi(frame)
+            if schema.LOCAL_TIME_COL not in frame:
+                raise ValueError("BBI data does not provide local_time")
+            measurements = pd.DataFrame(
+                {
+                    "time": _naive_local_datetimes(frame[schema.LOCAL_TIME_COL]),
+                    "bbi": pd.to_numeric(frame[schema.BBI_COL], errors="coerce"),
+                }
+            )
+            measurements = measurements[
+                measurements["time"].notna()
+                & np.isfinite(measurements["bbi"])
+                & measurements["bbi"].gt(0)
+            ].drop_duplicates("time", keep="last")
+            grouped = (
+                measurements.groupby(measurements["time"].dt.floor("h"))["bbi"].sum()
+                / 3_600_000
+            ).clip(upper=1)
+        positions = hours.get_indexer(pd.DatetimeIndex(grouped.index))
+        present = positions >= 0
+        values[user_position, positions[present]] = grouped.to_numpy()[present]
+    index = pd.MultiIndex.from_product(
+        [users, hours], names=[schema.USER_COL, schema.LOCAL_TIME_COL]
+    )
+    return pd.DataFrame({column: values.reshape(-1)}, index=index)
+
+
+def _daily_sleep_adherence(loader, users, start, end):
+    """Calculate vectorized usable-night availability over local dates."""
+    dates = pd.date_range(start, end, freq="1D", inclusive="left")
+    column = _ADHERENCE_COLUMNS[ADHERENCE_SLEEP]
+    values = np.full((len(users), len(dates)), np.nan)
+    for user_position, user in enumerate(users):
+        try:
+            frame = loader.load_sleep_summary(
+                user_id=user,
+                start_date=start,
+                end_date=end,
+                drop_duplicates=False,
+            )
+        except NotImplementedError:
+            continue
+        if frame is None:
+            continue
+        if not isinstance(frame, pd.DataFrame):
+            raise ValueError("sleep summary data must be a pandas DataFrame")
+        values[user_position] = 0.0
+        if frame.empty:
+            continue
+        frame = frame.copy()
+        if schema.CALENDAR_DATE_COL not in frame:
+            raise ValueError("sleep summary data is missing calendar_date")
+        if "validation" in frame:
+            validation = frame["validation"].astype("string").str.upper()
+            frame = frame[~validation.isin({"MANUAL", "AUTO_MANUAL"})]
+        observed = _naive_local_datetimes(
+            frame[schema.CALENDAR_DATE_COL]
+        ).dt.normalize()
+        positions = dates.get_indexer(pd.DatetimeIndex(observed.dropna().unique()))
+        positions = positions[positions >= 0]
+        values[user_position, positions] = 1.0
+    index = pd.MultiIndex.from_product(
+        [users, dates], names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
+    )
+    return pd.DataFrame({column: values.reshape(-1)}, index=index)
+
+
+def _prepare_adherence_summary_data(
+    loader,
+    user_id,
+    metric,
+    follow_up_days,
+    include_without_evidence,
+):
+    """Load aligned hourly adherence and nightly availability once per stream."""
+    cached_loader = _CachedAdherenceLoader(loader)
+    periods, follow_up_days = _adherence_study_periods(
+        cached_loader,
+        user_id,
+        metric,
+        follow_up_days,
+        include_without_evidence,
+    )
+    users = pd.Index(periods)
+    start = min(value[0] for value in periods.values())
+    end = max(value[1] for value in periods.values())
+    hourly = _hourly_adherence(cached_loader, users, start, end, metric)[
+        [_ADHERENCE_COLUMNS[metric]]
+    ]
+    nights = _daily_sleep_adherence(cached_loader, users, start, end)[
+        [_ADHERENCE_COLUMNS[ADHERENCE_SLEEP]]
+    ]
+    return periods, follow_up_days, hourly, nights
 
 
 def _metric_list(metric) -> list[str]:
@@ -992,7 +1379,7 @@ def get_adherence(
     if start_date is None or end_date is None:
         raise ValueError("start_date and end_date are required for adherence")
     metrics = _metric_list(metric)
-    users = resolve_user_ids(loader, user_id)
+    users = loader.resolve_user_ids(user_id)
     chain, _ = hierarchy.normalize_resolution_chain(resolution)
     physiological_chain = _physiological_chain(chain)
     time_col = _resolve_time_col(loader, metrics, chain, time_reference)

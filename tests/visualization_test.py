@@ -12,6 +12,14 @@ import pytest
 from pywearable import adherence, schema, trajectory, visualization
 
 
+def _resolve_users(available, requested="all"):
+    if requested == "all" or requested is None:
+        return list(available)
+    if isinstance(requested, str):
+        return [requested]
+    return list(requested)
+
+
 def _trajectory(values, *, feature="feature", frequency="D"):
     times = pd.date_range("2024-01-01", periods=len(values), freq=frequency)
     index = pd.MultiIndex.from_arrays(
@@ -157,6 +165,9 @@ def _sleep_loader():
         activity_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
         heart_rate_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
         get_user_ids=lambda: ["person-1"],
+        resolve_user_ids=lambda requested="all": _resolve_users(
+            ["person-1"], requested
+        ),
         call_counts=call_counts,
         load_sleep_summary=load_sleep_summary,
         load_sleep_stage=load_sleep_stage,
@@ -543,6 +554,9 @@ def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch)
 
     loader = SimpleNamespace(
         get_user_ids=lambda: ["person-1", "person-2", "outside-study"],
+        resolve_user_ids=lambda requested="all": _resolve_users(
+            ["person-1", "person-2", "outside-study"], requested
+        ),
         load_heart_rate=load_heart_rate,
         load_sleep_summary=load_sleep_summary,
     )
@@ -588,7 +602,7 @@ def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch)
         return pd.DataFrame({f"{metric}_adherence": values}, index=index)
 
     monkeypatch.setattr(
-        visualization,
+        adherence,
         "_hourly_adherence",
         lambda loader, users, start, end, metric: fake_adherence(
             loader,
@@ -601,7 +615,7 @@ def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch)
         ),
     )
     monkeypatch.setattr(
-        visualization,
+        adherence,
         "_daily_sleep_adherence",
         lambda loader, users, start, end: fake_adherence(
             loader,
@@ -654,82 +668,6 @@ def test_adherence_summary_reuses_each_raw_stream_load():
 
     assert loader.call_counts["heart_rate"] == 1
     assert loader.call_counts["sleep_summary"] == 1
-
-
-def test_vectorized_plot_adherence_matches_canonical_adherence():
-    loader = _sleep_loader()
-    cached = visualization._AdherencePlotLoader(loader)
-    users = pd.Index(["person-1"])
-    start = pd.Timestamp("2024-01-01")
-    end = pd.Timestamp("2024-01-08")
-
-    hourly = visualization._hourly_adherence(
-        cached,
-        users,
-        start,
-        end,
-        adherence.ADHERENCE_HEART_RATE,
-    )
-    expected_hourly = adherence.get_adherence(
-        loader,
-        metric=adherence.ADHERENCE_HEART_RATE,
-        user_id=list(users),
-        start_date=start,
-        end_date=end,
-        resolution="1h",
-        time_reference="local",
-    )
-    pd.testing.assert_frame_equal(hourly, expected_hourly)
-
-    nights = visualization._daily_sleep_adherence(
-        cached,
-        users,
-        start,
-        end,
-    )
-    expected_nights = adherence.get_adherence(
-        loader,
-        metric=adherence.ADHERENCE_SLEEP,
-        user_id=list(users),
-        start_date=start,
-        end_date=end,
-        resolution="daily",
-        time_reference="local",
-    )
-    pd.testing.assert_frame_equal(nights, expected_nights)
-
-    bbi_times = pd.date_range(start, periods=3_600, freq="1s")
-    bbi = pd.DataFrame(
-        {
-            schema.UTC_TIME_COL: bbi_times,
-            schema.LOCAL_TIME_COL: bbi_times,
-            schema.TIMEZONE_COL: pd.Timedelta(0),
-            schema.BBI_COL: 1_000.0,
-        }
-    )
-    bbi_loader = SimpleNamespace(
-        hrv_source="bbi",
-        hrv_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
-        get_user_ids=lambda: ["person-1"],
-        load_bbi=lambda user_id, start_date=None, end_date=None: bbi.copy(),
-    )
-    bbi_hourly = visualization._hourly_adherence(
-        visualization._AdherencePlotLoader(bbi_loader),
-        users,
-        start,
-        start + pd.Timedelta(hours=2),
-        adherence.ADHERENCE_BBI,
-    )
-    expected_bbi = adherence.get_adherence(
-        bbi_loader,
-        metric=adherence.ADHERENCE_BBI,
-        user_id=list(users),
-        start_date=start,
-        end_date=start + pd.Timedelta(hours=2),
-        resolution="1h",
-        time_reference="local",
-    )
-    pd.testing.assert_frame_equal(bbi_hourly, expected_bbi)
 
 
 def test_empty_trajectory_reports_a_clear_error():

@@ -5,9 +5,10 @@ import pandas as pd
 import pytest
 
 from pywearable import adherence
+from tests.helpers import LoaderBase
 
 
-class AdherenceLoader:
+class AdherenceLoader(LoaderBase):
     heart_rate_time_columns = ("utc_time", "local_time")
     hrv_source = "bbi"
     hrv_time_columns = ("utc_time", "local_time")
@@ -99,6 +100,66 @@ def _sleep_summary(dates, validations=None):
     if validations is not None:
         frame["validation"] = validations
     return frame
+
+
+def test_vectorized_summary_adherence_matches_canonical_adherence():
+    start = pd.Timestamp("2024-01-01")
+    end = pd.Timestamp("2024-01-08")
+    users = pd.Index(["user"])
+    loader = AdherenceLoader(
+        heart_rate=_heart_rate(pd.date_range(start, periods=180, freq="1min")),
+        sleep_summary=_sleep_summary(pd.date_range(start, periods=4, freq="1D")),
+    )
+    cached = adherence._CachedAdherenceLoader(loader)
+
+    hourly = adherence._hourly_adherence(
+        cached,
+        users,
+        start,
+        end,
+        adherence.ADHERENCE_HEART_RATE,
+    )
+    expected_hourly = adherence.get_adherence(
+        loader,
+        metric=adherence.ADHERENCE_HEART_RATE,
+        user_id=list(users),
+        start_date=start,
+        end_date=end,
+        resolution="1h",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(hourly, expected_hourly)
+
+    nights = adherence._daily_sleep_adherence(cached, users, start, end)
+    expected_nights = adherence.get_adherence(
+        loader,
+        metric=adherence.ADHERENCE_SLEEP,
+        user_id=list(users),
+        start_date=start,
+        end_date=end,
+        resolution="daily",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(nights, expected_nights)
+
+    bbi_loader = AdherenceLoader(bbi=_bbi(start, 3_600))
+    bbi_hourly = adherence._hourly_adherence(
+        adherence._CachedAdherenceLoader(bbi_loader),
+        users,
+        start,
+        start + pd.Timedelta(hours=2),
+        adherence.ADHERENCE_BBI,
+    )
+    expected_bbi = adherence.get_adherence(
+        bbi_loader,
+        metric=adherence.ADHERENCE_BBI,
+        user_id=list(users),
+        start_date=start,
+        end_date=start + pd.Timedelta(hours=2),
+        resolution="1h",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(bbi_hourly, expected_bbi)
 
 
 def _scanned_heart_rate_adherence(frame, segments, time_col):
