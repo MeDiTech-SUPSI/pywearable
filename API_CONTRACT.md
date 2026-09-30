@@ -62,8 +62,8 @@ in the owning function's docstring.
 | `provider_features.get_available_provider_features`, `get_provider_features`, and provider feature identifiers | Public | Available names as `list[str]`; extraction as canonical trajectory; requested features must share a native grain | Shared contract | Coverage is sample/day/child availability; vendor metrics are not equated across providers | `provider_features` | Current docstrings; direct tests across providers |
 | `trajectory.impute_trajectory`, `compute_trajectory_trend`, `aggregate_trajectory_by_weekday` | Public | Copy of a canonical trajectory, or weekday trajectory indexed by `(user_id, weekday)`; requires matching coverage columns | Operates on input rows | Coverage is never overwritten; imputation is flagged separately and excluded from trend inputs by default | `trajectory` | Current docstrings; extensive direct tests |
 | All names in `visualization.__all__` | Public | Matplotlib `Axes`, axis mappings, or arrays; generic functions require canonical trajectories and composite functions require a loader | Loader-aware plots document their own half-open bounds | Missing, zero, observed, and imputed values remain visually distinct | `visualization` | Current docstrings; direct behavioral tests |
-| Canonical schema constants and `schema.prepare_*` functions | Extension | Canonical loader-facing `DataFrame` schemas; required columns depend on stream | Preparers normalize rows but do not define an analysis interval | Invalid provider values become missing or rows are rejected as documented | `schema` | Function docstrings and direct schema/loader tests; no curated `__all__` yet |
-| `loader.BaseLoader` portable methods and capability attributes | Extension | Canonical stream DataFrames; see schema contract; `resolve_user_ids` normalizes participant selection | Loader methods target half-open bounds on the selected clock | Empty supported streams return typed empty frames; unavailable capabilities are advertised by attributes | `loader.base` | Contract is partly documented and tested; several abstract/legacy methods need docstrings |
+| Canonical schema constants and `schema.prepare_*` functions | Extension | Canonical loader-facing `DataFrame` schemas; required columns depend on stream | Preparers normalize rows but do not define an analysis interval | Invalid provider values become missing or rows are rejected as documented | `schema` | Curated exports, function docstrings, and direct schema/loader tests |
+| `loader.BaseLoader` portable methods and capability attributes | Extension | Canonical stream DataFrames; see schema contract; `resolve_user_ids` normalizes participant selection | Loader methods target half-open bounds on the selected clock | Empty supported streams return typed empty frames; unavailable capabilities are advertised by attributes | `loader.base` | Contract and resolver are directly tested; a custom-loader guide remains release documentation work |
 | `loader.LabfrontLoader`, `LifeSnapsParquetLoader`, `OuraLoader`, `TesseraeCSVLoader`, `TesseraeParquetLoader` | Public | Implement the portable `BaseLoader` contract; provider-only methods are compatibility conveniences | Target shared loader bounds | Translate provider missingness and conflicts into canonical schemas | Provider loader modules | Direct loader tests; class/method documentation is uneven |
 | `loader.garmin.prepare_epoch_activity_samples` | Extension | Canonical activity-sample `DataFrame` from Garmin epochs | Uses input rows | Collapses categories without double-counting duration; conflicts become missing | `loader.garmin` | Short docstring; direct activity tests |
 | `hierarchy.*`, `utils.time.*`, and underscored names | Internal | Implementation-specific | Internal | Internal | Respective modules | Unit-tested where useful; not user-facing documentation targets |
@@ -169,8 +169,9 @@ authors receive the behavior without depending on the lower-level helper.
   `pywearable.loader.sphyncs`, while the unimplemented MongoDB placeholder is
   no longer advertised. Their historical package-level imports still resolve,
   but neither name belongs to `pywearable.loader.__all__`.
-- `pywearable.utils` now restricts wildcard exports to the named legacy
-  compatibility helpers instead of also exposing imported dependencies.
+- LifeSnaps follows the same provider-package layout as the other maintained
+  loaders while preserving `pywearable.loader.lifesnaps.LifeSnapsParquetLoader`.
+- `pywearable.utils` exposes only the canonical `time` utility module.
 - The root `pywearable` package is intentionally not a flat namespace. The
   supported style is module-qualified, such as
   `from pywearable import sleep` followed by `sleep.get_sleep_statistics(...)`.
@@ -181,9 +182,8 @@ authors receive the behavior without depending on the lower-level helper.
 2. Adjust the candidate export lists if that review changes a classification.
 3. Fill the identified public docstring gaps and add focused tests where the
    matrix currently says coverage is only indirect.
-4. Use the frozen inventory as the input to the later ownership, constants,
-   structure, and documentation passes. File moves must preserve public import
-   paths with compatibility re-exports where necessary.
+4. Use the frozen inventory to complete the public docstring and documentation
+   passes without widening the first-release API accidentally.
 
 Before release, the loader documentation must include a small guide showing
 how to implement a project- or cohort-specific `BaseLoader`, declare stream
