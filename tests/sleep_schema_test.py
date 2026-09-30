@@ -1,9 +1,18 @@
-from types import SimpleNamespace
-
 import pandas as pd
 import pytest
 
 from pywearable import hierarchy, sleep, schema
+from tests.helpers import LoaderBase
+
+
+class _SleepLoader(LoaderBase):
+    def __init__(self, user_ids, **methods):
+        self._user_ids = user_ids
+        for name, method in methods.items():
+            setattr(self, name, method)
+
+    def get_user_ids(self):
+        return list(self._user_ids)
 
 
 def test_sleep_feature_names_are_family_prefixed():
@@ -43,8 +52,8 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
         }
     )
     stages = pd.DataFrame(columns=["sleep_summary_id", "local_time", "duration_in_ms", "type"])
-    loader = SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    loader = _SleepLoader(
+        ["person-1"],
         load_sleep_summary=lambda **kwargs: summaries.copy(),
         load_sleep_stage=lambda **kwargs: stages.copy(),
     )
@@ -120,8 +129,8 @@ def test_sleep_trajectory_is_sorted_and_accepts_omitted_bounds():
             "unmeasurable_sleep_duration_in_ms": [0, 0],
         }
     )
-    loader = SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    loader = _SleepLoader(
+        ["person-1"],
         load_sleep_summary=lambda **kwargs: summaries.copy(),
         load_sleep_stage=lambda **kwargs: pd.DataFrame(),
     )
@@ -152,8 +161,8 @@ def test_sleep_trajectory_rejects_more_than_one_summary_per_night():
             "unmeasurable_sleep_duration_in_ms": [0, 0],
         }
     )
-    loader = SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    loader = _SleepLoader(
+        ["person-1"],
         load_sleep_summary=lambda **kwargs: summaries.copy(),
         load_sleep_stage=lambda **kwargs: pd.DataFrame(),
     )

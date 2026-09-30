@@ -4,9 +4,10 @@ import pytest
 
 from pywearable import activity, cycle, schema
 from pywearable.loader.garmin import prepare_epoch_activity_samples
+from tests.helpers import LoaderBase
 
 
-class SampleActivityLoader:
+class SampleActivityLoader(LoaderBase):
     activity_source = "samples"
     activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
     activity_primary_resolution = "1min"
@@ -31,7 +32,7 @@ class SampleActivityLoader:
         return self.heart_rate.copy()
 
 
-class DailyActivityLoader:
+class DailyActivityLoader(LoaderBase):
     activity_source = "daily_summary"
     activity_time_columns = (schema.LOCAL_TIME_COL,)
     activity_primary_resolution = "daily"

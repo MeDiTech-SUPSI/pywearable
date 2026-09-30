@@ -2,9 +2,10 @@ import pandas as pd
 import pytest
 
 from pywearable import heart_rate
+from tests.helpers import LoaderBase
 
 
-class HeartRateCycleLoader:
+class HeartRateCycleLoader(LoaderBase):
     heart_rate_time_columns = ("utc_time", "local_time")
 
     def __init__(self):
@@ -68,7 +69,7 @@ class HeartRateCycleLoader:
         return result
 
 
-class MultiUserCycleLoader:
+class MultiUserCycleLoader(LoaderBase):
     heart_rate_time_columns = ("utc_time", "local_time")
 
     def __init__(self):

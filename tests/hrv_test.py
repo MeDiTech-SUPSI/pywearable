@@ -6,9 +6,10 @@ import pandas as pd
 import pytest
 
 from pywearable import hrv, schema
+from tests.helpers import LoaderBase
 
 
-class RawBBILoader:
+class RawBBILoader(LoaderBase):
     hrv_source = "bbi"
     hrv_time_columns = ("utc_time", "local_time")
 

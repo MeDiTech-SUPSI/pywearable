@@ -1,12 +1,22 @@
 import datetime
 import inspect
-from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from pywearable import sleep
+from tests.helpers import LoaderBase
+
+
+class _SleepLoader(LoaderBase):
+    def __init__(self, user_ids, **methods):
+        self._user_ids = user_ids
+        for name, method in methods.items():
+            setattr(self, name, method)
+
+    def get_user_ids(self):
+        return list(self._user_ids)
 
 
 def _sleep_loader(empty=False):
@@ -45,8 +55,8 @@ def _sleep_loader(empty=False):
             ]
         return result.reset_index(drop=True)
 
-    return SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    return _SleepLoader(
+        ["person-1"],
         load_sleep_summary=load_sleep_summary,
         load_sleep_stage=lambda **kwargs: pd.DataFrame(
             columns=["sleep_summary_id", "local_time", "duration_in_ms", "type"]
@@ -276,8 +286,8 @@ def test_unbounded_sleep_hierarchy_skips_users_without_observed_nights():
             return source.load_sleep_summary(user_id, **kwargs).iloc[0:0]
         return source.load_sleep_summary(user_id, **kwargs)
 
-    loader = SimpleNamespace(
-        get_user_ids=lambda: ["person-1", "person-2"],
+    loader = _SleepLoader(
+        ["person-1", "person-2"],
         load_sleep_summary=load_sleep_summary,
         load_sleep_stage=source.load_sleep_stage,
     )

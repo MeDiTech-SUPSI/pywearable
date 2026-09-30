@@ -1,9 +1,10 @@
 import pandas as pd
 
 from pywearable import cycle
+from tests.helpers import LoaderBase
 
 
-class SessionLoader:
+class SessionLoader(LoaderBase):
     def __init__(self, sessions):
         self.sessions = sessions
         self.calls = 0

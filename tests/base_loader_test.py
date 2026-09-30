@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from pywearable.loader.base import BaseLoader, resolve_user_ids
+from pywearable.loader.base import BaseLoader
 
 
 class MinimalLoader(BaseLoader):
@@ -30,5 +30,4 @@ class MinimalLoader(BaseLoader):
 def test_resolve_user_ids(requested, expected):
     loader = MinimalLoader()
 
-    assert resolve_user_ids(loader, requested) == expected
     assert loader.resolve_user_ids(requested) == expected

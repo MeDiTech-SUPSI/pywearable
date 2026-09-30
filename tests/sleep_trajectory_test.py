@@ -1,9 +1,18 @@
-from types import SimpleNamespace
-
 import pandas as pd
 import pytest
 
 from pywearable import sleep
+from tests.helpers import LoaderBase
+
+
+class _SleepLoader(LoaderBase):
+    def __init__(self, user_ids, **methods):
+        self._user_ids = user_ids
+        for name, method in methods.items():
+            setattr(self, name, method)
+
+    def get_user_ids(self):
+        return list(self._user_ids)
 
 
 def _trajectory_loader(
@@ -92,8 +101,8 @@ def _trajectory_loader(
                 ],
                 ignore_index=True,
             )
-    return SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    return _SleepLoader(
+        ["person-1"],
         load_sleep_sessions=lambda *args, **kwargs: sessions.copy(),
         load_sleep_session_stages=lambda *args, **kwargs: stages.copy(),
     )
@@ -250,8 +259,8 @@ def test_missing_nights_leave_the_intervening_trajectory_unknown():
             "type": ["asleep", "asleep"],
         }
     )
-    loader = SimpleNamespace(
-        get_user_ids=lambda: ["person-1"],
+    loader = _SleepLoader(
+        ["person-1"],
         load_sleep_sessions=lambda *args, **kwargs: sessions.copy(),
         load_sleep_session_stages=lambda *args, **kwargs: stages.copy(),
     )

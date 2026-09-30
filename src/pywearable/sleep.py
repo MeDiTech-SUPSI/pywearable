@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 
 from . import hierarchy, schema
-from .loader.base import BaseLoader, resolve_user_ids
+from .loader.base import BaseLoader
 from .utils import time as time_utils
 
 SLEEP_STATISTIC_TIB = "sleep_TIB"
@@ -1030,7 +1030,7 @@ def get_sleep_wake_trajectory(
     missing. Non-main sessions are included when the loader exposes them and
     ``include_naps`` is true.
     """
-    users = resolve_user_ids(loader, user_id)
+    users = loader.resolve_user_ids(user_id)
     trajectories = [
         _get_user_sleep_wake_trajectory(
             loader,
@@ -3245,7 +3245,7 @@ def _nightly_sleep_statistics(
     """
 
     # Get user id from the loader
-    users = resolve_user_ids(loader, user_id)
+    users = loader.resolve_user_ids(user_id)
     # Convert to datetime
     start_date = None if start_date is None else pd.Timestamp(start_date)
     end_date = None if end_date is None else pd.Timestamp(end_date)
@@ -3559,7 +3559,7 @@ def get_sleep_statistics(
         else:
             min_valid_children = [None, min_valid_children]
 
-    users = resolve_user_ids(loader, user_id)
+    users = loader.resolve_user_ids(user_id)
     statistics = _sleep_statistics_list(statistic)
     return _hierarchical_sleep_statistics(
         loader,

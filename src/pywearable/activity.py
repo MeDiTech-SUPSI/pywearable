@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from . import cycle, hierarchy, schema
-from .loader.base import BaseLoader, resolve_user_ids
+from .loader.base import BaseLoader
 
 ACTIVITY_STATISTIC_STEPS = schema.ACTIVITY_STEPS_COL
 ACTIVITY_STATISTIC_PEAK_60MIN_STEPS = "activity_peak_60min_steps"
@@ -638,7 +638,7 @@ def get_activity_statistics(
         raise ValueError("aggregation requires a resolution hierarchy")
     if not hierarchical and min_valid_children is not None:
         raise ValueError("min_valid_children requires a resolution hierarchy")
-    users = resolve_user_ids(loader, user_id)
+    users = loader.resolve_user_ids(user_id)
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
     aggregation_levels = hierarchy.normalize_aggregation_levels(

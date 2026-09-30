@@ -5,9 +5,10 @@ import pytest
 
 from pywearable import heart_rate
 from pywearable.utils import time as time_utils
+from tests.helpers import LoaderBase
 
 
-class HeartRateLoader:
+class HeartRateLoader(LoaderBase):
     def __init__(self, samples):
         self.samples = samples
         self.requested_time_cols = []
