@@ -1,5 +1,8 @@
 -r requirements.txt
-pymongo
+pyarrow
+freezegun
 pytest
+pytest-mock
 sphinx
 sphinx-rtd-theme
+nbsphinx
