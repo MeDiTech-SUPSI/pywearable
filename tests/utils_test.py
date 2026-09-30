@@ -21,6 +21,9 @@ def test_shared_circular_clock_helpers_handle_midnight_and_unwrapping():
     center = time_utils.circular_mean_seconds(seconds)
 
     assert time_utils.clock_time(center) == datetime.time(0, 0)
+    assert time_utils.circular_mean_time(["23:30", "00:30"]) == datetime.time(
+        0, 0
+    )
     assert time_utils.circular_std_minutes(seconds) == pytest.approx(
         30.043003, rel=1e-5
     )

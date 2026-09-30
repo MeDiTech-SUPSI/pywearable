@@ -60,6 +60,12 @@ def circular_mean_seconds(seconds) -> float:
     return float(angle / (2 * np.pi) * SECONDS_PER_DAY)
 
 
+def circular_mean_time(values):
+    """Return the circular mean of clock-like values as a clock time."""
+    seconds = [clock_seconds(value) for value in values]
+    return clock_time(circular_mean_seconds(seconds))
+
+
 def circular_std_minutes(seconds) -> float:
     """Return circular clock-time dispersion in minutes."""
     values = np.asarray(seconds, dtype=float)

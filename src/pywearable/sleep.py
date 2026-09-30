@@ -73,16 +73,6 @@ def _require_dataframe(value, name):
     return value
 
 
-def _mean_clock_time(values) -> str:
-    """Return the circular mean of clock-like values as ``HH:MM``."""
-    seconds = [
-        time_utils.clock_seconds(value) for value in values if pd.notna(value)
-    ]
-    return time_utils.clock_time(
-        time_utils.circular_mean_seconds(seconds)
-    ).strftime("%H:%M")
-
-
 def get_time_in_bed(
     loader: BaseLoader,
     user_id: Union[str, list] = "all",
@@ -2677,9 +2667,9 @@ def _compute_cpd_midpoint(
     if (
         chronotype is None
     ):  # if chronotype isn't explicitely given, calculate the midpoint from the available data
-        chronotype_midpoint = _mean_clock_time(midpoints)
+        chronotype_midpoint = time_utils.circular_mean_time(midpoints)
     else:  # from specified times
-        chronotype_midpoint = _mean_clock_time(chronotype)
+        chronotype_midpoint = time_utils.circular_mean_time(chronotype)
 
     previous_midpoint = None
     previous_calendar_date = None
@@ -2694,10 +2684,10 @@ def _compute_cpd_midpoint(
         calendar_date = calendar_dates.loc[summary_id]
         # mistiming component
         chronotype_daily_midpoint = pd.Timestamp(calendar_date).replace(
-            hour=int(chronotype_midpoint[:2]), minute=int(chronotype_midpoint[3:])
+            hour=chronotype_midpoint.hour, minute=chronotype_midpoint.minute
         )
         # if the expected midpoint is prior to midnight we need to adjust the day
-        if 14 < int(chronotype_midpoint[:2]) < 24:
+        if 14 < chronotype_midpoint.hour < 24:
             chronotype_daily_midpoint -= pd.Timedelta(days=1)
         mistiming_component = (chronotype_daily_midpoint - midpoint).total_seconds() / (
             60 * 60
