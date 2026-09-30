@@ -37,6 +37,7 @@ from . import (
     sleep,
     trajectory as trajectory_analysis,
 )
+from .utils import get_user_ids
 from .utils import time as time_utils
 
 # Okabe-Ito colors, with neutral greys for missing and contextual layers.
@@ -52,7 +53,7 @@ LIGHT_GREY = "#D9D9D9"
 PALETTE = (BLUE, ORANGE, GREEN, PURPLE, LIGHT_BLUE, VERMILLION, BLACK)
 
 SLEEP_STAGE_COLORS = {
-    # Retain the established pywearable sleep palette used in prior reports.
+    # Sleep-stage colors and opacity shared by sleep visualizations.
     schema.SLEEP_STAGE_AWAKE_STAGE_VALUE: "hotpink",
     schema.SLEEP_STAGE_REM_STAGE_VALUE: "darkmagenta",
     schema.SLEEP_STAGE_LIGHT_STAGE_VALUE: "royalblue",
@@ -69,19 +70,21 @@ SLEEP_STAGE_ALPHA = {
     schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: 0.45,
     "asleep": 0.6,
 }
-SLEEP_HEART_RATE_STAGE_ALPHA_SCALE = 0.5
+SLEEP_HEART_RATE_STAGE_ALPHA = {
+    schema.SLEEP_STAGE_AWAKE_STAGE_VALUE: 0.10,
+    schema.SLEEP_STAGE_REM_STAGE_VALUE: 0.34,
+    schema.SLEEP_STAGE_LIGHT_STAGE_VALUE: 0.28,
+    schema.SLEEP_STAGE_DEEP_STAGE_VALUE: 0.28,
+    schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: 0.20,
+    "asleep": 0.18,
+}
 SLEEP_STAGE_LEVELS = {
     schema.SLEEP_STAGE_DEEP_STAGE_VALUE: (0, "deep"),
     schema.SLEEP_STAGE_LIGHT_STAGE_VALUE: (1, "light"),
     "asleep": (1, "light"),
+    schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: (None, "unknown"),
     schema.SLEEP_STAGE_REM_STAGE_VALUE: (2, "rem"),
     schema.SLEEP_STAGE_AWAKE_STAGE_VALUE: (3, "wake"),
-}
-
-ADHERENCE_COLORS = {
-    "low": "#D73027",
-    "partial": "#FEE08B",
-    "high": "#1A9850",
 }
 
 _WEEKDAY_NAMES = (
@@ -1666,11 +1669,12 @@ def plot_sleep_summary(
     user_id
         Participant identifier.
     start_date, end_date
-        Inclusive/exclusive sleep-calendar-date bounds. Missing dates remain
-        visible as empty rows.
+        Inclusive sleep-calendar-date bounds. Missing dates remain visible as
+        empty rows. A night assigned to ``start_date`` retains stages from the
+        preceding civil date.
     show_scores
         Write the provider's nightly sleep score to the right of each row when
-        available. Scores are colored using the established report bands.
+        available. Scores are colored using fixed quality bands.
     show_boundaries
         Draw dotted vertical lines at the participant's circular mean bedtime
         and wake-up time. It does not add a marker for every night.
@@ -1705,25 +1709,60 @@ def plot_sleep_summary(
     """
     if not np.isfinite(fontsize) or fontsize <= 0:
         raise ValueError("fontsize must be a positive finite number")
+    summary_start = (
+        pd.Timestamp(start_date).normalize() if start_date is not None else None
+    )
+    summary_end = (
+        pd.Timestamp(end_date).normalize() + pd.Timedelta(days=1)
+        if end_date is not None
+        else None
+    )
+    if summary_start is not None and summary_end is not None:
+        if summary_end <= summary_start:
+            raise ValueError("end_date must not precede start_date")
     summaries = schema.prepare_sleep_summary(
-        loader.load_sleep_summary(user_id, start_date, end_date)
+        loader.load_sleep_summary(user_id, summary_start, summary_end)
     )
     if summaries.empty:
         raise ValueError("no sleep summaries are available for the requested period")
+
+    stage_start = summaries[schema.LOCAL_TIME_COL].min()
+    stage_ends = (
+        pd.to_datetime(summaries[schema.LOCAL_END_TIME_COL], errors="coerce")
+        if schema.LOCAL_END_TIME_COL in summaries
+        else pd.Series(pd.NaT, index=summaries.index, dtype="datetime64[ns]")
+    )
+    durations = pd.to_numeric(
+        summaries[schema.DURATION_IN_MS_COL], errors="coerce"
+    ).fillna(0)
+    awake_durations = (
+        pd.to_numeric(
+            summaries[schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
+            errors="coerce",
+        ).fillna(0)
+        if schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL in summaries
+        else pd.Series(0.0, index=summaries.index)
+    )
+    reconstructed_ends = summaries[schema.LOCAL_TIME_COL] + pd.to_timedelta(
+        durations + awake_durations, unit="ms"
+    )
+    stage_end = stage_ends.fillna(reconstructed_ends).max()
+    if pd.isna(stage_end) or stage_end <= stage_start:
+        raise ValueError("the selected sleep summaries have invalid session bounds")
     stages = schema.prepare_sleep_stages(
-        loader.load_sleep_stage(user_id, start_date, end_date)
+        loader.load_sleep_stage(user_id, stage_start, stage_end)
     )
     summary_ids = set(summaries[schema.SLEEP_SUMMARY_ID_COL])
     stages = stages[stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids)]
 
     start = (
-        pd.Timestamp(start_date).normalize()
-        if start_date is not None
+        summary_start
+        if summary_start is not None
         else summaries[schema.CALENDAR_DATE_COL].min().normalize()
     )
     end = (
-        pd.Timestamp(end_date).normalize()
-        if end_date is not None
+        summary_end
+        if summary_end is not None
         else summaries[schema.CALENDAR_DATE_COL].max().normalize()
         + pd.Timedelta(days=1)
     )
@@ -1997,9 +2036,9 @@ def plot_sleep_heart_rate(
         Shade native sleep-stage intervals behind the heart-rate traces.
     stage_alpha
         Optional opacity applied to every stage background. By default each
-        stage uses the canonical color with half the opacity used by
-        :func:`plot_sleep_summary`, keeping heart rate visually dominant. The
-        external legend identifies every stage present in the session.
+        stage uses a subdued stage-specific opacity that keeps heart rate
+        visually dominant while making wake and light sleep distinguishable.
+        The external legend identifies every stage present in the session.
     show_boundaries
         Draw calculated bedtime, sleep-onset, wake-up, and get-up timestamps as
         dashed vertical lines when available. A sleep-onset line coincident
@@ -2099,8 +2138,7 @@ def plot_sleep_heart_rate(
             stage_type = getattr(stage, schema.SLEEP_STAGE_SLEEP_TYPE_COL)
             present_stages.append(stage_type)
             alpha = (
-                SLEEP_HEART_RATE_STAGE_ALPHA_SCALE
-                * SLEEP_STAGE_ALPHA.get(stage_type, 0.7)
+                SLEEP_HEART_RATE_STAGE_ALPHA.get(stage_type, 0.20)
                 if stage_alpha is None
                 else stage_alpha
             )
@@ -2190,8 +2228,7 @@ def plot_sleep_heart_rate(
         Patch(
             color=SLEEP_STAGE_COLORS[stage_type],
             alpha=(
-                SLEEP_HEART_RATE_STAGE_ALPHA_SCALE
-                * SLEEP_STAGE_ALPHA.get(stage_type, 0.7)
+                SLEEP_HEART_RATE_STAGE_ALPHA.get(stage_type, 0.20)
                 if stage_alpha is None
                 else stage_alpha
             ),
@@ -2447,13 +2484,14 @@ def plot_weekly_overview(
     heart_rate_resolution, activity_resolution
         Fixed aggregation windows passed to the corresponding domain APIs.
         Activity bars are totals per ``activity_resolution`` window, which is
-        stated explicitly on their y-axis.
+        stated explicitly on the activity y-axis.
     missing_threshold
         A window is shaded grey when neither heart-rate nor activity coverage
         is greater than this value. Positive steps can therefore support a
         window even if heart rate is absent.
     title, figsize
-        Figure title and optional size. Height grows with the number of rows.
+        Optional figure title and size. No title is added when ``title`` is
+        ``None``. Height grows with the number of rows.
     axes
         Optional sequence containing one primary axis per day. Heart-rate twin
         axes are created by the function.
@@ -2542,6 +2580,7 @@ def plot_weekly_overview(
         if any(axis.figure is not fig for axis in activity_axes):
             raise ValueError("all overview axes must share a figure")
     heart_axes = []
+    stage_axes = []
     hr_feature = heart_rate.HEART_RATE_STATISTIC_MEAN
     step_feature = activity.ACTIVITY_STATISTIC_STEPS
 
@@ -2572,6 +2611,29 @@ def plot_weekly_overview(
             zorder=3,
         )
         heart_axes.append(heart_ax)
+        stage_ax = primary_ax.twinx()
+        stage_ax.spines["right"].set_visible(False)
+        stage_ax.spines["left"].set_position(("outward", 52))
+        stage_ax.spines["left"].set_visible(True)
+        stage_ax.spines["left"].set_color(BLUE)
+        stage_ax.spines["left"].set_linewidth(0.8)
+        stage_ax.yaxis.set_ticks_position("left")
+        stage_ax.yaxis.set_label_position("left")
+        stage_ax.set_ylim(-0.35, 3.35)
+        stage_ax.set_yticks([0, 1, 2, 3])
+        stage_ax.set_yticklabels(["deep", "light", "rem", "wake"])
+        stage_ax.tick_params(
+            axis="y",
+            colors=BLUE,
+            labelsize=7,
+            length=3,
+            width=0.8,
+            direction="out",
+            pad=3,
+        )
+        stage_ax.tick_params(axis="x", bottom=False, top=False, labelbottom=False)
+        stage_ax.patch.set_visible(False)
+        stage_axes.append(stage_ax)
 
         hr_coverage = pd.to_numeric(
             hr_day.get(f"{hr_feature}__coverage"), errors="coerce"
@@ -2605,12 +2667,12 @@ def plot_weekly_overview(
             ).gt(window_start)
         ]
         overlapping = overlapping.sort_values(schema.LOCAL_TIME_COL)
-        stage_fractions = {0: 0.08, 1: 0.35, 2: 0.62, 3: 0.89}
-        wake_fraction = stage_fractions[3]
+        wake_level = SLEEP_STAGE_LEVELS[schema.SLEEP_STAGE_AWAKE_STAGE_VALUE][0]
         stage_x = [0.0]
-        stage_y = [wake_fraction]
+        stage_y = [wake_level]
+        unknown_intervals = []
         current_end = 0.0
-        current_fraction = wake_fraction
+        current_level = wake_level
         for stage in overlapping.itertuples(index=False):
             stage_start = max(
                 pd.Timestamp(getattr(stage, schema.LOCAL_TIME_COL)), window_start
@@ -2623,30 +2685,38 @@ def plot_weekly_overview(
             left = (stage_start - window_start).total_seconds() / 3600
             right = (stage_end - window_start).total_seconds() / 3600
             stage_type = getattr(stage, schema.SLEEP_STAGE_SLEEP_TYPE_COL)
-            level, _ = SLEEP_STAGE_LEVELS.get(stage_type, (1, "light"))
-            fraction = stage_fractions[level]
             if right <= current_end:
                 continue
             left = max(left, current_end)
             if left > current_end:
-                if current_fraction != wake_fraction:
+                if current_level != wake_level:
                     stage_x.append(current_end)
-                    stage_y.append(wake_fraction)
+                    stage_y.append(wake_level)
                 stage_x.append(left)
-                stage_y.append(wake_fraction)
-            stage_x.extend([left, right])
-            stage_y.extend([fraction, fraction])
+                stage_y.append(wake_level)
+            if stage_type == schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE:
+                stage_x.extend([left, np.nan, right])
+                stage_y.extend([wake_level, np.nan, wake_level])
+                unknown_intervals.append((left, right))
+                current_level = wake_level
+            else:
+                level, _ = SLEEP_STAGE_LEVELS.get(
+                    stage_type,
+                    SLEEP_STAGE_LEVELS["asleep"],
+                )
+                stage_x.extend([left, right])
+                stage_y.extend([level, level])
+                current_level = level
             current_end = right
-            current_fraction = fraction
         if current_end < 24:
-            if current_fraction != wake_fraction:
+            if current_level != wake_level:
                 stage_x.append(current_end)
-                stage_y.append(wake_fraction)
+                stage_y.append(wake_level)
             stage_x.append(24.0)
-            stage_y.append(wake_fraction)
+            stage_y.append(wake_level)
         if len(stage_x) > 1:
             transform = blended_transform_factory(
-                primary_ax.transData, primary_ax.transAxes
+                primary_ax.transData, stage_ax.transData
             )
             primary_ax.plot(
                 stage_x,
@@ -2656,23 +2726,14 @@ def plot_weekly_overview(
                 transform=transform,
                 zorder=5,
             )
-            for level, label in enumerate(("deep", "light", "rem", "wake")):
-                primary_ax.text(
-                    0.004,
-                    stage_fractions[level],
-                    label,
-                    color=BLUE,
-                    fontsize=6.5,
-                    ha="left",
-                    va="center",
-                    transform=primary_ax.transAxes,
-                    clip_on=False,
-                    bbox={
-                        "facecolor": "white",
-                        "edgecolor": "none",
-                        "alpha": 0.72,
-                        "pad": 0.2,
-                    },
+            for left, right in unknown_intervals:
+                primary_ax.plot(
+                    [left, right],
+                    [1.5, 1.5],
+                    color=GREY,
+                    linewidth=3.0,
+                    transform=transform,
+                    zorder=6,
                 )
 
         primary_ax.set_xlim(0, 24)
@@ -2680,6 +2741,7 @@ def plot_weekly_overview(
             f"Steps / {_resolution_label(activity_resolution)}",
             color=BLACK,
             fontsize=8,
+            labelpad=8,
         )
         primary_ax.tick_params(axis="y", colors=BLACK, labelsize=7)
         heart_ax.set_ylabel("HR", color=VERMILLION, fontsize=8)
@@ -2714,8 +2776,11 @@ def plot_weekly_overview(
         [f"{(start_hour + hour) % 24:02d}:00" for hour in clock_ticks]
     )
     activity_axes[-1].set_xlabel("Participant-local time")
-    fig.suptitle(title or "Daily sleep, activity, heart rate, and missingness")
-    fig.tight_layout(rect=(0, 0, 1, 0.97))
+    if title is not None:
+        fig.suptitle(title)
+        fig.tight_layout(rect=(0, 0, 1, 0.97))
+    else:
+        fig.tight_layout()
     _finish_figure(fig, show=show, save_to=save_to)
     return {
         "activity": np.asarray(activity_axes),
@@ -2723,41 +2788,363 @@ def plot_weekly_overview(
     }
 
 
-def _adherence_participant_periods(
-    daily,
-    column,
-    start,
-    end,
-    participant_periods,
-    infer_participant_periods,
+def _naive_local_datetimes(values):
+    """Normalize clock-like values to naive local datetimes."""
+    parsed = pd.to_datetime(pd.Series(values), errors="coerce", format="mixed")
+    if isinstance(parsed.dtype, pd.DatetimeTZDtype):
+        return parsed.dt.tz_localize(None)
+    if is_datetime64_any_dtype(parsed.dtype):
+        return parsed
+    return parsed.map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+
+
+def _local_date_bounds(values):
+    """Return the first and last valid local calendar dates."""
+    parsed = _naive_local_datetimes(values).dropna()
+    if parsed.empty:
+        return None
+    return parsed.min().normalize(), parsed.max().normalize()
+
+
+class _AdherencePlotLoader:
+    """Reuse unbounded stream loads across adherence resolutions."""
+
+    def __init__(self, loader):
+        self._loader = loader
+        self._heart_rate = {}
+        self._bbi = {}
+        self._sleep_summary = {}
+
+    def __getattr__(self, name):
+        return getattr(self._loader, name)
+
+    @staticmethod
+    def _slice(frame, column, start_date, end_date, *, normalize=False):
+        if frame is None or frame.empty or column not in frame:
+            return None if frame is None else frame.copy()
+        if start_date is None and end_date is None:
+            return frame
+        values = _naive_local_datetimes(frame[column])
+        if normalize:
+            values = pd.to_datetime(values, errors="coerce").dt.normalize()
+        selected = values.notna()
+        if start_date is not None:
+            selected &= values.ge(pd.Timestamp(start_date))
+        if end_date is not None:
+            selected &= values.lt(pd.Timestamp(end_date))
+        return frame.loc[selected].copy().reset_index(drop=True)
+
+    def load_heart_rate(
+        self,
+        user_id,
+        start_date=None,
+        end_date=None,
+        time_col=schema.LOCAL_TIME_COL,
+        **kwargs,
+    ):
+        key = (user_id, time_col)
+        if key not in self._heart_rate:
+            self._heart_rate[key] = self._loader.load_heart_rate(
+                user_id,
+                start_date=None,
+                end_date=None,
+                time_col=time_col,
+                **kwargs,
+            )
+        return self._slice(
+            self._heart_rate[key], time_col, start_date, end_date
+        )
+
+    def load_bbi(self, user_id, start_date=None, end_date=None, **kwargs):
+        if user_id not in self._bbi:
+            self._bbi[user_id] = self._loader.load_bbi(
+                user_id,
+                None,
+                None,
+                **kwargs,
+            )
+        return self._slice(
+            self._bbi[user_id],
+            schema.LOCAL_TIME_COL,
+            start_date,
+            end_date,
+        )
+
+    def load_sleep_summary(
+        self,
+        user_id,
+        start_date=None,
+        end_date=None,
+        drop_duplicates=True,
+        **kwargs,
+    ):
+        key = (user_id, bool(drop_duplicates))
+        if key not in self._sleep_summary:
+            self._sleep_summary[key] = self._loader.load_sleep_summary(
+                user_id=user_id,
+                start_date=None,
+                end_date=None,
+                drop_duplicates=drop_duplicates,
+                **kwargs,
+            )
+        return self._slice(
+            self._sleep_summary[key],
+            schema.CALENDAR_DATE_COL,
+            start_date,
+            end_date,
+            normalize=True,
+        )
+
+
+def _adherence_evidence_bounds(loader, user, metric):
+    """Return first and last dates with primary-stream or usable-night evidence."""
+    evidence = []
+    if metric == adherence.ADHERENCE_HEART_RATE:
+        try:
+            frame = loader.load_heart_rate(
+                user,
+                start_date=None,
+                end_date=None,
+                time_col=schema.LOCAL_TIME_COL,
+            )
+        except NotImplementedError:
+            frame = None
+        if frame is not None:
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("heart-rate data must be a pandas DataFrame")
+            if not frame.empty:
+                missing = {schema.LOCAL_TIME_COL, schema.HEART_RATE_COL}.difference(
+                    frame.columns
+                )
+                if missing:
+                    raise ValueError(
+                        "heart-rate data is missing required columns: "
+                        + ", ".join(sorted(missing))
+                    )
+                valid = pd.to_numeric(
+                    frame[schema.HEART_RATE_COL], errors="coerce"
+                ).gt(0)
+                bounds = _local_date_bounds(
+                    frame.loc[valid, schema.LOCAL_TIME_COL]
+                )
+                if bounds is not None:
+                    evidence.append(bounds)
+    else:
+        if getattr(loader, "hrv_source", "bbi") == "bbi":
+            try:
+                frame = loader.load_bbi(user, None, None)
+            except NotImplementedError:
+                frame = None
+            if frame is not None:
+                if not isinstance(frame, pd.DataFrame):
+                    raise ValueError("BBI data must be a pandas DataFrame")
+                frame = schema.prepare_bbi(frame)
+                if schema.LOCAL_TIME_COL in frame:
+                    bounds = _local_date_bounds(frame[schema.LOCAL_TIME_COL])
+                    if bounds is not None:
+                        evidence.append(bounds)
+
+    try:
+        summaries = loader.load_sleep_summary(
+            user_id=user,
+            start_date=None,
+            end_date=None,
+            drop_duplicates=False,
+        )
+    except NotImplementedError:
+        summaries = None
+    if summaries is not None:
+        if not isinstance(summaries, pd.DataFrame):
+            raise ValueError("sleep summary data must be a pandas DataFrame")
+        summaries = schema.normalize_sleep_columns(summaries.copy())
+        if not summaries.empty:
+            if schema.CALENDAR_DATE_COL not in summaries:
+                raise ValueError("sleep summary data is missing calendar_date")
+            if "validation" in summaries:
+                validation = summaries["validation"].astype("string").str.upper()
+                summaries = summaries[
+                    ~validation.isin({"MANUAL", "AUTO_MANUAL"})
+                ]
+            bounds = _local_date_bounds(summaries[schema.CALENDAR_DATE_COL])
+            if bounds is not None:
+                evidence.append(bounds)
+    if not evidence:
+        return None
+    return min(value[0] for value in evidence), max(value[1] for value in evidence)
+
+
+def _adherence_study_periods(
+    loader,
+    user_id,
+    metric,
+    follow_up_days,
+    include_without_evidence,
 ):
-    """Resolve participant-local study bounds for relative-time panels."""
-    users = pd.Index(daily.index.get_level_values(schema.USER_COL)).unique()
+    """Infer aligned participant periods and their shared follow-up length."""
+    users = get_user_ids(loader, user_id)
+    if not users:
+        raise ValueError("no participants were requested")
+    evidence = {
+        user: _adherence_evidence_bounds(loader, user, metric) for user in users
+    }
+    observed = {user: bounds for user, bounds in evidence.items() if bounds is not None}
+    if not observed:
+        raise ValueError("no requested participant has adherence evidence")
+    if follow_up_days is None:
+        follow_up_days = max(
+            int((bounds[1] - bounds[0]).days) + 1
+            for bounds in observed.values()
+        )
+    elif (
+        not isinstance(follow_up_days, (int, np.integer))
+        or isinstance(follow_up_days, (bool, np.bool_))
+        or follow_up_days <= 0
+    ):
+        raise ValueError("follow_up_days must be a positive integer or None")
+    follow_up_days = int(follow_up_days)
+    fallback_start = min(bounds[0] for bounds in observed.values())
     periods = {}
     for user in users:
-        if participant_periods is not None and user in participant_periods:
-            bounds = participant_periods[user]
-            if len(bounds) != 2:
-                raise ValueError("each participant period must contain start and end")
-            participant_start = max(start, pd.Timestamp(bounds[0]).normalize())
-            participant_end = min(end, pd.Timestamp(bounds[1]).ceil("D"))
-        elif participant_periods is not None:
-            participant_start, participant_end = start, end
-        elif infer_participant_periods:
-            values = pd.to_numeric(
-                daily.xs(user, level=schema.USER_COL)[column], errors="coerce"
-            )
-            observed = values.gt(0)
-            if not observed.any():
-                continue
-            observed_times = pd.to_datetime(values.index[observed])
-            participant_start = observed_times.min().normalize()
-            participant_end = observed_times.max().normalize() + pd.Timedelta(days=1)
+        if evidence[user] is not None:
+            participant_start = evidence[user][0]
+        elif include_without_evidence:
+            participant_start = fallback_start
         else:
-            participant_start, participant_end = start, end
-        if participant_end > participant_start:
-            periods[user] = (participant_start, participant_end)
-    return periods
+            continue
+        periods[user] = (
+            participant_start,
+            participant_start + pd.Timedelta(days=follow_up_days),
+        )
+    return periods, follow_up_days
+
+
+def _hourly_adherence(loader, users, start, end, metric):
+    """Calculate vectorized local hourly adherence for the monitoring plot."""
+    hours = pd.date_range(start, end, freq="1h", inclusive="left")
+    column = f"{metric}_adherence"
+    values = np.full((len(users), len(hours)), np.nan)
+    for user_position, user in enumerate(users):
+        if metric == adherence.ADHERENCE_HEART_RATE:
+            try:
+                frame = loader.load_heart_rate(
+                    user,
+                    start_date=start,
+                    end_date=end,
+                    time_col=schema.LOCAL_TIME_COL,
+                )
+            except NotImplementedError:
+                continue
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("heart-rate data must be a pandas DataFrame")
+            supported = not frame.empty or {
+                schema.LOCAL_TIME_COL,
+                schema.HEART_RATE_COL,
+            }.issubset(frame.columns)
+            if not supported:
+                continue
+            values[user_position] = 0.0
+            if frame.empty:
+                continue
+            missing = {schema.LOCAL_TIME_COL, schema.HEART_RATE_COL}.difference(
+                frame.columns
+            )
+            if missing:
+                raise ValueError(
+                    "heart-rate data is missing required columns: "
+                    + ", ".join(sorted(missing))
+                )
+            timestamps = _naive_local_datetimes(frame[schema.LOCAL_TIME_COL])
+            heart_values = pd.to_numeric(frame[schema.HEART_RATE_COL], errors="coerce")
+            valid = timestamps.notna() & np.isfinite(heart_values) & heart_values.gt(0)
+            minute_starts = timestamps.loc[valid].dt.floor("min").drop_duplicates()
+            grouped = minute_starts.dt.floor("h").value_counts().sort_index() / 60
+        else:
+            if getattr(loader, "hrv_source", "bbi") != "bbi":
+                continue
+            try:
+                frame = loader.load_bbi(user, start, end)
+            except NotImplementedError:
+                continue
+            if not isinstance(frame, pd.DataFrame):
+                raise ValueError("BBI data must be a pandas DataFrame")
+            supported = not frame.empty or {
+                schema.LOCAL_TIME_COL,
+                schema.BBI_COL,
+            }.issubset(frame.columns)
+            if not supported:
+                continue
+            values[user_position] = 0.0
+            if frame.empty:
+                continue
+            frame = schema.prepare_bbi(frame)
+            if schema.LOCAL_TIME_COL not in frame:
+                raise ValueError("BBI data does not provide local_time")
+            measurements = pd.DataFrame(
+                {
+                    "time": _naive_local_datetimes(frame[schema.LOCAL_TIME_COL]),
+                    "bbi": pd.to_numeric(frame[schema.BBI_COL], errors="coerce"),
+                }
+            )
+            measurements = measurements[
+                measurements["time"].notna()
+                & np.isfinite(measurements["bbi"])
+                & measurements["bbi"].gt(0)
+            ].drop_duplicates("time", keep="last")
+            grouped = (
+                measurements.groupby(measurements["time"].dt.floor("h"))["bbi"].sum()
+                / 3_600_000
+            ).clip(upper=1)
+        positions = hours.get_indexer(pd.DatetimeIndex(grouped.index))
+        present = positions >= 0
+        values[user_position, positions[present]] = grouped.to_numpy()[present]
+    index = pd.MultiIndex.from_product(
+        [users, hours], names=[schema.USER_COL, schema.LOCAL_TIME_COL]
+    )
+    return pd.DataFrame({column: values.reshape(-1)}, index=index)
+
+
+def _daily_sleep_adherence(loader, users, start, end):
+    """Calculate vectorized usable-night availability over local dates."""
+    dates = pd.date_range(start, end, freq="1D", inclusive="left")
+    column = f"{adherence.ADHERENCE_SLEEP}_adherence"
+    values = np.full((len(users), len(dates)), np.nan)
+    for user_position, user in enumerate(users):
+        try:
+            frame = loader.load_sleep_summary(
+                user_id=user,
+                start_date=start,
+                end_date=end,
+                drop_duplicates=False,
+            )
+        except NotImplementedError:
+            continue
+        if frame is None:
+            continue
+        if not isinstance(frame, pd.DataFrame):
+            raise ValueError("sleep summary data must be a pandas DataFrame")
+        values[user_position] = 0.0
+        if frame.empty:
+            continue
+        frame = schema.normalize_sleep_columns(frame.copy())
+        if schema.CALENDAR_DATE_COL not in frame:
+            raise ValueError("sleep summary data is missing calendar_date")
+        if "validation" in frame:
+            validation = frame["validation"].astype("string").str.upper()
+            frame = frame[~validation.isin({"MANUAL", "AUTO_MANUAL"})]
+        observed = _naive_local_datetimes(
+            frame[schema.CALENDAR_DATE_COL]
+        ).dt.normalize()
+        positions = dates.get_indexer(pd.DatetimeIndex(observed.dropna().unique()))
+        positions = positions[positions >= 0]
+        values[user_position, positions] = 1.0
+    index = pd.MultiIndex.from_product(
+        [users, dates], names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
+    )
+    return pd.DataFrame({column: values.reshape(-1)}, index=index)
 
 
 def _relative_adherence_rows(frame, periods):
@@ -2784,156 +3171,177 @@ def _relative_adherence_rows(frame, periods):
     return rows
 
 
+def _daily_adherence_from_hourly(hourly, column):
+    """Aggregate equal one-hour local windows to exact daily adherence."""
+    time_level = _trajectory_time_level(hourly)
+    rows = hourly[[column]].reset_index()
+    rows[schema.CALENDAR_DATE_COL] = pd.to_datetime(
+        rows[time_level], errors="coerce"
+    ).dt.normalize()
+    return (
+        rows.groupby(
+            [schema.USER_COL, schema.CALENDAR_DATE_COL],
+            sort=True,
+            dropna=False,
+        )[column]
+        .mean()
+        .to_frame()
+    )
+
+
+def _weekly_adherence_counts(rows, column, users, number_of_weeks, threshold):
+    """Count qualifying days in each participant-relative study week."""
+    counts = np.full((len(users), number_of_weeks), np.nan)
+    user_lookup = {value: position for position, value in enumerate(users)}
+    for (user, week), group in rows.groupby(
+        [schema.USER_COL, "study_week"], sort=False
+    ):
+        if week >= number_of_weeks:
+            continue
+        values = pd.to_numeric(group[column], errors="coerce")
+        if values.notna().any():
+            counts[user_lookup[user], int(week)] = int(values.ge(threshold).sum())
+    return counts
+
+
+def _column_means(matrix):
+    """Average finite matrix values by column without empty-slice warnings."""
+    valid = np.isfinite(matrix)
+    denominator = valid.sum(axis=0)
+    return np.divide(
+        np.nansum(matrix, axis=0),
+        denominator,
+        out=np.full(matrix.shape[1], np.nan),
+        where=denominator > 0,
+    )
+
+
 def plot_adherence_summary(
     loader,
-    start_date,
-    end_date,
     *,
     metric: str = adherence.ADHERENCE_HEART_RATE,
     user_id="all",
+    follow_up_days: int | None = None,
     worn_day_threshold: float = 0.7,
-    participant_periods: Mapping | None = None,
-    infer_participant_periods: bool = False,
+    include_without_evidence: bool = False,
     title: str | None = None,
     figsize=None,
     axes: Mapping | None = None,
     show: bool = True,
     save_to=None,
 ):
-    """Summarize cohort adherence by participant, week, weekday, and hour.
+    """Summarize aligned cohort adherence and nightly availability.
 
-    The four panels mirror common study-monitoring views: participant-week
-    categories, the cohort distribution of those categories, weekday patterns,
-    and time-of-day patterns. Daily and hourly adherence are loaded through the
-    canonical adherence API.
+    Every participant is aligned to their first date with primary-stream or
+    usable-sleep evidence. The default common follow-up is the longest observed
+    trajectory among the requested participants, so shorter trajectories retain
+    trailing non-adherence instead of disappearing from the denominator.
 
     Parameters
     ----------
     loader
         Loader used by :func:`pywearable.adherence.get_adherence`.
-    start_date, end_date
-        Required half-open local study bounds.
     metric
         ``"heart_rate"`` or ``"bbi"``. Sleep has no hourly stream and is not
-        suitable for the four-panel view.
+        suitable as the primary wearing-time stream.
     user_id
         One participant, several participants, ``"all"``, or ``None``.
+    follow_up_days
+        Shared number of participant-relative days to display. With ``None``,
+        use the maximum first-to-last evidence span across requested
+        participants. A final partial study week is retained.
     worn_day_threshold
-        Daily adherence required for a day to count as worn. Participant-week
-        categories are 0–2, 3–5, and 6–7 worn days.
-    participant_periods
-        Optional mapping ``user_id -> (start, end)``. Cells outside those
-        participant-specific half-open study periods are excluded rather than
-        treated as non-adherence, and every participant is aligned to their own
-        study day zero. Participants omitted from the mapping use the full
-        requested interval.
-    infer_participant_periods
-        If ``True`` and ``participant_periods`` is not supplied, infer each
-        participant's interval from their first through last day of positive
-        adherence and exclude participants with no positive evidence. The
-        default ``False`` keeps every requested participant in the denominator
-        for the full requested interval, so trailing non-wear remains visible.
+        Daily primary-stream adherence required for a day to count as worn.
+    include_without_evidence
+        Include requested participants with no primary or sleep evidence. They
+        are aligned to the earliest inferred cohort start. By default they are
+        excluded because their individual study start cannot be inferred.
     title, figsize
         Figure title and optional size. Height grows with cohort size.
     axes
-        Optional mapping with axes named ``participant_weeks``,
-        ``weekly_distribution``, ``weekday_pattern``, and ``intraday``.
+        Optional mapping with axes named ``wearing_days``,
+        ``available_nights``, ``weekly_wearing``, ``weekly_nights``,
+        ``weekday_pattern``, and ``intraday``.
     show, save_to
         Display the figure and/or save it to a path. Saving does not close it.
 
     Returns
     -------
     dict
-        Mapping of the four panel names to Matplotlib axes.
+        Mapping of the six panel names to Matplotlib axes.
 
     Notes
     -----
-    Red, yellow, and green always mean 0–2, 3–5, and 6–7 qualifying days in
-    panels A and B. Panels C and D average raw adherence at participant-relative
-    study weeks and days. White cells are unavailable or outside explicit or
-    inferred participant periods; zero adherence is red. Supply enrollment
-    bounds for staggered cohorts when those dates are known.
+    Participant-week heatmaps use the exact integer range 0–7. Grey cells mean
+    that a stream is unsupported; zero qualifying days or nights is red. The
+    final partial week can contain fewer than seven requested days. Weekday and
+    intraday panels average raw primary-stream adherence.
     """
     if metric not in {adherence.ADHERENCE_HEART_RATE, adherence.ADHERENCE_BBI}:
         raise ValueError("metric must be 'heart_rate' or 'bbi'")
     if not np.isfinite(worn_day_threshold) or not 0 <= worn_day_threshold <= 1:
         raise ValueError("worn_day_threshold must lie between zero and one")
-    if not isinstance(infer_participant_periods, (bool, np.bool_)):
-        raise ValueError("infer_participant_periods must be a boolean")
-    start = pd.Timestamp(start_date).normalize()
-    end = pd.Timestamp(end_date).normalize()
-    if end <= start:
-        raise ValueError("end_date must be after start_date")
-    column = f"{metric}_adherence"
-    daily = adherence.get_adherence(
-        loader,
-        metric=metric,
-        user_id=user_id,
-        start_date=start,
-        end_date=end,
-        resolution="daily",
-        time_reference="local",
+    if not isinstance(include_without_evidence, (bool, np.bool_)):
+        raise ValueError("include_without_evidence must be a boolean")
+    cached_loader = _AdherencePlotLoader(loader)
+    periods, follow_up_days = _adherence_study_periods(
+        cached_loader,
+        user_id,
+        metric,
+        follow_up_days,
+        include_without_evidence,
     )
-    hourly = adherence.get_adherence(
-        loader,
-        metric=metric,
-        user_id=user_id,
-        start_date=start,
-        end_date=end,
-        resolution="1h",
-        time_reference="local",
-    )
-    daily = daily[[column]]
-    hourly = hourly[[column]]
-    periods = _adherence_participant_periods(
-        daily,
-        column,
-        start,
-        end,
-        participant_periods,
-        infer_participant_periods,
-    )
-    if not periods:
-        raise ValueError(
-            "no participants have an applicable study period or positive "
-            "adherence evidence"
-        )
     users = pd.Index(periods)
+    start = min(bounds[0] for bounds in periods.values())
+    end = max(bounds[1] for bounds in periods.values())
+    column = f"{metric}_adherence"
+    hourly = _hourly_adherence(cached_loader, users, start, end, metric)
+    nights = _daily_sleep_adherence(cached_loader, users, start, end)
+    hourly = hourly[[column]]
+    daily = _daily_adherence_from_hourly(hourly, column)
+    night_column = f"{adherence.ADHERENCE_SLEEP}_adherence"
+    nights = nights[[night_column]]
     daily_rows = _relative_adherence_rows(daily, periods)
     hourly_rows = _relative_adherence_rows(hourly, periods)
-    number_of_weeks = int(daily_rows["study_week"].max()) + 1
+    night_rows = _relative_adherence_rows(nights, periods)
+    number_of_weeks = int(np.ceil(follow_up_days / 7))
     weeks = np.arange(number_of_weeks)
-    user_lookup = {value: position for position, value in enumerate(users)}
-    categories = np.full((len(users), len(weeks)), np.nan)
-    for (user, week), rows in daily_rows.groupby(
-        [schema.USER_COL, "study_week"], sort=False
-    ):
-        values = pd.to_numeric(rows[column], errors="coerce")
-        if not values.notna().any():
-            continue
-        worn = int(values.ge(worn_day_threshold).sum())
-        category = 0 if worn <= 2 else 1 if worn <= 5 else 2
-        categories[user_lookup[user], int(week)] = category
+    wearing_days = _weekly_adherence_counts(
+        daily_rows,
+        column,
+        users,
+        number_of_weeks,
+        worn_day_threshold,
+    )
+    available_nights = _weekly_adherence_counts(
+        night_rows,
+        night_column,
+        users,
+        number_of_weeks,
+        1.0,
+    )
 
     if axes is None:
         if figsize is None:
-            figsize = (15, max(8, 5 + len(users) * 0.12))
+            figsize = (15, max(9, 6 + len(users) * 0.15))
         fig, created = plt.subplot_mosaic(
             [
-                ["participant_weeks", "weekly_distribution"],
-                ["participant_weeks", "weekday_pattern"],
-                ["participant_weeks", "intraday"],
+                ["wearing_days", "weekly_wearing"],
+                ["available_nights", "weekly_nights"],
+                ["weekday_pattern", "intraday"],
             ],
             figsize=figsize,
-            width_ratios=(1.1, 3.4),
+            width_ratios=(1.4, 2.6),
             height_ratios=(1, 1, 1.35),
             constrained_layout=True,
         )
         axes_map = created
     else:
         required = {
-            "participant_weeks",
-            "weekly_distribution",
+            "wearing_days",
+            "available_nights",
+            "weekly_wearing",
+            "weekly_nights",
             "weekday_pattern",
             "intraday",
         }
@@ -2941,74 +3349,74 @@ def plot_adherence_summary(
         if missing:
             raise ValueError(f"axes is missing panels: {sorted(missing)}")
         axes_map = dict(axes)
-        fig = axes_map["participant_weeks"].figure
+        fig = axes_map["wearing_days"].figure
 
-    category_cmap = mpl.colors.ListedColormap(
-        [
-            ADHERENCE_COLORS["low"],
-            ADHERENCE_COLORS["partial"],
-            ADHERENCE_COLORS["high"],
-        ]
+    weekly_cmap = mpl.colors.ListedColormap(
+        mpl.colormaps["RdYlGn"](np.linspace(0, 1, 8))
     )
-    category_cmap.set_bad("white")
-    participant_ax = axes_map["participant_weeks"]
-    participant_ax.imshow(
-        np.ma.masked_invalid(categories),
-        aspect="auto",
-        interpolation="nearest",
-        cmap=category_cmap,
-        vmin=-0.5,
-        vmax=2.5,
+    weekly_cmap.set_bad(LIGHT_GREY)
+    weekly_images = []
+    for axis_name, matrix, panel_title in (
+        ("wearing_days", wearing_days, "A  Worn days by participant"),
+        (
+            "available_nights",
+            available_nights,
+            "B  Available nights by participant",
+        ),
+    ):
+        panel = axes_map[axis_name]
+        image = panel.imshow(
+            np.ma.masked_invalid(matrix),
+            aspect="auto",
+            interpolation="nearest",
+            cmap=weekly_cmap,
+            norm=mpl.colors.BoundaryNorm(np.arange(-0.5, 8.5), weekly_cmap.N),
+        )
+        weekly_images.append(image)
+        panel.set(title=panel_title, xlabel="Study week", ylabel="Participant")
+        tick_step = max(1, len(weeks) // 10)
+        panel.set_xticks(np.arange(len(weeks))[::tick_step])
+        panel.set_xticklabels((weeks + 1)[::tick_step])
+        if len(users) <= 30:
+            panel.set_yticks(np.arange(len(users)))
+            panel.set_yticklabels(users)
+        else:
+            panel.set_yticks([])
+    weekly_colorbar = fig.colorbar(
+        weekly_images[0],
+        ax=[axes_map["wearing_days"], axes_map["available_nights"]],
+        ticks=np.arange(8),
+        fraction=0.025,
+        pad=0.02,
     )
-    participant_ax.set(
-        title="A  Participant monitoring",
-        xlabel="Study week",
-        ylabel="Participant",
-    )
-    participant_ax.set_xticks(np.arange(len(weeks))[:: max(1, len(weeks) // 10)])
-    participant_ax.set_xticklabels(
-        (weeks + 1)[:: max(1, len(weeks) // 10)]
-    )
-    if len(users) <= 30:
-        participant_ax.set_yticks(np.arange(len(users)))
-        participant_ax.set_yticklabels(users)
-    else:
-        participant_ax.set_yticks([])
+    weekly_colorbar.set_label("Days / nights")
 
-    distribution_ax = axes_map["weekly_distribution"]
-    valid = np.isfinite(categories)
-    denominator = valid.sum(axis=0)
-    bottom = np.zeros(len(weeks))
-    labels = ("0–2 days", "3–5 days", "6–7 days")
-    for category, (key, label) in enumerate(zip(("low", "partial", "high"), labels)):
-        count = (categories == category).sum(axis=0)
-        percent = np.divide(
-            count * 100,
-            denominator,
-            out=np.full(len(weeks), np.nan),
-            where=denominator > 0,
+    for axis_name, matrix, panel_title, ylabel in (
+        ("weekly_wearing", wearing_days, "C  Cohort mean worn days", "Worn days"),
+        (
+            "weekly_nights",
+            available_nights,
+            "D  Cohort mean available nights",
+            "Available nights",
+        ),
+    ):
+        panel = axes_map[axis_name]
+        panel.plot(
+            weeks + 1,
+            _column_means(matrix),
+            color=BLUE,
+            marker="o",
+            linewidth=1.8,
         )
-        distribution_ax.bar(
-            np.arange(len(weeks)),
-            np.nan_to_num(percent),
-            bottom=bottom,
-            width=0.82,
-            color=ADHERENCE_COLORS[key],
-            label=label,
+        panel.set(
+            title=panel_title,
+            xlabel="Study week",
+            ylabel=ylabel,
+            xlim=(0.5, len(weeks) + 0.5),
+            ylim=(-0.1, 7.1),
         )
-        bottom += np.nan_to_num(percent)
-    distribution_ax.set(
-        title="B  Weekly cohort adherence",
-        ylabel="Participants (%)",
-        ylim=(0, 100),
-    )
-    distribution_ax.set_xticks([])
-    distribution_ax.legend(
-        title="Worn days",
-        frameon=False,
-        loc="upper left",
-        bbox_to_anchor=(1.01, 1.0),
-    )
+        panel.set_yticks(np.arange(8))
+        _style_axis(panel)
 
     weekday_matrix = np.full((7, len(weeks)), np.nan)
     grouped = daily_rows.groupby(["weekday", "study_week"])[column].mean()
@@ -3026,7 +3434,7 @@ def plot_adherence_summary(
         vmax=1,
     )
     weekday_ax.set(
-        title="C  Mean adherence by weekday and relative study week",
+        title="E  Mean adherence by weekday and relative study week",
         xlabel="Study week",
         ylabel="Weekday",
     )
@@ -3035,8 +3443,7 @@ def plot_adherence_summary(
     weekday_ax.set_xticks(np.arange(len(weeks))[:: max(1, len(weeks) // 10)])
     weekday_ax.set_xticklabels((weeks + 1)[:: max(1, len(weeks) // 10)])
 
-    number_of_days = int(daily_rows["study_day"].max()) + 1
-    days = np.arange(number_of_days)
+    days = np.arange(follow_up_days)
     intraday_matrix = np.full((24, len(days)), np.nan)
     grouped = hourly_rows.groupby(["hour", "study_day"])[column].mean()
     for (hour, day), value in grouped.items():
@@ -3051,7 +3458,7 @@ def plot_adherence_summary(
         vmax=1,
     )
     intraday_ax.set(
-        title="D  Mean adherence by local hour and relative study day",
+        title="F  Mean adherence by local hour and relative study day",
         xlabel="Study day",
         ylabel="Local hour",
     )

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pywearable import schema, trajectory, visualization
+from pywearable import adherence, schema, trajectory, visualization
 
 
 def _trajectory(values, *, feature="feature", frequency="D"):
@@ -28,6 +28,7 @@ def _trajectory(values, *, feature="feature", frequency="D"):
 
 
 def _sleep_loader():
+    call_counts = {"sleep_summary": 0, "sleep_stage": 0, "heart_rate": 0}
     summary_rows = []
     stage_rows = []
     for offset in range(4):
@@ -50,13 +51,19 @@ def _sleep_loader():
             }
         )
         stage_start = start
-        for stage_type, minutes in (
+        stage_sequence = (
             (schema.SLEEP_STAGE_AWAKE_STAGE_VALUE, 15),
-            (schema.SLEEP_STAGE_LIGHT_STAGE_VALUE, 180),
+            (
+                schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE
+                if offset == 1
+                else schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                180,
+            ),
             (schema.SLEEP_STAGE_DEEP_STAGE_VALUE, 90),
             (schema.SLEEP_STAGE_REM_STAGE_VALUE, 120),
             (schema.SLEEP_STAGE_AWAKE_STAGE_VALUE, 15),
-        ):
+        )
+        for stage_type, minutes in stage_sequence:
             stage_rows.append(
                 {
                     schema.SLEEP_SUMMARY_ID_COL: summary_id,
@@ -100,6 +107,7 @@ def _sleep_loader():
     )
 
     def load_sleep_summary(user_id, start_date=None, end_date=None, **kwargs):
+        call_counts["sleep_summary"] += 1
         frame = summaries.copy()
         if start_date is not None:
             frame = frame[
@@ -112,11 +120,22 @@ def _sleep_loader():
         return frame.reset_index(drop=True)
 
     def load_sleep_stage(user_id, start_date=None, end_date=None, **kwargs):
-        return stages.copy()
+        call_counts["sleep_stage"] += 1
+        frame = stages.copy()
+        stage_ends = frame[schema.LOCAL_TIME_COL] + pd.to_timedelta(
+            frame[schema.DURATION_IN_MS_COL], unit="ms"
+        )
+        if start_date is not None:
+            frame = frame[stage_ends > pd.Timestamp(start_date)]
+            stage_ends = stage_ends.loc[frame.index]
+        if end_date is not None:
+            frame = frame[frame[schema.LOCAL_TIME_COL] < pd.Timestamp(end_date)]
+        return frame.reset_index(drop=True)
 
     def load_heart_rate(
         user_id, start_date=None, end_date=None, time_col=schema.LOCAL_TIME_COL
     ):
+        call_counts["heart_rate"] += 1
         frame = heart_rates.copy()
         if start_date is not None:
             frame = frame[frame[time_col] >= pd.Timestamp(start_date)]
@@ -138,6 +157,7 @@ def _sleep_loader():
         activity_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
         heart_rate_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
         get_user_ids=lambda: ["person-1"],
+        call_counts=call_counts,
         load_sleep_summary=load_sleep_summary,
         load_sleep_stage=load_sleep_stage,
         load_heart_rate=load_heart_rate,
@@ -388,12 +408,12 @@ def test_sleep_views_combine_loader_tables_without_expanding_stages(monkeypatch)
         loader,
         "person-1",
         "2024-01-02",
-        "2024-01-06",
+        "2024-01-05",
         cpd="duration",
         show=False,
     )
     assert set(summary_axes) == {"sleep", "sleep_cpd_duration"}
-    assert summary_axes["sleep"].collections
+    assert len(summary_axes["sleep"].collections) == 20
 
     boundary_index = pd.MultiIndex.from_arrays(
         [["person-1"], [pd.Timestamp("2024-01-02")]],
@@ -429,9 +449,18 @@ def test_sleep_views_combine_loader_tables_without_expanding_stages(monkeypatch)
     assert "Sleep onset" not in labels
     assert "Get-up" not in labels
     assert {patch.get_alpha() for patch in heart_axes["heart_rate"].patches} == {
-        0.175,
-        0.45,
+        0.10,
+        0.28,
+        0.34,
     }
+    assert (
+        visualization.SLEEP_HEART_RATE_STAGE_ALPHA[
+            schema.SLEEP_STAGE_AWAKE_STAGE_VALUE
+        ]
+        < visualization.SLEEP_HEART_RATE_STAGE_ALPHA[
+            schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
+        ]
+    )
 
 
 def test_weekly_overview_combines_activity_heart_rate_sleep_and_missingness():
@@ -449,6 +478,29 @@ def test_weekly_overview_combines_activity_heart_rate_sleep_and_missingness():
     assert not axes["activity"][0].figure.legends
     assert any(axis.patches for axis in axes["activity"])
     assert any(axis.lines for axis in axes["activity"])
+    assert any(
+        line.get_color() == visualization.GREY
+        for axis in axes["activity"]
+        for line in axis.lines
+    )
+    stage_axes = [
+        axis
+        for axis in axes["activity"][0].figure.axes
+        if [label.get_text() for label in axis.get_yticklabels()]
+        == ["deep", "light", "rem", "wake"]
+    ]
+    assert len(stage_axes) == 4
+    for stage_axis in stage_axes:
+        np.testing.assert_allclose(np.diff(stage_axis.get_yticks()), 1.0)
+        assert stage_axis.spines["left"].get_position() == ("outward", 52)
+        assert stage_axis.spines["left"].get_visible()
+        assert stage_axis.spines["left"].get_edgecolor() == matplotlib.colors.to_rgba(
+            visualization.BLUE
+        )
+        assert any(
+            tick.tick1line.get_visible() or tick.tick2line.get_visible()
+            for tick in stage_axis.yaxis.get_major_ticks()
+        )
     for axis in axes["activity"]:
         x, y = axis.lines[0].get_data()
         sloped = (np.diff(x) > 1e-9) & (np.abs(np.diff(y)) > 1e-9)
@@ -462,9 +514,39 @@ def test_weekly_overview_combines_activity_heart_rate_sleep_and_missingness():
         ]
         assert not any(artificial_wake_spike)
         assert axis.get_ylabel() == "Steps / 15 min"
+    assert axes["activity"][0].figure._suptitle is None
 
 
-def test_adherence_summary_builds_four_cohort_panels(monkeypatch):
+def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch):
+    heart_rate_dates = {
+        "person-1": pd.date_range("2024-01-01 12:00", periods=14, freq="1D"),
+        "person-2": pd.date_range("2024-01-08 12:00", periods=7, freq="1D"),
+        "outside-study": pd.DatetimeIndex([]),
+    }
+    sleep_dates = {
+        "person-1": pd.date_range("2024-01-01", periods=7, freq="1D"),
+        "person-2": pd.date_range("2024-01-08", periods=3, freq="1D"),
+        "outside-study": pd.DatetimeIndex([]),
+    }
+
+    def load_heart_rate(user_id, start_date=None, end_date=None, **kwargs):
+        times = heart_rate_dates[user_id]
+        return pd.DataFrame(
+            {
+                schema.LOCAL_TIME_COL: times,
+                schema.HEART_RATE_COL: np.full(len(times), 60.0),
+            }
+        )
+
+    def load_sleep_summary(user_id, start_date=None, end_date=None, **kwargs):
+        return pd.DataFrame({schema.CALENDAR_DATE_COL: sleep_dates[user_id]})
+
+    loader = SimpleNamespace(
+        get_user_ids=lambda: ["person-1", "person-2", "outside-study"],
+        load_heart_rate=load_heart_rate,
+        load_sleep_summary=load_sleep_summary,
+    )
+
     def fake_adherence(
         loader,
         metric,
@@ -476,7 +558,7 @@ def test_adherence_summary_builds_four_cohort_panels(monkeypatch):
     ):
         frequency = "1h" if resolution == "1h" else "1D"
         times = pd.date_range(start_date, end_date, freq=frequency, inclusive="left")
-        users = ["person-1", "person-2", "outside-study"]
+        users = list(user_id)
         index = pd.MultiIndex.from_product(
             [users, times],
             names=[
@@ -490,57 +572,164 @@ def test_adherence_summary_builds_four_cohort_panels(monkeypatch):
         )
         values = []
         for participant, timestamp in index:
-            if participant == "person-1":
-                value = float(
-                    pd.Timestamp("2024-01-01")
-                    <= timestamp
-                    < pd.Timestamp("2024-01-15")
-                )
+            if metric == "sleep":
+                value = float(timestamp.normalize() in sleep_dates[participant])
+            elif participant == "person-1":
+                value = float(timestamp.normalize() <= pd.Timestamp("2024-01-14"))
             elif participant == "person-2":
-                value = 0.5 * float(
+                value = float(
                     pd.Timestamp("2024-01-08")
-                    <= timestamp
-                    < pd.Timestamp("2024-01-22")
+                    <= timestamp.normalize()
+                    <= pd.Timestamp("2024-01-14")
                 )
             else:
                 value = 0.0
             values.append(value)
         return pd.DataFrame({f"{metric}_adherence": values}, index=index)
 
-    monkeypatch.setattr(visualization.adherence, "get_adherence", fake_adherence)
-    full_period_axes = visualization.plot_adherence_summary(
-        SimpleNamespace(),
-        "2024-01-01",
-        "2024-01-22",
-        show=False,
+    monkeypatch.setattr(
+        visualization,
+        "_hourly_adherence",
+        lambda loader, users, start, end, metric: fake_adherence(
+            loader,
+            metric,
+            users,
+            start,
+            end,
+            "1h",
+            "local",
+        ),
     )
-    full_period_categories = full_period_axes["participant_weeks"].images[
-        0
-    ].get_array()
-    assert full_period_categories.shape == (3, 3)
-    assert not np.ma.getmaskarray(full_period_categories).any()
-
-    inferred_axes = visualization.plot_adherence_summary(
-        SimpleNamespace(),
-        "2024-01-01",
-        "2024-01-22",
-        infer_participant_periods=True,
-        show=False,
+    monkeypatch.setattr(
+        visualization,
+        "_daily_sleep_adherence",
+        lambda loader, users, start, end: fake_adherence(
+            loader,
+            "sleep",
+            users,
+            start,
+            end,
+            "daily",
+            "local",
+        ),
     )
+    axes = visualization.plot_adherence_summary(loader, show=False)
 
-    assert set(inferred_axes) == {
-        "participant_weeks",
-        "weekly_distribution",
+    assert set(axes) == {
+        "wearing_days",
+        "available_nights",
+        "weekly_wearing",
+        "weekly_nights",
         "weekday_pattern",
         "intraday",
     }
-    assert inferred_axes["participant_weeks"].images[0].get_array().shape == (2, 2)
-    weekday = inferred_axes["weekday_pattern"].images[0].get_array()
-    intraday = inferred_axes["intraday"].images[0].get_array()
+    wearing = np.asarray(axes["wearing_days"].images[0].get_array())
+    nights = np.asarray(axes["available_nights"].images[0].get_array())
+    np.testing.assert_array_equal(wearing, [[7, 7], [7, 0]])
+    np.testing.assert_array_equal(nights, [[7, 0], [3, 0]])
+    assert axes["wearing_days"].get_legend() is None
+    weekday = axes["weekday_pattern"].images[0].get_array()
+    intraday = axes["intraday"].images[0].get_array()
     assert weekday.shape == (7, 2)
-    assert np.asarray(weekday).mean() == pytest.approx(0.75)
     assert intraday.shape == (24, 14)
-    assert np.asarray(intraday).mean() == pytest.approx(0.75)
+
+    fixed_axes = visualization.plot_adherence_summary(
+        loader,
+        follow_up_days=7,
+        include_without_evidence=True,
+        show=False,
+    )
+    assert fixed_axes["wearing_days"].images[0].get_array().shape == (3, 1)
+    assert fixed_axes["intraday"].images[0].get_array().shape == (24, 7)
+
+
+def test_adherence_summary_reuses_each_raw_stream_load():
+    loader = _sleep_loader()
+
+    visualization.plot_adherence_summary(
+        loader,
+        follow_up_days=7,
+        show=False,
+    )
+
+    assert loader.call_counts["heart_rate"] == 1
+    assert loader.call_counts["sleep_summary"] == 1
+
+
+def test_vectorized_plot_adherence_matches_canonical_adherence():
+    loader = _sleep_loader()
+    cached = visualization._AdherencePlotLoader(loader)
+    users = pd.Index(["person-1"])
+    start = pd.Timestamp("2024-01-01")
+    end = pd.Timestamp("2024-01-08")
+
+    hourly = visualization._hourly_adherence(
+        cached,
+        users,
+        start,
+        end,
+        adherence.ADHERENCE_HEART_RATE,
+    )
+    expected_hourly = adherence.get_adherence(
+        loader,
+        metric=adherence.ADHERENCE_HEART_RATE,
+        user_id=list(users),
+        start_date=start,
+        end_date=end,
+        resolution="1h",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(hourly, expected_hourly)
+
+    nights = visualization._daily_sleep_adherence(
+        cached,
+        users,
+        start,
+        end,
+    )
+    expected_nights = adherence.get_adherence(
+        loader,
+        metric=adherence.ADHERENCE_SLEEP,
+        user_id=list(users),
+        start_date=start,
+        end_date=end,
+        resolution="daily",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(nights, expected_nights)
+
+    bbi_times = pd.date_range(start, periods=3_600, freq="1s")
+    bbi = pd.DataFrame(
+        {
+            schema.UTC_TIME_COL: bbi_times,
+            schema.LOCAL_TIME_COL: bbi_times,
+            schema.TIMEZONE_COL: pd.Timedelta(0),
+            schema.BBI_COL: 1_000.0,
+        }
+    )
+    bbi_loader = SimpleNamespace(
+        hrv_source="bbi",
+        hrv_time_columns=(schema.UTC_TIME_COL, schema.LOCAL_TIME_COL),
+        get_user_ids=lambda: ["person-1"],
+        load_bbi=lambda user_id, start_date=None, end_date=None: bbi.copy(),
+    )
+    bbi_hourly = visualization._hourly_adherence(
+        visualization._AdherencePlotLoader(bbi_loader),
+        users,
+        start,
+        start + pd.Timedelta(hours=2),
+        adherence.ADHERENCE_BBI,
+    )
+    expected_bbi = adherence.get_adherence(
+        bbi_loader,
+        metric=adherence.ADHERENCE_BBI,
+        user_id=list(users),
+        start_date=start,
+        end_date=start + pd.Timedelta(hours=2),
+        resolution="1h",
+        time_reference="local",
+    )
+    pd.testing.assert_frame_equal(bbi_hourly, expected_bbi)
 
 
 def test_empty_trajectory_reports_a_clear_error():
