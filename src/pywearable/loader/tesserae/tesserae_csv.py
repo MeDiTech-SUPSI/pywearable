@@ -8,7 +8,7 @@ import pandas as pd
 
 from ... import schema
 from ..base import BaseLoader
-from ..garmin import prepare_epoch_activity_samples
+from ..garmin import _normalize_garmin_sleep_columns, prepare_epoch_activity_samples
 
 
 class TesseraeCSVLoader(BaseLoader):
@@ -202,9 +202,7 @@ class TesseraeCSVLoader(BaseLoader):
                 by=["durationInMs", "validationMap"], ascending=[True, True]
             ).drop_duplicates(subset="calendarDate", keep="last")
 
-        from ...schema import normalize_sleep_columns
-
-        return normalize_sleep_columns(sleep_summary)
+        return _normalize_garmin_sleep_columns(sleep_summary)
 
     def load_sleep_stage(
         self,
@@ -311,9 +309,7 @@ class TesseraeCSVLoader(BaseLoader):
             sleep_stage = sleep_stage.loc[
                 sleep_stage["isoDate"] < pd.Timestamp(end_date)
             ]
-        from ...schema import normalize_sleep_columns
-
-        return normalize_sleep_columns(sleep_stage)
+        return _normalize_garmin_sleep_columns(sleep_stage)
 
     def load_daily_survey(
         self,
@@ -631,6 +627,7 @@ class TesseraeCSVLoader(BaseLoader):
             hr["heart_rate"] = pd.to_numeric(hr["beats_per_minute"], errors="coerce")
             hr = hr[hr["heart_rate"] > 0]
             hr = hr.drop_duplicates(subset="utc_time", keep="last")
+            hr = schema.prepare_heart_rate_samples(hr)
             return (
                 schema.filter_heart_rate_by_time(
                     hr, start_date, end_date, time_col

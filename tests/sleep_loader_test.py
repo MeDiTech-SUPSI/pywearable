@@ -4,7 +4,47 @@ import pytest
 
 from pywearable import sleep
 from pywearable.loader import LifeSnapsParquetLoader
+from pywearable.loader.sphyncs import SphyncsDataLoader
 from pywearable.loader.tesserae import TesseraeCSVLoader, TesseraeParquetLoader
+
+
+def test_sphyncs_initial_awake_stage_uses_canonical_schema(tmp_path, monkeypatch):
+    user_folder = tmp_path / "person-1"
+    user_folder.mkdir()
+    (user_folder / "sleep_episodes.parquet").touch()
+    (user_folder / "sleep_stages.parquet").touch()
+    episodes = pd.DataFrame(
+        {
+            "dateTime": pd.to_datetime(["2024-01-02"]),
+            "startTime": pd.to_datetime(["2024-01-01 22:00"]),
+            "endTime": pd.to_datetime(["2024-01-01 23:00"]),
+        }
+    )
+    stages = pd.DataFrame(
+        {"sleepStage": ["light"]},
+        index=pd.DatetimeIndex(["2024-01-01 22:10"], name="dateTime"),
+    )
+
+    def read_parquet(path):
+        return (
+            episodes.copy()
+            if str(path).endswith("sleep_episodes.parquet")
+            else stages.copy()
+        )
+
+    monkeypatch.setattr(pd, "read_parquet", read_parquet)
+
+    result = SphyncsDataLoader(tmp_path).load_sleep_stage("person-1")
+
+    assert result["type"].tolist() == ["awake", "light"]
+    assert result["duration_in_ms"].tolist() == [600_000, 3_000_000]
+    assert (
+        result[["sleep_summary_id", "local_time", "utc_time"]]
+        .notna()
+        .all()
+        .all()
+    )
+    assert not {"sleepSummaryId", "isoDate", "durationInMs"}.intersection(result)
 
 
 def test_tesserae_csv_sleep_uses_optional_bounds_and_true_utc_milliseconds(

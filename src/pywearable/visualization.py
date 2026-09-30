@@ -2960,7 +2960,7 @@ def _adherence_evidence_bounds(loader, user, metric):
     if summaries is not None:
         if not isinstance(summaries, pd.DataFrame):
             raise ValueError("sleep summary data must be a pandas DataFrame")
-        summaries = schema.normalize_sleep_columns(summaries.copy())
+        summaries = summaries.copy()
         if not summaries.empty:
             if schema.CALENDAR_DATE_COL not in summaries:
                 raise ValueError("sleep summary data is missing calendar_date")
@@ -3129,7 +3129,7 @@ def _daily_sleep_adherence(loader, users, start, end):
         values[user_position] = 0.0
         if frame.empty:
             continue
-        frame = schema.normalize_sleep_columns(frame.copy())
+        frame = frame.copy()
         if schema.CALENDAR_DATE_COL not in frame:
             raise ValueError("sleep summary data is missing calendar_date")
         if "validation" in frame:

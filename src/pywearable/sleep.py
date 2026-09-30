@@ -1514,7 +1514,7 @@ def _compute_sleep_maintenance_efficiency(
     # SME combines two quantities derived from the same stage trajectory.
     # Provider summaries and epoch grids can differ slightly in resolution;
     # mixing summary TST with stage-derived SPT can otherwise exceed 100%.
-    filtered_sleep_stages = schema.coalesce_sleep_stage_runs(
+    filtered_sleep_stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 sleep_summary[schema.SLEEP_SUMMARY_ID_COL].unique()
@@ -1864,7 +1864,7 @@ def _compute_sleep_period_time(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -1882,7 +1882,7 @@ def _compute_sleep_period_time(
     if len(sleep_stages) == 0:
         return pd.Series(index=sleep_summary.index)
 
-    filtered_sleep_stages = schema.coalesce_sleep_stage_runs(
+    filtered_sleep_stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 sleep_summary[schema.SLEEP_SUMMARY_ID_COL].unique()
@@ -1932,7 +1932,7 @@ def _compute_sleep_onset_latency(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -1972,7 +1972,7 @@ def _compute_wake_after_sleep_onset(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -1988,7 +1988,7 @@ def _compute_wake_after_sleep_onset(
     if len(sleep_stages) == 0:
         return pd.Series(index=sleep_summary.index)
 
-    filtered_sleep_stages = schema.coalesce_sleep_stage_runs(
+    filtered_sleep_stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 sleep_summary[schema.SLEEP_SUMMARY_ID_COL].unique()
@@ -2051,7 +2051,7 @@ def _compute_light_latency(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -2073,7 +2073,7 @@ def _compute_deep_latency(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -2095,7 +2095,7 @@ def _compute_rem_latency(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -2120,7 +2120,7 @@ def _compute_latencies(
     ----------
     sleep_summary : :class:`pd.DataFrame`
         Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
-        The index of the ``sleep_summary`` must be set to the unique `sleepSummaryId`.
+        The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
 
@@ -2160,7 +2160,7 @@ def _compute_latencies(
                 schema.SLEEP_STAGE_REM_STAGE_VALUE,
             ],
         )
-    filtered_sleep_stages = schema.coalesce_sleep_stage_runs(
+    filtered_sleep_stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 sleep_summary[schema.SLEEP_SUMMARY_ID_COL].unique()
@@ -2216,7 +2216,7 @@ def _compute_awake_count(
     Parameters
     ----------
     sleep_summary : :class:`pandas.DataFrame`
-        Sleep summary data with sleepSummaryId as index.
+        Sleep summary data with ``sleep_summary_id`` as index.
     sleep_stages : :class:`pandas.DataFrame`
         Sleep stages.
 
@@ -2296,7 +2296,7 @@ def _compute_stage_count(
         return pd.DataFrame(index=sleep_summary.index)
 
     # Count maximal contiguous bouts rather than provider/export rows.
-    filtered_sleep_stages = schema.coalesce_sleep_stage_runs(
+    filtered_sleep_stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 sleep_summary[schema.SLEEP_SUMMARY_ID_COL].unique()
@@ -2416,7 +2416,7 @@ def _compute_sleep_boundaries(
         return boundaries
 
     summary_ids = _get_sleep_summary_ids(sleep_summary)
-    stages = schema.coalesce_sleep_stage_runs(
+    stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 summary_ids.unique()
@@ -2826,7 +2826,7 @@ def _compute_awakening_metrics(
         return metrics
 
     summary_ids = _get_sleep_summary_ids(sleep_summary)
-    stages = schema.coalesce_sleep_stage_runs(
+    stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 summary_ids.unique()
@@ -2919,7 +2919,7 @@ def _compute_stage_transition_count(
     if sleep_summary.empty or sleep_stages.empty:
         return result
     summary_ids = _get_sleep_summary_ids(sleep_summary)
-    stages = schema.coalesce_sleep_stage_runs(
+    stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 summary_ids.unique()
@@ -2978,7 +2978,7 @@ def _compute_stage_coverage(
     if sleep_summary.empty or sleep_stages.empty:
         return result
     summary_ids = _get_sleep_summary_ids(sleep_summary)
-    stages = schema.coalesce_sleep_stage_runs(
+    stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
             sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
                 summary_ids.unique()
@@ -3302,7 +3302,7 @@ def _nightly_sleep_statistics(
             ]
             user_statistics_list = []
             for statistic in statistics:
-                # Get series with metrics by calendarDate
+                # Get series with metrics by calendar date.
                 ser: pd.Series = SLEEP_STATISTICS_DICT[statistic](
                     sleep_summary=sleep_summary,
                     sleep_stages=sleep_stages,

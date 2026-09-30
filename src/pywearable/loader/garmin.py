@@ -6,6 +6,38 @@ import pandas as pd
 from .. import schema
 
 
+_GARMIN_SLEEP_COLUMN_MAP = {
+    "isoDate": schema.LOCAL_TIME_COL,
+    "unixTimestampInMs": "unix_timestamp_in_ms",
+    "timezoneOffsetInMs": "timezone_offset_in_ms",
+    "calendarDate": schema.CALENDAR_DATE_COL,
+    "sleepSummaryId": schema.SLEEP_SUMMARY_ID_COL,
+    "durationInMs": schema.DURATION_IN_MS_COL,
+    "isSleeping": schema.IS_SLEEPING_COL,
+    "overallSleepScore": schema.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL,
+    "lightSleepDurationInMs": (
+        schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL
+    ),
+    "deepSleepDurationInMs": schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+    "remSleepDurationInMs": schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+    "awakeDurationInMs": schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+    "unmeasurableSleepDurationInMs": (
+        schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL
+    ),
+}
+
+
+def _normalize_garmin_sleep_columns(frame: pd.DataFrame) -> pd.DataFrame:
+    """Translate Garmin sleep fields into the canonical schema."""
+    return frame.rename(
+        columns={
+            name: _GARMIN_SLEEP_COLUMN_MAP[name]
+            for name in frame.columns
+            if name in _GARMIN_SLEEP_COLUMN_MAP
+        }
+    )
+
+
 def prepare_epoch_activity_samples(
     frame: pd.DataFrame,
     *,

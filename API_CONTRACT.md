@@ -147,7 +147,7 @@ conveniences rather than portable cross-provider API.
 All non-underscored uppercase constants in `schema` are canonical field,
 required-column, or categorical-value definitions. The public preparation
 functions are `prepare_activity_samples`, `prepare_activity_summary`,
-`prepare_bbi`, `prepare_provider_feature_samples`,
+`prepare_bbi`, `prepare_heart_rate_samples`, `prepare_provider_feature_samples`,
 `prepare_provider_feature_summary`, `prepare_respiration_samples`,
 `prepare_respiration_summary`, `prepare_spo2_samples`, `prepare_spo2_summary`,
 `prepare_sleep_summary`, `prepare_sleep_stages`, and
@@ -156,14 +156,14 @@ functions are `prepare_activity_samples`, `prepare_activity_summary`,
 `empty_heart_rate_frame`, `empty_bbi_frame`, `empty_respiration_frame`,
 `empty_spo2_frame`, `empty_activity_frame`, `empty_activity_summary`,
 `validate_heart_rate_time_col`, `normalize_time_bound`,
-`filter_heart_rate_by_time`, and `normalize_sleep_columns` are currently used
-as loader-building helpers. They are proposed as extension API because custom
-loaders need the same normalization behavior.
+and `filter_heart_rate_by_time` are loader-building helpers. They are extension
+API because custom loaders need the same normalization behavior. Provider
+field names must be translated to canonical names before calling a schema
+preparer.
 
-`coalesce_sleep_stage_runs` is internal. `prepare_sleep_stages` already invokes
-it to merge exactly adjacent, equal-stage intervals within one sleep session,
-so loader authors receive the behavior without depending on the lower-level
-helper.
+Sleep-stage run coalescing is internal. `prepare_sleep_stages` already merges
+exactly adjacent, equal-stage intervals within one sleep session, so loader
+authors receive the behavior without depending on the lower-level helper.
 
 ## Export decisions applied
 

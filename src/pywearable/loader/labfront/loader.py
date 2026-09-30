@@ -16,7 +16,10 @@ import pandas as pd
 
 from ... import schema, sleep, utils
 from ..base import BaseLoader
-from ..garmin import prepare_epoch_activity_samples
+from ..garmin import (
+    _normalize_garmin_sleep_columns,
+    prepare_epoch_activity_samples,
+)
 from . import constants as lf_constants
 
 _LABFRONT_METRICS_DICT = {
@@ -2247,6 +2250,7 @@ class LabfrontLoader(BaseLoader):
         data = data.drop_duplicates(
             subset=["utc_time", "heart_rate"], keep="last"
         )
+        data = schema.prepare_heart_rate_samples(data)
         return (
             schema.filter_heart_rate_by_time(
                 data, requested_start, requested_end, time_col
@@ -2553,7 +2557,7 @@ class LabfrontLoader(BaseLoader):
         available. ``"last"`` means the last snapshot in the deterministic
         Labfront file-index order (first timestamp, then last-edit timestamp).
         """
-        return schema.normalize_sleep_columns(
+        return _normalize_garmin_sleep_columns(
             self._load_sleep_stage_raw(
                 user_id, start_date, end_date, on_conflict=on_conflict
             )
@@ -2816,7 +2820,7 @@ class LabfrontLoader(BaseLoader):
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         """Return Garmin sleep summaries in the shared snake_case schema."""
-        return schema.normalize_sleep_columns(
+        return _normalize_garmin_sleep_columns(
             self._load_sleep_summary_raw(
                 user_id, start_date, end_date, drop_duplicates=drop_duplicates
             )

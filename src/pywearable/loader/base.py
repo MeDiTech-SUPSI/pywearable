@@ -10,18 +10,18 @@ from .. import schema
 class BaseLoader(ABC):
     """Abstract class for the implementation of loader classes."""
 
-    heart_rate_time_columns = ("utc_time", "local_time")
+    heart_rate_time_columns = schema.HEART_RATE_TIME_COLUMNS
     hrv_source = "bbi"
-    hrv_time_columns = ("utc_time", "local_time")
+    hrv_time_columns = schema.BBI_TIME_COLUMNS
     respiratory_rate_source = "samples"
-    respiratory_rate_time_columns = ("utc_time", "local_time")
+    respiratory_rate_time_columns = schema.RESPIRATION_TIME_COLUMNS
     spo2_source = "samples"
-    spo2_time_columns = ("utc_time", "local_time")
+    spo2_time_columns = schema.RESPIRATION_TIME_COLUMNS
     activity_source = None
-    activity_time_columns = ("utc_time", "local_time")
+    activity_time_columns = schema.ACTIVITY_TIME_COLUMNS
     activity_primary_resolution = None
     provider_features = frozenset()
-    provider_feature_time_columns = ("utc_time", "local_time")
+    provider_feature_time_columns = schema.HEART_RATE_TIME_COLUMNS
 
     def __init__(self):
         pass

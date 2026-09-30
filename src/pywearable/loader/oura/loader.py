@@ -441,6 +441,7 @@ class OuraLoader(BaseLoader):
                 f"{unresolved} Oura heart-rate samples have no unambiguous local "
                 "offset; they remain available only through utc_time."
             )
+        frame = schema.prepare_heart_rate_samples(frame)
         return (
             schema.filter_heart_rate_by_time(
                 frame, start_date, end_date, time_col

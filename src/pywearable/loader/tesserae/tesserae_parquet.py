@@ -76,6 +76,7 @@ class TesseraeParquetLoader(BaseLoader):
         # Preserve the loader's established latest-record policy for repeated
         # Tesserae export timestamps.
         hr = hr.drop_duplicates(subset="utc_time", keep="last")
+        hr = schema.prepare_heart_rate_samples(hr)
         return (
             schema.filter_heart_rate_by_time(hr, start_date, end_date, time_col)
             .sort_values("utc_time")
@@ -237,9 +238,7 @@ class TesseraeParquetLoader(BaseLoader):
                 (sleep_stage["local_time"] < end_date),
                 :,
             ]
-        from ...schema import normalize_sleep_columns
-
-        return normalize_sleep_columns(sleep_stage)
+        return sleep_stage
 
     def load_sleep_summary(
         self,
@@ -390,9 +389,7 @@ class TesseraeParquetLoader(BaseLoader):
                 :,
             ]
 
-        from ...schema import normalize_sleep_columns
-
-        return normalize_sleep_columns(sleep)
+        return sleep
 
     def load_bbi(
         self, user_id: str, start_date: pd.Timestamp, end_date: pd.Timestamp

@@ -35,7 +35,6 @@ CURATED_MODULES = (
 
 INTERNAL_NON_PRIVATE_CALLABLES = {
     "pywearable.loader.lifesnaps": {"LifeSnapsMongoDBLoader"},
-    "pywearable.schema": {"coalesce_sleep_stage_runs"},
     "pywearable.sleep": {"compute_sleep_validation"},
 }
 

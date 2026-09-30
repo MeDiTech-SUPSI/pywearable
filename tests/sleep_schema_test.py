@@ -15,7 +15,7 @@ def test_sleep_feature_names_are_family_prefixed():
     ) == [sleep.SLEEP_STATISTIC_TIB, sleep.SLEEP_STATISTIC_SLEEP_SCORE]
 
 
-def test_legacy_sleep_columns_are_normalized():
+def test_sleep_schema_requires_canonical_column_names():
     raw = pd.DataFrame(
         {
             "calendarDate": ["2024-01-02"],
@@ -24,14 +24,8 @@ def test_legacy_sleep_columns_are_normalized():
             "REMValue": [2],
         }
     )
-    result = schema.normalize_sleep_columns(raw)
-    assert list(result) == [
-        "calendar_date",
-        "sleep_summary_id",
-        "duration_in_ms",
-        "REMValue",
-    ]
-    assert list(raw) == ["calendarDate", "sleepSummaryId", "durationInMs", "REMValue"]
+    with pytest.raises(ValueError, match="missing required columns"):
+        schema.prepare_sleep_summary(raw)
 
 
 def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():

@@ -8,8 +8,6 @@ LOCAL_TIME_COL = "local_time"
 TIMEZONE_COL = "timezone"
 LOCAL_END_TIME_COL = "local_end_time"
 UTC_END_TIME_COL = "utc_end_time"
-UNIXTIMESTAMP_IN_MS_COL = "unix_timestamp_in_ms"
-TIMEZONEOFFSET_IN_MS_COL = "timezone_offset_in_ms"
 CALENDAR_DATE_COL = "calendar_date"
 DURATION_IN_MS_COL = "duration_in_ms"
 IS_SLEEPING_COL = "is_sleeping"
@@ -127,21 +125,42 @@ SLEEP_STAGE_REQUIRED_COLUMNS = (
     SLEEP_STAGE_SLEEP_TYPE_COL,
 )
 
-_COLUMN_MAP = {
-    "isoDate": LOCAL_TIME_COL,
-    "unixTimestampInMs": UNIXTIMESTAMP_IN_MS_COL,
-    "timezoneOffsetInMs": TIMEZONEOFFSET_IN_MS_COL,
-    "calendarDate": CALENDAR_DATE_COL,
-    "sleepSummaryId": SLEEP_SUMMARY_ID_COL,
-    "durationInMs": DURATION_IN_MS_COL,
-    "isSleeping": IS_SLEEPING_COL,
-    "overallSleepScore": SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL,
-    "lightSleepDurationInMs": SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-    "deepSleepDurationInMs": SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-    "remSleepDurationInMs": SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-    "awakeDurationInMs": SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-    "unmeasurableSleepDurationInMs": SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-}
+
+def _empty_frame(column_dtypes, extra_columns=()) -> pd.DataFrame:
+    """Return an empty frame with stable canonical dtypes."""
+    frame = pd.DataFrame(
+        {
+            column: pd.Series(dtype=dtype)
+            for column, dtype in column_dtypes.items()
+        }
+    )
+    for column in extra_columns:
+        if column not in frame:
+            frame[column] = pd.Series(dtype=object)
+    return frame
+
+
+def _local_datetimes(values) -> pd.Series:
+    """Return timezone-naive participant-local timestamps."""
+    return pd.to_datetime(values, errors="coerce", format="mixed").map(
+        lambda value: value.tz_localize(None)
+        if pd.notna(value) and value.tzinfo is not None
+        else value
+    )
+
+
+def _utc_datetimes(values) -> pd.Series:
+    """Return timezone-naive UTC timestamps."""
+    return pd.to_datetime(values, errors="coerce", utc=True).dt.tz_localize(None)
+
+
+def _timedeltas(values) -> pd.Series:
+    """Return canonical UTC offsets, coercing datetime-typed missing values."""
+    if pd.api.types.is_datetime64_any_dtype(values.dtype):
+        if values.notna().any():
+            raise ValueError("timezone values must be time offsets, not timestamps")
+        return pd.Series(pd.NaT, index=values.index, dtype="timedelta64[ns]")
+    return pd.to_timedelta(values, errors="coerce")
 
 
 def validate_heart_rate_time_col(time_col: str) -> str:
@@ -181,34 +200,120 @@ def filter_heart_rate_by_time(
 
 def empty_heart_rate_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical heart-rate columns."""
-    return pd.DataFrame(columns=[*HEART_RATE_REQUIRED_COLUMNS, *extra_columns])
+    return _empty_frame(
+        {
+            UTC_TIME_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            TIMEZONE_COL: "timedelta64[ns]",
+            HEART_RATE_COL: "float64",
+        },
+        extra_columns,
+    )
 
 
 def empty_bbi_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical BBI columns."""
-    return pd.DataFrame(columns=[*BBI_REQUIRED_COLUMNS, *extra_columns])
+    return _empty_frame(
+        {
+            UTC_TIME_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            TIMEZONE_COL: "timedelta64[ns]",
+            BBI_COL: "float64",
+        },
+        extra_columns,
+    )
 
 
 def empty_respiration_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical respiration columns."""
-    return pd.DataFrame(
-        columns=[*RESPIRATION_SAMPLE_REQUIRED_COLUMNS, *extra_columns]
+    return _empty_frame(
+        {
+            UTC_TIME_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            TIMEZONE_COL: "timedelta64[ns]",
+            RESPIRATORY_RATE_COL: "float64",
+        },
+        extra_columns,
     )
 
 
 def empty_spo2_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical SpO2 columns."""
-    return pd.DataFrame(columns=[*SPO2_SAMPLE_REQUIRED_COLUMNS, *extra_columns])
+    return _empty_frame(
+        {
+            UTC_TIME_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            TIMEZONE_COL: "timedelta64[ns]",
+            SPO2_COL: "float64",
+        },
+        extra_columns,
+    )
 
 
 def empty_activity_frame(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical activity-sample columns."""
-    return pd.DataFrame(columns=[*ACTIVITY_SAMPLE_REQUIRED_COLUMNS, *extra_columns])
+    return _empty_frame(
+        {
+            UTC_TIME_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            TIMEZONE_COL: "timedelta64[ns]",
+            DURATION_IN_MS_COL: "float64",
+            ACTIVITY_STEPS_COL: "float64",
+        },
+        extra_columns,
+    )
 
 
 def empty_activity_summary(extra_columns=()) -> pd.DataFrame:
     """Return an empty table containing the canonical daily-activity columns."""
-    return pd.DataFrame(columns=[*ACTIVITY_SUMMARY_REQUIRED_COLUMNS, *extra_columns])
+    return _empty_frame(
+        {
+            CALENDAR_DATE_COL: "datetime64[ns]",
+            ACTIVITY_STEPS_COL: "float64",
+        },
+        extra_columns,
+    )
+
+
+def prepare_heart_rate_samples(frame) -> pd.DataFrame:
+    """Validate and normalize canonical timestamped heart-rate samples.
+
+    Loaders must translate vendor columns before calling this function.
+    Duplicate and conflicting exports are preserved so each loader can apply
+    its documented reconciliation policy.
+    """
+    if not isinstance(frame, pd.DataFrame):
+        raise ValueError("heart-rate data must be a pandas DataFrame")
+    frame = frame.copy()
+    for column in (UTC_TIME_COL, LOCAL_TIME_COL):
+        if column not in frame:
+            frame[column] = pd.NaT
+    frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
+    if TIMEZONE_COL not in frame:
+        frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    else:
+        frame[TIMEZONE_COL] = _timedeltas(frame[TIMEZONE_COL])
+    if HEART_RATE_COL not in frame:
+        if frame.empty:
+            frame[HEART_RATE_COL] = pd.Series(dtype=float)
+        else:
+            raise ValueError(
+                f"heart-rate data is missing required column: {HEART_RATE_COL}"
+            )
+    frame[HEART_RATE_COL] = pd.to_numeric(frame[HEART_RATE_COL], errors="coerce")
+    if TIMESTAMP_CONFLICT_COL in frame:
+        frame[TIMESTAMP_CONFLICT_COL] = frame[TIMESTAMP_CONFLICT_COL].astype(
+            "boolean"
+        )
+    frame = frame[
+        frame[HEART_RATE_COL].gt(0)
+        & (frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna())
+    ]
+    order_col = (
+        UTC_TIME_COL if frame[UTC_TIME_COL].notna().any() else LOCAL_TIME_COL
+    )
+    return frame.sort_values(order_col, kind="stable").reset_index(drop=True)
 
 
 def _prepare_physiological_samples(frame, value_col, label):
@@ -218,20 +323,14 @@ def _prepare_physiological_samples(frame, value_col, label):
     frame = frame.copy()
     if LOCAL_TIME_COL not in frame.columns:
         frame[LOCAL_TIME_COL] = pd.NaT
-    frame[LOCAL_TIME_COL] = pd.to_datetime(
-        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
-    )
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if UTC_TIME_COL not in frame.columns:
         frame[UTC_TIME_COL] = pd.NaT
-    frame[UTC_TIME_COL] = pd.to_datetime(
-        frame[UTC_TIME_COL], errors="coerce", utc=True
-    ).dt.tz_localize(None)
+    frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
     if TIMEZONE_COL not in frame.columns:
         frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    else:
+        frame[TIMEZONE_COL] = _timedeltas(frame[TIMEZONE_COL])
     if value_col not in frame.columns:
         if frame.empty:
             frame[value_col] = pd.Series(dtype=float)
@@ -286,15 +385,8 @@ def _prepare_provider_summary(frame, value_columns, label):
             raise ValueError(
                 f"{label} summary is missing required column: {CALENDAR_DATE_COL}"
             )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
-    )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce"
+    frame[CALENDAR_DATE_COL] = _local_datetimes(
+        frame[CALENDAR_DATE_COL]
     ).dt.normalize()
     for column in value_columns:
         if column not in frame.columns:
@@ -303,13 +395,7 @@ def _prepare_provider_summary(frame, value_columns, label):
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
     for column in (LOCAL_TIME_COL, LOCAL_END_TIME_COL):
         if column in frame.columns:
-            frame[column] = pd.to_datetime(
-                frame[column], errors="coerce", format="mixed"
-            ).map(
-                lambda value: value.tz_localize(None)
-                if pd.notna(value) and value.tzinfo is not None
-                else value
-            )
+            frame[column] = _local_datetimes(frame[column])
     frame = frame[frame[CALENDAR_DATE_COL].notna()].copy()
     for column in value_columns:
         valid = (
@@ -360,18 +446,12 @@ def prepare_activity_samples(frame) -> pd.DataFrame:
     for column in (UTC_TIME_COL, LOCAL_TIME_COL):
         if column not in frame.columns:
             frame[column] = pd.NaT
-    frame[UTC_TIME_COL] = pd.to_datetime(
-        frame[UTC_TIME_COL], errors="coerce", utc=True
-    ).dt.tz_localize(None)
-    frame[LOCAL_TIME_COL] = pd.to_datetime(
-        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
-    )
+    frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if TIMEZONE_COL not in frame.columns:
         frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    else:
+        frame[TIMEZONE_COL] = _timedeltas(frame[TIMEZONE_COL])
     if DURATION_IN_MS_COL not in frame.columns:
         if frame.empty:
             frame[DURATION_IN_MS_COL] = pd.Series(dtype=float)
@@ -437,17 +517,8 @@ def prepare_activity_summary(frame) -> pd.DataFrame:
             raise ValueError(
                 "activity summary is missing required column: activity_steps"
             )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: (
-            value.tz_localize(None)
-            if pd.notna(value) and value.tzinfo is not None
-            else value
-        )
-    )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce"
+    frame[CALENDAR_DATE_COL] = _local_datetimes(
+        frame[CALENDAR_DATE_COL]
     ).dt.normalize()
     frame[ACTIVITY_STEPS_COL] = pd.to_numeric(
         frame[ACTIVITY_STEPS_COL], errors="coerce"
@@ -484,18 +555,12 @@ def prepare_provider_feature_samples(frame, feature: str) -> pd.DataFrame:
     for column in (UTC_TIME_COL, LOCAL_TIME_COL):
         if column not in frame.columns:
             frame[column] = pd.NaT
-    frame[UTC_TIME_COL] = pd.to_datetime(
-        frame[UTC_TIME_COL], errors="coerce", utc=True
-    ).dt.tz_localize(None)
-    frame[LOCAL_TIME_COL] = pd.to_datetime(
-        frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
-    )
+    frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if TIMEZONE_COL not in frame.columns:
         frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    else:
+        frame[TIMEZONE_COL] = _timedeltas(frame[TIMEZONE_COL])
     frame[feature] = pd.to_numeric(frame[feature], errors="coerce")
     frame = frame[
         frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna()
@@ -544,15 +609,8 @@ def prepare_provider_feature_summary(
             raise ValueError(
                 f"provider feature summary is missing required column: {feature}"
             )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce", format="mixed"
-    ).map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
-    )
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce"
+    frame[CALENDAR_DATE_COL] = _local_datetimes(
+        frame[CALENDAR_DATE_COL]
     ).dt.normalize()
     frame = frame[frame[CALENDAR_DATE_COL].notna()].copy()
     if numeric:
@@ -566,55 +624,24 @@ def prepare_provider_feature_summary(
 
 
 def prepare_bbi(frame):
-    """Validate and order beat-to-beat intervals in the shared schema."""
+    """Validate and normalize canonical beat-to-beat interval samples."""
     if not isinstance(frame, pd.DataFrame):
         raise ValueError("BBI data must be a pandas DataFrame")
     frame = frame.copy()
-    aliases = {
-        "isoDate": LOCAL_TIME_COL,
-        "timezoneOffsetInMs": TIMEZONEOFFSET_IN_MS_COL,
-        "unixTimestampInMs": UNIXTIMESTAMP_IN_MS_COL,
-    }
-    frame = frame.rename(
-        columns={source: target for source, target in aliases.items() if target not in frame}
-    )
-    if "timezone_offset" in frame.columns and TIMEZONE_COL not in frame.columns:
-        frame = frame.rename(columns={"timezone_offset": TIMEZONE_COL})
-    if UTC_TIME_COL not in frame.columns and UNIXTIMESTAMP_IN_MS_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(
-            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
-        ).dt.tz_localize(None)
-    if LOCAL_TIME_COL in frame.columns:
-        frame[LOCAL_TIME_COL] = pd.to_datetime(
-            frame[LOCAL_TIME_COL], errors="coerce", format="mixed"
-        ).map(
-            lambda value: value.tz_localize(None)
-            if pd.notna(value) and value.tzinfo is not None
-            else value
-        )
+    for column in (UTC_TIME_COL, LOCAL_TIME_COL):
+        if column not in frame:
+            frame[column] = pd.NaT
+    frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if TIMEZONE_COL not in frame.columns:
-        if TIMEZONEOFFSET_IN_MS_COL in frame.columns:
-            frame[TIMEZONE_COL] = pd.to_timedelta(
-                pd.to_numeric(frame[TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
-                unit="ms",
-            )
-        elif UTC_TIME_COL in frame.columns and LOCAL_TIME_COL in frame.columns:
-            frame[TIMEZONE_COL] = (
-                pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
-                - pd.to_datetime(frame[UTC_TIME_COL], errors="coerce")
-            )
-    if frame.empty:
-        for column in BBI_REQUIRED_COLUMNS:
-            if column not in frame.columns:
-                frame[column] = pd.Series(dtype="object")
-        return frame
-    missing = [column for column in BBI_REQUIRED_COLUMNS if column not in frame.columns]
-    if missing:
-        raise ValueError("BBI data is missing required columns: " + ", ".join(missing))
-    frame[UTC_TIME_COL] = pd.to_datetime(
-        frame[UTC_TIME_COL], errors="coerce", utc=True
-    ).dt.tz_localize(None)
-    frame[LOCAL_TIME_COL] = pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
+        frame[TIMEZONE_COL] = frame[LOCAL_TIME_COL] - frame[UTC_TIME_COL]
+    else:
+        frame[TIMEZONE_COL] = _timedeltas(frame[TIMEZONE_COL])
+    if BBI_COL not in frame:
+        if frame.empty:
+            frame[BBI_COL] = pd.Series(dtype=float)
+        else:
+            raise ValueError(f"BBI data is missing required column: {BBI_COL}")
     frame[BBI_COL] = pd.to_numeric(frame[BBI_COL], errors="coerce")
     frame = frame[
         frame[BBI_COL].gt(0)
@@ -626,21 +653,24 @@ def prepare_bbi(frame):
     ).reset_index(drop=True)
 
 
-def normalize_sleep_columns(frame):
-    """Normalize a provider's sleep output without altering its source data."""
-    return frame.rename(
-        columns={name: _COLUMN_MAP[name] for name in frame.columns if name in _COLUMN_MAP}
-    )
-
-
 def prepare_sleep_summary(frame):
-    """Validate and order a loader result for nightly feature extraction."""
+    """Validate and normalize a canonical nightly sleep summary."""
     if not isinstance(frame, pd.DataFrame):
         raise ValueError("sleep summary data must be a pandas DataFrame")
 
-    frame = normalize_sleep_columns(frame.copy())
+    frame = frame.copy()
     if frame.empty:
-        return frame
+        required_dtypes = {
+            SLEEP_SUMMARY_ID_COL: object,
+            CALENDAR_DATE_COL: "datetime64[ns]",
+            LOCAL_TIME_COL: "datetime64[ns]",
+            **{column: "float64" for column in SLEEP_SUMMARY_FEATURE_COLUMNS},
+        }
+        empty = _empty_frame(required_dtypes)
+        for column in frame:
+            if column not in empty:
+                empty[column] = frame[column]
+        return empty
 
     missing = [
         column for column in SLEEP_SUMMARY_REQUIRED_COLUMNS if column not in frame.columns
@@ -655,27 +685,18 @@ def prepare_sleep_summary(frame):
             frame[column] = pd.Series(float("nan"), index=frame.index, dtype=float)
         else:
             frame[column] = pd.to_numeric(frame[column], errors="coerce")
+        frame.loc[frame[column].lt(0), column] = float("nan")
 
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce"
+    frame[CALENDAR_DATE_COL] = _local_datetimes(
+        frame[CALENDAR_DATE_COL]
     ).dt.normalize()
-    frame[LOCAL_TIME_COL] = pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if UTC_TIME_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(
-            frame[UTC_TIME_COL], errors="coerce", utc=True
-        ).dt.tz_localize(None)
-    elif UNIXTIMESTAMP_IN_MS_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(
-            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
-        ).dt.tz_localize(None)
+        frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
     if LOCAL_END_TIME_COL in frame.columns:
-        frame[LOCAL_END_TIME_COL] = pd.to_datetime(
-            frame[LOCAL_END_TIME_COL], errors="coerce"
-        )
+        frame[LOCAL_END_TIME_COL] = _local_datetimes(frame[LOCAL_END_TIME_COL])
     if UTC_END_TIME_COL in frame.columns:
-        frame[UTC_END_TIME_COL] = pd.to_datetime(
-            frame[UTC_END_TIME_COL], errors="coerce", utc=True
-        ).dt.tz_localize(None)
+        frame[UTC_END_TIME_COL] = _utc_datetimes(frame[UTC_END_TIME_COL])
 
     if frame[[CALENDAR_DATE_COL, LOCAL_TIME_COL, SLEEP_SUMMARY_ID_COL]].isna().any().any():
         raise ValueError(
@@ -697,16 +718,23 @@ def prepare_sleep_summary(frame):
 
 
 def prepare_sleep_stages(frame):
-    """Validate and order a loader result for sleep-stage feature extraction."""
+    """Validate and normalize canonical sleep-stage intervals."""
     if not isinstance(frame, pd.DataFrame):
         raise ValueError("sleep stage data must be a pandas DataFrame")
 
-    frame = normalize_sleep_columns(frame.copy())
+    frame = frame.copy()
     if frame.empty:
-        for column in SLEEP_STAGE_REQUIRED_COLUMNS:
-            if column not in frame.columns:
-                frame[column] = pd.Series(dtype="object")
-        return frame
+        required_dtypes = {
+            SLEEP_SUMMARY_ID_COL: object,
+            LOCAL_TIME_COL: "datetime64[ns]",
+            DURATION_IN_MS_COL: "float64",
+            SLEEP_STAGE_SLEEP_TYPE_COL: object,
+        }
+        empty = _empty_frame(required_dtypes)
+        for column in frame:
+            if column not in empty:
+                empty[column] = frame[column]
+        return empty
 
     missing = [
         column for column in SLEEP_STAGE_REQUIRED_COLUMNS if column not in frame.columns
@@ -716,15 +744,9 @@ def prepare_sleep_stages(frame):
             "sleep stage data is missing required columns: " + ", ".join(missing)
         )
 
-    frame[LOCAL_TIME_COL] = pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
     if UTC_TIME_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(
-            frame[UTC_TIME_COL], errors="coerce", utc=True
-        ).dt.tz_localize(None)
-    elif UNIXTIMESTAMP_IN_MS_COL in frame.columns:
-        frame[UTC_TIME_COL] = pd.to_datetime(
-            frame[UNIXTIMESTAMP_IN_MS_COL], unit="ms", errors="coerce", utc=True
-        ).dt.tz_localize(None)
+        frame[UTC_TIME_COL] = _utc_datetimes(frame[UTC_TIME_COL])
     frame[DURATION_IN_MS_COL] = pd.to_numeric(
         frame[DURATION_IN_MS_COL], errors="coerce"
     )
@@ -754,7 +776,7 @@ def prepare_sleep_stages(frame):
     frame = frame.sort_values(
         [SLEEP_SUMMARY_ID_COL, LOCAL_TIME_COL], kind="stable"
     ).reset_index(drop=True)
-    return coalesce_sleep_stage_runs(frame)
+    return _coalesce_sleep_stage_runs(frame)
 
 
 def prepare_sleep_sessions(frame):
@@ -764,10 +786,17 @@ def prepare_sleep_sessions(frame):
 
     frame = frame.copy()
     if frame.empty:
-        for column in SLEEP_SESSION_COLUMNS:
-            if column not in frame.columns:
-                frame[column] = pd.Series(dtype="object")
-        return frame[list(SLEEP_SESSION_COLUMNS)]
+        return _empty_frame(
+            {
+                "id": object,
+                CALENDAR_DATE_COL: "datetime64[ns]",
+                "type": object,
+                "main_sleep": "bool",
+                LOCAL_TIME_COL: "datetime64[ns]",
+                LOCAL_END_TIME_COL: "datetime64[ns]",
+                "time_in_bed_seconds": "float64",
+            }
+        )
 
     missing = [
         column for column in SLEEP_SESSION_REQUIRED_COLUMNS if column not in frame.columns
@@ -777,13 +806,11 @@ def prepare_sleep_sessions(frame):
             "sleep session data is missing required columns: " + ", ".join(missing)
         )
 
-    frame[CALENDAR_DATE_COL] = pd.to_datetime(
-        frame[CALENDAR_DATE_COL], errors="coerce"
+    frame[CALENDAR_DATE_COL] = _local_datetimes(
+        frame[CALENDAR_DATE_COL]
     ).dt.normalize()
-    frame[LOCAL_TIME_COL] = pd.to_datetime(frame[LOCAL_TIME_COL], errors="coerce")
-    frame[LOCAL_END_TIME_COL] = pd.to_datetime(
-        frame[LOCAL_END_TIME_COL], errors="coerce"
-    )
+    frame[LOCAL_TIME_COL] = _local_datetimes(frame[LOCAL_TIME_COL])
+    frame[LOCAL_END_TIME_COL] = _local_datetimes(frame[LOCAL_END_TIME_COL])
     required_values = ["id", CALENDAR_DATE_COL, LOCAL_TIME_COL, LOCAL_END_TIME_COL]
     if frame[required_values].isna().any().any():
         raise ValueError(
@@ -814,7 +841,7 @@ def prepare_sleep_sessions(frame):
     )
 
 
-def coalesce_sleep_stage_runs(frame):
+def _coalesce_sleep_stage_runs(frame):
     """Merge exactly adjacent intervals with the same stage label."""
     if frame.empty:
         return frame
@@ -901,9 +928,7 @@ __all__ = [
     "SPO2_SAMPLE_REQUIRED_COLUMNS",
     "SPO2_UPPER_BOUND_COL",
     "TIMESTAMP_CONFLICT_COL",
-    "TIMEZONEOFFSET_IN_MS_COL",
     "TIMEZONE_COL",
-    "UNIXTIMESTAMP_IN_MS_COL",
     "USER_COL",
     "UTC_END_TIME_COL",
     "UTC_TIME_COL",
@@ -914,11 +939,11 @@ __all__ = [
     "empty_respiration_frame",
     "empty_spo2_frame",
     "filter_heart_rate_by_time",
-    "normalize_sleep_columns",
     "normalize_time_bound",
     "prepare_activity_samples",
     "prepare_activity_summary",
     "prepare_bbi",
+    "prepare_heart_rate_samples",
     "prepare_provider_feature_samples",
     "prepare_provider_feature_summary",
     "prepare_respiration_samples",

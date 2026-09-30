@@ -259,6 +259,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 heart_rate.groupby("local_time")["heart_rate"].transform("nunique")
                 > 1
             )
+            heart_rate = schema.prepare_heart_rate_samples(heart_rate)
             return (
                 schema.filter_heart_rate_by_time(
                     heart_rate, start_date, end_date, time_col
@@ -493,14 +494,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 sleep_stages = sleep_stages[
                     sleep_stages["local_time"] < pd.Timestamp(end_date)
                 ]
-            from ..schema import (
-                coalesce_sleep_stage_runs,
-                normalize_sleep_columns,
-            )
-
-            return coalesce_sleep_stage_runs(
-                normalize_sleep_columns(sleep_stages)
-            )
+            return schema.prepare_sleep_stages(sleep_stages)
         else:
             return pd.DataFrame(
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
@@ -856,9 +850,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 ]
             if drop_duplicates:
                 sleep = sleep.drop_duplicates(subset="calendar_date", keep="last")
-            from ..schema import normalize_sleep_columns
-
-            return normalize_sleep_columns(sleep)
+            return schema.prepare_sleep_summary(sleep)
         return pd.DataFrame(
             columns=[
                 "sleep_summary_id",

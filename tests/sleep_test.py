@@ -12,6 +12,23 @@ import pywearable.loader
 import pywearable.sleep
 import pywearable.schema
 
+
+_SLEEP_COLUMN_MAP = {
+    "sleepSummaryId": "sleep_summary_id",
+    "calendarDate": "calendar_date",
+    "isoDate": "local_time",
+    "durationInMs": "duration_in_ms",
+    "unmeasurableSleepDurationInMs": "unmeasurable_sleep_duration_in_ms",
+    "deepSleepDurationInMs": "deep_sleep_duration_in_ms",
+    "lightSleepDurationInMs": "light_sleep_duration_in_ms",
+    "remSleepDurationInMs": "rem_sleep_duration_in_ms",
+    "awakeDurationInMs": "awake_duration_in_ms",
+    "overallSleepScore": "overall_sleep_score",
+    "unixTimestampInMs": "unix_timestamp_in_ms",
+    "timezoneOffsetInMs": "timezone_offset_in_ms",
+}
+
+
 @pytest.fixture
 def sleep_summary():
     """
@@ -35,7 +52,7 @@ x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    return pywearable.schema.normalize_sleep_columns(sleep_summary)
+    return sleep_summary.rename(columns=_SLEEP_COLUMN_MAP)
 
 
 @pytest.fixture
@@ -81,7 +98,7 @@ x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
-    return pywearable.schema.normalize_sleep_columns(sleep_stages)
+    return sleep_stages.rename(columns=_SLEEP_COLUMN_MAP)
 
 
 @pytest.fixture

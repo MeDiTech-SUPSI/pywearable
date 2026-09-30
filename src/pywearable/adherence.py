@@ -568,7 +568,7 @@ def _load_sleep_dates(
         return None
     if not isinstance(frame, pd.DataFrame):
         raise ValueError("sleep summary data must be a pandas DataFrame")
-    frame = schema.normalize_sleep_columns(frame.copy())
+    frame = frame.copy()
     if frame.empty:
         return set()
     if schema.CALENDAR_DATE_COL not in frame:
