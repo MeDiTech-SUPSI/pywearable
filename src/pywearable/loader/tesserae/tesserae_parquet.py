@@ -762,3 +762,6 @@ class TesseraeParquetLoader(BaseLoader):
             return self.get_all_users_demographics().loc[user_id, "local_time"]
         else:
             return pd.NaT
+
+
+__all__ = ["TesseraeParquetLoader"]

@@ -40,6 +40,10 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
+.pytest-*/
+.tmp/
+tmp/
+pytest-cache-files-*/
 .coverage
 .coverage.*
 .cache
@@ -170,6 +174,7 @@ playground/
 AGENTS.md
 .agents/
 .codex/
+.codex-test-temp/
 
 # Generated locally by LabfrontLoader
 **/.pywearable_file_index.csv

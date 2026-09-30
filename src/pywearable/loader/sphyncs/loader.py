@@ -636,3 +636,6 @@ class SphyncsDataLoader(BaseLoader):
                 user_ids.append(entry)
 
         return sorted(user_ids)
+
+
+__all__ = ["SphyncsDataLoader"]

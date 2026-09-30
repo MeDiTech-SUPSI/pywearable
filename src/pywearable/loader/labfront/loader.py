@@ -3194,3 +3194,6 @@ class LabfrontLoader(BaseLoader):
         if "activityType" in epochs:
             epochs = epochs.rename(columns={"activityType": "activity_type"})
         return prepare_epoch_activity_samples(epochs)
+
+
+__all__ = ["LabfrontLoader"]

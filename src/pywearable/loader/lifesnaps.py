@@ -1069,3 +1069,6 @@ class LifeSnapsParquetLoader(BaseLoader):
         return self._filter_survey_rows(
             sema, user_id, start_date, end_date, "CREATED_TS"
         )
+
+
+__all__ = ["LifeSnapsParquetLoader"]

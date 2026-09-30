@@ -1,7 +1,8 @@
 import pandas as pd
 import pytest
 
-from pywearable.loader import LifeSnapsParquetLoader, SphyncsDataLoader
+from pywearable.loader import LifeSnapsParquetLoader
+from pywearable.loader.sphyncs import SphyncsDataLoader
 from pywearable.loader.tesserae import TesseraeParquetLoader
 
 

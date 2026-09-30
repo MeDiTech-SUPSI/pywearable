@@ -1882,3 +1882,28 @@ def get_heart_rate_statistics(
         time_reference,
         cycle_kwargs,
     )
+
+
+__all__ = [
+    "HEART_RATE_STATISTIC_COUNT",
+    "HEART_RATE_STATISTIC_MAX",
+    "HEART_RATE_STATISTIC_MEAN",
+    "HEART_RATE_STATISTIC_MEDIAN",
+    "HEART_RATE_STATISTIC_MIN",
+    "HEART_RATE_STATISTIC_P10",
+    "HEART_RATE_STATISTIC_P90",
+    "HEART_RATE_STATISTIC_REST",
+    "HEART_RATE_STATISTIC_STD",
+    "HEART_RATE_STATISTICS",
+    "get_daily_heart_rate_statistics",
+    "get_daily_max_heart_rate",
+    "get_daily_mean_heart_rate",
+    "get_daily_min_heart_rate",
+    "get_daily_rest_heart_rate",
+    "get_heart_rate_statistics",
+    "get_hourly_heart_rate_statistics",
+    "get_minute_heart_rate_statistics",
+    "get_monthly_heart_rate_statistics",
+    "get_weekly_heart_rate_statistics",
+    "get_yearly_heart_rate_statistics",
+]
