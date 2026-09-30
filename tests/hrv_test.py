@@ -83,6 +83,45 @@ class ProviderHRVLoader(RawBBILoader):
         return frame
 
 
+class SubperiodProviderHRVLoader(ProviderHRVLoader):
+    def load_hrv_samples(self, user_id, start_date=None, end_date=None):
+        return pd.DataFrame(
+            {
+                "utc_time": [pd.NaT] * 6,
+                "local_time": pd.to_datetime(
+                    [
+                        "2024-01-01 23:00",
+                        "2024-01-01 23:05",
+                        "2024-01-01 23:10",
+                        "2024-01-02 23:00",
+                        "2024-01-02 23:05",
+                        "2024-01-02 23:10",
+                    ]
+                ),
+                "timezone": [pd.NaT] * 6,
+                "hrv_rmssd": [1.0, 100.0, 1.0, 2.0, 2.0, 2.0],
+                "hrv_coverage": [1.0] * 6,
+            }
+        )
+
+    def load_sleep_sessions(self, user_id, start_date=None, end_date=None):
+        return pd.DataFrame(
+            {
+                "id": ["night-1", "night-2"],
+                "calendar_date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
+                "type": ["main_sleep", "main_sleep"],
+                "main_sleep": [True, True],
+                "local_time": pd.to_datetime(
+                    ["2024-01-01 23:00", "2024-01-02 23:00"]
+                ),
+                "local_end_time": pd.to_datetime(
+                    ["2024-01-01 23:15", "2024-01-02 23:15"]
+                ),
+                "time_in_bed_seconds": [900.0, 900.0],
+            }
+        )
+
+
 class InternalWakeGapLoader(RawBBILoader):
     def __init__(self):
         super().__init__(sample_count=300)
@@ -231,6 +270,41 @@ def test_raw_bbi_night_hierarchy_uses_equal_five_minute_windows():
     assert result.loc[
         ("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"
     ] == 1
+
+
+def _subperiod_hrv_results():
+    loader = SubperiodProviderHRVLoader()
+    common = {
+        "loader": loader,
+        "statistic": "hrv_rmssd",
+        "user_id": "user",
+        "start_date": "2024-01-01",
+        "end_date": "2024-02-01",
+    }
+    direct = hrv.get_hrv_statistics(resolution="monthly", **common)
+    by_night = hrv.get_hrv_statistics(
+        resolution=["5min", "cycle_night", "monthly"],
+        aggregation=[["median", "max"], ["max"]],
+        **common,
+    )
+    return direct.iloc[0], by_night.iloc[0]
+
+
+def test_direct_max_differs_from_maximum_nightly_median():
+    direct, by_night = _subperiod_hrv_results()
+
+    assert direct["hrv_rmssd__5min__monthly_max"] == 100
+    assert by_night[
+        "hrv_rmssd__5min__cycle_night_median__monthly_max"
+    ] == 2
+
+
+def test_maximum_nightly_maximum_equals_direct_maximum():
+    direct, by_night = _subperiod_hrv_results()
+
+    assert by_night[
+        "hrv_rmssd__5min__cycle_night_max__monthly_max"
+    ] == direct["hrv_rmssd__5min__monthly_max"]
 
 
 def test_raw_bbi_wake_filtering_is_limited_to_night_cycles():
