@@ -1,7 +1,9 @@
-API
-===
+API reference
+=============
 
-API documentation.
+Only symbols intentionally exported by the listed modules form the supported
+public API. Underscored helpers and the ``hierarchy`` and ``utils.time``
+modules are implementation details.
 
 .. toctree::
    :maxdepth: 1
@@ -12,7 +14,9 @@ API documentation.
    _api/heart_rate
    _api/hrv
    _api/loader
+   _api/provider_features
    _api/respiration
+   _api/schema
    _api/sleep
-   _api/utils
+   _api/trajectory
    _api/visualization

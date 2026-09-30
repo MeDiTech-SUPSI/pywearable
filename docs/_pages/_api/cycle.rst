@@ -1,9 +1,7 @@
-Cyle-based Statistics
-=====================
+Cycles
+======
 
-.. toctree:: 
-    :maxdepth: 1
-
-    _cycle/awake.rst
-    _cycle/physiological.rst
-    _cycle/sleep.rst
+.. automodule:: pywearable.cycle
+   :members:
+   :undoc-members:
+   :member-order: bysource

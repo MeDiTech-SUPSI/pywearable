@@ -1,9 +1,7 @@
 HRV
-=========
-
-.. autosummary::
-   :toctree: generated/
-   :recursive:
+===
 
 .. automodule:: pywearable.hrv
    :members:
+   :undoc-members:
+   :member-order: bysource

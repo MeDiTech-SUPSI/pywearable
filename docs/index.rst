@@ -1,24 +1,33 @@
-.. pywearable documentation master file, created by
-   sphinx-quickstart on Wed Apr  5 15:15:27 2023.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+pywearable
+==========
 
-Welcome to pywearable's documentation!
-======================================
+``pywearable`` loads wearable data from supported providers, normalizes it
+into shared schemas, calculates comparable feature trajectories, and provides
+visualizations for individual and cohort monitoring.
+
+The library keeps source loading, feature calculation, and visualization
+separate. Provider loaders translate raw exports into canonical tables;
+domain modules produce trajectories with explicit coverage; plotting functions
+consume those trajectories without silently recalculating them.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: User guide
 
    _pages/getting_started
    _pages/data_sources
    _pages/metrics
-   _pages/tutorials
    _pages/statistics
+   _pages/visualization
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Reference
+
    _pages/api
 
-Indices and tables
-==================
+Indices
+========
 
 * :ref:`genindex`
 * :ref:`modindex`
