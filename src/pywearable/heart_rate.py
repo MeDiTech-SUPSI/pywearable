@@ -277,7 +277,7 @@ def get_daily_mean_heart_rate(
     )
 
 
-def _prepare_heart_rate_samples(
+def _filter_heart_rate_samples_for_aggregation(
     heart_rate: pd.DataFrame, time_col: str
 ) -> pd.DataFrame:
     """Validate and deduplicate samples before any heart-rate calculation."""
@@ -1080,7 +1080,7 @@ def _get_heart_rate_statistics_single_resolution(
             **loader_kwargs,
         )
         if len(loaded_heart_rate) > 0:
-            loaded_heart_rate = _prepare_heart_rate_samples(
+            loaded_heart_rate = _filter_heart_rate_samples_for_aggregation(
                 loaded_heart_rate, time_col
             )
             heart_rate = schema.filter_heart_rate_by_time(
@@ -1311,7 +1311,7 @@ def _cycle_heart_rate_trajectory(
                 time_col=schema.LOCAL_TIME_COL,
                 **loader_kwargs,
             )
-            heart_rate = _prepare_heart_rate_samples(
+            heart_rate = _filter_heart_rate_samples_for_aggregation(
                 heart_rate, schema.LOCAL_TIME_COL
             ).sort_values(schema.LOCAL_TIME_COL, kind="stable")
             if needs_coverage:

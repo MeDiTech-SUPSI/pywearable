@@ -10,10 +10,6 @@ from .. import schema
 from .base import BaseLoader
 
 
-class LifeSnapsMongoDBLoader(BaseLoader):
-    pass
-
-
 class LifeSnapsParquetLoader(BaseLoader):
     """Loader for the LifeSnaps dataset.
 

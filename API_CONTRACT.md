@@ -66,9 +66,8 @@ in the owning function's docstring.
 | `loader.BaseLoader` portable methods and capability attributes | Extension | Canonical stream DataFrames; see schema contract; `resolve_user_ids` normalizes participant selection | Loader methods target half-open bounds on the selected clock | Empty supported streams return typed empty frames; unavailable capabilities are advertised by attributes | `loader.base` | Contract is partly documented and tested; several abstract/legacy methods need docstrings |
 | `loader.LabfrontLoader`, `LifeSnapsParquetLoader`, `OuraLoader`, `TesseraeCSVLoader`, `TesseraeParquetLoader` | Public | Implement the portable `BaseLoader` contract; provider-only methods are compatibility conveniences | Target shared loader bounds | Translate provider missingness and conflicts into canonical schemas | Provider loader modules | Direct loader tests; class/method documentation is uneven |
 | `loader.garmin.prepare_epoch_activity_samples` | Extension | Canonical activity-sample `DataFrame` from Garmin epochs | Uses input rows | Collapses categories without double-counting duration; conflicts become missing | `loader.garmin` | Short docstring; direct activity tests |
-| `hierarchy.*`, `utils.time.*`, underscored names, and `sleep.compute_sleep_validation` | Internal | Implementation-specific | Internal | Internal | Respective modules | Unit-tested where useful; not user-facing documentation targets |
+| `hierarchy.*`, `utils.time.*`, and underscored names | Internal | Implementation-specific | Internal | Internal | Respective modules | Unit-tested where useful; not user-facing documentation targets |
 | `loader.SphyncsDataLoader` | Experimental | Private-dataset loader | Loader-specific | Loader-specific | `loader.sphyncs` | Retained and partly tested; excluded from first release |
-| `loader.LifeSnapsMongoDBLoader` | Internal | Unimplemented placeholder | Not applicable | Not applicable | `loader.lifesnaps` | No implementation, docs, or tests; should not be exported |
 | `pywearable` console command and conversion subcommands | Pending decision | Filesystem conversion commands | Command-specific | Command-specific | `cli` | A maintainer decision is required; public documentation and tests are currently absent |
 
 ## Exact symbol groups
@@ -132,10 +131,6 @@ declared by `BaseLoader`: `get_user_ids`, `resolve_user_ids`, `load_sleep_summar
 `load_respiration_summary`, `load_pulse_ox`, `load_spo2_summary`,
 `load_sleep_respiration`, `load_sleep_pulse_ox`, and
 `load_provider_feature`.
-
-`BaseLoader.load_stress` and `load_epoch` are retained as compatibility
-methods. They expose provider-specific shapes and are not part of the portable
-cross-provider interface.
 
 Provider-specific discovery, questionnaire, survey, demographic, raw-table,
 and conversion methods remain available on their loaders but are compatibility

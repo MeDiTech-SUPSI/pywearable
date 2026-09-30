@@ -32,12 +32,6 @@ CURATED_MODULES = (
     "pywearable.visualization",
 )
 
-INTERNAL_NON_PRIVATE_CALLABLES = {
-    "pywearable.loader.lifesnaps": {"LifeSnapsMongoDBLoader"},
-    "pywearable.sleep": {"compute_sleep_validation"},
-}
-
-
 @pytest.mark.parametrize("module_name", CURATED_MODULES)
 def test_curated_exports_resolve(module_name):
     module = importlib.import_module(module_name)
@@ -62,9 +56,7 @@ def test_non_private_callables_are_classified(module_name):
         name for name in module.__all__ if name in defined_callables
     }
 
-    assert defined_callables == exported_callables | INTERNAL_NON_PRIVATE_CALLABLES.get(
-        module_name, set()
-    )
+    assert defined_callables == exported_callables
 
 
 def test_loader_package_exports_only_first_release_loaders():
@@ -78,10 +70,8 @@ def test_loader_package_exports_only_first_release_loaders():
         "TesseraeCSVLoader",
         "TesseraeParquetLoader",
     }
-    assert "LifeSnapsMongoDBLoader" not in loader.__all__
-    assert "SphyncsDataLoader" not in loader.__all__
-    assert loader.LifeSnapsMongoDBLoader.__module__ == "pywearable.loader.lifesnaps"
-    assert loader.SphyncsDataLoader.__module__ == "pywearable.loader.sphyncs.loader"
+    assert not hasattr(loader, "LifeSnapsMongoDBLoader")
+    assert not hasattr(loader, "SphyncsDataLoader")
 
 
 def test_experimental_sphyncs_loader_remains_available_from_its_subpackage():

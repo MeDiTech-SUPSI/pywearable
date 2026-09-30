@@ -2811,7 +2811,7 @@ def _compute_cpd_duration(
     return cpds.reindex(sleep_summary.index)
 
 
-def compute_sleep_validation(sleep_summary: pd.DataFrame, **kwargs):
+def _compute_sleep_validation(sleep_summary: pd.DataFrame, **kwargs):
     return sleep_summary["validation"]
 
 
@@ -3065,7 +3065,7 @@ SLEEP_STATISTICS_DICT = {
     SLEEP_STATISTIC_MIDPOINT: _compute_sleep_midpoint,
     SLEEP_STATISTIC_CPD_MIDPOINT: _compute_cpd_midpoint,
     SLEEP_STATISTIC_CPD_DURATION: _compute_cpd_duration,
-    SLEEP_STATISTIC_VALIDATION: compute_sleep_validation,
+    SLEEP_STATISTIC_VALIDATION: _compute_sleep_validation,
 }
 
 
