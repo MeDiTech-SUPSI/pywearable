@@ -1334,7 +1334,7 @@ def plot_coverage_heatmap(
         Matplotlib colormap. The default maps low coverage to red, partial
         coverage to yellow, and complete coverage to green.
     missing_color
-        Color for unknown coverage. Unknown values are not converted to zero.
+        Color used where coverage is unknown.
     title, figsize, ax
         Optional title, new-figure size, or existing axis.
     show, save_to
@@ -1658,7 +1658,7 @@ def plot_sleep_summary(
 
     Unlike the generic trajectory plots, this view accepts a loader because it
     combines sleep summaries, native stage intervals, calculated average sleep
-    timing, provider scores, and optional circadian-personalized-disruption
+    timing, provider scores, and optional composite-phase-deviation
     (CPD) panels.
 
     Parameters
@@ -2874,8 +2874,8 @@ def plot_adherence_summary(
 
     Every participant is aligned to their first date with primary-stream or
     usable-sleep evidence. The default common follow-up is the longest observed
-    trajectory among the requested participants, so shorter trajectories retain
-    trailing non-adherence instead of disappearing from the denominator.
+    trajectory among the requested participants. Shorter trajectories
+    contribute trailing non-adherence to that shared denominator.
 
     Parameters
     ----------

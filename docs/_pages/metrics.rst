@@ -1,5 +1,5 @@
-Canonical data model
-====================
+Data model and missingness
+==========================
 
 pywearable separates two related table types: canonical loader frames and
 feature trajectories.
@@ -42,8 +42,8 @@ participant-local time, and ``timezone`` is the UTC offset represented by a
 date label.
 
 The public constants and validation functions are listed in
-:mod:`pywearable.schema`. Provider field names are deliberately absent from
-the canonical contract.
+:mod:`pywearable.schema`. Loader authors can use them to produce the same
+tables as the built-in loaders.
 
 Feature trajectories
 --------------------
@@ -52,19 +52,19 @@ Analysis functions return a :class:`pandas.DataFrame` with a two-level
 ``(user_id, time)`` index. The time level is named ``utc_time``, ``local_time``,
 or ``calendar_date`` according to the requested clock and resolution.
 
-Each feature has a separate ``<feature>__coverage`` column. Coverage describes
-the evidence supporting the feature; it is not encoded by replacing missing
-values with zero. Consequently:
+Each feature has a separate ``<feature>__coverage`` column. The value and its
+support can therefore be inspected independently:
 
-* ``0`` is a valid observed value when the feature permits it;
-* ``NaN`` means unavailable, unsupported, or invalid;
-* coverage remains separate from the value; and
-* imputed values receive ``<feature>__is_imputed`` without changing coverage.
+* ``0`` records a measured zero when the feature permits it;
+* ``NaN`` identifies a value that is unavailable for that row;
+* coverage is expressed on the scale documented by the owning feature.
 
-Hierarchical feature names record their calculation path. For example, a
-weekly mean calculated from valid daily values has a name such as
-``heart_rate_mean__weekly_mean`` rather than silently replacing the meaning of
-``heart_rate_mean``.
+The :doc:`trajectories` guide introduces the optional annotations added by
+imputation and trend analysis after describing this base format.
+
+Hierarchical feature names record their calculation path. For example,
+``heart_rate_mean__weekly_mean`` is a weekly mean of daily heart-rate means.
+This makes the calculation represented by a column visible in its name.
 
 Sleep stages
 ------------

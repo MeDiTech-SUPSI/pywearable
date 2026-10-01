@@ -27,9 +27,8 @@ The first-release public loaders are:
        :class:`pywearable.loader.TesseraeParquetLoader`
      - Published CSV layout or locally converted Parquet dataset
 
-A loader can support samples, provider summaries, or both. The domain function
-uses the source grain advertised by that loader; it does not invent a finer
-resolution than the source contains.
+A loader can support samples, provider summaries, or both. Each domain
+function offers the finest resolution supported by the source data.
 
 .. toctree::
    :maxdepth: 1

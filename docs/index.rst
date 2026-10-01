@@ -1,14 +1,14 @@
 pywearable
 ==========
 
-``pywearable`` loads wearable data from supported providers, normalizes it
-into shared schemas, calculates comparable feature trajectories, and provides
-visualizations for individual and cohort monitoring.
+``pywearable`` turns wearable exports into analysis-ready trajectories for
+activity, sleep, heart rate, heart-rate variability, respiration, oxygen
+saturation, provider scores, and adherence.
 
-The library keeps source loading, feature calculation, and visualization
-separate. Provider loaders translate raw exports into canonical tables;
-domain modules produce trajectories with explicit coverage; plotting functions
-consume those trajectories without silently recalculating them.
+A typical workflow has three steps: choose a loader, extract one or more
+features at the resolution needed by the analysis, and inspect or visualize
+the resulting trajectory. The user guide introduces each step with runnable
+examples; the API reference lists every supported parameter.
 
 .. toctree::
    :maxdepth: 2
@@ -16,9 +16,19 @@ consume those trajectories without silently recalculating them.
 
    _pages/getting_started
    _pages/data_sources
+   _pages/features
+   _pages/resolutions
+   _pages/cycles
+   _pages/trajectories
    _pages/metrics
-   _pages/statistics
    _pages/visualization
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Tutorials
+
+   _notebooks/analysis_examples
+   _notebooks/custom_loader
 
 .. toctree::
    :maxdepth: 2

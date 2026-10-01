@@ -81,5 +81,5 @@ Generic plotting functions accept a trajectory directly::
         ylabel="Steps",
     )
 
-See :doc:`statistics` for resolutions, hierarchy, and coverage semantics, and
-:doc:`visualization` for the plotting API.
+Continue with :doc:`features` to choose an outcome, :doc:`resolutions` to
+choose its time scale, and :doc:`visualization` to select a plot.

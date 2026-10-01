@@ -14,7 +14,7 @@ Install the ``parquet`` optional dependency before using this loader::
 
 The loader exposes timestamped Fitbit activity and heart-rate samples together
 with provider-computed sleep, HRV, SpO2, and stress features where present in
-the converted dataset. Missing source tables return empty canonical frames;
-they are not interpreted as observed zeros.
+the converted dataset. Missing source tables return empty canonical frames,
+preserving the distinction between unavailable data and measured zeros.
 
 See :class:`pywearable.loader.LifeSnapsParquetLoader` for the loader API.

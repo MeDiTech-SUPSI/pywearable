@@ -37,6 +37,7 @@ dev = [
     "sphinx",
     "sphinx-rtd-theme",
     "nbsphinx",
+    "pypandoc-binary",
     "pyarrow",
 ]
 
