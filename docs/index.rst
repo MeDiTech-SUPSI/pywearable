@@ -17,8 +17,8 @@ examples; the API reference lists every supported parameter.
    _pages/getting_started
    _pages/data_sources
    _pages/features
-   _pages/resolutions
    _pages/cycles
+   _pages/resolutions
    _pages/trajectories
    _pages/metrics
    _pages/visualization

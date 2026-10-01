@@ -1,7 +1,7 @@
 Tesserae
 ========
 
-The public Tesserae dataset can be read directly from its published CSV
+The public Tesserae dataset [1]_ can be read directly from its published CSV
 layout::
 
     from pywearable.loader import TesseraeCSVLoader
@@ -20,3 +20,11 @@ The Parquet loader also exposes BBI data when present.
 
 See :class:`pywearable.loader.TesseraeCSVLoader` and
 :class:`pywearable.loader.TesseraeParquetLoader` for their APIs.
+
+References
+----------
+
+.. [1] Mattingly, Stephen M., et al. "The Tesserae Project: Large-Scale,
+   Longitudinal, In Situ, Multimodal Sensing of Information Workers."
+   *Extended Abstracts of the 2019 CHI Conference on Human Factors in
+   Computing Systems* (2019).

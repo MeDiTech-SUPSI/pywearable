@@ -22,7 +22,5 @@ Additional pagination files can live in the same endpoint directory::
 
 Daily and nightly records use Oura's participant-local ``day`` label.
 Subdaily timestamps are normalized to canonical UTC and local-time columns.
-Repeated identical records are collapsed; conflicting records with the same
-provider identifier raise an error.
 
 See :class:`pywearable.loader.OuraLoader` for the loader API.

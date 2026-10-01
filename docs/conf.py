@@ -26,7 +26,7 @@ except ImportError:
 sys.path.insert(0, os.path.abspath("../src/"))
 
 project = "pywearable"
-copyright = "2023-2026, pywearable contributors"
+copyright = "2023-2026, Davide Marzorati"
 author = "pywearable contributors"
 
 # -- General configuration ---------------------------------------------------

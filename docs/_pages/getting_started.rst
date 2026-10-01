@@ -22,10 +22,10 @@ The optional NeuroKit HRV backend is installed separately::
 
     python -m pip install ".[neurokit]"
 
-Load data
----------
+Instantiate a loader
+--------------------
 
-Choose the loader matching the source dataset and inspect its participants::
+Instantiate the loader matching the source dataset and inspect its participants::
 
     from pywearable.loader import LabfrontLoader
 
@@ -35,8 +35,8 @@ Choose the loader matching the source dataset and inspect its participants::
 All analysis bounds are half-open: ``start_date`` is included and
 ``end_date`` is excluded.
 
-Calculate a trajectory
-----------------------
+Compute feature trajectories
+----------------------------
 
 Domain functions return a :class:`pandas.DataFrame` indexed by participant and
 time. Feature values and their coverage are separate columns::
@@ -56,7 +56,7 @@ time. Feature values and their coverage are separate columns::
     # activity_steps, activity_steps__coverage
 
 Use a named getter when it reads more naturally. Named getters are permanent
-convenience APIs and return the same canonical trajectory format::
+convenience APIs and return the same feature trajectory format::
 
     from pywearable import sleep
 
@@ -70,7 +70,7 @@ convenience APIs and return the same canonical trajectory format::
 Visualize the result
 --------------------
 
-Generic plotting functions accept a trajectory directly::
+Generic plotting functions accept a feature trajectory directly::
 
     from pywearable import visualization
 

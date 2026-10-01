@@ -7,10 +7,6 @@ they coordinate several streams in one figure. Every function returns its
 Matplotlib axes, so labels, annotations, and layout can be customized after
 the plot is created.
 
-The figures below use de-identified measurements from one Oura export. Dates
-are shifted or replaced by relative study labels; measurements and temporal
-patterns are retained.
-
 Choose a plot
 -------------
 
@@ -28,7 +24,8 @@ Choose a plot
      - Values, imputation, historical baseline, and normal range
      - Trend-enriched trajectory
    * - :func:`~pywearable.visualization.plot_hierarchical_trajectory`
-     - Child observations against a parent mean and standard deviation
+     - Child observations against each parent mean and its
+       ``mean ± std_multiplier × SD`` band
      - Loader and feature request
    * - :func:`~pywearable.visualization.plot_calendar_heatmap`
      - One daily value in a familiar calendar layout
@@ -40,7 +37,8 @@ Choose a plot
      - Typical within-day pattern for each weekday
      - Subdaily trajectory
    * - :func:`~pywearable.visualization.plot_period_comparison`
-     - Consecutive weekly, monthly, or yearly values and percentage changes
+     - Consecutive daily, weekly, monthly, or yearly values and percentage
+       changes
      - Aggregated trajectory
    * - :func:`~pywearable.visualization.plot_sleep_summary`
      - Sleep stages, timing, score, and optional CPD panels across nights
@@ -79,6 +77,11 @@ feature. Add a coverage panel when the support behind each row matters::
         show_coverage=True,
         ylabel="Steps",
     )
+
+.. image:: /_static/figures/trajectory.svg
+   :alt: Daily step trajectory with a source-coverage panel.
+   :width: 96%
+   :align: center
 
 For historical context, enrich the trajectory first and pass the result to
 :func:`~pywearable.visualization.plot_trajectory_trend`::
@@ -122,9 +125,17 @@ time, resting heart rate, or a provider score::
    :width: 96%
    :align: center
 
+Coverage heatmaps
+-----------------
+
 :func:`~pywearable.visualization.plot_coverage_heatmap` uses rows for dates
 and columns for local time. It is designed for questions such as “when during
 the day is heart-rate coverage usually available?”
+
+.. image:: /_static/figures/coverage-heatmap.svg
+   :alt: Heart-rate coverage by calendar date and local time of day.
+   :width: 96%
+   :align: center
 
 Typical within-day profiles
 ---------------------------
@@ -160,7 +171,7 @@ scores, average bedtime and wake-up boundaries, and narrow CPD panels.
         loader,
         user_id="participant-01",
         start_date="2026-01-01",
-        end_date="2026-01-07",
+        end_date="2026-01-14",
         cpd=("midpoint", "duration"),
     )
 
@@ -189,11 +200,18 @@ shows worn days, available nights, cohort summaries, weekday patterns, and
 local-hour patterns. Participants are aligned at their first date with
 wearable or sleep evidence; ``follow_up_days`` can set a shared study window.
 
+.. image:: /_static/figures/adherence-summary.svg
+   :alt: Cohort adherence across participants, study weeks, weekdays, and local hours.
+   :width: 100%
+   :align: center
+
 Save and customize
 ------------------
 
 Pass ``show=False`` when building figures in a script and ``save_to`` to write
-the output. The returned axes can be edited with normal Matplotlib methods::
+the output. Every plotting function returns its Matplotlib axis or axes; assign
+that return value to update labels, annotations, limits, or layout with normal
+Matplotlib methods::
 
     axis = visualization.plot_calendar_heatmap(
         steps,
@@ -202,5 +220,3 @@ the output. The returned axes can be edited with normal Matplotlib methods::
         save_to="daily-steps.svg",
     )
     axis.set_title("Participant 01 — daily steps")
-
-The generation script is ``docs/_scripts/generate_examples.py``.

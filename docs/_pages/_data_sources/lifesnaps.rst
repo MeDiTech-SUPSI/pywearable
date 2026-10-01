@@ -1,7 +1,7 @@
 LifeSnaps
 =========
 
-``LifeSnapsParquetLoader`` reads a LifeSnaps dataset that has already been
+``LifeSnapsParquetLoader`` reads the LifeSnaps dataset [1]_ after it has been
 converted into pywearable's local Parquet layout::
 
     from pywearable.loader import LifeSnapsParquetLoader
@@ -18,3 +18,10 @@ the converted dataset. Missing source tables return empty canonical frames,
 preserving the distinction between unavailable data and measured zeros.
 
 See :class:`pywearable.loader.LifeSnapsParquetLoader` for the loader API.
+
+References
+----------
+
+.. [1] Yfantidou, Sofia, et al. "LifeSnaps, a 4-month multi-modal dataset
+   capturing unobtrusive snapshots of our lives in the wild." *Scientific
+   Data* 9.1 (2022): 663.

@@ -63,7 +63,7 @@ calendar week::
         resolution=("daily", "weekly"),
         aggregation="mean",
         min_coverage=(0.70, None),
-        min_valid_children=5,
+        min_valid_children=(None, 5),
     )
 
 The result includes ``heart_rate_mean__weekly_mean``. Its weekly coverage is
@@ -90,9 +90,9 @@ specification per level. Nest lists when a level branches into several
 operations::
 
     resolution=("daily", "weekly", "monthly")
-    aggregation=(["mean", "p90"], "mean")
+    aggregation=(["mean", "std"], "mean")
 
-This produces weekly mean and p90 branches, followed by monthly means of each
+This produces weekly mean and standard-deviation branches, followed by monthly means of each
 branch.
 
 Coverage and support
@@ -103,10 +103,35 @@ coverage reflects the evidence available for that domain and window. At a
 parent level, it reports the fraction of expected child windows that met the
 child requirement.
 
-``min_coverage`` sets one optional threshold per level.
-``min_valid_children`` adds a count requirement for a parent. Together they
-allow statements such as “include a weekly value only when at least five
-well-covered days are present.”
+``min_coverage`` is the minimum acceptable ratio between observed and expected
+evidence. At the primary level, the numerator and denominator are defined by
+the domain: for regularly sampled heart rate, for example, they are the number
+of observed and expected samples in the window. At a parent level, the ratio
+is the number of valid child windows divided by the number expected in that
+parent. A scalar applies the same threshold at every level. A sequence must
+contain one entry per requested resolution; use ``None`` where no threshold
+should be applied.
+
+``min_valid_children`` is a separate count requirement for parent levels. Its
+sequence form also has one entry per requested resolution, but the primary
+entry must be ``None`` because primary rows have no children. A scalar integer
+is shorthand for applying that count to every parent level.
+
+For example, this two-level request keeps a daily heart-rate value only when
+at least 70% of its expected samples are observed, then keeps a weekly value
+only when at least five valid daily rows are present::
+
+    weekly = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+        user_id="participant-01",
+        start_date="2026-01-01",
+        end_date="2026-04-01",
+        resolution=("daily", "weekly"),
+        aggregation="mean",
+        min_coverage=(0.70, None),
+        min_valid_children=(None, 5),
+    )
 
 Direct and hierarchical summaries answer different questions
 ------------------------------------------------------------

@@ -7,12 +7,14 @@ belongs naturally to the same sleep-wake sequence. pywearable therefore
 provides three participant-local cycle definitions.
 
 .. image:: /_static/figures/cycles.svg
-   :alt: Timeline comparing the night, awake, and physiological cycle definitions across two main sleep sessions.
+   :alt: Heart rate across several days, repeated in three panels with night, awake, and physiological cycle intervals shaded.
    :width: 94%
    :align: center
 
-The boundaries above come from two consecutive main sleeps in a de-identified
-Oura export. The horizontal scale is elapsed time from the first bedtime.
+The three panels show the same heart-rate trajectory from a de-identified Oura
+export. Only the shaded cycle definition changes, making the different
+boundaries directly comparable. The horizontal scale is elapsed time from the
+first bedtime.
 
 ``cycle_night``
     The provider-designated main-sleep session, from bedtime to session end.
@@ -28,11 +30,11 @@ Oura export. The horizontal scale is elapsed time from the first bedtime.
 Naps remain observations within the awake and physiological cycles; they do
 not create new boundaries.
 
-Inspect cycle boundaries
-------------------------
+Define cycle boundaries
+-----------------------
 
-Use :func:`pywearable.cycle.get_intervals` to inspect the exact intervals
-before calculating a feature::
+Use :func:`pywearable.cycle.get_intervals` to define and inspect the exact
+intervals::
 
     from pywearable import cycle
 
@@ -45,7 +47,10 @@ before calculating a feature::
     )
 
 The result contains ``start_time``, ``end_time``, ``interval_valid``, and
-``end_source`` for each requested sleep calendar date.
+``end_source`` for each requested sleep calendar date. Feature functions use
+this same interval calculation internally when ``resolution`` is set to a
+cycle. Calling it directly is useful when the boundaries themselves need to
+be inspected or reused.
 
 Use cycles in feature extraction
 --------------------------------

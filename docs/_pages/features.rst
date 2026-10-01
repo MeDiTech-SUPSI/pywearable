@@ -9,10 +9,11 @@ to request all features in a domain.
 
    The features listed here are capabilities of pywearable, not a guarantee
    that every loader can calculate all of them. A feature is available only
-   when the selected loader supplies its required source stream and time
-   information. For example, daily activity summaries support daily step
-   totals, while peak-hour activity requires timestamped activity samples.
-   See :doc:`data_sources` for the streams exposed by each built-in loader.
+   when the selected loader supplies its required source stream, time
+   information, and sufficient source resolution. For example, daily activity
+   summaries support daily step totals, while peak-hour activity requires
+   timestamped activity samples. See :doc:`data_sources` for the streams
+   exposed by each built-in loader.
 
 The examples below use the canonical functions. Named getters such as
 :func:`pywearable.sleep.get_total_sleep_time` and
@@ -115,20 +116,21 @@ or for calendar aggregates derived from those nights.
      - Available information
    * - Duration and continuity
      - Time in bed (TIB), total sleep time (TST), sleep period time (SPT),
-       wake after sleep onset (WASO), sleep onset latency (SOL), sleep
-       efficiency (SE), and sleep maintenance efficiency (SME)
+       wake after sleep onset (WASO), sleep efficiency (SE), and sleep
+       maintenance efficiency (SME)
    * - Stage composition
      - Deep, light, REM, NREM, awake, and unmeasurable durations; stage
-       percentages; stage counts; and stage latencies
+       percentages; and stage counts
+   * - Latencies
+     - Sleep onset latency (SOL), get-up latency, and deep, light, and REM
+       stage latencies
    * - Fragmentation
      - Awakening count, awakening index, median awakening duration, stage
        transition count, and stage transition index
    * - Timing
-     - Bedtime, sleep onset, wake-up, get-up, midpoint, and get-up latency
+     - Bedtime, sleep onset, wake-up, get-up, and midpoint
    * - Regularity
      - Composite phase deviation (CPD) for midpoint and duration
-   * - Data quality
-     - Sleep-stage coverage and provider validation status
    * - Provider summary
      - Nightly sleep score when supplied by the source
 
@@ -145,9 +147,13 @@ for SRI with comparable-epoch coverage, or
 Provider-native features
 ------------------------
 
-Some useful outcomes are defined by a provider rather than by pywearable.
+Some useful outcomes are calculated by individual wearable providers rather
+than by pywearable. Their availability therefore depends on both the provider
+and the loader: Garmin measures are expected only from Garmin-backed sources,
+for example, while Oura readiness requires Oura data.
 :func:`pywearable.provider_features.get_available_provider_features` reports
-which of these the current loader can supply. They currently include:
+which provider-native features the current loader can supply. They currently
+include:
 
 * Garmin stress and Body Battery measures;
 * Fitbit stress-management scores and components; and
@@ -170,10 +176,9 @@ are provider-specific::
 Adherence
 ---------
 
-Use :func:`pywearable.adherence.get_adherence` to quantify the represented
-fraction of a window for heart rate, beat-to-beat intervals, or sleep.
-Adherence can be calculated directly for a window or hierarchically, such as
-the fraction of qualifying five-minute windows in each day.
+Use :func:`pywearable.adherence.get_adherence` to quantify how much of each
+requested time window is represented by valid heart-rate, beat-to-beat
+interval, or sleep data.
 
 Next steps
 ----------

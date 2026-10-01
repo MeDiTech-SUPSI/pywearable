@@ -1,5 +1,5 @@
-Working with trajectories
-=========================
+Working with feature trajectories
+=================================
 
 A trajectory is the common output of pywearable's feature modules. It is a
 :class:`pandas.DataFrame` indexed by ``(user_id, time)`` and contains feature
@@ -28,7 +28,8 @@ and adds ``<feature>__is_imputed``. This Boolean column is ``True`` only where
 that feature was filled. Coverage continues to describe the source data that
 supported the original row.
 
-Historical methods use observations preceding the missing row:
+Select the estimator with the ``method`` parameter. Historical methods use
+observations preceding the missing row:
 
 ``ma``
     Trailing moving mean.
@@ -43,10 +44,12 @@ Historical methods use observations preceding the missing row:
 ``cumulative_mean``
     Mean of all earlier observations for that participant.
 
-Retrospective methods use the complete supplied trajectory:
-``user_mean``, ``user_median``, ``population_mean``, and
-``population_median``. Choose these only when using later observations is
-consistent with the study design.
+Retrospective methods use the complete supplied trajectory. ``user_mean`` and
+``user_median`` use all observed values for the same participant.
+``population_mean`` and ``population_median`` pool all observed values across
+every participant present in the supplied trajectory; they do not load any
+additional participants or data. Choose these methods only when using later
+observations is consistent with the study design.
 
 ::
 
@@ -93,7 +96,9 @@ calculated from earlier observed values and excludes imputed values.
 
 The baseline and normal range can use different histories. A short baseline
 can follow recent change, while a longer normal-range window describes the
-participant's broader variability::
+participant's broader variability. The normal range is centered on its
+historical estimate and extends ``std_multiplier`` historical standard
+deviations on each side::
 
     enriched = trajectory.compute_trajectory_trend(
         filled,
@@ -119,6 +124,11 @@ Summarize a typical week
 Mondays, all Tuesdays, and so on within each participant. It supports mean,
 median, min, max, standard deviation, and percentiles such as ``p90``. This is
 a descriptive weekday profile, not a chronological parent hierarchy.
+
+The function accepts daily or subdaily feature trajectories. With daily rows,
+it returns one summary for each weekday. With subdaily rows, it collapses all
+times observed on the same weekday and therefore does not retain time-of-day
+patterns.
 
 ::
 

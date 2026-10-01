@@ -1,4 +1,4 @@
-"""Generate the Oura-derived figures embedded in the user guide."""
+"""Generate the real-data figures embedded in the user guide."""
 
 from __future__ import annotations
 
@@ -13,7 +13,6 @@ matplotlib.use("Agg")
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.patches import Rectangle
 from matplotlib.ticker import FuncFormatter
 
 
@@ -29,7 +28,7 @@ from pywearable import (  # noqa: E402
     trajectory,
     visualization,
 )
-from pywearable.loader import OuraLoader  # noqa: E402
+from pywearable.loader import LabfrontLoader, OuraLoader  # noqa: E402
 
 
 OUTPUT = ROOT / "docs" / "_static" / "figures"
@@ -39,6 +38,7 @@ DATA_ROOT = Path(
         ROOT / "data_wearable" / "oura_20240822",
     )
 )
+LABFRONT_ROOT = os.environ.get("PYWEARABLE_DOCS_LABFRONT_ROOT")
 USER_PREFIX = os.environ.get("PYWEARABLE_DOCS_USER_PREFIX", "A_")
 PUBLIC_USER = "example-participant"
 PUBLIC_MONDAY = pd.Timestamp("2026-01-05")
@@ -74,6 +74,20 @@ def _load_example():
             f"No participant directory starts with {USER_PREFIX!r} in {DATA_ROOT}."
         )
     return loader, matches[0]
+
+
+def _load_labfront_example():
+    """Return the configured Labfront loader without exposing participant IDs."""
+    if not LABFRONT_ROOT:
+        raise FileNotFoundError(
+            "Set PYWEARABLE_DOCS_LABFRONT_ROOT to the local Labfront export root."
+        )
+    data_root = Path(LABFRONT_ROOT)
+    if not data_root.is_dir():
+        raise FileNotFoundError(
+            "PYWEARABLE_DOCS_LABFRONT_ROOT does not identify a directory."
+        )
+    return LabfrontLoader(data_root)
 
 
 def _analysis_data(loader, user, days=70):
@@ -149,7 +163,12 @@ def _densest_sleep_window(loader, user, start, end, days=14):
 
 
 def make_cycle_figure(loader, user, start, end):
-    """Plot real boundaries for one complete sleep-wake cycle."""
+    """Compare cycle definitions over one real multi-day heart-rate trace."""
+    cycle_types = (
+        cycle.CYCLE_NIGHT,
+        cycle.CYCLE_AWAKE,
+        cycle.CYCLE_PHYSIOLOGICAL,
+    )
     intervals = {
         kind: cycle.get_intervals(
             loader,
@@ -158,57 +177,109 @@ def make_cycle_figure(loader, user, start, end):
             start_date=start,
             end_date=end,
         ).xs(user, level=schema.USER_COL)
-        for kind in (
-            cycle.CYCLE_NIGHT,
-            cycle.CYCLE_AWAKE,
-            cycle.CYCLE_PHYSIOLOGICAL,
-        )
+        for kind in cycle_types
     }
-    valid_dates = intervals[cycle.CYCLE_NIGHT].index[
-        intervals[cycle.CYCLE_NIGHT]["interval_valid"]
-        & intervals[cycle.CYCLE_AWAKE]["interval_valid"]
-        & intervals[cycle.CYCLE_PHYSIOLOGICAL]["interval_valid"]
+    valid_sets = {
+        kind: set(frame.index[frame["interval_valid"]])
+        for kind, frame in intervals.items()
+    }
+    common_dates = sorted(set.intersection(*valid_sets.values()))
+    common_set = set(common_dates)
+    runs = [
+        pd.DatetimeIndex([date + pd.Timedelta(days=offset) for offset in range(3)])
+        for date in common_dates
+        if all(
+            date + pd.Timedelta(days=offset) in common_set for offset in range(3)
+        )
     ]
-    if valid_dates.empty:
-        raise ValueError("No complete sleep-wake cycle is available.")
-    calendar_date = valid_dates[0]
-    next_nights = intervals[cycle.CYCLE_NIGHT].loc[
-        (intervals[cycle.CYCLE_NIGHT].index > calendar_date)
-        & intervals[cycle.CYCLE_NIGHT]["interval_valid"]
-    ]
-    current = intervals[cycle.CYCLE_NIGHT].loc[calendar_date]
-    following = next_nights.iloc[0]
-    origin = pd.Timestamp(current["start_time"])
+    if not runs:
+        raise ValueError("No three consecutive complete sleep-wake cycles are available.")
 
-    def hours(value):
-        return (pd.Timestamp(value) - origin).total_seconds() / 3600
+    heart_rate_all = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+        user_id=user,
+        start_date=start,
+        end_date=end,
+        resolution="15min",
+        time_reference="local",
+    ).xs(user, level=schema.USER_COL)
+    feature = heart_rate.HEART_RATE_STATISTIC_MEAN
 
-    fig, ax = plt.subplots(figsize=(10, 3.6))
-    ax.set_ylim(-0.2, 3.8)
-    ax.set_xlim(-1, hours(following["end_time"]) + 1)
-    ax.set_yticks([3.2, 2.35, 1.45, 0.55])
-    ax.set_yticklabels(
-        ["Main sleeps", "Night cycle", "Awake cycle", "Physiological cycle"]
+    def bounds(run):
+        rows = intervals[cycle.CYCLE_PHYSIOLOGICAL].loc[run]
+        return pd.Timestamp(rows.iloc[0]["start_time"]), pd.Timestamp(
+            rows.iloc[-1]["end_time"]
+        )
+
+    selected = max(
+        runs,
+        key=lambda run: heart_rate_all.loc[
+            (heart_rate_all.index >= bounds(run)[0])
+            & (heart_rate_all.index < bounds(run)[1]),
+            feature,
+        ].notna().sum(),
     )
-    ax.set_xlabel("Hours from the first bedtime")
-    ax.grid(axis="x", color="#D9D9D9", linewidth=0.8)
-    ax.spines[["top", "right", "left"]].set_visible(False)
-    ax.tick_params(axis="y", length=0)
+    plot_start, plot_end = bounds(selected)
+    heart_rate_window = heart_rate_all.loc[
+        (heart_rate_all.index >= plot_start)
+        & (heart_rate_all.index < plot_end)
+    ]
 
-    for row in (current, following):
-        left = hours(row["start_time"])
-        width = hours(row["end_time"]) - left
-        ax.add_patch(Rectangle((left, 3.0), width, 0.4, color=visualization.BLUE))
-    for y, kind, color in (
-        (2.15, cycle.CYCLE_NIGHT, visualization.BLUE),
-        (1.25, cycle.CYCLE_AWAKE, visualization.ORANGE),
-        (0.35, cycle.CYCLE_PHYSIOLOGICAL, visualization.GREEN),
-    ):
-        row = intervals[kind].loc[calendar_date]
-        left = hours(row["start_time"])
-        width = hours(row["end_time"]) - left
-        ax.add_patch(Rectangle((left, y), width, 0.4, color=color, alpha=0.85))
-    ax.set_title("Sleep-anchored intervals from one observed sleep-wake cycle")
+    def elapsed_days(values):
+        return (pd.to_datetime(values) - plot_start).total_seconds() / 86_400
+
+    colors = {
+        cycle.CYCLE_NIGHT: visualization.BLUE,
+        cycle.CYCLE_AWAKE: visualization.ORANGE,
+        cycle.CYCLE_PHYSIOLOGICAL: visualization.GREEN,
+    }
+    labels = {
+        cycle.CYCLE_NIGHT: "Night cycles: bedtime to sleep-session end",
+        cycle.CYCLE_AWAKE: "Awake cycles: session end to the next bedtime",
+        cycle.CYCLE_PHYSIOLOGICAL: "Physiological cycles: bedtime to bedtime",
+    }
+    x = elapsed_days(heart_rate_window.index)
+    fig, axes = plt.subplots(
+        3,
+        1,
+        figsize=(10, 6.5),
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+    for axis, kind in zip(axes, cycle_types):
+        for calendar_date in selected:
+            row = intervals[kind].loc[calendar_date]
+            axis.axvspan(
+                elapsed_days(pd.DatetimeIndex([row["start_time"]]))[0],
+                elapsed_days(pd.DatetimeIndex([row["end_time"]]))[0],
+                color=colors[kind],
+                alpha=0.20,
+                linewidth=0,
+            )
+        if kind == cycle.CYCLE_PHYSIOLOGICAL:
+            for boundary in intervals[kind].loc[selected, "start_time"].iloc[1:]:
+                axis.axvline(
+                    elapsed_days(pd.DatetimeIndex([boundary]))[0],
+                    color=visualization.BLACK,
+                    linestyle=":",
+                    linewidth=1.2,
+                    alpha=0.65,
+                )
+        axis.plot(
+            x,
+            heart_rate_window[feature],
+            color=visualization.BLACK,
+            linewidth=1.1,
+        )
+        axis.set_title(labels[kind], loc="left", fontsize=10)
+        axis.grid(axis="y", alpha=0.18)
+        axis.spines[["top", "right"]].set_visible(False)
+    axes[-1].set_xlim(0, (plot_end - plot_start).total_seconds() / 86_400)
+    axes[-1].set_xlabel("Elapsed days from the first bedtime")
+    fig.supylabel("Heart rate (bpm)")
+    fig.suptitle("One heart-rate trajectory under three cycle definitions")
     _save(fig, "cycles.svg")
 
 
@@ -234,8 +305,21 @@ def make_hierarchy_figure(loader, user, start, end):
 
 def make_trajectory_figure(steps):
     """Render imputation, trend, normal range, and coverage together."""
+    source = _shift_trajectory(steps)
+    axes = visualization.plot_trajectory(
+        source,
+        activity.ACTIVITY_STATISTIC_STEPS,
+        kind="bar",
+        show_imputed=False,
+        show_coverage=True,
+        title="Daily steps and source coverage",
+        ylabel="Steps",
+        show=False,
+    )
+    _save(axes["trajectory"].figure, "trajectory.svg")
+
     frame = trajectory.impute_trajectory(
-        _shift_trajectory(steps),
+        source,
         activity.ACTIVITY_STATISTIC_STEPS,
         method="rolling_median",
         window=7,
@@ -270,6 +354,45 @@ def make_calendar_figure(steps):
         show=False,
     )
     _save(axis.figure, "calendar-heatmap.svg")
+
+
+def make_coverage_figure(loader):
+    """Render one de-identified Labfront heart-rate coverage heatmap."""
+    start = pd.Timestamp("2024-02-12")
+    end = pd.Timestamp("2024-03-01")
+    user = next(
+        (
+            candidate
+            for candidate in loader.get_user_ids()
+            if not loader.load_heart_rate(
+                candidate,
+                start_date=start,
+                end_date=end,
+                time_col=schema.LOCAL_TIME_COL,
+            ).empty
+        ),
+        None,
+    )
+    if user is None:
+        raise ValueError("No Labfront participant has heart-rate data in the window.")
+
+    five_minute = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+        user_id=user,
+        start_date=start,
+        end_date=end,
+        resolution="5min",
+        time_reference="local",
+    )
+    axis = visualization.plot_coverage_heatmap(
+        _shift_trajectory(five_minute),
+        heart_rate.HEART_RATE_STATISTIC_MEAN,
+        cmap="RdYlGn",
+        title="Heart-rate coverage by local time",
+        show=False,
+    )
+    _save(axis.figure, "coverage-heatmap.svg")
 
 
 def make_weekly_profile_figure(loader, user, start, end):
@@ -346,6 +469,25 @@ def make_sleep_heart_rate_figure(loader, user, start, end):
     _save(axes["heart_rate"].figure, "sleep-heart-rate.svg")
 
 
+def make_adherence_figure(loader):
+    """Render a de-identified Labfront cohort adherence summary."""
+    axes = visualization.plot_adherence_summary(
+        loader,
+        metric="heart_rate",
+        user_id="all",
+        follow_up_days=70,
+        worn_day_threshold=0.7,
+        include_without_evidence=False,
+        title="Cohort heart-rate and sleep adherence",
+        show=False,
+    )
+    participants = len(axes["wearing_days"].get_yticks())
+    labels = [f"P{index + 1:02d}" for index in range(participants)]
+    for name in ("wearing_days", "available_nights"):
+        axes[name].set_yticklabels(labels)
+    _save(axes["wearing_days"].figure, "adherence-summary.svg")
+
+
 def main():
     """Generate every figure referenced by the Sphinx pages."""
     OUTPUT.mkdir(parents=True, exist_ok=True)
@@ -360,14 +502,17 @@ def main():
         }
     )
     loader, user = _load_example()
+    labfront_loader = _load_labfront_example()
     steps, start, end = _analysis_data(loader, user)
     make_cycle_figure(loader, user, start, end)
     make_hierarchy_figure(loader, user, start, end)
     make_trajectory_figure(steps)
     make_calendar_figure(steps)
+    make_coverage_figure(labfront_loader)
     make_weekly_profile_figure(loader, user, start, end)
     make_sleep_summary_figure(loader, user, start, end)
     make_sleep_heart_rate_figure(loader, user, start, end)
+    make_adherence_figure(labfront_loader)
 
 
 if __name__ == "__main__":
