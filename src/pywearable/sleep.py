@@ -3528,23 +3528,28 @@ def get_sleep_statistics(
 ) -> pd.DataFrame:
     """Return main-sleep features at night level or along a hierarchy.
 
-    A scalar weekly, monthly, or yearly resolution is shorthand for a
-    ``nightly`` hierarchy ending at that calendar resolution. Resolution
-    sequences explicitly define each increasingly larger level, for example
+    Requesting ``"weekly"``, ``"monthly"``, or ``"yearly"`` as a single
+    resolution is shorthand for a ``nightly`` hierarchy ending at that
+    calendar resolution. Resolution sequences explicitly define each
+    increasingly larger level, for example
     ``["nightly", "weekly", "monthly"]``. Upper levels give each valid child
     row equal weight and return immediate ``valid / expected`` coverage in
     ``[0, 1]``. Nightly coverage is binary feature availability: ``1`` when
-    the feature is present and ``0`` when it is missing on an expected
-    calendar date. At upper levels, coverage is the fraction of expected
-    nights containing a valid feature.
+    that feature is present and ``0`` when it is missing on an expected
+    calendar date. This is feature-specific: a sleep summary alone does not
+    produce coverage ``1`` for every metric. For example, CPD that cannot be
+    computed without the preceding night's data has coverage ``0``. At upper
+    levels, coverage is the fraction of expected nights containing a valid
+    feature.
 
     ``aggregation`` selects the operation or branching operations at each
     upper level; ``None`` uses the shared standard operations. A
-    ``min_coverage`` sequence supplies one threshold per resolution. A scalar
-    threshold on a scalar calendar request applies to that calendar level.
-    ``min_valid_children`` independently requires an absolute number of valid
-    child windows at each upper level; a scalar applies to every upper level,
-    while a sequence uses ``None`` for the nightly level.
+    ``min_coverage`` sequence supplies one threshold per resolution. When both
+    the calendar resolution and threshold are given as single values, the
+    threshold applies to that calendar level. ``min_valid_children``
+    independently requires an absolute number of valid child windows at each
+    upper level; a single value applies to every upper level, while a sequence
+    uses ``None`` for the nightly level.
 
     Parameters
     ----------
@@ -3571,8 +3576,9 @@ def get_sleep_statistics(
         Operation or branching operations for each parent level. It is valid
         only when the request contains a parent resolution.
     min_coverage
-        Optional minimum feature coverage at each requested level. A scalar
-        calendar request applies its scalar threshold to the calendar parent.
+        Optional minimum feature coverage at each requested level. When the
+        calendar resolution and threshold are each given as one value, the
+        threshold applies to the calendar parent.
     min_valid_children
         Optional minimum number of valid nightly or intermediate child rows at
         each parent level.

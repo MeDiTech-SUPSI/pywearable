@@ -540,9 +540,13 @@ def impute_trajectory(
     -----
     Historical estimates are participant-specific, use observations preceding
     the missing row, and never use values filled by this or an earlier call.
-    Full-user and population methods intentionally use observations from the
-    complete input trajectory. Clock features are aggregated by time of day
-    and restored on the missing row's relevant calendar date.
+    Full-user methods compute the mean or median from all observed values for
+    that participant in the complete supplied trajectory. Population methods
+    compute one mean or median from all observed values across every
+    participant and date in the supplied trajectory, then use it for every
+    participant; no loader or external cohort data is consulted. Clock
+    features are aggregated by time of day and restored on the missing row's
+    relevant calendar date.
     """
     selected = _trajectory_features(trajectory, features)
     clock = _clock_features(trajectory, selected, temporal_features)

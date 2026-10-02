@@ -1709,9 +1709,8 @@ def plot_sleep_summary(
 
     Notes
     -----
-    Stage intervals are drawn at native duration; no one-minute expansion is
-    performed. The clock axis is cropped to the observed sleep range rather
-    than showing an entire 24-hour day.
+    The clock axis is cropped to the observed sleep range rather than showing
+    an entire 24-hour day.
     """
     if not np.isfinite(fontsize) or fontsize <= 0:
         raise ValueError("fontsize must be a positive finite number")
