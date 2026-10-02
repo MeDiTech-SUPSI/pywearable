@@ -324,8 +324,15 @@ def plot_trajectory(
         marker or hatch and are never confused with observed values.
     show_coverage
         Add a lower panel from the corresponding ``__coverage`` columns.
+    title, xlabel, ylabel
+        Optional title and axis labels.
+    figsize
+        Figure size used when new axes are created.
+    ax
+        Existing trajectory axis, or axes accepted by the coverage layout.
     show, save_to
-        Display the figure and/or save it to the supplied path.
+        Display the figure and/or save it to the supplied path. Saving does
+        not close the figure.
 
     Returns
     -------

@@ -853,6 +853,50 @@ def get_hrv_statistics(
     rejects provider samples whose coverage is unavailable. Higher-level
     coverage is the fraction of valid child features.
 
+    Parameters
+    ----------
+    loader
+        Loader exposing raw beat-to-beat intervals or provider-computed HRV
+        samples.
+    statistic
+        One HRV feature name, a sequence of names, or ``None`` for every
+        registered feature supported by the selected source.
+    user_id
+        One participant, several participants, or ``"all"``/``None``.
+    start_date, end_date
+        Half-open analysis bounds. For cycle resolutions, the bounds select
+        cycle calendar labels and selected cycles are not clipped.
+    resolution
+        A five-minute, calendar, or sleep-cycle resolution, or an increasing
+        hierarchy. Calendar and cycle shorthand requests automatically begin
+        from the native five-minute HRV grain.
+    loader_kwargs
+        Extra keyword arguments passed to the loader's HRV method.
+    time_reference
+        ``"auto"``, ``"local"``, or ``"utc"`` for fixed windows. Calendar
+        and sleep-cycle parents require participant-local time.
+    aggregation
+        Operation or branching operations for each parent level. It is valid
+        only when the request forms a hierarchy.
+    min_coverage
+        Optional minimum coverage at each requested level. A scalar applies
+        to every level; a sequence supplies one value per resolution.
+    cycle_kwargs
+        Extra arguments passed to :func:`pywearable.cycle.get_intervals`.
+    min_valid_children
+        Optional minimum number of valid child windows at each parent level.
+        In sequence form, the primary entry must be ``None``.
+    backend
+        ``"pywearable"`` for the built-in raw-BBI calculation or
+        ``"neurokit"`` for the optional NeuroKit backend.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A ``(user_id, time)`` trajectory containing each requested feature and
+        its ``__coverage`` column. Hierarchical names preserve the complete
+        calculation path.
+
     Examples
     --------
     Five-minute RMSSD::

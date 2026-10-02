@@ -1,10 +1,6 @@
 API reference
 =============
 
-Only symbols intentionally exported by the listed modules form the supported
-public API. Underscored helpers and the ``hierarchy`` and ``utils.time``
-modules are implementation details.
-
 .. toctree::
    :maxdepth: 1
 

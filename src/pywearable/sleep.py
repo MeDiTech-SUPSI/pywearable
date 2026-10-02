@@ -3545,6 +3545,44 @@ def get_sleep_statistics(
     ``min_valid_children`` independently requires an absolute number of valid
     child windows at each upper level; a scalar applies to every upper level,
     while a sequence uses ``None`` for the nightly level.
+
+    Parameters
+    ----------
+    loader
+        Loader exposing canonical main-sleep summaries and, where required by
+        the selected features, sleep-stage intervals.
+    statistic
+        One sleep feature name, a sequence of names, or ``None`` for all
+        registered sleep features.
+    user_id
+        One participant, several participants, or ``"all"``/``None``.
+    start_date, end_date
+        Half-open range of participant-local sleep calendar labels. Selected
+        nights retain their complete physical intervals across midnight.
+    resolution
+        ``"nightly"``/``"daily"``, a calendar parent, or an increasing
+        hierarchy beginning with the nightly grain.
+    loader_kwargs
+        Extra keyword arguments passed to the loader's sleep methods.
+    chronotype
+        Optional participant-to-chronotype mapping used by composite phase
+        deviation features.
+    aggregation
+        Operation or branching operations for each parent level. It is valid
+        only when the request contains a parent resolution.
+    min_coverage
+        Optional minimum feature coverage at each requested level. A scalar
+        calendar request applies its scalar threshold to the calendar parent.
+    min_valid_children
+        Optional minimum number of valid nightly or intermediate child rows at
+        each parent level.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A ``(user_id, calendar_date)`` trajectory containing each requested
+        feature and its ``__coverage`` column. Hierarchical names preserve the
+        complete calculation path.
     """
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
     if start_date is not None and end_date is not None:

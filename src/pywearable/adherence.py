@@ -1304,7 +1304,7 @@ def get_adherence(
     resolution
         A fixed resolution, calendar resolution, cycle type, or an ordered
         resolution chain accepted by
-        :func:`pywearable.hierarchy.normalize_resolution_chain`.  ``'nightly'``
+        the shared resolution normalization. ``'nightly'``
         is an alias for ``cycle_night`` for physical streams and for
         date-labelled nightly sleep-summary availability for sleep.
     time_reference
@@ -1325,7 +1325,8 @@ def get_adherence(
         ``time_reference`` and sleep ``drop_duplicates`` is controlled here,
         so callers may not override them.
     cycle_kwargs
-        Optional keyword arguments forwarded to :func:`cycle.get_intervals`.
+        Optional keyword arguments forwarded to
+        :func:`pywearable.cycle.get_intervals`.
     check_sleep_validation
         If true, sleep-summary rows labelled ``MANUAL`` or ``AUTO_MANUAL`` in
         the canonical ``validation`` column do not count as observed nights.

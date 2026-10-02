@@ -35,12 +35,38 @@ author = "pywearable contributors"
 extensions = [
     "sphinx_rtd_theme",
     "sphinx.ext.autodoc",
+    "sphinx.ext.intersphinx",
     "sphinx.ext.napoleon",
     "nbsphinx",
 ]
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "_ci_index.rst"]
+
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3/", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
+}
+intersphinx_timeout = 10
+
+# Autodoc renders runtime annotation paths and free-form NumPy-doc type labels
+# as references. Keep nitpicky mode strict for project symbols while ignoring
+# third-party implementation paths and descriptive pseudo-types that have no
+# stable inventory target.
+nitpick_ignore_regex = [
+    ("py:class", r"pandas\.(?:_libs|core)\..*"),
+    ("py:class", r"matplotlib\.axes\._axes\.Axes"),
+    ("py:class", r"pd\..*"),
+    (
+        "py:class",
+        r"(?:sequence|optional|date-like|timestamp-like|timedelta|nested sequence)",
+    ),
+    ("py:class", r"default .*"),
+    ("py:class", r"\{.*"),
+    ("py:class", r'".*'),
+]
 
 
 # -- Options for HTML output -------------------------------------------------

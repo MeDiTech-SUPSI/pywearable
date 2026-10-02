@@ -57,7 +57,7 @@ class LabfrontLoader(BaseLoader):
 
     Parameters
     ----------
-    data_paths : str, Path, or list
+    data_paths : str, pathlib.Path, or list
         Path or paths to folders containing Labfront data.
     reindex_files : bool, optional
         Rebuild the local Labfront file index, by default False.

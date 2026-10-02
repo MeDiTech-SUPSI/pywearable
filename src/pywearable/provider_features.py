@@ -142,7 +142,18 @@ _SAMPLE_STATISTICS = {"mean", "median", "std", "min", "max", "count"}
 
 
 def get_available_provider_features(loader: BaseLoader) -> list[str]:
-    """Return provider-feature names implemented by ``loader``."""
+    """Return provider-feature names implemented by ``loader``.
+
+    Parameters
+    ----------
+    loader
+        Loader whose provider-native feature support should be inspected.
+
+    Returns
+    -------
+    list of str
+        Sorted feature names accepted by :func:`get_provider_features`.
+    """
     available = set(getattr(loader, "provider_features", ()))
     if GARMIN_BODY_BATTERY in available:
         available.update(_BODY_BATTERY_SLEEP_FEATURES)
@@ -589,7 +600,7 @@ def get_provider_features(
         Participant selection; ``"all"`` and ``None`` select every loader user.
     start_date, end_date : date-like or None
         Half-open sample or native-label range, ``[start_date, end_date)``.
-    resolution : str, Timedelta, sequence, or None
+    resolution : str, pandas.Timedelta, sequence, or None
         Primary window or increasing hierarchy. ``None`` selects daily windows
         for samples and the native grain for summaries. Native summaries may
         only remain native or aggregate to week, month, or year.

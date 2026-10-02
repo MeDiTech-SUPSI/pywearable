@@ -26,7 +26,7 @@ class TesseraeCSVLoader(BaseLoader):
     provider_features = frozenset({"garmin_stress_level"})
     provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
 
-    def __init__(self, root_folder: Path):
+    def __init__(self, root_folder: Union[str, os.PathLike]):
         if not Path(root_folder).exists():
             raise ValueError(f"Folder {root_folder} does not exist.")
         self.root_folder = Path(root_folder)

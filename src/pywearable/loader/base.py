@@ -271,7 +271,8 @@ class BaseLoader(ABC):
         Implement this method when ``hrv_source == "bbi"`` and return columns
         accepted by :func:`pywearable.schema.prepare_bbi`. Loaders exposing
         provider-computed HRV instead should set ``hrv_source`` to
-        ``"provider_samples"`` and implement :meth:`load_hrv_samples`.
+        ``"provider_samples"`` and implement
+        :meth:`~pywearable.loader.BaseLoader.load_hrv_samples`.
         """
         raise NotImplementedError
 

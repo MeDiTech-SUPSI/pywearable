@@ -131,6 +131,34 @@ def get_intervals(
     inside the latter two cycles and do not alter their boundaries. Date
     bounds select cycle ``calendar_date`` labels; selected intervals retain
     their complete physical boundaries and are never clipped.
+
+    Parameters
+    ----------
+    loader
+        Loader exposing canonical sleep summaries or sessions.
+    cycle_type
+        One of ``cycle_night``, ``cycle_awake``, or
+        ``cycle_physiological``.
+    user_id
+        One participant, several participants, or ``"all"``/``None``.
+    start_date, end_date
+        Half-open range of participant-local sleep calendar labels. Selected
+        cycles retain their complete physical intervals.
+    missing_end
+        Policy for an awake or physiological cycle whose following bedtime is
+        unavailable. ``"invalidate"`` leaves it invalid; ``"midnight"`` uses
+        the next local midnight when the starting boundary is known.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A ``(user_id, calendar_date)`` frame with ``start_time``, ``end_time``,
+        ``interval_valid``, and ``end_source`` columns.
+
+    Raises
+    ------
+    ValueError
+        If ``cycle_type`` or ``missing_end`` is unsupported.
     """
     if cycle_type not in CYCLE_TYPES:
         raise ValueError(

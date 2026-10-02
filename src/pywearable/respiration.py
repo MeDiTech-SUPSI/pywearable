@@ -456,7 +456,7 @@ def get_respiration_statistics(
         Participant(s); ``"all"`` or ``None`` selects every loader user.
     start_date, end_date : date-like or None
         Half-open time or night-label range, ``[start_date, end_date)``.
-    resolution : str, Timedelta, or sequence
+    resolution : str, pandas.Timedelta, or sequence
         Primary window or ascending hierarchy, for example ``"5min"`` or
         ``["5min", "cycle_night"]``. Provider summaries support only their
         native ``"cycle_night"`` grain and larger calendar periods.

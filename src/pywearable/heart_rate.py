@@ -68,7 +68,7 @@ def get_daily_rest_heart_rate(
     from ``start_date`` to ``end_date``and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
@@ -125,7 +125,7 @@ def get_daily_max_heart_rate(
     from ``start_date`` to ``end_date`` (exclusive) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
@@ -183,7 +183,7 @@ def get_daily_min_heart_rate(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
@@ -239,7 +239,7 @@ def get_daily_mean_heart_rate(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The result is a :class:`pandas.DataFrame` indexed by ``user_id`` and
@@ -619,7 +619,7 @@ def get_minute_heart_rate_statistics(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
@@ -679,7 +679,7 @@ def get_hourly_heart_rate_statistics(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
@@ -738,7 +738,7 @@ def get_daily_heart_rate_statistics(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
@@ -797,7 +797,7 @@ def get_weekly_heart_rate_statistics(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
@@ -855,7 +855,7 @@ def get_monthly_heart_rate_statistics(
     from ``start_date`` to ``end_date`` (excluded) and
     for the users specified by ``user_id``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
     The function returns a :class:`pandas.DataFrame` indexed by ``user_id``
@@ -985,7 +985,7 @@ def _get_heart_rate_statistics_single_resolution(
     to be computed, then the ``statistic`` parameter
     can be set to ``None``.
     The function used to load heart rate data is the
-    :func:`~loader.BaseLoader.load_heart_rate`. If
+    :func:`~pywearable.loader.BaseLoader.load_heart_rate`. If
     loader-specific arguments are required, it is
     possible to set them using the ``loader_kwargs`` argument.
 
