@@ -79,6 +79,63 @@ class ProviderFeatureLoader(BaseLoader):
         return self.daily.copy()
 
 
+class CustomProviderFeatureLoader(ProviderFeatureLoader):
+    provider_features = frozenset(
+        {"example_sleep_health_score", "example_daily_strain_score"}
+    )
+    provider_feature_definitions = {
+        "example_sleep_health_score": {"grain": "daily", "numeric": True},
+        "example_daily_strain_score": {"grain": "daily", "numeric": True},
+    }
+
+    def __init__(self):
+        super().__init__()
+        self.daily = pd.DataFrame(
+            {
+                schema.CALENDAR_DATE_COL: pd.to_datetime(
+                    ["2024-01-01", "2024-01-02"]
+                ),
+                "example_sleep_health_score": [82.0, 76.0],
+                "example_daily_strain_score": [61.0, 73.0],
+            }
+        )
+
+    def load_provider_feature(
+        self, feature, user_id, start_date=None, end_date=None, **kwargs
+    ):
+        return self.daily[[schema.CALENDAR_DATE_COL, feature]].copy()
+
+
+def test_loader_declared_daily_provider_features_use_shared_pipeline():
+    loader = CustomProviderFeatureLoader()
+
+    assert provider_features.get_available_provider_features(loader) == [
+        "example_daily_strain_score",
+        "example_sleep_health_score",
+    ]
+    result = provider_features.get_provider_features(
+        loader,
+        feature=["example_sleep_health_score", "example_daily_strain_score"],
+        user_id="person",
+        start_date="2024-01-01",
+        end_date="2024-01-03",
+    )
+
+    assert result["example_sleep_health_score"].tolist() == [82.0, 76.0]
+    assert result["example_daily_strain_score"].tolist() == [61.0, 73.0]
+    assert result["example_sleep_health_score__coverage"].eq(1.0).all()
+
+
+def test_loader_declared_provider_feature_definitions_are_validated():
+    loader = CustomProviderFeatureLoader()
+    loader.provider_feature_definitions = {
+        "example_sleep_health_score": {"grain": "nightly"}
+    }
+
+    with pytest.raises(ValueError, match="grain 'samples' or 'daily'"):
+        provider_features.get_available_provider_features(loader)
+
+
 def test_provider_sample_duplicate_conflicts_are_not_selected_arbitrarily():
     timestamp = pd.Timestamp("2024-01-01")
     frame = pd.DataFrame(

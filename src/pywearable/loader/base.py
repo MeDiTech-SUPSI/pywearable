@@ -32,6 +32,7 @@ class BaseLoader(ABC):
     activity_time_columns = schema.ACTIVITY_TIME_COLUMNS
     activity_primary_resolution = None
     provider_features = frozenset()
+    provider_feature_definitions = {}
     provider_feature_time_columns = schema.HEART_RATE_TIME_COLUMNS
 
     def __init__(self):
@@ -288,7 +289,9 @@ class BaseLoader(ABC):
 
         Implementations translate vendor fields, units, and missing-value
         conventions only. Windowing, aggregation, and derived features belong
-        to :mod:`pywearable.provider_features`.
+        to :mod:`pywearable.provider_features`. Custom loaders can describe
+        additional features with ``provider_feature_definitions``, mapping
+        each name to ``{"grain": "samples" | "daily", "numeric": bool}``.
         """
         raise ValueError(
             f"{type(self).__name__} does not provide feature {feature!r}"

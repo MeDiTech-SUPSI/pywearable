@@ -9,6 +9,7 @@ remain at their native grain or be aggregated upward.
 from __future__ import annotations
 
 import warnings
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Union
 
@@ -141,6 +142,44 @@ _BODY_BATTERY_SLEEP_FEATURES = {
 _SAMPLE_STATISTICS = {"mean", "median", "std", "min", "max", "count"}
 
 
+def _loader_feature_definitions(loader) -> dict[str, _FeatureDefinition]:
+    """Return built-in and loader-declared provider-feature definitions."""
+    definitions = dict(_FEATURE_DEFINITIONS)
+    declared = getattr(loader, "provider_feature_definitions", {})
+    if declared is None:
+        return definitions
+    if not isinstance(declared, Mapping):
+        raise ValueError("provider_feature_definitions must be a mapping")
+
+    for name, metadata in declared.items():
+        if name in _FEATURE_DEFINITIONS:
+            raise ValueError(
+                f"provider_feature_definitions cannot override built-in feature {name!r}"
+            )
+        if not isinstance(name, str) or not name:
+            raise ValueError("custom provider feature names must be non-empty strings")
+        if not isinstance(metadata, Mapping):
+            raise ValueError(
+                f"definition for custom provider feature {name!r} must be a mapping"
+            )
+        grain = metadata.get("grain")
+        numeric = metadata.get("numeric", True)
+        if grain not in {"samples", "daily"}:
+            raise ValueError(
+                f"custom provider feature {name!r} must use grain 'samples' or 'daily'"
+            )
+        if not isinstance(numeric, bool):
+            raise ValueError(
+                f"numeric for custom provider feature {name!r} must be a boolean"
+            )
+        if grain == "samples" and not numeric:
+            raise ValueError(
+                f"timestamped custom provider feature {name!r} must be numeric"
+            )
+        definitions[name] = _FeatureDefinition(grain, numeric=numeric)
+    return definitions
+
+
 def get_available_provider_features(loader: BaseLoader) -> list[str]:
     """Return provider-feature names implemented by ``loader``.
 
@@ -148,26 +187,29 @@ def get_available_provider_features(loader: BaseLoader) -> list[str]:
     ----------
     loader
         Loader whose provider-native feature support should be inspected.
+        Additional names require a matching entry in the loader's
+        ``provider_feature_definitions`` mapping.
 
     Returns
     -------
     list of str
         Sorted feature names accepted by :func:`get_provider_features`.
     """
+    definitions = _loader_feature_definitions(loader)
     available = set(getattr(loader, "provider_features", ()))
     if GARMIN_BODY_BATTERY in available:
         available.update(_BODY_BATTERY_SLEEP_FEATURES)
-    return sorted(available.intersection(_FEATURE_DEFINITIONS))
+    return sorted(available.intersection(definitions))
 
 
-def _requested_features(loader, feature) -> list[str]:
+def _requested_features(loader, feature, definitions) -> list[str]:
     """Validate feature names, loader support, and one shared native grain."""
     features = [feature] if isinstance(feature, str) else list(feature)
     if not features:
         raise ValueError("feature must contain at least one provider feature")
     features = list(dict.fromkeys(features))
     available = set(get_available_provider_features(loader))
-    unknown = set(features).difference(_FEATURE_DEFINITIONS)
+    unknown = set(features).difference(definitions)
     if unknown:
         raise ValueError(f"unknown provider feature(s): {sorted(unknown)}")
     unsupported = set(features).difference(available)
@@ -176,7 +218,7 @@ def _requested_features(loader, feature) -> list[str]:
             f"{type(loader).__name__} does not provide {sorted(unsupported)}; "
             f"available features are {sorted(available)}"
         )
-    grains = {_FEATURE_DEFINITIONS[name].grain for name in features}
+    grains = {definitions[name].grain for name in features}
     if len(grains) != 1:
         raise ValueError(
             "all requested provider features must have the same native grain"
@@ -385,10 +427,10 @@ def _daily_feature_trajectory(
     loader_kwargs,
     min_coverage,
     return_coverage,
+    numeric,
 ):
     """Build a complete native-day trajectory, retaining missing dates."""
     frames = []
-    numeric = _FEATURE_DEFINITIONS[feature].numeric
     for user in users:
         summary = schema.prepare_provider_feature_summary(
             loader.load_provider_feature(
@@ -587,7 +629,8 @@ def get_provider_features(
     ----------
     loader : BaseLoader
         Loader declaring the requested feature in ``provider_features`` and
-        returning canonical rows from ``load_provider_feature``.
+        returning canonical rows from ``load_provider_feature``. Custom names
+        must also be described by ``provider_feature_definitions``.
     feature : str or sequence of str
         Names reported by :func:`get_available_provider_features`. Features in
         one call must share a native grain. This argument is required because
@@ -622,11 +665,12 @@ def get_provider_features(
         per output feature. Hierarchical column names encode resolutions and
         operations.
     """
-    features = _requested_features(loader, feature)
+    definitions = _loader_feature_definitions(loader)
+    features = _requested_features(loader, feature, definitions)
     users = loader.resolve_user_ids(user_id)
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
-    definition = _FEATURE_DEFINITIONS[features[0]]
+    definition = definitions[features[0]]
     grain = definition.grain
     if resolution is None:
         resolution = "daily" if grain == "samples" else grain
@@ -643,8 +687,8 @@ def get_provider_features(
         outputs = list(features)
     if grain != "samples" and time_reference == "utc":
         raise ValueError("native provider summaries use local calendar labels")
-    if any(not _FEATURE_DEFINITIONS[name].numeric for name in features):
-        numeric = [name for name in features if _FEATURE_DEFINITIONS[name].numeric]
+    if any(not definitions[name].numeric for name in features):
+        numeric = [name for name in features if definitions[name].numeric]
         if numeric:
             raise ValueError(
                 "numeric and categorical provider features must be requested "
@@ -657,7 +701,7 @@ def get_provider_features(
     if not hierarchical and min_valid_children is not None:
         raise ValueError("min_valid_children requires a resolution hierarchy")
     if hierarchical and any(
-        not _FEATURE_DEFINITIONS[name].numeric for name in features
+        not definitions[name].numeric for name in features
     ):
         raise ValueError("categorical provider features cannot be aggregated")
     aggregation_levels = hierarchy.normalize_aggregation_levels(
@@ -719,6 +763,7 @@ def get_provider_features(
                 loader_kwargs,
                 coverage_thresholds[0],
                 include_coverage,
+                definitions[name].numeric,
             )
             for name in features
         ]
