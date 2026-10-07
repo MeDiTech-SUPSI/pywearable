@@ -11,11 +11,6 @@ provides three participant-local cycle definitions.
    :width: 94%
    :align: center
 
-The three panels show the same heart-rate trajectory from a de-identified Oura
-export. Only the shaded cycle definition changes, making the different
-boundaries directly comparable. The horizontal scale is elapsed time from the
-first bedtime.
-
 ``cycle_night``
     The provider-designated main-sleep session, from bedtime to session end.
 
