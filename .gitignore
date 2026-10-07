@@ -176,5 +176,9 @@ AGENTS.md
 .codex/
 .codex-test-temp/
 
+# Local-only project review documents
+/API_CONTRACT.md
+/docs/activity_feature_review.md
+
 # Generated locally by LabfrontLoader
 **/.pywearable_file_index.csv
