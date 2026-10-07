@@ -650,7 +650,7 @@ def build_analysis_examples():
 
 
 def build_custom_loader():
-    """Build the synthetic custom-loader tutorial."""
+    """Build the guided custom-loader tutorial."""
     cells = [
         markdown(
             """
@@ -660,37 +660,23 @@ def build_custom_loader():
             schemas. Domain functions then calculate features without knowing
             the original file names or field conventions.
 
-            This tutorial builds a small loader from synthetic tables. It
-            covers:
+            Here we implement `WyvernLoader` for the **Wyvern Band**, a fictional
+            wearable. The example export contains three participants and seven
+            days, with deliberately inconsistent field names, units, and file
+            formats.
 
-            - the required `BaseLoader` methods;
-            - capability attributes for optional streams;
-            - canonical schema preparation and half-open date filtering;
-            - empty and unsupported streams;
-            - end-to-end feature extraction and visualization.
-            """
-        ),
-        markdown(
-            """
-            ## The loader contract
-
-            Subclasses implement `get_user_ids`, `load_sleep_summary`,
-            `load_sleep_stage`, and `load_heart_rate`. Optional methods such as
-            `load_activity_samples` are implemented only when the source
-            provides that stream. Capability attributes describe source grain
-            and available clocks.
-
-            Loader methods normalize fields and units. Feature calculations,
-            aggregation, imputation, and trends remain in the domain modules.
+            We will inspect the provider files, translate deliberately
+            inconsistent fields into canonical schemas, validate the loader
+            boundary, and then use the normal feature and visualization APIs.
             """
         ),
         code(
             """
+            import json
             import sys
             from pathlib import Path
 
             import matplotlib.pyplot as plt
-            import numpy as np
             import pandas as pd
             from IPython.display import display
 
@@ -703,82 +689,122 @@ def build_custom_loader():
                 )
             sys.path.insert(0, str(REPO_ROOT / "src"))
 
-            from pywearable import activity, heart_rate, schema, sleep, visualization
+            from pywearable import (
+                activity,
+                heart_rate,
+                provider_features,
+                respiration,
+                schema,
+                sleep,
+                visualization,
+            )
             from pywearable.loader import BaseLoader
+
+            DATA_ROOT = REPO_ROOT / "docs" / "_notebooks" / "mock_provider_data"
+            START = pd.Timestamp("2026-03-02")
+            END = pd.Timestamp("2026-03-09")
+
+            WYVERN_SLEEP_HEALTH_SCORE = "wyvern_sleep_health_score"
+            WYVERN_DAILY_STRAIN_SCORE = "wyvern_daily_strain_score"
             """
         ),
         markdown(
             """
-            ## Create representative source tables
+            ## Inspect the fictional provider export
 
-            Real adapters would read CSV, Parquet, a database, or an API. These
-            tables deliberately use source-specific names so the translation
-            step remains visible.
+            The export uses one directory per participant and mixes TSV, CSV,
+            and JSON files. Source names mix camel case and snake case, and
+            none is assumed to be canonical.
             """
         ),
         code(
             """
-            rng = np.random.default_rng(7)
-            participant = "participant-01"
-            start = pd.Timestamp("2026-01-01")
-            end = pd.Timestamp("2026-01-15")
-
-            hr_time = pd.date_range(start, end, freq="5min", inclusive="left")
-            source_hr = pd.DataFrame(
-                {
-                    "participant": participant,
-                    "recorded_at": hr_time,
-                    "bpm": 66
-                    + 9 * np.sin(2 * np.pi * (hr_time.hour + hr_time.minute / 60) / 24)
-                    + rng.normal(0, 2.5, len(hr_time)),
-                }
+            participant_dirs = sorted(
+                path for path in DATA_ROOT.glob("demo-*") if path.is_dir()
+            )
+            participants_source = pd.concat(
+                [
+                    pd.read_csv(path / "participant.tsv", sep="\t")
+                    for path in participant_dirs
+                ],
+                ignore_index=True,
+            )
+            pulse_source = pd.concat(
+                [
+                    pd.read_csv(path / "pulse.tsv", sep="\t")
+                    for path in participant_dirs
+                ],
+                ignore_index=True,
+            )
+            movement_source = pd.concat(
+                [pd.read_csv(path / "movement.csv") for path in participant_dirs],
+                ignore_index=True,
+            )
+            sleep_source = pd.json_normalize(
+                [
+                    night
+                    for path in participant_dirs
+                    for night in json.loads(
+                        (path / "sleep.json").read_text()
+                    )["nights"]
+                ]
+            )
+            score_source = pd.DataFrame(
+                [
+                    record
+                    for path in participant_dirs
+                    for record in json.loads(
+                        (path / "daily_scores.json").read_text()
+                    )["records"]
+                ]
+            )
+            inventory = pd.DataFrame(
+                [
+                    ("demo-*/participant.tsv", "TSV", len(participant_dirs), len(participants_source)),
+                    ("demo-*/pulse.tsv", "TSV", len(participant_dirs), len(pulse_source)),
+                    ("demo-*/movement.csv", "CSV", len(participant_dirs), len(movement_source)),
+                    ("demo-*/sleep.json", "JSON", len(participant_dirs), len(sleep_source)),
+                    ("demo-*/daily_scores.json", "JSON", len(participant_dirs), len(score_source)),
+                ],
+                columns=["path pattern", "format", "files", "records"],
             )
 
-            activity_time = pd.date_range(start, end, freq="15min", inclusive="left")
-            hour = activity_time.hour.to_numpy()
-            source_activity = pd.DataFrame(
-                {
-                    "participant": participant,
-                    "interval_start": activity_time,
-                    "step_count": rng.poisson(
-                        2
-                        + 35 * np.exp(-((hour - 8) / 2.0) ** 2)
-                        + 50 * np.exp(-((hour - 18) / 2.5) ** 2)
-                    ),
-                }
+            display(inventory)
+            display(
+                pulse_source.head(3),
+                movement_source.head(3),
+                sleep_source[
+                    [
+                        "memberCode",
+                        "sleepDate",
+                        "startedAt",
+                        "sleepSeconds",
+                        "nightlyRespiration.meanBreathsPerMinute",
+                    ]
+                ].head(3),
+                score_source.head(3),
             )
+            """
+        ),
+        markdown(
+            """
+            ## Plan the translation
 
-            summary_rows = []
-            stage_rows = []
-            stages = [("awake", 20), ("light", 90), ("deep", 100), ("light", 80), ("rem", 70), ("light", 90), ("awake", 30)]
-            for offset, calendar_date in enumerate(pd.date_range(start + pd.Timedelta(days=1), end, inclusive="left")):
-                bedtime = calendar_date - pd.Timedelta(days=1) + pd.Timedelta(hours=23, minutes=(offset % 4) * 10)
-                summary_id = f"night-{offset + 1}"
-                summary_rows.append(
-                    {
-                        "night_id": summary_id,
-                        "sleep_day": calendar_date,
-                        "bedtime": bedtime,
-                        "session_end": bedtime + pd.Timedelta(hours=8),
-                        "sleep_minutes": 430,
-                        "awake_minutes": 50,
-                    }
-                )
-                stage_start = bedtime
-                for stage_name, minutes in stages:
-                    stage_rows.append(
-                        {
-                            "night_id": summary_id,
-                            "stage_start": stage_start,
-                            "minutes": minutes,
-                            "stage": stage_name,
-                        }
-                    )
-                    stage_start += pd.Timedelta(minutes=minutes)
+            | Source field | Canonical field | Conversion |
+            |---|---|---|
+            | `capturedAtLocal`, `utcOffsetMinutes`, `pulseBpm` | `local_time`, `utc_time`, `timezone`, `heart_rate` | Parse the local clock, subtract the offset for UTC, and retain numeric beats per minute. |
+            | `movement.csv`: `intervalStart`, `intervalSeconds`, `stepCount`; `participant.tsv`: `utcOffsetMinutes` | `local_time`, `utc_time`, `timezone`, `duration_in_ms`, `activity_steps` | Use the participant metadata offset for both clocks, convert seconds to milliseconds, and preserve zero-step intervals. |
+            | `nightKey`, `sleepDate`, `startedAt`, `endedAt` | `sleep_summary_id`, `calendar_date`, `local_time`, `local_end_time` | Retain the provider's night identifier and sleep-calendar label; parse session bounds. |
+            | `sleepSeconds`, `awakeSeconds`, `unmeasurableSeconds`, stage totals | `duration_in_ms`, `awake_duration_in_ms`, `unmeasurable_sleep_duration_in_ms`, `light_sleep_duration_in_ms`, `deep_sleep_duration_in_ms`, `rem_sleep_duration_in_ms` | Convert seconds to milliseconds and aggregate stage durations by night. |
+            | `stageSegments[].startedAt`, `durationSeconds`, `stageCode` | `local_time`, `duration_in_ms`, `type`, linked by `sleep_summary_id` | Flatten stage intervals and map provider codes to canonical sleep-stage values. |
+            | `nightlyRespiration.meanBreathsPerMinute`, `stdBreathsPerMinute` | `respiratory_rate_mean`, `respiratory_rate_std`, indexed by `calendar_date` | Expose the available nightly summary without inventing respiration samples. |
+            | `sleepHealthScore` | `overall_sleep_score` and `wyvern_sleep_health_score` | Make the score available in sleep views while retaining its provider-native feature name. |
+            | `dailyStrain_score` | `wyvern_daily_strain_score` | Retain the fictional provider prefix and native daily grain. |
 
-            source_sleep = pd.DataFrame(summary_rows)
-            source_stages = pd.DataFrame(stage_rows)
-            display(source_hr.head(2), source_activity.head(2), source_sleep.head(2), source_stages.head(2))
+            A `BaseLoader` subclass implements the required sleep and
+            heart-rate methods. Optional methods are added only for streams
+            present in the export. Capability attributes tell pywearable which
+            clocks and source grains are available.
             """
         ),
         markdown(
@@ -794,23 +820,98 @@ def build_custom_loader():
         ),
         code(
             """
-            class SyntheticLoader(BaseLoader):
+            class WyvernLoader(BaseLoader):
+                '''Adapt participant-folder exports from the fictional Wyvern Band.'''
+
                 activity_source = "samples"
                 activity_primary_resolution = "15min"
                 activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
                 heart_rate_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+                respiratory_rate_source = "provider_summary"
+                provider_features = frozenset(
+                    {WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE}
+                )
+                provider_feature_definitions = {
+                    WYVERN_SLEEP_HEALTH_SCORE: {"grain": "daily", "numeric": True},
+                    WYVERN_DAILY_STRAIN_SCORE: {"grain": "daily", "numeric": True},
+                }
 
-                def __init__(self, heart_rate_rows, activity_rows, sleep_rows, stage_rows):
-                    self._heart_rate = heart_rate_rows.copy()
-                    self._activity = activity_rows.copy()
-                    self._sleep = sleep_rows.copy()
-                    self._stages = stage_rows.copy()
+                _stage_codes = {
+                    "AWK": schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    "LT": schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                    "DP": schema.SLEEP_STAGE_DEEP_STAGE_VALUE,
+                    "REM": schema.SLEEP_STAGE_REM_STAGE_VALUE,
+                    "UNM": schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                    "ASL": "asleep",
+                }
+
+                def __init__(self, data_root):
+                    '''Read every participant directory into source-shaped tables.
+
+                    Each ``demo-*`` directory is self-contained. TSV, CSV, and
+                    JSON records are concatenated here, but no canonical
+                    conversion occurs until a ``load_*`` method is called.
+                    '''
+                    data_root = Path(data_root)
+                    participant_dirs = sorted(
+                        path for path in data_root.glob("demo-*") if path.is_dir()
+                    )
+                    self._participants = pd.concat(
+                        [
+                            pd.read_csv(path / "participant.tsv", sep="\t")
+                            for path in participant_dirs
+                        ],
+                        ignore_index=True,
+                    )
+                    self._heart_rate = pd.concat(
+                        [
+                            pd.read_csv(path / "pulse.tsv", sep="\t")
+                            for path in participant_dirs
+                        ],
+                        ignore_index=True,
+                    )
+                    self._activity = pd.concat(
+                        [pd.read_csv(path / "movement.csv") for path in participant_dirs],
+                        ignore_index=True,
+                    )
+
+                    sleep_nights = [
+                        night
+                        for path in participant_dirs
+                        for night in json.loads(
+                            (path / "sleep.json").read_text()
+                        )["nights"]
+                    ]
+                    self._sleep = pd.json_normalize(sleep_nights)
+                    stage_rows = []
+                    for night in sleep_nights:
+                        for segment in night["stageSegments"]:
+                            stage_rows.append(
+                                {
+                                    "memberCode": night["memberCode"],
+                                    "nightKey": night["nightKey"],
+                                    **segment,
+                                }
+                            )
+                    self._stages = pd.DataFrame(stage_rows)
+
+                    self._scores = pd.DataFrame(
+                        [
+                            record
+                            for path in participant_dirs
+                            for record in json.loads(
+                                (path / "daily_scores.json").read_text()
+                            )["records"]
+                        ]
+                    )
 
                 def get_user_ids(self):
-                    return sorted(self._heart_rate["participant"].unique())
+                    '''Return participant identifiers read from ``participant.tsv``.'''
+                    return sorted(self._participants["memberCode"].unique())
 
                 @staticmethod
                 def _filter(frame, column, start_date, end_date):
+                    '''Apply half-open ``[start_date, end_date)`` canonical bounds.'''
                     values = pd.to_datetime(frame[column])
                     mask = pd.Series(True, index=frame.index)
                     if start_date is not None:
@@ -819,28 +920,71 @@ def build_custom_loader():
                         mask &= values < pd.Timestamp(end_date)
                     return frame.loc[mask].copy()
 
-                def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="local_time"):
-                    rows = self._heart_rate[self._heart_rate["participant"].eq(user_id)].copy()
+                @staticmethod
+                def _utc_from_local(local_time, offset_minutes):
+                    '''Subtract provider UTC offsets from naive local timestamps.'''
+                    return pd.to_datetime(local_time) - pd.to_timedelta(
+                        offset_minutes, unit="m"
+                    )
+
+                def load_heart_rate(
+                    self,
+                    user_id,
+                    start_date=None,
+                    end_date=None,
+                    time_col=schema.LOCAL_TIME_COL,
+                ):
+                    '''Convert ``pulse.tsv`` rows to canonical heart-rate samples.
+
+                    ``capturedAtLocal`` becomes ``local_time``; the per-row
+                    minute offset supplies both ``timezone`` and ``utc_time``;
+                    ``pulseBpm`` becomes numeric ``heart_rate``. Filtering uses
+                    the caller-selected canonical clock.
+                    '''
+                    rows = self._heart_rate[
+                        self._heart_rate["memberCode"].eq(user_id)
+                    ].copy()
+                    local_time = pd.to_datetime(rows["capturedAtLocal"])
+                    offsets = pd.to_timedelta(rows["utcOffsetMinutes"], unit="m")
                     canonical = pd.DataFrame(
                         {
-                            schema.UTC_TIME_COL: rows["recorded_at"],
-                            schema.LOCAL_TIME_COL: rows["recorded_at"],
-                            schema.TIMEZONE_COL: pd.Timedelta(0),
-                            schema.HEART_RATE_COL: rows["bpm"],
+                            schema.UTC_TIME_COL: self._utc_from_local(
+                                local_time, rows["utcOffsetMinutes"]
+                            ),
+                            schema.LOCAL_TIME_COL: local_time,
+                            schema.TIMEZONE_COL: offsets,
+                            schema.HEART_RATE_COL: rows["pulseBpm"],
                         }
                     )
                     canonical = schema.prepare_heart_rate_samples(canonical)
                     return self._filter(canonical, time_col, start_date, end_date)
 
                 def load_activity_samples(self, user_id, start_date=None, end_date=None, **kwargs):
-                    rows = self._activity[self._activity["participant"].eq(user_id)].copy()
+                    '''Convert ``movement.csv`` intervals to canonical activity samples.
+
+                    The participant metadata supplies the UTC offset missing
+                    from each movement row. ``intervalSeconds`` is converted to
+                    ``duration_in_ms`` and ``stepCount`` to ``activity_steps``;
+                    observed zero-step intervals remain observations, not nulls.
+                    '''
+                    rows = self._activity[
+                        self._activity["member_code"].eq(user_id)
+                    ].copy()
+                    local_time = pd.to_datetime(rows["intervalStart"])
+                    offset_minutes = self._participants.set_index("memberCode").loc[
+                        user_id, "utcOffsetMinutes"
+                    ]
                     canonical = pd.DataFrame(
                         {
-                            schema.UTC_TIME_COL: rows["interval_start"],
-                            schema.LOCAL_TIME_COL: rows["interval_start"],
-                            schema.TIMEZONE_COL: pd.Timedelta(0),
-                            schema.DURATION_IN_MS_COL: 15 * 60_000,
-                            schema.ACTIVITY_STEPS_COL: rows["step_count"],
+                            schema.UTC_TIME_COL: self._utc_from_local(
+                                local_time, offset_minutes
+                            ),
+                            schema.LOCAL_TIME_COL: local_time,
+                            schema.TIMEZONE_COL: pd.to_timedelta(
+                                offset_minutes, unit="m"
+                            ),
+                            schema.DURATION_IN_MS_COL: rows["intervalSeconds"] * 1_000,
+                            schema.ACTIVITY_STEPS_COL: rows["stepCount"],
                         }
                     )
                     canonical = schema.prepare_activity_samples(canonical)
@@ -849,15 +993,48 @@ def build_custom_loader():
                     )
 
                 def load_sleep_summary(self, user_id, start_date=None, end_date=None, drop_duplicates=True):
-                    rows = self._sleep.copy()
+                    '''Convert nightly JSON records to canonical sleep summaries.
+
+                    Provider session identifiers, calendar labels, and local
+                    bounds are retained. Durations are converted from seconds
+                    to milliseconds, flattened stage intervals are totaled by
+                    type, and ``sleepHealthScore`` is joined as canonical
+                    ``overall_sleep_score`` for sleep-specific displays.
+                    '''
+                    rows = self._sleep[self._sleep["memberCode"].eq(user_id)].copy()
+                    score_rows = self._scores[
+                        self._scores["memberCode"].eq(user_id)
+                    ][["memberCode", "day", "sleepHealthScore"]]
+                    rows = rows.merge(
+                        score_rows,
+                        left_on=["memberCode", "sleepDate"],
+                        right_on=["memberCode", "day"],
+                        how="left",
+                    )
+                    stage_totals = (
+                        self._stages[self._stages["memberCode"].eq(user_id)]
+                        .groupby(["nightKey", "stageCode"])["durationSeconds"]
+                        .sum()
+                        .unstack(fill_value=0)
+                    )
+                    rows = rows.merge(stage_totals, on="nightKey", how="left")
+
+                    def stage_duration(code):
+                        return rows.get(code, pd.Series(0, index=rows.index)) * 1_000
+
                     canonical = pd.DataFrame(
                         {
-                            schema.SLEEP_SUMMARY_ID_COL: rows["night_id"],
-                            schema.CALENDAR_DATE_COL: rows["sleep_day"],
-                            schema.LOCAL_TIME_COL: rows["bedtime"],
-                            schema.LOCAL_END_TIME_COL: rows["session_end"],
-                            schema.DURATION_IN_MS_COL: rows["sleep_minutes"] * 60_000,
-                            schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: rows["awake_minutes"] * 60_000,
+                            schema.SLEEP_SUMMARY_ID_COL: rows["nightKey"],
+                            schema.CALENDAR_DATE_COL: rows["sleepDate"],
+                            schema.LOCAL_TIME_COL: rows["startedAt"],
+                            schema.LOCAL_END_TIME_COL: rows["endedAt"],
+                            schema.DURATION_IN_MS_COL: rows["sleepSeconds"] * 1_000,
+                            schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: rows["awakeSeconds"] * 1_000,
+                            schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: rows["unmeasurableSeconds"] * 1_000,
+                            schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: stage_duration("LT"),
+                            schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: stage_duration("DP"),
+                            schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: stage_duration("REM"),
+                            schema.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL: rows["sleepHealthScore"],
                         }
                     )
                     canonical = schema.prepare_sleep_summary(canonical)
@@ -869,13 +1046,24 @@ def build_custom_loader():
                     return canonical.reset_index(drop=True)
 
                 def load_sleep_stage(self, user_id, start_date=None, end_date=None):
-                    rows = self._stages.copy()
+                    '''Convert flattened stage segments to canonical intervals.
+
+                    ``startedAt`` becomes ``local_time``, seconds become
+                    ``duration_in_ms``, and Wyvern stage codes map to canonical
+                    ``type`` values. ``nightKey`` preserves the required link
+                    to ``sleep_summary_id``. Bounds use interval overlap.
+                    '''
+                    rows = self._stages[
+                        self._stages["memberCode"].eq(user_id)
+                    ].copy()
                     canonical = pd.DataFrame(
                         {
-                            schema.SLEEP_SUMMARY_ID_COL: rows["night_id"],
-                            schema.LOCAL_TIME_COL: rows["stage_start"],
-                            schema.DURATION_IN_MS_COL: rows["minutes"] * 60_000,
-                            schema.SLEEP_STAGE_SLEEP_TYPE_COL: rows["stage"],
+                            schema.SLEEP_SUMMARY_ID_COL: rows["nightKey"],
+                            schema.LOCAL_TIME_COL: rows["startedAt"],
+                            schema.DURATION_IN_MS_COL: rows["durationSeconds"] * 1_000,
+                            schema.SLEEP_STAGE_SLEEP_TYPE_COL: rows["stageCode"].map(
+                                self._stage_codes
+                            ),
                         }
                     )
                     canonical = schema.prepare_sleep_stages(canonical)
@@ -889,9 +1077,65 @@ def build_custom_loader():
                         mask &= canonical[schema.LOCAL_TIME_COL] < pd.Timestamp(end_date)
                     return canonical.loc[mask].reset_index(drop=True)
 
+                def load_respiration_summary(
+                    self, user_id, start_date=None, end_date=None
+                ):
+                    '''Expose the nightly respiration summary stored in ``sleep.json``.
 
-            loader = SyntheticLoader(source_hr, source_activity, source_sleep, source_stages)
-            print(loader.get_user_ids())
+                    The two provider fields map directly to canonical
+                    ``respiratory_rate_mean`` and ``respiratory_rate_std`` at
+                    ``calendar_date`` grain. No sample-level stream is created.
+                    '''
+                    rows = self._sleep[self._sleep["memberCode"].eq(user_id)].copy()
+                    canonical = pd.DataFrame(
+                        {
+                            schema.CALENDAR_DATE_COL: rows["sleepDate"],
+                            schema.RESPIRATORY_RATE_MEAN_COL: rows[
+                                "nightlyRespiration.meanBreathsPerMinute"
+                            ],
+                            schema.RESPIRATORY_RATE_STD_COL: rows[
+                                "nightlyRespiration.stdBreathsPerMinute"
+                            ],
+                        }
+                    )
+                    canonical = schema.prepare_respiration_summary(canonical)
+                    return self._filter(
+                        canonical, schema.CALENDAR_DATE_COL, start_date, end_date
+                    ).reset_index(drop=True)
+
+                def load_provider_feature(
+                    self, feature, user_id, start_date=None, end_date=None, **kwargs
+                ):
+                    '''Convert a named daily score to a canonical provider feature.
+
+                    ``daily_scores.json`` uses ``day`` plus two differently
+                    styled score names. The requested source column is renamed
+                    to its registered Wyvern feature and returned at canonical
+                    ``calendar_date`` grain, preserving missing score values.
+                    '''
+                    source_columns = {
+                        WYVERN_SLEEP_HEALTH_SCORE: "sleepHealthScore",
+                        WYVERN_DAILY_STRAIN_SCORE: "dailyStrain_score",
+                    }
+                    if feature not in source_columns:
+                        raise ValueError(f"WyvernLoader does not provide {feature!r}")
+                    rows = self._scores[self._scores["memberCode"].eq(user_id)]
+                    canonical = pd.DataFrame(
+                        {
+                            schema.CALENDAR_DATE_COL: rows["day"],
+                            feature: rows[source_columns[feature]],
+                        }
+                    )
+                    canonical = schema.prepare_provider_feature_summary(
+                        canonical, feature
+                    )
+                    return self._filter(
+                        canonical, schema.CALENDAR_DATE_COL, start_date, end_date
+                    ).reset_index(drop=True)
+
+
+            loader = WyvernLoader(DATA_ROOT)
+            print("Participants:", loader.get_user_ids())
             """
         ),
         markdown(
@@ -905,16 +1149,37 @@ def build_custom_loader():
         ),
         code(
             """
-            hr = loader.load_heart_rate(participant, start, start + pd.Timedelta(hours=1))
-            activity_samples = loader.load_activity_samples(participant, start, start + pd.Timedelta(hours=1))
-            summaries = loader.load_sleep_summary(participant, start, end)
-            stage_intervals = loader.load_sleep_stage(participant, start, end)
+            participant = loader.get_user_ids()[0]
+            hr = loader.load_heart_rate(
+                participant, START, START + pd.Timedelta(hours=1)
+            )
+            activity_samples = loader.load_activity_samples(
+                participant, START, START + pd.Timedelta(hours=1)
+            )
+            summaries = loader.load_sleep_summary(participant, START, END)
+            stage_intervals = loader.load_sleep_stage(participant, START, END)
+            respiration_summary = loader.load_respiration_summary(
+                participant, START, END
+            )
 
             assert set(schema.HEART_RATE_REQUIRED_COLUMNS) <= set(hr)
             assert set(schema.ACTIVITY_SAMPLE_REQUIRED_COLUMNS) <= set(activity_samples)
             assert set(schema.SLEEP_SUMMARY_REQUIRED_COLUMNS) <= set(summaries)
-            assert tuple(stage_intervals.columns) == schema.SLEEP_STAGE_REQUIRED_COLUMNS
-            assert loader.load_heart_rate(participant, end, end + pd.Timedelta(days=1)).empty
+            assert set(schema.SLEEP_STAGE_REQUIRED_COLUMNS) <= set(stage_intervals)
+            assert {
+                schema.CALENDAR_DATE_COL,
+                schema.RESPIRATORY_RATE_MEAN_COL,
+            } <= set(respiration_summary)
+            assert loader.load_respiration(participant, START, END).empty
+            assert loader.load_heart_rate(
+                participant, END, END + pd.Timedelta(days=1)
+            ).empty
+            assert provider_features.get_available_provider_features(loader) == [
+                WYVERN_DAILY_STRAIN_SCORE,
+                WYVERN_SLEEP_HEALTH_SCORE,
+            ]
+
+            display(hr.head(3), activity_samples.head(3), summaries.head(3))
             print("Canonical loader checks passed")
             """
         ),
@@ -931,9 +1196,9 @@ def build_custom_loader():
             daily_steps = activity.get_activity_statistics(
                 loader,
                 statistic=activity.ACTIVITY_STATISTIC_STEPS,
-                user_id=participant,
-                start_date=start,
-                end_date=end,
+                user_id="all",
+                start_date=START,
+                end_date=END,
                 resolution="daily",
             )
             daily_hr = heart_rate.get_heart_rate_statistics(
@@ -943,8 +1208,8 @@ def build_custom_loader():
                     heart_rate.HEART_RATE_STATISTIC_REST,
                 ],
                 user_id=participant,
-                start_date=start,
-                end_date=end,
+                start_date=START,
+                end_date=END,
                 resolution="daily",
             )
             nightly_sleep = sleep.get_sleep_statistics(
@@ -956,16 +1221,41 @@ def build_custom_loader():
                     sleep.SLEEP_STATISTIC_BEDTIME,
                 ],
                 user_id=participant,
-                start_date=start,
-                end_date=end,
+                start_date=START,
+                end_date=END,
                 resolution="nightly",
             )
-            display(daily_steps.head(), daily_hr.head(), nightly_sleep.head())
+            nightly_respiration = respiration.get_respiration_statistics(
+                loader,
+                statistic=[
+                    respiration.RESPIRATORY_RATE_STATISTIC_MEAN,
+                    respiration.RESPIRATORY_RATE_STATISTIC_STD,
+                ],
+                user_id=participant,
+                start_date=START,
+                end_date=END,
+                resolution="cycle_night",
+            )
+            daily_scores = provider_features.get_provider_features(
+                loader,
+                feature=[WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE],
+                user_id="all",
+                start_date=START,
+                end_date=END,
+            )
+
+            display(
+                daily_steps.head(6),
+                daily_hr.head(3),
+                nightly_sleep.head(3),
+                nightly_respiration.head(3),
+                daily_scores.head(6),
+            )
             """
         ),
         markdown(
             """
-            ## Verify a composite view
+            ## Visualize one integrated week
 
             The weekly overview needs timestamped activity samples, heart rate,
             and sleep stages. Implementing those three streams makes the
@@ -977,9 +1267,9 @@ def build_custom_loader():
             visualization.plot_weekly_overview(
                 loader,
                 participant,
-                start,
-                start + pd.Timedelta(days=7),
-                title="Synthetic loader: one integrated week",
+                START,
+                END,
+                title="Wyvern mock export: one integrated week",
                 show=False,
             )
             plt.show()
@@ -987,30 +1277,97 @@ def build_custom_loader():
         ),
         markdown(
             """
-            ## Exercise
+            ## Compare the provider-native scores
 
-            Add an optional provider-native daily score.
-
-            1. Add its name to `provider_features`.
-            2. Implement `load_provider_feature` with a daily canonical table.
-            3. Call `provider_features.get_available_provider_features` and
-               `provider_features.get_provider_features`.
-            4. Add tests for empty bounds and an unknown feature name.
+            These scores remain provider-specific: pywearable can align and
+            aggregate them, but does not equate them with similarly named
+            scores from another device. A sleep-health score is absent when
+            no nightly sleep result is available; daytime strain can still be
+            present when activity data exists.
             """
         ),
         code(
             """
-            # Suggested scaffold:
-            # class ExtendedSyntheticLoader(SyntheticLoader):
-            #     provider_features = frozenset({"my_provider_score"})
-            #
-            #     def load_provider_feature(self, feature, user_id, start_date=None, end_date=None):
-            #         ...
+            score_participant = "demo-02"
+            score_axes = visualization.plot_trajectory(
+                daily_scores,
+                [WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE],
+                user_id=score_participant,
+                title=f"Provider-native daily scores: {score_participant}",
+                ylabel="Score (0-100)",
+                show_imputed=False,
+                show_coverage=True,
+                show=False,
+            )
+            score_axes["trajectory"].set_ylim(0, 100)
+            plt.show()
             """
         ),
         markdown(
             """
-            ## Production checklist
+            ## Inspect nightly sleep
+
+            The compact sleep view uses the canonical summaries and native
+            stage intervals. Because the loader maps `sleepHealthScore` to
+            canonical `overall_sleep_score`, it can also be displayed beside
+            each night; unavailable nights and scores remain blank.
+            """
+        ),
+        code(
+            """
+            sleep_participant = "demo-02"
+            visualization.plot_sleep_summary(
+                loader,
+                sleep_participant,
+                start_date=START,
+                end_date=END - pd.Timedelta(days=1),
+                show_scores=True,
+                title=f"Seven sleep-calendar dates: {sleep_participant}",
+                show=False,
+            )
+            plt.show()
+            """
+        ),
+        markdown(
+            """
+            ## Inspect adherence across participants
+
+            To inspect adherence during the study, aggregate heart-rate
+            coverage into 10-minute windows and compare its local-time pattern
+            for each participant.
+            """
+        ),
+        code(
+            """
+            ten_minute_heart_rate = heart_rate.get_heart_rate_statistics(
+                loader,
+                statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+                user_id="all",
+                start_date=START,
+                end_date=END,
+                resolution="10min",
+            )
+
+            participants = loader.get_user_ids()
+            fig, axes = plt.subplots(
+                len(participants), 1, figsize=(12, 8), constrained_layout=True
+            )
+            for user_id, axis in zip(participants, axes):
+                visualization.plot_coverage_heatmap(
+                    ten_minute_heart_rate,
+                    heart_rate.HEART_RATE_STATISTIC_MEAN,
+                    user_id=user_id,
+                    interval="10min",
+                    title=f"{user_id}: 10-minute heart-rate coverage",
+                    ax=axis,
+                    show=False,
+                )
+            plt.show()
+            """
+        ),
+        markdown(
+            """
+            ## What the adapter is responsible for
 
             - Preserve the provider's native resolution and units.
             - Expose UTC and local clocks only when they are known.
@@ -1021,6 +1378,9 @@ def build_custom_loader():
             - Link every sleep-stage interval to a `sleep_summary_id`.
             - Test duplicate records, timezone changes, empty intervals, and
               one end-to-end domain function for every implemented stream.
+
+            Once those responsibilities are met, downstream analysis remains
+            independent of the original source structure.
             """
         ),
     ]

@@ -1,0 +1,1092 @@
+{
+  "exportVersion": "3.2",
+  "nights": [
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260302",
+      "sleepDate": "2026-03-02",
+      "startedAt": "2026-03-01T23:22:00",
+      "endedAt": "2026-03-02T07:16:00",
+      "sleepSeconds": 28200,
+      "awakeSeconds": 240,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 14.8,
+        "stdBreathsPerMinute": 1.0
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-01T23:22:00",
+          "durationSeconds": 900,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-01T23:37:00",
+          "durationSeconds": 1800,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-02T00:07:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T00:13:00",
+          "durationSeconds": 1620,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T00:40:00",
+          "durationSeconds": 1020,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T00:57:00",
+          "durationSeconds": 1080,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-02T01:15:00",
+          "durationSeconds": 1200,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T01:35:00",
+          "durationSeconds": 1680,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T02:03:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-02T02:04:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T02:05:00",
+          "durationSeconds": 720,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T02:17:00",
+          "durationSeconds": 120,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-02T02:19:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T02:20:00",
+          "durationSeconds": 2100,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-02T02:55:00",
+          "durationSeconds": 240,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T02:59:00",
+          "durationSeconds": 900,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-02T03:14:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T03:23:00",
+          "durationSeconds": 540,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T03:32:00",
+          "durationSeconds": 180,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T03:35:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T03:39:00",
+          "durationSeconds": 780,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T03:52:00",
+          "durationSeconds": 120,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-02T03:54:00",
+          "durationSeconds": 2880,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T04:42:00",
+          "durationSeconds": 960,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T04:58:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T04:59:00",
+          "durationSeconds": 1620,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T05:26:00",
+          "durationSeconds": 2220,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T06:03:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T06:07:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-02T06:08:00",
+          "durationSeconds": 420,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T06:15:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T06:16:00",
+          "durationSeconds": 660,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T06:27:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T06:33:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T06:34:00",
+          "durationSeconds": 1080,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T06:52:00",
+          "durationSeconds": 360,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-02T06:58:00",
+          "durationSeconds": 1080,
+          "stageCode": "LT"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260303",
+      "sleepDate": "2026-03-03",
+      "startedAt": "2026-03-02T23:47:00",
+      "endedAt": "2026-03-03T07:49:00",
+      "sleepSeconds": 27540,
+      "awakeSeconds": 120,
+      "unmeasurableSeconds": 1260,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 14.8,
+        "stdBreathsPerMinute": 1.2
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-02T23:47:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-02T23:56:00",
+          "durationSeconds": 2220,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T00:33:00",
+          "durationSeconds": 1380,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T00:56:00",
+          "durationSeconds": 420,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T01:03:00",
+          "durationSeconds": 660,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T01:14:00",
+          "durationSeconds": 840,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T01:28:00",
+          "durationSeconds": 480,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T01:36:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T01:37:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T01:39:00",
+          "durationSeconds": 2040,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T02:13:00",
+          "durationSeconds": 2700,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T02:58:00",
+          "durationSeconds": 1260,
+          "stageCode": "UNM"
+        },
+        {
+          "startedAt": "2026-03-03T03:19:00",
+          "durationSeconds": 2220,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T03:56:00",
+          "durationSeconds": 300,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T04:01:00",
+          "durationSeconds": 2940,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T04:50:00",
+          "durationSeconds": 600,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:00:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T05:06:00",
+          "durationSeconds": 600,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:16:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-03T05:17:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:21:00",
+          "durationSeconds": 180,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T05:24:00",
+          "durationSeconds": 120,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:26:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T05:28:00",
+          "durationSeconds": 660,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:39:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T05:40:00",
+          "durationSeconds": 180,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T05:43:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-03T05:44:00",
+          "durationSeconds": 3540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T06:43:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T06:44:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T06:46:00",
+          "durationSeconds": 3240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-03T07:40:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260304",
+      "sleepDate": "2026-03-04",
+      "startedAt": "2026-03-03T22:51:00",
+      "endedAt": "2026-03-04T07:13:00",
+      "sleepSeconds": 29880,
+      "awakeSeconds": 240,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 16.7,
+        "stdBreathsPerMinute": 2.1
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-03T22:51:00",
+          "durationSeconds": 660,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T23:02:00",
+          "durationSeconds": 1020,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T23:19:00",
+          "durationSeconds": 780,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T23:32:00",
+          "durationSeconds": 600,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T23:42:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-03T23:43:00",
+          "durationSeconds": 480,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-03T23:51:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-03T23:57:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T00:01:00",
+          "durationSeconds": 420,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T00:08:00",
+          "durationSeconds": 840,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T00:22:00",
+          "durationSeconds": 1020,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T00:39:00",
+          "durationSeconds": 960,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-04T00:55:00",
+          "durationSeconds": 6660,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T02:46:00",
+          "durationSeconds": 480,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T02:54:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T02:56:00",
+          "durationSeconds": 540,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T03:05:00",
+          "durationSeconds": 3480,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T04:03:00",
+          "durationSeconds": 1020,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T04:20:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T04:21:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T04:22:00",
+          "durationSeconds": 5040,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T05:46:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T05:50:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T05:51:00",
+          "durationSeconds": 120,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T05:53:00",
+          "durationSeconds": 120,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-04T05:55:00",
+          "durationSeconds": 780,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T06:08:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-04T06:09:00",
+          "durationSeconds": 1620,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-04T06:36:00",
+          "durationSeconds": 2220,
+          "stageCode": "LT"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260305",
+      "sleepDate": "2026-03-05",
+      "startedAt": "2026-03-04T23:37:00",
+      "endedAt": "2026-03-05T07:17:00",
+      "sleepSeconds": 27600,
+      "awakeSeconds": 0,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 15.1,
+        "stdBreathsPerMinute": 1.1
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-04T23:37:00",
+          "durationSeconds": 600,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-04T23:47:00",
+          "durationSeconds": 5940,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-05T01:26:00",
+          "durationSeconds": 1740,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T01:55:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-05T01:56:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T01:58:00",
+          "durationSeconds": 1440,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-05T02:22:00",
+          "durationSeconds": 3360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T03:18:00",
+          "durationSeconds": 660,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-05T03:29:00",
+          "durationSeconds": 7080,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T05:27:00",
+          "durationSeconds": 2100,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-05T06:02:00",
+          "durationSeconds": 3780,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T07:05:00",
+          "durationSeconds": 720,
+          "stageCode": "REM"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260306",
+      "sleepDate": "2026-03-06",
+      "startedAt": "2026-03-05T23:14:00",
+      "endedAt": "2026-03-06T06:30:00",
+      "sleepSeconds": 26040,
+      "awakeSeconds": 120,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 15.0,
+        "stdBreathsPerMinute": 1.0
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-05T23:14:00",
+          "durationSeconds": 600,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-05T23:24:00",
+          "durationSeconds": 2280,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T00:02:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T00:08:00",
+          "durationSeconds": 840,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T00:22:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T00:31:00",
+          "durationSeconds": 1560,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T00:57:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T01:06:00",
+          "durationSeconds": 720,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T01:18:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-06T01:19:00",
+          "durationSeconds": 360,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T01:25:00",
+          "durationSeconds": 3000,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T02:15:00",
+          "durationSeconds": 780,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T02:28:00",
+          "durationSeconds": 720,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T02:40:00",
+          "durationSeconds": 120,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T02:42:00",
+          "durationSeconds": 1980,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T03:15:00",
+          "durationSeconds": 420,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T03:22:00",
+          "durationSeconds": 2520,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T04:04:00",
+          "durationSeconds": 300,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T04:09:00",
+          "durationSeconds": 1500,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T04:34:00",
+          "durationSeconds": 1800,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T05:04:00",
+          "durationSeconds": 3780,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T06:07:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-06T06:08:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T06:10:00",
+          "durationSeconds": 1200,
+          "stageCode": "REM"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260307",
+      "sleepDate": "2026-03-07",
+      "startedAt": "2026-03-06T23:20:00",
+      "endedAt": "2026-03-07T06:45:00",
+      "sleepSeconds": 25740,
+      "awakeSeconds": 960,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 17.3,
+        "stdBreathsPerMinute": 2.6
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-06T23:20:00",
+          "durationSeconds": 540,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T23:29:00",
+          "durationSeconds": 600,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-06T23:39:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T23:41:00",
+          "durationSeconds": 540,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T23:50:00",
+          "durationSeconds": 120,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-06T23:52:00",
+          "durationSeconds": 180,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-06T23:55:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-06T23:56:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T00:00:00",
+          "durationSeconds": 180,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-07T00:03:00",
+          "durationSeconds": 1620,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T00:30:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T00:31:00",
+          "durationSeconds": 360,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T00:37:00",
+          "durationSeconds": 360,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-07T00:43:00",
+          "durationSeconds": 1380,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T01:06:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-07T01:07:00",
+          "durationSeconds": 3720,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T02:09:00",
+          "durationSeconds": 120,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-07T02:11:00",
+          "durationSeconds": 1020,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T02:28:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T02:29:00",
+          "durationSeconds": 1800,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T02:59:00",
+          "durationSeconds": 120,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T03:01:00",
+          "durationSeconds": 420,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T03:08:00",
+          "durationSeconds": 2340,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T03:47:00",
+          "durationSeconds": 840,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T04:01:00",
+          "durationSeconds": 360,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-07T04:07:00",
+          "durationSeconds": 4140,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T05:16:00",
+          "durationSeconds": 1260,
+          "stageCode": "DP"
+        },
+        {
+          "startedAt": "2026-03-07T05:37:00",
+          "durationSeconds": 1380,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T06:00:00",
+          "durationSeconds": 900,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T06:15:00",
+          "durationSeconds": 300,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-07T06:20:00",
+          "durationSeconds": 540,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T06:29:00",
+          "durationSeconds": 960,
+          "stageCode": "LT"
+        }
+      ]
+    },
+    {
+      "memberCode": "demo-01",
+      "nightKey": "demo-01-night-20260308",
+      "sleepDate": "2026-03-08",
+      "startedAt": "2026-03-07T22:19:00",
+      "endedAt": "2026-03-08T08:27:00",
+      "sleepSeconds": 36120,
+      "awakeSeconds": 360,
+      "unmeasurableSeconds": 0,
+      "nightlyRespiration": {
+        "meanBreathsPerMinute": 14.9,
+        "stdBreathsPerMinute": 1.3
+      },
+      "stageSegments": [
+        {
+          "startedAt": "2026-03-07T22:19:00",
+          "durationSeconds": 1740,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T22:48:00",
+          "durationSeconds": 780,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-07T23:01:00",
+          "durationSeconds": 3180,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-07T23:54:00",
+          "durationSeconds": 900,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T00:09:00",
+          "durationSeconds": 60,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T00:10:00",
+          "durationSeconds": 540,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T00:19:00",
+          "durationSeconds": 1260,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T00:40:00",
+          "durationSeconds": 6900,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T02:35:00",
+          "durationSeconds": 180,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T02:38:00",
+          "durationSeconds": 420,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T02:45:00",
+          "durationSeconds": 120,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-08T02:47:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T02:48:00",
+          "durationSeconds": 180,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-08T02:51:00",
+          "durationSeconds": 480,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T02:59:00",
+          "durationSeconds": 300,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T03:04:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T03:08:00",
+          "durationSeconds": 3720,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T04:10:00",
+          "durationSeconds": 600,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T04:20:00",
+          "durationSeconds": 360,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T04:26:00",
+          "durationSeconds": 60,
+          "stageCode": "AWK"
+        },
+        {
+          "startedAt": "2026-03-08T04:27:00",
+          "durationSeconds": 600,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T04:37:00",
+          "durationSeconds": 1800,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T05:07:00",
+          "durationSeconds": 4800,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T06:27:00",
+          "durationSeconds": 60,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T06:28:00",
+          "durationSeconds": 1740,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T06:57:00",
+          "durationSeconds": 2040,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T07:31:00",
+          "durationSeconds": 2820,
+          "stageCode": "LT"
+        },
+        {
+          "startedAt": "2026-03-08T08:18:00",
+          "durationSeconds": 240,
+          "stageCode": "REM"
+        },
+        {
+          "startedAt": "2026-03-08T08:22:00",
+          "durationSeconds": 300,
+          "stageCode": "LT"
+        }
+      ]
+    }
+  ]
+}
