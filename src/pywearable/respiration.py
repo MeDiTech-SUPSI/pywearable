@@ -267,6 +267,7 @@ def _sample_family_trajectory(
             valid_interval = bool(window.get("interval_valid", True))
             values = {name: np.nan for name in statistics}
             coverage = np.nan
+            rows = frame.iloc[0:0]
             if valid_interval:
                 left = timestamps.searchsorted(window["start_time"], side="left")
                 right = timestamps.searchsorted(window["end_time"], side="left")
@@ -298,6 +299,11 @@ def _sample_family_trajectory(
                     "window_start": label,
                     "period_start": window["start_time"],
                     "period_end": window["end_time"],
+                    **(
+                        hierarchy.fixed_window_time_metadata(rows, label, time_col)
+                        if hierarchy.fixed_duration(resolution) is not None
+                        else {}
+                    ),
                     **values,
                     **(
                         {f"{name}__coverage": coverage for name in statistics}
@@ -487,7 +493,8 @@ def get_respiration_statistics(
         ``__coverage`` column per requested feature. Hierarchical column names
         include each resolution and aggregation. Unsupported provider-summary
         features are missing, never inferred from summary means.
-        Below-threshold duration is in seconds.
+        Below-threshold duration is in seconds. Fixed-duration output also
+        contains the alternate clock and the ``timezone`` UTC offset.
     """
     statistics = _statistics_list(statistic)
     users = loader.resolve_user_ids(user_id)
@@ -563,6 +570,11 @@ def get_respiration_statistics(
     )
 
     unresolved_coverage = set()
+    fixed_time_col = (
+        _resolve_time_col(loader, families[0], time_reference, chain)
+        if source == "samples" and families
+        else None
+    )
     family_frames = []
     for family in families:
         requested = hierarchy.family_statistics(statistics, family)
@@ -638,6 +650,7 @@ def get_respiration_statistics(
                 membership=membership,
                 min_coverage=coverage_thresholds[level + 1],
                 min_valid_children=child_thresholds[level + 1],
+                time_col=fixed_time_col,
             )
         index_name = (
             schema.CALENDAR_DATE_COL
@@ -645,14 +658,24 @@ def get_respiration_statistics(
             or chain[-1] in cycle.CYCLE_TYPES
             else _resolve_time_col(loader, families[0], time_reference, chain)
         )
-        return trajectory.rename_axis(index={"window_start": index_name})
+        trajectory = trajectory.rename_axis(index={"window_start": index_name})
+        if hierarchy.fixed_duration(chain[-1]) is not None:
+            return hierarchy.format_fixed_time_output(trajectory, index_name)
+        return trajectory
 
     columns = [
         column
         for name in statistics
         for column in (name, f"{name}__coverage")
     ]
-    result = trajectory[columns].copy()
+    result = trajectory[
+        columns
+        + [
+            column
+            for column in hierarchy.TIME_METADATA_COLUMNS
+            if column in trajectory
+        ]
+    ].copy()
     index_name = (
         schema.CALENDAR_DATE_COL
         if direct_summary
@@ -661,6 +684,8 @@ def get_respiration_statistics(
         else _resolve_time_col(loader, families[0], time_reference, chain)
     )
     result = result.rename_axis(index={"window_start": index_name})
+    if hierarchy.fixed_duration(chain[0]) is not None:
+        return hierarchy.format_fixed_time_output(result, index_name)
     return result
 
 

@@ -346,6 +346,10 @@ def test_fixed_windows_can_be_aggregated_to_a_larger_fixed_resolution():
 
     assert result.index.names == ["user_id", "local_time"]
     assert result.loc[
+        ("user-1", pd.Timestamp("2024-01-10 01:00")), "utc_time"
+    ] == pd.Timestamp("2024-01-10 00:00")
+    assert result["timezone"].dropna().eq(pd.Timedelta(hours=1)).all()
+    assert result.loc[
         ("user-1", pd.Timestamp("2024-01-10 01:00")),
         "heart_rate_mean__5min__1h_mean",
     ] == 60

@@ -403,6 +403,11 @@ def _sample_primary_trajectory(
                     "window_start": label,
                     "period_start": window_start,
                     "period_end": window_end,
+                    **(
+                        hierarchy.fixed_window_time_metadata(rows, label, time_col)
+                        if hierarchy.fixed_duration(resolution) is not None
+                        else {}
+                    ),
                     **values,
                     **(
                         {f"{name}__coverage": coverage for name in statistics}
@@ -502,11 +507,18 @@ def _aggregate_default_level(
     membership,
     min_coverage,
     min_valid_children,
+    time_col,
 ):
     """Aggregate step totals by sum and peak descriptors by mean."""
     metadata = [
         column
-        for column in ("period_start", "period_end", "interval_valid", "end_source")
+        for column in (
+            "period_start",
+            "period_end",
+            "interval_valid",
+            "end_source",
+            *hierarchy.TIME_METADATA_COLUMNS,
+        )
         if column in trajectory
     ]
     features = [
@@ -542,6 +554,7 @@ def _aggregate_default_level(
             min_coverage=min_coverage,
             min_valid_children=min_valid_children,
             allow_sum=True,
+            time_col=time_col,
         )
         frames.append(frame)
         next_temporal.update(group_temporal)
@@ -624,6 +637,8 @@ def get_activity_statistics(
         and its ``__coverage`` column. An interval contributes when it is
         fully contained in the requested window. Peak 60-minute values require
         one completely observed contiguous hour inside the requested window.
+        Fixed-duration output also contains the alternate clock and the
+        ``timezone`` UTC offset for each window.
     """
     source = getattr(loader, "activity_source", None)
     if source not in {"samples", "daily_summary"}:
@@ -664,7 +679,14 @@ def get_activity_statistics(
         else None
     )
     include_coverage = True
+    fixed_time_col = None
     if source == "samples":
+        fixed_time_col = hierarchy.resolve_time_col(
+            getattr(loader, "activity_time_columns", schema.ACTIVITY_TIME_COLUMNS),
+            time_reference,
+            chain,
+            "activity",
+        )
         trajectory = _sample_primary_trajectory(
             loader,
             users,
@@ -731,6 +753,7 @@ def get_activity_statistics(
                     membership,
                     coverage_thresholds[level + 1],
                     child_thresholds[level + 1],
+                    fixed_time_col,
                 )
             else:
                 trajectory, temporal = hierarchy.aggregate_level(
@@ -743,6 +766,7 @@ def get_activity_statistics(
                     min_coverage=coverage_thresholds[level + 1],
                     min_valid_children=child_thresholds[level + 1],
                     allow_sum=True,
+                    time_col=fixed_time_col,
                 )
         index_name = (
             schema.CALENDAR_DATE_COL
@@ -755,14 +779,24 @@ def get_activity_statistics(
                 "activity",
             )
         )
-        return trajectory.rename_axis(index={"window_start": index_name})
+        trajectory = trajectory.rename_axis(index={"window_start": index_name})
+        if hierarchy.fixed_duration(chain[-1]) is not None:
+            return hierarchy.format_fixed_time_output(trajectory, index_name)
+        return trajectory
 
     columns = [
         column
         for name in statistics
         for column in (name, f"{name}__coverage")
     ]
-    result = trajectory[columns].copy()
+    result = trajectory[
+        columns
+        + [
+            column
+            for column in hierarchy.TIME_METADATA_COLUMNS
+            if column in trajectory
+        ]
+    ].copy()
     index_name = (
         schema.CALENDAR_DATE_COL
         if chain[0] in hierarchy.CALENDAR_RESOLUTIONS or chain[0] in cycle.CYCLE_TYPES
@@ -774,6 +808,8 @@ def get_activity_statistics(
         )
     )
     result = result.rename_axis(index={"window_start": index_name})
+    if hierarchy.fixed_duration(chain[0]) is not None:
+        return hierarchy.format_fixed_time_output(result, index_name)
     return result
 
 

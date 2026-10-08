@@ -243,6 +243,8 @@ def test_hourly_hr_uses_utc_hour_boundaries_and_requested_columns(tmp_path):
         statistic=["heart_rate_mean", "heart_rate_max"],
     )
     assert list(result) == [
+        "local_time",
+        "timezone",
         "heart_rate_mean",
         "heart_rate_mean__coverage",
         "heart_rate_max",

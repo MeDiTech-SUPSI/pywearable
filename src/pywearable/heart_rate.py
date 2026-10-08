@@ -571,29 +571,17 @@ def _compute_hr_statistics(
 
     heart_rate_stats = pd.concat(frames, axis=1).reindex(columns=statistics)
 
-    # Let's add back timezone info
-    if (
-        not calendar_based
-        and time_col == schema.UTC_TIME_COL
-        and schema.TIMEZONE_COL in heart_rate.columns
-    ):
-        tz_lookup = (
-            heart_rate[
-                [schema.UTC_TIME_COL, schema.TIMEZONE_COL]
-            ]
-            .sort_values(schema.UTC_TIME_COL)
-            .drop_duplicates(subset=schema.UTC_TIME_COL, keep="last")
+    if not calendar_based and schema.TIMEZONE_COL in heart_rate.columns:
+        offsets = (
+            heart_rate.resample(
+                rule=rule, on=time_col, label="left", closed="left"
+            )[schema.TIMEZONE_COL]
+            .first()
+            .reindex(heart_rate_stats.index)
         )
-        heart_rate_stats = heart_rate_stats.reset_index()
-
-        heart_rate_stats = pd.merge_asof(
-            heart_rate_stats.sort_values("utc_time"),
-            tz_lookup,
-            on=schema.UTC_TIME_COL,
-            direction="nearest",
-        )
+        heart_rate_stats[schema.TIMEZONE_COL] = offsets
         heart_rate_stats = heart_rate_stats.set_index(
-            [schema.UTC_TIME_COL, schema.TIMEZONE_COL]
+            schema.TIMEZONE_COL, append=True
         )
 
     return heart_rate_stats
@@ -1449,6 +1437,14 @@ def _single_resolution_hr_trajectory(
             ],
             index=index,
         )
+    canonical = hierarchy.canonical_resolution(resolution)
+    if hierarchy.fixed_duration(canonical) is not None:
+        time_col = next(
+            name
+            for name in result.index.names
+            if name not in {schema.USER_COL, schema.TIMEZONE_COL}
+        )
+        result = hierarchy.format_fixed_time_output(result, time_col)
     while result.index.nlevels > 2:
         result = result.droplevel(-1)
     result.index = result.index.set_names(["user_id", "window_start"])
@@ -1456,7 +1452,6 @@ def _single_resolution_hr_trajectory(
     starts = pd.Series(
         result.index.get_level_values("window_start"), index=result.index
     )
-    canonical = hierarchy.canonical_resolution(resolution)
     if canonical in hierarchy.CALENDAR_RESOLUTIONS:
         spec = time_utils.get_resampling_spec(canonical, time_reference="local")
         canonical_starts = starts.map(
@@ -1565,6 +1560,19 @@ def _hierarchical_heart_rate_statistics(
         # A hierarchy must use one coherent clock. Local calendar and sleep
         # intervals therefore make their lower fixed windows local as well.
         primary_reference = "local"
+    primary_time_col = None
+    if hierarchy.fixed_duration(primary) is not None:
+        primary_time_col = time_utils.get_resampling_spec(
+            primary, time_reference=primary_reference
+        ).time_col
+        available_time_columns = getattr(
+            loader, "heart_rate_time_columns", schema.HEART_RATE_TIME_COLUMNS
+        )
+        if (
+            primary_time_col not in available_time_columns
+            and primary_reference == "auto"
+        ):
+            primary_time_col = schema.LOCAL_TIME_COL
     cycle_target = next(
         (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
     )
@@ -1698,6 +1706,7 @@ def _hierarchical_heart_rate_statistics(
             membership=membership,
             min_coverage=coverage_thresholds[level_index + 1],
             min_valid_children=valid_child_thresholds[level_index + 1],
+            time_col=primary_time_col,
         )
     if chain[-1] in cycle.CYCLE_TYPES or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS:
         index_name = "calendar_date"
@@ -1710,7 +1719,10 @@ def _hierarchical_heart_rate_statistics(
         )
         if index_name not in available and primary_reference == "auto":
             index_name = schema.LOCAL_TIME_COL
-    return trajectory.rename_axis(index={"window_start": index_name})
+    trajectory = trajectory.rename_axis(index={"window_start": index_name})
+    if hierarchy.fixed_duration(chain[-1]) is not None:
+        return hierarchy.format_fixed_time_output(trajectory, index_name)
+    return trajectory
 
 
 def get_heart_rate_statistics(
@@ -1786,6 +1798,8 @@ def get_heart_rate_statistics(
         A ``(user_id, time)`` trajectory containing each requested feature and
         its ``__coverage`` column. Hierarchical output names retain the full
         calculation path and include immediate child coverage columns.
+        Fixed-duration output also contains the alternate clock and the
+        ``timezone`` UTC offset for each window.
 
     Examples
     --------
@@ -1835,6 +1849,13 @@ def get_heart_rate_statistics(
         )
         if threshold is not None:
             _warn_unknown_primary_coverage(unresolved_streams)
+        if hierarchy.fixed_duration(chain[0]) is not None:
+            time_col = next(
+                name
+                for name in result.index.names
+                if name not in {schema.USER_COL, schema.TIMEZONE_COL}
+            )
+            return hierarchy.format_fixed_time_output(result, time_col)
         return result
 
     users = loader.resolve_user_ids(user_id)

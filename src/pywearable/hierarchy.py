@@ -24,6 +24,11 @@ from .utils import time as time_utils
 
 STANDARD_AGGREGATIONS = ("mean", "std", "median", "min", "max", "p10", "p90")
 CALENDAR_RESOLUTIONS = ("daily", "weekly", "monthly", "yearly")
+TIME_METADATA_COLUMNS = (
+    schema.UTC_TIME_COL,
+    schema.LOCAL_TIME_COL,
+    schema.TIMEZONE_COL,
+)
 RESOLUTION_ALIASES = {
     "day": "daily",
     "week": "weekly",
@@ -450,6 +455,86 @@ def observed_bounds(frame, time_col, start_date, end_date, resolution):
     return start, end
 
 
+def fixed_window_time_metadata(rows, window_start, time_col):
+    """Return the alternate clock and UTC offset for one fixed window.
+
+    The first observed offset in the window is attached to its start label.
+    Missing source offsets remain missing rather than being inferred across a
+    gap or an offset change.
+    """
+    if time_col not in {schema.UTC_TIME_COL, schema.LOCAL_TIME_COL}:
+        raise ValueError("time_col must be 'utc_time' or 'local_time'")
+
+    offset = pd.NaT
+    if schema.TIMEZONE_COL in rows:
+        offsets = rows[schema.TIMEZONE_COL].dropna()
+        if not offsets.empty:
+            offset = pd.Timedelta(offsets.iloc[0])
+
+    window_start = pd.Timestamp(window_start)
+    if time_col == schema.UTC_TIME_COL:
+        local_time = window_start + offset if pd.notna(offset) else pd.NaT
+        return {
+            schema.LOCAL_TIME_COL: local_time,
+            schema.TIMEZONE_COL: offset,
+        }
+
+    utc_time = window_start - offset if pd.notna(offset) else pd.NaT
+    return {
+        schema.UTC_TIME_COL: utc_time,
+        schema.TIMEZONE_COL: offset,
+    }
+
+
+def format_fixed_time_output(frame: pd.DataFrame, time_col: str) -> pd.DataFrame:
+    """Expose the alternate clock and UTC offset beside a fixed-time index."""
+    if time_col not in {schema.UTC_TIME_COL, schema.LOCAL_TIME_COL}:
+        raise ValueError("time_col must be 'utc_time' or 'local_time'")
+    result = frame.copy()
+    if schema.TIMEZONE_COL in result.index.names:
+        result = result.reset_index(level=schema.TIMEZONE_COL)
+    if time_col not in result.index.names:
+        raise ValueError(f"fixed-time output index is missing {time_col}")
+
+    if schema.TIMEZONE_COL not in result:
+        result[schema.TIMEZONE_COL] = pd.Series(
+            pd.NaT, index=result.index, dtype="timedelta64[ns]"
+        )
+    elif pd.api.types.is_datetime64_any_dtype(result[schema.TIMEZONE_COL]):
+        if result[schema.TIMEZONE_COL].notna().any():
+            raise ValueError("timezone values must be UTC offsets")
+        result[schema.TIMEZONE_COL] = pd.Series(
+            pd.NaT, index=result.index, dtype="timedelta64[ns]"
+        )
+    elif not pd.api.types.is_timedelta64_dtype(result[schema.TIMEZONE_COL]):
+        result[schema.TIMEZONE_COL] = pd.to_timedelta(
+            result[schema.TIMEZONE_COL], errors="coerce"
+        )
+
+    alternate = (
+        schema.LOCAL_TIME_COL
+        if time_col == schema.UTC_TIME_COL
+        else schema.UTC_TIME_COL
+    )
+    if alternate not in result:
+        selected = pd.Series(
+            pd.to_datetime(result.index.get_level_values(time_col)),
+            index=result.index,
+        )
+        if time_col == schema.UTC_TIME_COL:
+            result[alternate] = selected + result[schema.TIMEZONE_COL]
+        else:
+            result[alternate] = selected - result[schema.TIMEZONE_COL]
+
+    metadata = [alternate, schema.TIMEZONE_COL]
+    values = [
+        column
+        for column in result.columns
+        if column not in TIME_METADATA_COLUMNS
+    ]
+    return result[metadata + values]
+
+
 def empty_trajectory(statistics, include_coverage=False, time_col="window_start"):
     """Return an empty feature table using the shared hierarchy row shape."""
     index = pd.MultiIndex.from_arrays([[], []], names=[schema.USER_COL, time_col])
@@ -476,14 +561,26 @@ def combine_trajectories(frames, features, include_coverage=False):
     for frame in nonempty[1:]:
         index = index.union(frame.index)
     result = pd.DataFrame(index=index)
-    for metadata in ("period_start", "period_end"):
-        values = pd.Series(pd.NaT, index=index, dtype="datetime64[ns]")
+    temporal_metadata = tuple(
+        column
+        for column in TIME_METADATA_COLUMNS
+        if any(column in frame for frame in nonempty)
+    )
+    metadata_columns = ("period_start", "period_end", *temporal_metadata)
+    for metadata in metadata_columns:
+        dtype = (
+            "timedelta64[ns]"
+            if metadata == schema.TIMEZONE_COL
+            else "datetime64[ns]"
+        )
+        values = pd.Series(pd.NaT, index=index, dtype=dtype)
         for frame in nonempty:
-            values = values.fillna(frame[metadata].reindex(index))
+            if metadata in frame:
+                values = values.fillna(frame[metadata].reindex(index))
         result[metadata] = values
     for frame in frames:
         for column in frame.columns:
-            if column not in {"period_start", "period_end"}:
+            if column not in metadata_columns:
                 result[column] = frame[column].reindex(index)
     for feature in features:
         if feature not in result:
@@ -671,6 +768,7 @@ def aggregate_level(
     min_coverage: float | None = None,
     min_valid_children: int | None = None,
     allow_sum: bool = False,
+    time_col: str | None = None,
 ):
     """Aggregate one child trajectory into one larger resolution.
 
@@ -701,7 +799,13 @@ def aggregate_level(
         or min_valid_children < 0
     ):
         raise ValueError("min_valid_children must be a non-negative integer")
-    metadata = {"period_start", "period_end", "interval_valid", "end_source"}
+    metadata = {
+        "period_start",
+        "period_end",
+        "interval_valid",
+        "end_source",
+        *TIME_METADATA_COLUMNS,
+    }
     features = [
         column
         for column in trajectory.columns
@@ -743,6 +847,8 @@ def aggregate_level(
             "period_start": parent["start_time"],
             "period_end": parent["end_time"],
         }
+        if time_col is not None and fixed_duration(target_resolution) is not None:
+            record.update(fixed_window_time_metadata(selected, label, time_col))
         for feature in features:
             valid_count = int(selected[feature].notna().sum())
             coverage = (

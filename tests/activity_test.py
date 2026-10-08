@@ -83,9 +83,13 @@ def test_hourly_coverage_combines_hr_presence_and_positive_steps():
     )
 
     assert list(result) == [
+        schema.LOCAL_TIME_COL,
+        schema.TIMEZONE_COL,
         activity.ACTIVITY_STATISTIC_STEPS,
         f"{activity.ACTIVITY_STATISTIC_STEPS}__coverage",
     ]
+    assert result.iloc[0][schema.LOCAL_TIME_COL] == pd.Timestamp("2024-01-01")
+    assert result.iloc[0][schema.TIMEZONE_COL] == pd.Timedelta(0)
     row = result.iloc[0]
     assert row[activity.ACTIVITY_STATISTIC_STEPS] == 25
     assert row[f"{activity.ACTIVITY_STATISTIC_STEPS}__coverage"] == pytest.approx(

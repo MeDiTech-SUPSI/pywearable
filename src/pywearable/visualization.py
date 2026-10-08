@@ -697,7 +697,8 @@ def _single_value_column(frame, *, suffix=None):
     columns = [
         column
         for column in frame.columns
-        if column not in {"period_start", "period_end"}
+        if column
+        not in {"period_start", "period_end", *hierarchy.TIME_METADATA_COLUMNS}
         and not column.endswith("__coverage")
         and (suffix is None or column.endswith(suffix))
     ]

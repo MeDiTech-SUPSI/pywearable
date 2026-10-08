@@ -52,7 +52,11 @@ def test_subdaily_statistics_use_utc_windows_and_keep_timezone():
         statistic=["heart_rate_mean", "heart_rate_max"],
     )
     assert loader.requested_time_cols == ["utc_time"]
-    assert result.index.names == ["user_id", "utc_time", "timezone"]
+    assert result.index.names == ["user_id", "utc_time"]
+    assert result["local_time"].tolist() == pd.to_datetime(
+        ["2024-01-01 23:00", "2024-01-02 00:00", "2024-01-02 01:00"]
+    ).tolist()
+    assert result["timezone"].eq(pd.Timedelta(hours=1)).all()
     assert result["heart_rate_mean"].dropna().tolist() == [60, 70, 80]
 
 
@@ -85,6 +89,10 @@ def test_subdaily_statistics_can_use_local_clock_windows():
     )
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
+    assert result["utc_time"].tolist() == pd.to_datetime(
+        ["2024-01-01 22:00", "2024-01-01 23:00", "2024-01-02 00:00"]
+    ).tolist()
+    assert result["timezone"].eq(pd.Timedelta(hours=1)).all()
     assert result["heart_rate_mean"].tolist() == [60, 70, 80]
 
 
@@ -102,6 +110,8 @@ def test_auto_subdaily_statistics_warn_and_fall_back_to_available_local_time():
 
     assert loader.requested_time_cols == ["local_time"]
     assert result.index.names == ["user_id", "local_time"]
+    assert result["utc_time"].isna().all()
+    assert result["timezone"].isna().all()
     assert result["heart_rate_mean"].tolist() == [60, 70, 80]
 
 
@@ -366,7 +376,13 @@ def test_resolution_convenience_functions_remain_available(
         loader, user_id="person-1", statistic="heart_rate_mean"
     )
     assert isinstance(result, pd.DataFrame)
-    assert list(result) == ["heart_rate_mean", "heart_rate_mean__coverage"]
+    expected_columns = ["heart_rate_mean", "heart_rate_mean__coverage"]
+    if function in {
+        heart_rate.get_minute_heart_rate_statistics,
+        heart_rate.get_hourly_heart_rate_statistics,
+    }:
+        expected_columns = ["local_time", "timezone", *expected_columns]
+    assert list(result) == expected_columns
     assert loader.requested_time_cols == [expected_time_col]
 
 

@@ -102,6 +102,8 @@ def test_raw_five_minute_statistics_coverage_and_threshold_duration():
         spo2_threshold=90,
     )
     first = result.loc[("u1", pd.Timestamp("2024-01-01 00:00"))]
+    assert first["local_time"] == pd.Timestamp("2024-01-01 00:00")
+    assert first["timezone"] == pd.Timedelta(0)
     assert first["respiratory_rate_mean"] == 12
     assert first["respiratory_rate_count"] == 5
     assert first["respiratory_rate_mean__coverage"] == 1

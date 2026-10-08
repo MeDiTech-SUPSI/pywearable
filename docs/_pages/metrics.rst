@@ -51,6 +51,11 @@ Feature trajectories
 Analysis functions return a :class:`pandas.DataFrame` with a two-level
 ``(user_id, time)`` index. The time level is named ``utc_time``, ``local_time``,
 or ``calendar_date`` according to the requested clock and resolution.
+Fixed-duration trajectories also retain the other clock and the applicable
+``timezone`` offset as columns. For example, the default UTC-indexed
+five-minute output contains ``local_time`` and ``timezone`` columns. This
+allows trajectories to be joined on UTC and subsequently interpreted on each
+participant's local clock, including across offset changes.
 
 Each feature has a separate ``<feature>__coverage`` column. The value and its
 support can therefore be inspected independently:
