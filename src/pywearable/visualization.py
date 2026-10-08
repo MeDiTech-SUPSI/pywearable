@@ -669,7 +669,9 @@ def _statistic_trajectory(loader, statistic, **kwargs):
         return heart_rate.get_heart_rate_statistics(
             loader, statistic=statistic, **kwargs
         )
-    if statistic in hrv.HRV_STATISTICS:
+    if statistic in hrv.NEUROKIT_HRV_STATISTICS:
+        if statistic not in hrv.HRV_STATISTICS:
+            kwargs.setdefault("backend", "neurokit")
         return hrv.get_hrv_statistics(loader, statistic=statistic, **kwargs)
     if statistic in respiration.RESPIRATION_STATISTICS or any(
         statistic.startswith(prefix)

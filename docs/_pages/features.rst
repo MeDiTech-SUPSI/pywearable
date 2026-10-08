@@ -77,12 +77,23 @@ Use :func:`pywearable.hrv.get_hrv_statistics` for beat-to-beat interval data.
    * - Family
      - Features
    * - Time domain
-     - RMSSD, SDNN, pNN20, pNN50, and median BBI
+     - RMSSD, SDNN, pNN20, pNN50, median, minimum, mean, and maximum NN,
+       SDNN/RMSSD, CVNN, CVSD, and IQRNN
    * - Frequency domain
      - VLF, LF, and HF power, plus the LF/HF ratio
 
 The default implementation is self-contained. Install the ``neurokit`` extra
-when the NeuroKit backend is required by an analysis protocol.
+when the NeuroKit backend is required by an analysis protocol. With
+``statistic=None``, the built-in backend returns the features listed above,
+whereas the NeuroKit backend returns its broader time- and frequency-domain
+set. Supplying ``statistic`` always limits the output to the requested names.
+Frequency-domain values from different backends are not interchangeable.
+
+Raw BBI data use five-minute primary windows. A shorter ``window_step`` creates
+overlapping estimates, which can still feed larger hierarchy levels. During
+sleep-cycle extraction, ``awake`` and ``unmeasurable`` stages are excluded by
+default; ``sleep_stages_to_remove`` configures or disables this filter. The
+observed timestamps are retained when handling missing BBI rows.
 
 Respiration and oxygen saturation
 ---------------------------------

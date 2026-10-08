@@ -164,21 +164,66 @@ class InternalWakeGapLoader(RawBBILoader):
         )
 
 
+class LoaderFilteredGapLoader(RawBBILoader):
+    """Return BBIs after a provider-quality filter removed one source row."""
+
+    def __init__(self):
+        super().__init__(sample_count=300)
+        self.bbi["bbi"] = np.concatenate(
+            [np.full(150, 900.0), np.array([1000.0]), np.full(149, 1100.0)]
+        )
+
+    def load_bbi(self, user_id, start_date=None, end_date=None):
+        return self.bbi.drop(index=150).reset_index(drop=True)
+
+
 def test_time_domain_definitions_and_insufficient_sdnn():
     values = np.array([1000.0, 1030.0, 970.0, 1030.0])
-    assert hrv.compute_pnn20(values) == 75.0
-    assert hrv.compute_pnn50(values) == 50.0
+    assert hrv.compute_pnn20(values) == 100.0
+    assert hrv.compute_pnn50(values) == pytest.approx(2 / 3 * 100)
     assert np.isnan(hrv.compute_sdnn(values))
+
+
+def test_builtin_backend_exposes_expanded_time_domain_features():
+    values = np.resize([900.0, 1100.0], 300)
+    requested = [
+        "hrv_min_nn",
+        "hrv_mean_nn",
+        "hrv_max_nn",
+        "hrv_sdnn_rmssd_ratio",
+        "hrv_cv_nn",
+        "hrv_cv_sd",
+        "hrv_iqr_nn",
+    ]
+
+    result = hrv._window_statistics(values, requested, "pywearable")
+
+    assert result["hrv_min_nn"] == 900
+    assert result["hrv_mean_nn"] == 1000
+    assert result["hrv_max_nn"] == 1100
+    assert result["hrv_sdnn_rmssd_ratio"] == pytest.approx(
+        hrv.compute_sdnn(values) / hrv.compute_rmssd(values)
+    )
+    assert result["hrv_cv_nn"] == pytest.approx(hrv.compute_sdnn(values) / 1000)
+    assert result["hrv_cv_sd"] == pytest.approx(hrv.compute_rmssd(values) / 1000)
+    assert result["hrv_iqr_nn"] == 200
+
+
+def test_backend_default_registries_are_distinct():
+    assert set(hrv.HRV_STATISTICS) < set(hrv.NEUROKIT_HRV_STATISTICS)
+    assert "hrv_sdsd" in hrv.NEUROKIT_HRV_STATISTICS
+    assert "hrv_total_power" in hrv.NEUROKIT_HRV_STATISTICS
+    assert "hrv_sdsd" not in hrv.HRV_STATISTICS
 
 
 def test_frequency_statistics_share_one_spectrum(monkeypatch):
     calls = 0
     original = hrv._power_spectrum
 
-    def counted(values):
+    def counted(values, timestamps=None):
         nonlocal calls
         calls += 1
-        return original(values)
+        return original(values, timestamps)
 
     monkeypatch.setattr(hrv, "_power_spectrum", counted)
     hrv._window_statistics(
@@ -216,27 +261,104 @@ def test_neurokit_frequency_uses_absolute_power_and_four_hz(monkeypatch):
     assert result["hrv_lfhf_ratio"] == 0.5
 
 
-def test_neurokit_rejects_frequency_and_avoids_cross_gap_differences(monkeypatch):
-    def unexpected_call(*args, **kwargs):
-        raise AssertionError("NeuroKit must not receive a discontinuous BBI sequence")
+def test_neurokit_returns_requested_time_and_frequency_features_only(monkeypatch):
+    calls = []
+
+    def hrv_time(intervals, **kwargs):
+        calls.append("time")
+        return pd.DataFrame(
+            {
+                "HRV_MeanNN": [1000.0],
+                "HRV_SDSD": [12.0],
+                "HRV_MadNN": [20.0],
+            }
+        )
+
+    def hrv_frequency(intervals, **kwargs):
+        calls.append("frequency")
+        return pd.DataFrame({"HRV_TP": [123.0], "HRV_VHF": [4.0]})
 
     fake_neurokit = SimpleNamespace(
-        hrv_time=unexpected_call,
-        hrv_frequency=unexpected_call,
+        hrv_time=hrv_time,
+        hrv_frequency=hrv_frequency,
+        hrv_nonlinear=lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("nonlinear HRV must not be called")
+        ),
     )
+    monkeypatch.setitem(sys.modules, "neurokit2", fake_neurokit)
+
+    requested = ["hrv_sdsd", "hrv_mad_nn", "hrv_total_power"]
+    result = hrv._neurokit_window_statistics(
+        np.resize([900.0, 1100.0], 300), requested
+    )
+
+    assert result == {
+        "hrv_sdsd": 12.0,
+        "hrv_mad_nn": 20.0,
+        "hrv_total_power": 123.0,
+    }
+    assert calls == ["time", "frequency"]
+
+
+def test_neurokit_receives_observed_times_for_discontinuous_windows(monkeypatch):
+    received = []
+
+    def hrv_time(intervals, **kwargs):
+        received.append(("time", intervals["RRI_Time"].copy()))
+        return pd.DataFrame({"HRV_RMSSD": [12.0]})
+
+    def hrv_frequency(intervals, **kwargs):
+        received.append(("frequency", intervals["RRI_Time"].copy()))
+        return pd.DataFrame({"HRV_LF": [34.0]})
+
+    fake_neurokit = SimpleNamespace(hrv_time=hrv_time, hrv_frequency=hrv_frequency)
     monkeypatch.setitem(sys.modules, "neurokit2", fake_neurokit)
     values = np.concatenate([np.full(60, 900.0), np.full(60, 1100.0)])
     segments = np.concatenate([np.zeros(60, dtype=int), np.ones(60, dtype=int)])
+    timestamps = pd.date_range("2024-01-01", periods=120, freq="s").to_series()
+    timestamps.iloc[60:] += pd.Timedelta(seconds=3)
 
     result = hrv._window_statistics(
         values,
         ["hrv_rmssd", "hrv_lf_power"],
         "neurokit",
         segment_ids=segments,
+        timestamps=timestamps,
     )
 
-    assert result["hrv_rmssd"] == 0
-    assert np.isnan(result["hrv_lf_power"])
+    assert result == {"hrv_rmssd": 12.0, "hrv_lf_power": 34.0}
+    assert [name for name, _ in received] == ["time", "frequency"]
+    for _, interval_times in received:
+        assert interval_times[0] == 0
+        assert interval_times[60] - interval_times[59] == 4
+
+
+def test_builtin_frequency_uses_observed_times_across_a_gap(monkeypatch):
+    observed_times = None
+    original = hrv.interpolate.interp1d
+
+    def capture_times(times, values, **kwargs):
+        nonlocal observed_times
+        observed_times = np.asarray(times)
+        return original(times, values, **kwargs)
+
+    monkeypatch.setattr(hrv.interpolate, "interp1d", capture_times)
+    values = np.resize([900.0, 1100.0], 300)
+    timestamps = pd.date_range("2024-01-01", periods=300, freq="s").to_series()
+    timestamps.iloc[150:] += pd.Timedelta(seconds=3)
+
+    result = hrv._window_statistics(
+        values,
+        ["hrv_lf_power"],
+        "pywearable",
+        segment_ids=np.concatenate(
+            [np.zeros(150, dtype=int), np.ones(150, dtype=int)]
+        ),
+        timestamps=timestamps,
+    )
+
+    assert np.isfinite(result["hrv_lf_power"])
+    assert observed_times[150] - observed_times[149] == 4
 
 
 def test_raw_bbi_primary_coverage_filters_five_minute_feature():
@@ -255,6 +377,107 @@ def test_raw_bbi_primary_coverage_filters_five_minute_feature():
     assert np.isnan(result.iloc[0]["hrv_rmssd"])
 
 
+def test_primary_window_step_builds_overlapping_windows():
+    loader = RawBBILoader()
+    result = hrv.get_hrv_statistics(
+        loader,
+        statistic="hrv_rmssd",
+        user_id="user",
+        start_date="2024-01-01 23:00",
+        end_date="2024-01-01 23:10",
+        resolution="5min",
+        window_step="1min",
+        time_reference="local",
+    )
+
+    assert len(result) == 10
+    assert result.index.get_level_values("local_time")[1] == pd.Timestamp(
+        "2024-01-01 23:01"
+    )
+
+
+def test_overlapping_primary_windows_aggregate_to_night():
+    result = hrv.get_hrv_statistics(
+        RawBBILoader(),
+        statistic="hrv_rmssd",
+        user_id="user",
+        start_date="2024-01-02",
+        end_date="2024-01-03",
+        resolution=["5min", "nightly"],
+        window_step="1min",
+        aggregation="mean",
+        min_coverage=[0.7, None],
+    )
+
+    feature = "hrv_rmssd__5min__cycle_night_mean"
+    assert result.loc[("user", pd.Timestamp("2024-01-02")), feature] == pytest.approx(
+        200
+    )
+    assert result.loc[
+        ("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"
+    ] == 1
+
+
+def test_provider_hrv_rejects_non_native_window_step():
+    with pytest.raises(ValueError, match="provider-computed HRV"):
+        hrv.get_hrv_statistics(
+            ProviderHRVLoader(),
+            statistic="hrv_rmssd",
+            user_id="user",
+            resolution="5min",
+            window_step="1min",
+        )
+
+
+@pytest.mark.parametrize("window_step", ["0min", "6min"])
+def test_window_step_must_fit_inside_primary_window(window_step):
+    with pytest.raises(ValueError, match="window_step"):
+        hrv.get_hrv_statistics(
+            RawBBILoader(),
+            statistic="hrv_rmssd",
+            resolution="5min",
+            window_step=window_step,
+        )
+
+
+def test_fixed_hrv_output_retains_both_clocks_and_each_window_offset():
+    loader = RawBBILoader()
+    loader.bbi.loc[:299, "timezone"] = pd.Timedelta(hours=1)
+    loader.bbi.loc[300:, "timezone"] = pd.Timedelta(hours=2)
+    loader.bbi["local_time"] = loader.bbi["utc_time"] + loader.bbi["timezone"]
+
+    utc = hrv.get_hrv_statistics(
+        loader,
+        statistic="hrv_rmssd",
+        user_id="user",
+        resolution="5min",
+    )
+
+    assert utc.index.names == ["user_id", "utc_time"]
+    assert utc["timezone"].tolist() == [
+        pd.Timedelta(hours=1),
+        pd.Timedelta(hours=2),
+    ]
+    assert utc["local_time"].tolist() == [
+        pd.Timestamp("2024-01-01 23:00"),
+        pd.Timestamp("2024-01-02 00:05"),
+    ]
+
+    local = hrv.get_hrv_statistics(
+        RawBBILoader(),
+        statistic="hrv_rmssd",
+        user_id="user",
+        resolution="5min",
+        time_reference="local",
+    )
+    assert local.index.names == ["user_id", "local_time"]
+    assert local["utc_time"].tolist() == [
+        pd.Timestamp("2024-01-01 22:00"),
+        pd.Timestamp("2024-01-01 22:05"),
+    ]
+    assert local["timezone"].eq(pd.Timedelta(hours=1)).all()
+
+
 def test_raw_bbi_night_hierarchy_uses_equal_five_minute_windows():
     result = hrv.get_hrv_statistics(
         RawBBILoader(),
@@ -271,6 +494,29 @@ def test_raw_bbi_night_hierarchy_uses_equal_five_minute_windows():
     assert result.loc[
         ("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"
     ] == 1
+
+
+def test_nightly_and_cycle_night_are_complete_hrv_aliases():
+    common = {
+        "loader": RawBBILoader(),
+        "statistic": "hrv_rmssd",
+        "user_id": "user",
+        "start_date": "2024-01-02",
+        "end_date": "2024-01-03",
+        "aggregation": "mean",
+    }
+    nightly = hrv.get_hrv_statistics(resolution="nightly", **common)
+    cycle_night = hrv.get_hrv_statistics(resolution="cycle_night", **common)
+    explicit_nightly = hrv.get_hrv_statistics(
+        resolution=["5min", "nightly"], **common
+    )
+    explicit_cycle = hrv.get_hrv_statistics(
+        resolution=["5min", "cycle_night"], **common
+    )
+
+    pd.testing.assert_frame_equal(nightly, cycle_night)
+    pd.testing.assert_frame_equal(nightly, explicit_nightly)
+    pd.testing.assert_frame_equal(nightly, explicit_cycle)
 
 
 def _subperiod_hrv_results():
@@ -351,6 +597,57 @@ def test_internal_wake_gap_is_not_treated_as_contiguous_bbi():
     assert row["hrv_rmssd__5min__cycle_night_mean"] == 0
     assert row["hrv_pnn50__5min__cycle_night_mean"] == 0
     assert np.isnan(row["hrv_lf_power__5min__cycle_night_mean"])
+
+
+def test_sleep_stage_filtering_can_be_disabled():
+    result = hrv.get_hrv_statistics(
+        RawBBILoader(stage_type="awake"),
+        statistic="hrv_rmssd",
+        user_id="user",
+        start_date="2024-01-02",
+        end_date="2024-01-03",
+        resolution="nightly",
+        aggregation="mean",
+        sleep_stages_to_remove=None,
+    )
+
+    feature = "hrv_rmssd__5min__cycle_night_mean"
+    assert result.loc[("user", pd.Timestamp("2024-01-02")), feature] == pytest.approx(
+        200
+    )
+
+
+def test_sleep_stage_filtering_accepts_a_custom_list():
+    result = hrv.get_hrv_statistics(
+        RawBBILoader(stage_type="light"),
+        statistic="hrv_rmssd",
+        user_id="user",
+        start_date="2024-01-02",
+        end_date="2024-01-03",
+        resolution="nightly",
+        aggregation="mean",
+        sleep_stages_to_remove=["light"],
+    )
+
+    feature = "hrv_rmssd__5min__cycle_night_mean"
+    assert np.isnan(result.loc[("user", pd.Timestamp("2024-01-02")), feature])
+
+
+def test_loader_filtered_timestamp_gap_preserves_time_axis_and_successive_differences():
+    result = hrv.get_hrv_statistics(
+        LoaderFilteredGapLoader(),
+        statistic=["hrv_rmssd", "hrv_pnn50", "hrv_lf_power"],
+        user_id="user",
+        start_date="2024-01-01 23:00",
+        end_date="2024-01-01 23:05",
+        resolution="5min",
+        time_reference="local",
+        min_coverage=0.7,
+    )
+
+    assert result.iloc[0]["hrv_rmssd"] == 0
+    assert result.iloc[0]["hrv_pnn50"] == 0
+    assert np.isfinite(result.iloc[0]["hrv_lf_power"])
 
 
 def test_provider_source_does_not_fall_back_and_unsupported_features_are_missing():

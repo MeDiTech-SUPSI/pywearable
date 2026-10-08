@@ -31,7 +31,18 @@ Choose a resolution
 For timestamped streams, fixed windows use UTC by default when UTC timestamps
 are available. Calendar and sleep-anchored windows use participant-local time.
 Set ``time_reference="local"`` when a fixed-window analysis should follow the
-local clock.
+local clock. Fixed-window results keep the selected clock in the index and
+report the other clock together with the per-window ``timezone`` offset in
+columns. ``time_reference`` therefore controls window construction without
+discarding the UTC/local correspondence.
+
+HRV extracted from raw BBI can use overlapping five-minute primary windows.
+``window_step=None`` keeps the default five-minute displacement, while a
+shorter step such as ``"1min"`` starts a new five-minute estimate every
+minute. Only the primary HRV windows overlap; parent resolutions aggregate the
+resulting primary rows normally. Overlapping windows in a sleep cycle must be
+fully contained by that cycle. Provider-computed HRV remains at its native
+five-minute spacing and rejects a non-native ``window_step``.
 
 Build a hierarchy
 -----------------
