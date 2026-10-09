@@ -171,6 +171,7 @@ def _observation_intervals(rows, heart_rate_rows, time_col, end_col):
 
 def _peak_sixty_minutes(rows, observations, time_col, end_col, window_end):
     """Return the largest fully observed contiguous 60-minute step total."""
+    unknown = rows[rows[schema.ACTIVITY_STEPS_COL].isna()]
     rows = rows[rows[schema.ACTIVITY_STEPS_COL].notna()].sort_values(time_col)
     if observations.empty:
         return np.nan, pd.NaT
@@ -188,6 +189,8 @@ def _peak_sixty_minutes(rows, observations, time_col, end_col, window_end):
         candidate_end = candidate + hour
         if candidate_end > window_end:
             break
+        if (unknown[time_col].lt(candidate_end) & unknown[end_col].gt(candidate)).any():
+            continue
         selected = rows[rows[time_col].ge(candidate) & rows[end_col].le(candidate_end)]
         observed_rows = observations[
             observations["__activity_observation_start"].ge(candidate)
@@ -385,9 +388,9 @@ def _sample_primary_trajectory(
                 if ACTIVITY_STATISTIC_STEPS in statistics:
                     steps = rows[
                         schema.ACTIVITY_STEPS_COL
-                    ].sum(min_count=1)
+                    ].sum(min_count=1, skipna=False)
                     values[ACTIVITY_STATISTIC_STEPS] = (
-                        0.0 if pd.isna(steps) and coverage > 0 else steps
+                        0.0 if rows.empty and coverage > 0 else steps
                     )
                 if set(statistics).intersection(_PEAK_STATISTICS):
                     peak_steps, peak_start = _peak_sixty_minutes(

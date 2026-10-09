@@ -41,6 +41,9 @@ movement and the most active hour.
 Peak-hour features require timestamped activity samples. Loaders backed only
 by daily summaries can still provide daily step totals.
 
+Heart-rate presence can establish wear coverage, but explicit unknown step
+counts remain missing rather than becoming zero or a complete total.
+
 Heart rate
 ----------
 
