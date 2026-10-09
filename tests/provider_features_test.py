@@ -5,6 +5,7 @@ import pytest
 from pywearable import provider_features, schema
 from pywearable.loader import LabfrontLoader
 from pywearable.loader.base import BaseLoader
+from pywearable.loader.labfront import constants as labfront_constants
 from pywearable.loader.lifesnaps import LifeSnapsParquetLoader
 from pywearable.loader.tesserae.tesserae_parquet import TesseraeParquetLoader
 
@@ -134,6 +135,37 @@ def test_loader_declared_provider_feature_definitions_are_validated():
 
     with pytest.raises(ValueError, match="grain 'samples' or 'daily'"):
         provider_features.get_available_provider_features(loader)
+
+
+@pytest.mark.parametrize(
+    "source,folder",
+    [
+        (
+            labfront_constants.DATA_SOURCE_GARMIN_SDK,
+            labfront_constants.GARMIN_DEVICE_STRESS_FOLDER,
+        ),
+        (
+            labfront_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+            labfront_constants.GARMIN_CONNECT_STRESS_FOLDER,
+        ),
+    ],
+)
+def test_labfront_stress_routes_to_the_selected_stress_folder(
+    monkeypatch, source, folder,
+):
+    loader = LabfrontLoader.__new__(LabfrontLoader)
+    requested = {}
+
+    def load(**kwargs):
+        requested.update(kwargs)
+        return pd.DataFrame({"stressLevel": [25]})
+
+    monkeypatch.setattr(loader, "get_data_from_datetime", load)
+    result = loader.load_stress("person", "2024-01-01", "2024-01-02", source=source)
+    assert requested["metric"] == folder
+    assert requested["start_date"] == "2024-01-01"
+    assert requested["end_date"] == "2024-01-02"
+    assert result.stressLevel.iloc[0] == 25
 
 
 def test_provider_sample_duplicate_conflicts_are_not_selected_arbitrarily():
@@ -361,8 +393,9 @@ def test_body_battery_sleep_features_use_cycle_boundaries(monkeypatch):
     ] == pytest.approx(48 / 78)
 
 
+@pytest.mark.parametrize("include_offset", [True, False])
 def test_labfront_translates_stress_sentinels_without_losing_body_battery(
-    monkeypatch,
+    monkeypatch, include_offset,
 ):
     loader = LabfrontLoader.__new__(LabfrontLoader)
     raw = pd.DataFrame(
@@ -376,6 +409,8 @@ def test_labfront_translates_stress_sentinels_without_losing_body_battery(
             "bodyBattery": [50, 49, 48],
         }
     )
+    if not include_offset:
+        raw = raw.drop(columns="timezoneOffsetInMs")
     monkeypatch.setattr(loader, "load_stress", lambda *args, **kwargs: raw.copy())
 
     stress = loader.load_provider_feature(
@@ -390,6 +425,7 @@ def test_labfront_translates_stress_sentinels_without_losing_body_battery(
     assert stress[provider_features.GARMIN_STRESS_LEVEL].iloc[2] == 25
     assert battery[provider_features.GARMIN_BODY_BATTERY].tolist() == [50, 49, 48]
     assert stress[schema.UTC_TIME_COL].iloc[0] == pd.Timestamp("2023-12-31 23:00")
+    assert stress[schema.TIMEZONE_COL].eq(pd.Timedelta(hours=1)).all()
 
 
 def test_lifesnaps_drops_duplicates_and_requires_completed_fitbit_scores(tmp_path):

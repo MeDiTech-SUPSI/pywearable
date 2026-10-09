@@ -29,7 +29,7 @@ _LABFRONT_METRICS_DICT = {
     },
     lf_constants.METRIC_STRESS: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_STRESS_FOLDER,
-        lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
+        lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_STRESS_FOLDER,
     },
     lf_constants.METRIC_PULSE_OX: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
@@ -2560,12 +2560,17 @@ class LabfrontLoader(BaseLoader):
                 errors="coerce",
                 utc=True,
             ).dt.tz_localize(None)
-            data[schema.TIMEZONE_COL] = pd.to_timedelta(
-                pd.to_numeric(
-                    data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
-                ),
-                unit="ms",
-            )
+            if lf_constants.TIMEZONEOFFSET_IN_MS_COL in data:
+                data[schema.TIMEZONE_COL] = pd.to_timedelta(
+                    pd.to_numeric(
+                        data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                    ),
+                    unit="ms",
+                )
+            else:
+                data[schema.TIMEZONE_COL] = (
+                    data[schema.LOCAL_TIME_COL] - data[schema.UTC_TIME_COL]
+                )
             data[feature] = pd.to_numeric(
                 data[sample_columns[feature]], errors="coerce"
             )
