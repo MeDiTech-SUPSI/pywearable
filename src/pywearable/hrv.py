@@ -1060,6 +1060,8 @@ def _hierarchical_hrv_statistics(
     )
     hierarchy.warn_if_wide(statistics, aggregation_levels)
     time_col = _resolve_time_col(loader, time_reference, chain)
+    start_date = schema.normalize_time_bound(start_date, time_col)
+    end_date = schema.normalize_time_bound(end_date, time_col)
     cycle_target = next(
         (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
     )

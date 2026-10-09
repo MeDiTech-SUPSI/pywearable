@@ -665,6 +665,17 @@ def get_activity_statistics(
     child_thresholds = hierarchy.normalize_valid_child_thresholds(
         min_valid_children, len(chain)
     )
+    fixed_time_col = None
+    if source == "samples":
+        fixed_time_col = hierarchy.resolve_time_col(
+            getattr(loader, "activity_time_columns", schema.ACTIVITY_TIME_COLUMNS),
+            time_reference,
+            chain,
+            "activity",
+        )
+    bound_time_col = fixed_time_col or schema.LOCAL_TIME_COL
+    start_date = schema.normalize_time_bound(start_date, bound_time_col)
+    end_date = schema.normalize_time_bound(end_date, bound_time_col)
     cycle_target = next((value for value in chain if value in cycle.CYCLE_TYPES), None)
     cycle_intervals = (
         cycle.get_intervals(
@@ -679,14 +690,7 @@ def get_activity_statistics(
         else None
     )
     include_coverage = True
-    fixed_time_col = None
     if source == "samples":
-        fixed_time_col = hierarchy.resolve_time_col(
-            getattr(loader, "activity_time_columns", schema.ACTIVITY_TIME_COLUMNS),
-            time_reference,
-            chain,
-            "activity",
-        )
         trajectory = _sample_primary_trajectory(
             loader,
             users,

@@ -1573,6 +1573,9 @@ def _hierarchical_heart_rate_statistics(
             and primary_reference == "auto"
         ):
             primary_time_col = schema.LOCAL_TIME_COL
+    bound_time_col = primary_time_col or schema.LOCAL_TIME_COL
+    start_date = schema.normalize_time_bound(start_date, bound_time_col)
+    end_date = schema.normalize_time_bound(end_date, bound_time_col)
     cycle_target = next(
         (value for value in chain[1:] if value in cycle.CYCLE_TYPES), None
     )
