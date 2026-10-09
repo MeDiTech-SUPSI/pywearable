@@ -191,8 +191,63 @@ def test_single_sample_feature_returns_coverage_without_a_threshold():
     )
 
     feature = f"{provider_features.GARMIN_STRESS_LEVEL}_mean"
-    assert list(result) == [feature, f"{feature}__coverage"]
+    assert list(result) == [schema.LOCAL_TIME_COL, schema.TIMEZONE_COL,
+                            feature, f"{feature}__coverage"]
     assert result.iloc[0][f"{feature}__coverage"] == 0.8
+
+
+@pytest.mark.parametrize("time_reference", ["utc", "local"])
+@pytest.mark.parametrize("resolution", ["5min", ["5min", "10min"]])
+def test_fixed_provider_features_keep_both_clocks_and_offsets(time_reference, resolution):
+    loader = ProviderFeatureLoader()
+    for samples in loader.samples.values():
+        samples[schema.TIMEZONE_COL] = pd.to_timedelta([1] * 5 + [2] * 5, unit="h")
+        samples[schema.LOCAL_TIME_COL] = samples[schema.UTC_TIME_COL] + samples[schema.TIMEZONE_COL]
+    result = provider_features.get_provider_features(
+        loader, feature=[provider_features.GARMIN_STRESS_LEVEL, provider_features.GARMIN_BODY_BATTERY],
+        statistic="mean", resolution=resolution, time_reference=time_reference,
+        **({"aggregation": "mean"} if isinstance(resolution, list) else {}),
+    )
+    assert not result.empty
+    selected = schema.UTC_TIME_COL if time_reference == "utc" else schema.LOCAL_TIME_COL
+    alternative = schema.LOCAL_TIME_COL if time_reference == "utc" else schema.UTC_TIME_COL
+    assert result.index.names == [schema.USER_COL, selected]
+    observed = result[result[schema.TIMEZONE_COL].notna()]
+    times = pd.Series(observed.index.get_level_values(selected), index=observed.index)
+    expected = (times + observed[schema.TIMEZONE_COL] if selected == schema.UTC_TIME_COL
+                else times - observed[schema.TIMEZONE_COL])
+    pd.testing.assert_series_equal(observed[alternative], expected, check_names=False)
+    if time_reference == "local":
+        assert result[schema.TIMEZONE_COL].isna().any()
+    if resolution == "5min":
+        assert set(observed[schema.TIMEZONE_COL]) == {pd.Timedelta(hours=1), pd.Timedelta(hours=2)}
+
+
+@pytest.mark.parametrize("resolution", ["5min", ["5min", "10min"]])
+def test_empty_fixed_provider_features_keep_time_metadata(resolution):
+    loader = ProviderFeatureLoader()
+    loader.samples[provider_features.GARMIN_STRESS_LEVEL] = loader.samples[provider_features.GARMIN_STRESS_LEVEL].iloc[0:0]
+    result = provider_features.get_provider_features(
+        loader, feature=provider_features.GARMIN_STRESS_LEVEL, statistic="mean",
+        resolution=resolution, **({"aggregation": "mean"} if isinstance(resolution, list) else {}),
+    )
+    assert result.empty
+    assert result.index.names == [schema.USER_COL, schema.UTC_TIME_COL]
+    assert schema.LOCAL_TIME_COL in result
+    assert pd.api.types.is_timedelta64_dtype(result[schema.TIMEZONE_COL])
+
+
+def test_provider_features_do_not_invent_missing_source_offsets():
+    loader = ProviderFeatureLoader()
+    samples = loader.samples[provider_features.GARMIN_STRESS_LEVEL]
+    samples[schema.LOCAL_TIME_COL] = pd.NaT
+    samples[schema.TIMEZONE_COL] = pd.Series(pd.NaT, index=samples.index, dtype="timedelta64[ns]")
+    result = provider_features.get_provider_features(
+        loader, feature=provider_features.GARMIN_STRESS_LEVEL, statistic="mean", resolution="5min",
+    )
+    assert result.garmin_stress_level_mean.notna().all()
+    assert result[schema.LOCAL_TIME_COL].isna().all()
+    assert result[schema.TIMEZONE_COL].isna().all()
 
 
 def test_sample_hierarchy_uses_equal_primary_window_weights():

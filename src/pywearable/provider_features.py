@@ -399,6 +399,10 @@ def _sample_feature_trajectory(
                     "window_start": label,
                     "period_start": window["start_time"],
                     "period_end": window["end_time"],
+                    **(
+                        hierarchy.fixed_window_time_metadata(rows, label, time_col)
+                        if hierarchy.fixed_duration(resolution) is not None else {}
+                    ),
                     **values,
                     **(
                         {f"{name}__coverage": coverage for name in outputs}
@@ -715,6 +719,17 @@ def get_provider_features(
     )
     hierarchy.warn_if_wide(outputs, aggregation_levels)
 
+    fixed_time_col = (
+        hierarchy.resolve_time_col(
+            getattr(loader, "provider_feature_time_columns",
+                    (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)),
+            time_reference, chain, "provider feature",
+        )
+        if grain == "samples" else None
+    )
+    bound_time_col = fixed_time_col or schema.LOCAL_TIME_COL
+    start_date = schema.normalize_time_bound(start_date, bound_time_col)
+    end_date = schema.normalize_time_bound(end_date, bound_time_col)
     cycle_target = next((value for value in chain if value in cycle.CYCLE_TYPES), None)
     intervals = (
         cycle.get_intervals(
@@ -808,6 +823,11 @@ def get_provider_features(
                 prefer_explicit_bounds=grain == "daily",
             )
             if parent is None:
+                if hierarchy.fixed_duration(chain[-1]) is not None:
+                    empty = trajectory.iloc[0:0].rename_axis(
+                        index={"window_start": fixed_time_col}
+                    )
+                    return hierarchy.format_fixed_time_output(empty, fixed_time_col)
                 return trajectory.iloc[0:0].rename_axis(
                     index={"window_start": schema.CALENDAR_DATE_COL}
                 )
@@ -819,6 +839,7 @@ def get_provider_features(
                 membership=membership,
                 min_coverage=coverage_thresholds[level + 1],
                 min_valid_children=child_thresholds[level + 1],
+                time_col=fixed_time_col,
             )
         index_name = (
             schema.CALENDAR_DATE_COL
@@ -835,14 +856,19 @@ def get_provider_features(
                 "provider feature",
             )
         )
-        return trajectory.rename_axis(index={"window_start": index_name})
+        result = trajectory.rename_axis(index={"window_start": index_name})
+        if hierarchy.fixed_duration(chain[-1]) is not None:
+            return hierarchy.format_fixed_time_output(result, index_name)
+        return result
 
     columns = [
         column
         for name in outputs
         for column in (name, f"{name}__coverage")
     ]
-    result = trajectory[columns].copy()
+    result = trajectory[
+        columns + [column for column in hierarchy.TIME_METADATA_COLUMNS if column in trajectory]
+    ].copy()
     if (
         grain == "samples"
         and chain[0] not in hierarchy.CALENDAR_RESOLUTIONS
@@ -861,6 +887,8 @@ def get_provider_features(
     else:
         index_name = schema.CALENDAR_DATE_COL
     result = result.rename_axis(index={"window_start": index_name})
+    if hierarchy.fixed_duration(chain[-1]) is not None:
+        return hierarchy.format_fixed_time_output(result, index_name)
     return result
 
 
