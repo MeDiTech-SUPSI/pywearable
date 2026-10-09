@@ -11,6 +11,9 @@ Raw-BBI extraction supports overlapping primary windows through
 default feature registries; explicit ``statistic`` selections return only the
 requested features.
 
+Only finite, positive BBI values contribute to extraction. Repeated observations
+with the same physical timestamp and BBI value are counted once.
+
 .. automodule:: pywearable.hrv
    :members:
    :undoc-members:

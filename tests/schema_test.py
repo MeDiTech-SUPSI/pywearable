@@ -3,6 +3,44 @@ import pandas as pd
 from pywearable import schema
 
 
+def test_bbi_cleaning_rejects_nonfinite_values_and_deduplicates_pairs():
+    times = pd.to_datetime(
+        ["2024-01-01", "2024-01-01", "2024-01-01",
+         "2024-01-01 00:00:01", "2024-01-01 00:00:02",
+         "2024-01-01 00:00:03", "2024-01-01 00:00:04"], format="mixed",
+    )
+    frame = pd.DataFrame({
+        "utc_time": times,
+        "bbi": [800, 800, 900, 800, float("inf"), float("-inf"), 0],
+    })
+    result = schema.prepare_bbi(frame)
+    assert result.bbi.tolist() == [800, 900, 800]
+    assert result.utc_time.tolist() == times[[0, 2, 3]].tolist()
+
+
+def test_bbi_deduplication_uses_offsets_without_confusing_repeated_local_times():
+    frame = pd.DataFrame({
+        "utc_time": pd.to_datetime(["2024-10-27 00:30", None, None]),
+        "local_time": pd.to_datetime(["2024-10-27 02:30"] * 3),
+        "timezone": pd.to_timedelta([2, 2, 1], unit="h"),
+        "bbi": [800, 800, 800],
+    })
+    result = schema.prepare_bbi(frame)
+    assert len(result) == 2
+    assert result.timezone.tolist() == [pd.Timedelta(hours=2), pd.Timedelta(hours=1)]
+
+
+def test_bbi_local_only_duplicates_keep_distinct_timestamps():
+    frame = pd.DataFrame({
+        "local_time": pd.to_datetime(
+            ["2024-01-01", "2024-01-01", "2024-01-01 00:00:01"], format="mixed",
+        ),
+        "bbi": [800, 800, 800],
+    })
+    result = schema.prepare_bbi(frame)
+    assert len(result) == 2
+
+
 def test_empty_stream_frames_have_stable_canonical_dtypes():
     frames = [
         schema.empty_heart_rate_frame(),

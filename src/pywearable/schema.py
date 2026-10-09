@@ -1,5 +1,6 @@
 """Canonical columns and validation shared by loaders and domain modules."""
 
+import numpy as np
 import pandas as pd
 
 USER_COL = "user_id"
@@ -644,9 +645,18 @@ def prepare_bbi(frame):
             raise ValueError(f"BBI data is missing required column: {BBI_COL}")
     frame[BBI_COL] = pd.to_numeric(frame[BBI_COL], errors="coerce")
     frame = frame[
-        frame[BBI_COL].gt(0)
+        np.isfinite(frame[BBI_COL]) & frame[BBI_COL].gt(0)
         & (frame[UTC_TIME_COL].notna() | frame[LOCAL_TIME_COL].notna())
     ]
+    physical_times = frame[UTC_TIME_COL].fillna(
+        frame[LOCAL_TIME_COL] - frame[TIMEZONE_COL]
+    )
+    keys = pd.DataFrame({
+        "time": physical_times.fillna(frame[LOCAL_TIME_COL]),
+        "utc_known": physical_times.notna(),
+        "bbi": frame[BBI_COL],
+    })
+    frame = frame.loc[~keys.duplicated()]
     return frame.sort_values(
         UTC_TIME_COL if frame[UTC_TIME_COL].notna().any() else LOCAL_TIME_COL,
         kind="stable",

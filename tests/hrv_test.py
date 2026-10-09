@@ -377,6 +377,23 @@ def test_raw_bbi_primary_coverage_filters_five_minute_feature():
     assert np.isnan(result.iloc[0]["hrv_rmssd"])
 
 
+@pytest.mark.parametrize("injection", ["duplicates", "infinite"])
+def test_invalid_or_repeated_bbi_cannot_inflate_coverage(injection):
+    loader = RawBBILoader(sample_count=150)
+    extra = loader.bbi.copy()
+    if injection == "infinite":
+        extra = extra.iloc[:1].copy()
+        extra["bbi"] = np.inf
+    loader.bbi = pd.concat([loader.bbi, extra], ignore_index=True)
+    result = hrv.get_hrv_statistics(
+        loader, statistic="hrv_rmssd", user_id="user", resolution="5min",
+        start_date="2024-01-01 23:00", end_date="2024-01-01 23:05",
+        time_reference="local", min_coverage=0.7,
+    )
+    assert result.iloc[0]["hrv_rmssd__coverage"] == pytest.approx(0.5)
+    assert pd.isna(result.iloc[0]["hrv_rmssd"])
+
+
 def test_primary_window_step_builds_overlapping_windows():
     loader = RawBBILoader()
     result = hrv.get_hrv_statistics(
