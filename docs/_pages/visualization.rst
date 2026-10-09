@@ -132,6 +132,10 @@ Coverage heatmaps
 and columns for local time. It is designed for questions such as “when during
 the day is heart-rate coverage usually available?”
 
+Coverage and weekday profiles use local timestamps or per-row UTC offsets.
+Unmapped rows are omitted with a warning; UTC-only inputs are labelled UTC
+and do not receive local sleep shading.
+
 .. image:: /_static/figures/coverage-heatmap.svg
    :alt: Heart-rate coverage by calendar date and local time of day.
    :width: 96%

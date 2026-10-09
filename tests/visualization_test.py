@@ -352,6 +352,74 @@ def test_subdaily_coverage_and_weekly_profile_keep_expected_shape():
     assert any(axis.patches for axis in profile_axes)
 
 
+@pytest.mark.parametrize("supply_local", [True, False])
+def test_clock_plots_convert_utc_observations_across_local_midnight(supply_local):
+    utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
+    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
+    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
+                          "timezone": pd.Timedelta(hours=2)}, index=index)
+    if supply_local:
+        frame["local_time"] = utc + pd.Timedelta(hours=2)
+    original = frame.copy(deep=True)
+    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    matrix = coverage.images[0].get_array()
+    assert matrix.shape == (1, 24)
+    np.testing.assert_allclose(matrix[0, :2], [1, .5])
+    assert matrix.mask[0, 22]
+    assert coverage.get_yticklabels()[0].get_text() == "Jan 02"
+    profile = visualization.plot_weekly_profile(frame, "feature", kind="heatmap", interval="1h", show=False)
+    matrix = profile.images[0].get_array()
+    np.testing.assert_allclose(matrix[1, :2], [80, 85])
+    assert matrix.mask[0].all()
+    assert profile.get_xlabel() == "Local time of day"
+    pd.testing.assert_frame_equal(frame, original)
+    plt.close("all")
+
+
+def test_clock_plots_use_each_rows_offset_at_a_dst_transition():
+    utc = pd.to_datetime(["2024-03-30 23:00", "2024-03-31 01:00"])
+    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
+    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
+                          "timezone": pd.to_timedelta([1, 2], unit="h")}, index=index)
+    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    matrix = coverage.images[0].get_array()
+    assert matrix.shape == (1, 24)
+    assert matrix[0, 0] == 1
+    assert matrix[0, 3] == .5
+    assert matrix.mask[0, 2]
+    plt.close("all")
+
+
+def test_utc_only_profiles_label_clock_and_skip_local_sleep_shading(monkeypatch):
+    utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
+    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
+    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5]}, index=index)
+    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    assert coverage.get_xlabel() == "UTC time of day"
+    def unexpected_shading(*args, **kwargs):
+        raise AssertionError("A UTC-only trajectory cannot use local sleep shading")
+    monkeypatch.setattr(visualization, "_weekday_sleep_windows", unexpected_shading)
+    with pytest.warns(UserWarning, match="Sleep shading requires local times"):
+        profile = visualization.plot_weekly_profile(
+            frame, "feature", loader=object(), kind="heatmap", interval="1h", show=False,
+        )
+    assert profile.get_xlabel() == "UTC time of day"
+    np.testing.assert_allclose(profile.images[0].get_array()[0, 22:24], [80, 85])
+    plt.close("all")
+
+
+def test_local_clock_plots_warn_when_some_rows_cannot_be_mapped():
+    utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
+    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
+    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
+                          "local_time": pd.to_datetime(["2024-01-02", None])}, index=index)
+    with pytest.warns(UserWarning, match="Rows without local-time metadata"):
+        coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    assert coverage.get_xlabel() == "Local time of day"
+    assert coverage.images[0].get_array()[0, 0] == 1
+    plt.close("all")
+
+
 def test_weekday_sleep_windows_use_actual_local_days(monkeypatch):
     dates = pd.to_datetime(
         ["2024-01-08", "2024-01-09", "2024-01-10", "2024-01-17"]

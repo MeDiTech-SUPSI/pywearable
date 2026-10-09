@@ -10,6 +10,7 @@ and returns its axes for further customization.
 from __future__ import annotations
 
 import datetime
+import warnings
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -156,6 +157,28 @@ def _select_user(frame: pd.DataFrame, user_id=None) -> tuple[pd.DataFrame, objec
         raise ValueError("trajectory time index must contain valid timestamps")
     selected.index = pd.DatetimeIndex(times, name=time_level)
     return selected.sort_index(kind="stable"), user_id, time_level
+
+
+def _profile_clock(frame: pd.DataFrame) -> tuple[pd.DataFrame, str]:
+    """Use recoverable local times for clock profiles, otherwise retain UTC."""
+    if frame.index.name != schema.UTC_TIME_COL:
+        return frame, "Local"
+    local = (
+        pd.to_datetime(frame[schema.LOCAL_TIME_COL], errors="coerce")
+        if schema.LOCAL_TIME_COL in frame
+        else pd.Series(pd.NaT, index=frame.index, dtype="datetime64[ns]")
+    )
+    if schema.TIMEZONE_COL in frame:
+        utc = pd.Series(frame.index, index=frame.index)
+        local = local.fillna(utc + pd.to_timedelta(frame[schema.TIMEZONE_COL]))
+    available = local.notna()
+    if not available.any():
+        return frame, "UTC"
+    if not available.all():
+        warnings.warn("Rows without local-time metadata are omitted from local-clock plots.")
+    result = frame.loc[available].copy()
+    result.index = pd.DatetimeIndex(local[available], name=schema.LOCAL_TIME_COL)
+    return result.sort_index(kind="stable"), "Local"
 
 
 def _feature_list(frame: pd.DataFrame, features) -> list[str]:
@@ -1362,6 +1385,7 @@ def plot_coverage_heatmap(
         The heatmap axis. Its figure also owns the colorbar.
     """
     frame, _, _ = _select_user(trajectory, user_id)
+    frame, clock = _profile_clock(frame)
     column = f"{feature}__coverage"
     if column not in frame:
         raise ValueError(f"trajectory is missing coverage column: {column}")
@@ -1415,7 +1439,7 @@ def plot_coverage_heatmap(
     ax.set_yticklabels([days[index].strftime("%b %d") for index in indices])
     ax.set(
         title=title or f"{feature} coverage",
-        xlabel="Local time of day",
+        xlabel=f"{clock} time of day",
         ylabel="Calendar date",
     )
     bar = fig.colorbar(image, ax=ax, fraction=0.025, pad=0.02)
@@ -1497,6 +1521,7 @@ def plot_weekly_profile(
         Seven axes for line small multiples, or one heatmap axis.
     """
     frame, selected_user, _ = _select_user(trajectory, user_id)
+    frame, clock = _profile_clock(frame)
     _feature_list(frame, feature)
     if aggregation not in {"mean", "median"}:
         raise ValueError("aggregation must be 'mean' or 'median'")
@@ -1537,7 +1562,7 @@ def plot_weekly_profile(
                 frame.index.min().normalize(),
                 frame.index.max().normalize() + pd.Timedelta(days=1),
             )
-            if loader is not None
+            if loader is not None and clock == "Local"
             else {}
         )
     elif night_window is None:
@@ -1548,6 +1573,10 @@ def plot_weekly_profile(
                 "night_window must be 'auto', None, or a (start, end) pair"
             )
         night_windows = {name: night_window for name in _WEEKDAY_NAMES}
+    if clock == "UTC":
+        night_windows = {}
+        if night_window is not None and (night_window != "auto" or loader is not None):
+            warnings.warn("Sleep shading requires local times; skipped for UTC-only trajectories.")
     if kind == "heatmap":
         if ax is None:
             fig, profile_ax = plt.subplots(figsize=figsize)
@@ -1574,7 +1603,7 @@ def plot_weekly_profile(
         profile_ax.set_xticklabels([f"{hour:02d}:00" for hour in range(0, 25, 3)])
         profile_ax.set(
             title=title or f"Typical week: {feature} ({aggregation})",
-            xlabel="Local time of day",
+            xlabel=f"{clock} time of day",
         )
         bar = fig.colorbar(image, ax=profile_ax, fraction=0.025, pad=0.02)
         bar.set_label(ylabel or feature)
@@ -1615,7 +1644,7 @@ def plot_weekly_profile(
         profile_axes[0].set_title(title or f"Typical week: {feature} ({aggregation})")
         profile_axes[-1].set_xticks(np.arange(0, 25, 3))
         profile_axes[-1].set_xticklabels([f"{hour:02d}:00" for hour in range(0, 25, 3)])
-        profile_axes[-1].set_xlabel("Local time of day")
+        profile_axes[-1].set_xlabel(f"{clock} time of day")
         fig.supylabel(ylabel or feature)
         result = np.asarray(profile_axes)
     _finish_figure(fig, show=show, save_to=save_to)
