@@ -316,6 +316,47 @@ def test_provider_primary_coverage_is_not_invented():
     assert result["spo2_mean__coverage"].isna().all()
 
 
+@pytest.mark.parametrize("family", ["respiratory_rate", "spo2"])
+def test_provider_summary_hierarchy_counts_missing_nights(monkeypatch, family):
+    loader = SummaryRespirationLoader()
+    statistic = f"{family}_mean"
+    method = "load_respiration_summary" if family == "respiratory_rate" else "load_spo2_summary"
+    summary = pd.DataFrame({
+        "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-07"]),
+        statistic: [15.0, 16.0] if family == "respiratory_rate" else [96.0, 97.0],
+        f"{family}_coverage": [1.0, 1.0],
+    })
+    monkeypatch.setattr(loader, method, lambda **kwargs: summary.copy())
+    options = dict(loader=loader, statistic=statistic, user_id="u1",
+                   start_date="2024-01-01", end_date="2024-01-15")
+    nightly = pywearable.respiration.get_respiration_statistics(**options)
+    assert len(nightly) == 14
+    missing = nightly[statistic].isna()
+    assert missing.sum() == 12
+    assert nightly.loc[missing, f"{statistic}__coverage"].eq(0).all()
+    weekly = pywearable.respiration.get_respiration_statistics(
+        **options, resolution=["nightly", "weekly"], aggregation="mean",
+        min_coverage=[None, 0.7],
+    )
+    feature = f"{statistic}__cycle_night__weekly_mean"
+    assert len(weekly) == 2
+    assert weekly[feature].isna().all()
+    assert weekly[f"{feature}__coverage"].tolist() == pytest.approx([2 / 7, 0])
+
+
+def test_empty_provider_summary_preserves_requested_nights(monkeypatch):
+    loader = SummaryRespirationLoader()
+    monkeypatch.setattr(loader, "load_respiration_summary", lambda **kwargs: pd.DataFrame())
+    result = pywearable.respiration.get_respiration_statistics(
+        loader, statistic="respiratory_rate_mean", start_date="2024-01-01",
+        end_date="2024-01-08", resolution=["nightly", "weekly"], aggregation="mean",
+    )
+    feature = "respiratory_rate_mean__cycle_night__weekly_mean"
+    assert len(result) == 1
+    assert pd.isna(result.iloc[0][feature])
+    assert result.iloc[0][f"{feature}__coverage"] == 0
+
+
 def test_schema_requires_canonical_columns_and_drops_invalid_values():
     frame = pd.DataFrame(
         {

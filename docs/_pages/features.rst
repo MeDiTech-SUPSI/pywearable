@@ -113,6 +113,9 @@ Night and awake-cycle helpers are available through
 :func:`pywearable.respiration.get_night_respiration_statistics` and
 :func:`pywearable.respiration.get_awake_respiration_statistics`.
 
+Native nightly summaries retain missing dates in the requested interval, so
+upper-level coverage includes unavailable nights rather than only returned rows.
+
 Sleep
 -----
 

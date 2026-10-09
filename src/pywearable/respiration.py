@@ -363,6 +363,12 @@ def _summary_family_trajectory(
     """
     frames = []
     method = getattr(loader, _FAMILY_CONFIG[family]["summary_loader"])
+    start_date = schema.normalize_time_bound(start_date, schema.LOCAL_TIME_COL)
+    end_date = schema.normalize_time_bound(end_date, schema.LOCAL_TIME_COL)
+    start_date = None if start_date is None else start_date.normalize()
+    end_date = None if end_date is None else end_date.normalize()
+    if start_date is not None and end_date is not None and end_date <= start_date:
+        raise ValueError("end_date must be after start_date")
     for user in users:
         summary = method(
             user_id=user,
@@ -385,6 +391,22 @@ def _summary_family_trajectory(
                 summary[schema.CALENDAR_DATE_COL]
                 < pd.Timestamp(end_date).normalize()
             ]
+        lower = (
+            start_date if start_date is not None
+            else summary[schema.CALENDAR_DATE_COL].min()
+        )
+        upper = (
+            end_date if end_date is not None
+            else summary[schema.CALENDAR_DATE_COL].max() + pd.Timedelta(days=1)
+        )
+        if pd.isna(lower) or pd.isna(upper):
+            continue
+        expected = pd.date_range(lower, upper, freq="D", inclusive="left")
+        summary = summary.set_index(schema.CALENDAR_DATE_COL)
+        missing = ~expected.isin(summary.index)
+        summary = summary.reindex(expected)
+        summary.loc[missing, f"{family}_coverage"] = 0.0
+        summary = summary.rename_axis(schema.CALENDAR_DATE_COL).reset_index()
         records = []
         for row in summary.to_dict(orient="records"):
             label = pd.Timestamp(row[schema.CALENDAR_DATE_COL]).normalize()
