@@ -95,7 +95,8 @@ def test_tesserae_csv_empty_stage_supports_omitted_bounds(tmp_path):
     )
 
 
-def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatch):
+@pytest.mark.parametrize("unit", ["ns", "us", "ms"])
+def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatch, unit):
     sleep_folder = tmp_path / "person-1" / "GarminHealthAPI"
     sleep_folder.mkdir(parents=True)
     (sleep_folder / "Sleep.parquet").touch()
@@ -113,6 +114,7 @@ def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatc
             "sleep_levels_map": ["{}"],
         }
     )
+    raw["Timestamp"] = raw["Timestamp"].dt.as_unit(unit)
     monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
 
     result = TesseraeParquetLoader(tmp_path).load_sleep_summary("person-1")
@@ -120,6 +122,7 @@ def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatc
     assert result.loc[0, "duration_in_ms"] == 3_600_000
     assert result.loc[0, "rem_sleep_duration_in_ms"] == 0
     assert result.loc[0, "unmeasurable_sleep_duration_in_ms"] == 600_000
+    assert result.loc[0, "unix_timestamp_in_ms"] == 1_704_146_400_000
 
 
 def test_tesserae_normalizes_legacy_duration_that_includes_awake_time(

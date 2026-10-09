@@ -354,7 +354,7 @@ class TesseraeParquetLoader(BaseLoader):
         sleep["timezone_offset_in_ms"] = (
             (sleep["local_time"] - sleep["utc_time"]) / pd.Timedelta(milliseconds=1)
         )
-        sleep["unix_timestamp_in_ms"] = sleep["utc_time"].astype("int64") // 1_000_000
+        sleep["unix_timestamp_in_ms"] = sleep["utc_time"].dt.as_unit("ms").astype("int64")
         sleep["local_end_time"] = sleep["local_time"] + pd.to_timedelta(
             sleep["duration_seconds"].fillna(0)
             + sleep["awake_seconds"].fillna(0),
