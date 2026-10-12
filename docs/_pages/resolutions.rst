@@ -36,9 +36,6 @@ report the other clock together with the per-window ``timezone`` offset in
 columns. ``time_reference`` therefore controls window construction without
 discarding the UTC/local correspondence.
 
-Timezone-aware bounds are converted to UTC for UTC extraction; local extraction
-uses their wall-clock values. The same normalized bounds apply at every level.
-
 HRV extracted from raw BBI can use overlapping five-minute primary windows.
 ``window_step=None`` keeps the default five-minute displacement, while a
 shorter step such as ``"1min"`` starts a new five-minute estimate every
