@@ -1,5 +1,7 @@
 # pywearable
 
+[![tests](https://github.com/MeDiTech-SUPSI/pywearable/actions/workflows/python-app.yml/badge.svg)](https://github.com/MeDiTech-SUPSI/pywearable/actions/workflows/python-app.yml)
+
 Do you need to deal with wearable data? Then you are in the right place!
 In this repository you will find a Python package that you can use to analyse all data collected with several data sources, with a particular focus on longitudinal data. 
 At the moment, we support:
