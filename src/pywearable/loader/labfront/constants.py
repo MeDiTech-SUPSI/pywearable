@@ -23,6 +23,16 @@ FILE_INDEX_BASE_FOLDER_KEY = "baseFolder"
 DATA_SOURCE_GARMIN_HEALTH_API = "garmin_health_api"
 DATA_SOURCE_GARMIN_SDK = "garmin_sdk"
 
+METRIC_BBI = "bbi"
+METRIC_DAILY_SUMMARY = "daily-summary"
+METRIC_HEART_RATE = "heart-rate"
+METRIC_STRESS = "stress"
+METRIC_PULSE_OX = "pulse-ox"
+METRIC_RESPIRATION = "respiration"
+METRIC_SLEEP_RESPIRATION = "sleep-respiration"
+METRIC_SLEEP_STAGE = "sleep-stage"
+METRIC_SLEEP_SUMMARY = "sleep-summary"
+
 #################################################
 #              CSV FILES - ROWS                 #
 #################################################
@@ -81,9 +91,14 @@ TODO_FOLDER = "todo"
 
 # Labfront-specific CSV columns
 GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL = "timezoneOffsetInMs"
-GARMIN_DEVICE_TIMEZONE_COL = "timezone"
-FIRST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL = "firstSampleUnixTimestampInMs"
-LAST_SAMPLE_UNIXTIMESTAMP_IN_MS_COL = "lastSampleUnixTimestampInMs"
+ISODATE_COL = "isoDate"
+UNIXTIMESTAMP_IN_MS_COL = "unixTimestampInMs"
+TIMEZONEOFFSET_IN_MS_COL = "timezoneOffsetInMs"
+CALENDAR_DATE_COL = "calendarDate"
+SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
+DURATION_IN_MS_COL = "durationInMs"
+IS_SLEEPING_COL = "isSleeping"
+SPO2_SPO2_COL = "spo2"
 
 ##################################################
 #          Questionnaire/Task Columns            #
@@ -93,20 +108,28 @@ TODO_ID_COL = "todoId"
 QUESTIONNAIRE_NAME_COL = "questionnaireName"
 QUESTIONNAIRE_ID_COL = "questionnaireId"
 TASK_ID_COL = "taskId"
-QUESTIONNAIRE_QUESTION_DESCRIPTION_COL = "questionDescription"
-QUESTIONNAIRE_QUESTION_TYPE_COL = "questionType"
-QUESTIONNAIRE_SECTION_INDEX_COL = "sectionIndex"
-QUESTIONNAIRE_QUESTION_INDEX_COL = "questionIndex"
-TASK_SCHEDULE_COL = "taskScheduleRepeat"
+QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE = "text"
 
 ##################################################
 #            Sleep Summary Columns               #
 ##################################################
+GARMIN_CONNECT_SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL = "deepSleepDurationInMs"
+GARMIN_CONNECT_SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL = "lightSleepDurationInMs"
+GARMIN_CONNECT_SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL = "remSleepInMs"
+GARMIN_CONNECT_SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL = "awakeDurationInMs"
+GARMIN_CONNECT_SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL = (
+    "unmeasurableSleepInMs"
+)
+
+SLEEP_SUMMARY_DURATION_IN_MS_COL = "durationInMs"
 SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL = "deepSleepDurationInMs"
 SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL = "lightSleepDurationInMs"
-SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL = "remSleepInMs"
+SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL = "remSleepDurationInMs"
 SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL = "awakeDurationInMs"
-SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL = "unmeasurableSleepInMs"
+SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL = (
+    "unmeasurableSleepDurationInMs"
+)
+SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
 
 ##################################################
 #         Sleep Stages - Type values             #
@@ -116,6 +139,9 @@ SLEEP_STAGE_DEEP_STAGE_VALUE = "deep"
 SLEEP_STAGE_REM_STAGE_VALUE = "rem"
 SLEEP_STAGE_AWAKE_STAGE_VALUE = "awake"
 SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE = "unmeasurable"
+SLEEP_STAGE_SLEEP_TYPE_COL = "type"
+SLEEP_STAGE_DURATION_IN_MS_COL = "durationInMs"
+SLEEP_STAGE_SLEEP_SUMMARY_ID_COL = "sleepSummaryId"
 
 ##################################################
 #                 Stress columns                 #
@@ -125,6 +151,23 @@ _STRESS_STRESS_LEVEL_COL = "stressLevel"
 _STRESS_BODY_BATTERY_COL = "bodyBattery"
 _STRESS_BODY_BATTERY_BEDTIME_COL = "bodyBatteryBedtime"
 _STRESS_BODY_BATTERY_WAKING_COL = "bodyBatteryWakeup"
+STRESS_STRESS_LEVEL_COL = "stressLevel"
+STRESS_BODY_BATTERY_COL = "bodyBattery"
+
+##################################################
+#             Daily summary columns              #
+##################################################
+
+DAILY_SUMMARY_AVG_STRESS_IN_STRESS_LVL_COL = "averageStressInStressLevel"
+DAILY_SUMMARY_MAX_STRESS_IN_STRESS_LVL_COL = "maxStressInStressLevel"
+DAILY_SUMMARY_REST_STRESS_DURATION_IN_MS_COL = "restStressDurationInMs"
+DAILY_SUMMARY_LOW_STRESS_DURATION_IN_MS_COL = "lowStressDurationInMs"
+DAILY_SUMMARY_MEDIUM_STRESS_DURATION_IN_MS_COL = "mediumStressDurationInMs"
+DAILY_SUMMARY_HIGH_STRESS_DURATION_IN_MS_COL = "highStressDurationInMs"
+DAILY_SUMMARY_UNRELIABLE_STRESS_DURATION_IN_MS_COL = "activityStressDurationInMs"
+DAILY_SUMMARY_STRESS_SCORE_COL = "stressQualifier"
+
+RESPIRATION_BREATHS_PER_MINUTE_COL = "breathsPerMinute"
 
 ##################################################
 #                 Activity columns               #

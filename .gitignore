@@ -40,6 +40,10 @@ pip-delete-this-directory.txt
 htmlcov/
 .tox/
 .nox/
+.pytest-*/
+.tmp/
+tmp/
+pytest-cache-files-*/
 .coverage
 .coverage.*
 .cache
@@ -77,6 +81,7 @@ target/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+notebooks/
 
 # IPython
 profile_default/
@@ -160,6 +165,20 @@ cython_debug/
 #.idea/
 
 data/
+data_*/
 **/.DS_Store
 
 playground/
+
+# Local agent instructions/logs, never repository content
+AGENTS.md
+.agents/
+.codex/
+.codex-test-temp/
+
+# Local-only project review documents
+/API_CONTRACT.md
+/docs/activity_feature_review.md
+
+# Generated locally by LabfrontLoader
+**/.pywearable_file_index.csv

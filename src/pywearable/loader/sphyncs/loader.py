@@ -2,15 +2,22 @@ import os
 
 import pandas as pd
 
+from ... import schema
 from ..base import BaseLoader
 
 
 class SphyncsDataLoader(BaseLoader):
+    heart_rate_time_columns = ("local_time",)
+
     def __init__(self, root_folder: os.PathLike):
         self.root_folder = root_folder
 
     def load_heart_rate(
-        self, user_id: str, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
         """Load heart rate data for a specific user.
 
@@ -48,6 +55,13 @@ class SphyncsDataLoader(BaseLoader):
         The biometrics.parquet file should be located in the user's folder
         and must contain 'dateTime' and 'heart' columns.
         """
+        schema.validate_heart_rate_time_col(time_col)
+        if time_col == schema.UTC_TIME_COL:
+            raise ValueError(
+                "SPHYNCS heart-rate data does not provide UTC timestamps; "
+                "use time_col='local_time'."
+            )
+
         # Construct path to the user's biometrics.parquet file
         user_folder = os.path.join(self.root_folder, user_id)
         biometrics_file = os.path.join(user_folder, "biometrics.parquet")
@@ -71,26 +85,27 @@ class SphyncsDataLoader(BaseLoader):
                 f"Required columns 'dateTime' or 'heart' not found in {biometrics_file}"
             )
         
-        # Create the heart rate dataframe
-        heart_rate_df = pd.DataFrame({
-            'isoDate': pd.to_datetime(df['dateTime']),
-            'beatsPerMinute': df['heart']
-        })
-        
-        # Set isoDate as index
-        heart_rate_df = heart_rate_df.set_index('isoDate')
-        
-        # Filter by date range if provided
-        if start_date is not None:
-            heart_rate_df = heart_rate_df[heart_rate_df.index >= start_date]
-        if end_date is not None:
-            heart_rate_df = heart_rate_df[heart_rate_df.index < end_date]
-
-        
-        # Reset index to have isoDate as a column
-        heart_rate_df = heart_rate_df.reset_index()
-        
-        return heart_rate_df
+        heart_rate_df = pd.DataFrame(
+            {
+                "local_time": pd.to_datetime(df["dateTime"]),
+                "heart_rate": pd.to_numeric(df["heart"], errors="coerce"),
+            }
+        )
+        heart_rate_df = heart_rate_df[heart_rate_df["heart_rate"] > 0]
+        heart_rate_df["utc_time"] = pd.NaT
+        heart_rate_df["timezone"] = pd.NaT
+        heart_rate_df[schema.TIMESTAMP_CONFLICT_COL] = (
+            heart_rate_df.groupby("local_time")["heart_rate"].transform("nunique")
+            > 1
+        )
+        heart_rate_df = schema.prepare_heart_rate_samples(heart_rate_df)
+        return (
+            schema.filter_heart_rate_by_time(
+                heart_rate_df, start_date, end_date, time_col
+            )
+            .sort_values("local_time")
+            .reset_index(drop=True)
+        )
 
     def load_daily_summary(self, user_id: str, start_date=None, end_date=None) -> pd.DataFrame:
         """Return empty DataFrame - not available in SPHYNCS dataset."""
@@ -114,34 +129,36 @@ class SphyncsDataLoader(BaseLoader):
         end_date : pd.Timestamp, optional
             End date for filtering data (exclusive). Default is None.
         drop_duplicates : bool, default=True
-            Whether to drop duplicate entries based on calendarDate.
+            Whether to drop duplicate entries based on ``calendar_date``.
 
         Returns
         -------
         pd.DataFrame
             DataFrame with the following columns:
             
-            - sleepSummaryId : str
+            - sleep_summary_id : str
                 Unique identifier for each sleep summary (format: userId_YYYYMMDD_HHMMSS).
-            - calendarDate : datetime64[ns]
+            - calendar_date : datetime64[ns]
                 Calendar date for the sleep episode.
-            - isoDate : datetime64[ns]
-                Sleep start time (bedtime) in ISO format.
-            - unixTimestampInMs : int64
+            - local_time : datetime64[ns]
+                Participant-local sleep start time.
+            - utc_time : datetime64[ns]
+                UTC sleep start time.
+            - unix_timestamp_in_ms : int64
                 Unix timestamp of bedtime in milliseconds.
-            - timezoneOffsetInMs : int
+            - timezone_offset_in_ms : int
                 Timezone offset in milliseconds (CET = 3600000).
-            - durationInMs : int
+            - duration_in_ms : int
                 Overall sleep duration in milliseconds (excluding awake periods).
-            - deepSleepDurationInMs : int
+            - deep_sleep_duration_in_ms : int
                 Duration of deep sleep in milliseconds.
-            - lightSleepDurationInMs : int
+            - light_sleep_duration_in_ms : int
                 Duration of light sleep in milliseconds.
-            - remSleepDurationInMs : int
+            - rem_sleep_duration_in_ms : int
                 Duration of REM sleep in milliseconds.
-            - unmeasurableSleepDurationInMs : int
+            - unmeasurable_sleep_duration_in_ms : int
                 Duration of unmeasurable/restless sleep in milliseconds.
-            - awakeDurationInMs : int
+            - awake_duration_in_ms : int
                 Duration of awake stages in milliseconds.
             - validation : int
                 Validation flag (1 if contains 'restless' or 'asleep' stages, 0 otherwise).
@@ -166,9 +183,9 @@ class SphyncsDataLoader(BaseLoader):
         
         # Check if files exist
         if not os.path.exists(episodes_file):
-            return pd.DataFrame()
+            return schema.prepare_sleep_summary(pd.DataFrame())
         if not os.path.exists(stages_file):
-            return pd.DataFrame()
+            return schema.prepare_sleep_summary(pd.DataFrame())
         
         # Load the parquet files
         episodes_df = pd.read_parquet(episodes_file)
@@ -176,9 +193,9 @@ class SphyncsDataLoader(BaseLoader):
         
         # Validate required columns
         if 'startTime' not in episodes_df.columns or 'endTime' not in episodes_df.columns:
-            return pd.DataFrame()
+            return schema.prepare_sleep_summary(pd.DataFrame())
         if 'sleepStage' not in stages_df.columns:
-            return pd.DataFrame()
+            return schema.prepare_sleep_summary(pd.DataFrame())
         
         # Reset index if dateTime is the index
         if episodes_df.index.name == 'dateTime':
@@ -248,17 +265,19 @@ class SphyncsDataLoader(BaseLoader):
             
             # Create sleep summary entry
             summary = {
-                'sleepSummaryId': sleep_summary_id,
-                'calendarDate': pd.Timestamp(calendar_date.date()),
-                'isoDate': pd.Timestamp(start_time),
-                'unixTimestampInMs': unix_timestamp_ms,
-                'timezoneOffsetInMs': timezone_offset_ms,
-                'durationInMs': duration_ms,
-                'deepSleepDurationInMs': deep_sleep_ms,
-                'lightSleepDurationInMs': light_sleep_ms,
-                'remSleepDurationInMs': rem_sleep_ms,
-                'unmeasurableSleepDurationInMs': unmeasurable_ms,
-                'awakeDurationInMs': awake_ms,
+                'sleep_summary_id': sleep_summary_id,
+                'calendar_date': pd.Timestamp(calendar_date.date()),
+                'local_time': pd.Timestamp(start_time),
+                'utc_time': pd.Timestamp(start_time)
+                - pd.Timedelta(milliseconds=timezone_offset_ms),
+                'unix_timestamp_in_ms': unix_timestamp_ms,
+                'timezone_offset_in_ms': timezone_offset_ms,
+                'duration_in_ms': duration_ms,
+                'deep_sleep_duration_in_ms': deep_sleep_ms,
+                'light_sleep_duration_in_ms': light_sleep_ms,
+                'rem_sleep_duration_in_ms': rem_sleep_ms,
+                'unmeasurable_sleep_duration_in_ms': unmeasurable_ms,
+                'awake_duration_in_ms': awake_ms,
                 'validation': has_unreliable
             }
             
@@ -266,22 +285,22 @@ class SphyncsDataLoader(BaseLoader):
         
         # Create result DataFrame
         if len(sleep_summaries) == 0:
-            return pd.DataFrame()
+            return schema.prepare_sleep_summary(pd.DataFrame())
         
         result_df = pd.DataFrame(sleep_summaries)
         
         # Filter by date range if provided
         if start_date is not None:
             start_date = pd.Timestamp(start_date)
-            result_df = result_df[result_df['calendarDate'] >= start_date]
+            result_df = result_df[result_df['calendar_date'] >= start_date]
         if end_date is not None:
             end_date = pd.Timestamp(end_date)
-            result_df = result_df[result_df['calendarDate'] < end_date]
+            result_df = result_df[result_df['calendar_date'] < end_date]
         
-        # Drop duplicates if requested (keep first occurrence by calendarDate)
+        # Drop duplicates if requested (keep first occurrence by calendar date)
         if drop_duplicates and len(result_df) > 0:
-            result_df = result_df.drop_duplicates(subset=['calendarDate'], keep='first')
-        
+            result_df = result_df.drop_duplicates(subset=['calendar_date'], keep='first')
+
         return result_df.reset_index(drop=True)
 
     def load_sleep_stage(
@@ -308,13 +327,15 @@ class SphyncsDataLoader(BaseLoader):
         pd.DataFrame
             DataFrame with the following columns:
             
-            - sleepSummaryId : str
+            - sleep_summary_id : str
                 Reference to the corresponding sleep summary (format: userId_YYYYMMDD_HHMMSS).
-            - isoDate : datetime64[ns]
-                Timestamp of the stage start.
-            - unixTimestampInMs : int64
+            - local_time : datetime64[ns]
+                Participant-local timestamp of the stage start.
+            - utc_time : datetime64[ns]
+                UTC timestamp of the stage start.
+            - unix_timestamp_in_ms : int64
                 Unix timestamp in milliseconds.
-            - durationInMs : int
+            - duration_in_ms : int
                 Duration of the stage in milliseconds.
             - type : str
                 Type of sleep stage. Possible values: 'deep', 'light', 'rem', 'awake', 'unmeasurable'.
@@ -345,9 +366,9 @@ class SphyncsDataLoader(BaseLoader):
         
         # Check if files exist
         if not os.path.exists(episodes_file):
-            return pd.DataFrame()
+            return schema.prepare_sleep_stages(pd.DataFrame())
         if not os.path.exists(stages_file):
-            return pd.DataFrame()
+            return schema.prepare_sleep_stages(pd.DataFrame())
         
         # Load the parquet files
         episodes_df = pd.read_parquet(episodes_file)
@@ -355,9 +376,9 @@ class SphyncsDataLoader(BaseLoader):
         
         # Validate required columns
         if 'startTime' not in episodes_df.columns or 'endTime' not in episodes_df.columns:
-            return pd.DataFrame()
+            return schema.prepare_sleep_stages(pd.DataFrame())
         if 'sleepStage' not in stages_df.columns:
-            return pd.DataFrame()
+            return schema.prepare_sleep_stages(pd.DataFrame())
         
         # Reset index if dateTime is the index
         if episodes_df.index.name == 'dateTime':
@@ -407,10 +428,11 @@ class SphyncsDataLoader(BaseLoader):
                 bedtime_unix_ms = int(pd.Timestamp(start_time).value // 10**6)
                 
                 initial_awake = {
-                    'sleepSummaryId': sleep_summary_id,
-                    'isoDate': pd.Timestamp(start_time),
-                    'unixTimestampInMs': bedtime_unix_ms,
-                    'durationInMs': int(time_diff_ms),
+                    'sleep_summary_id': sleep_summary_id,
+                    'local_time': pd.Timestamp(start_time),
+                    'utc_time': pd.Timestamp(start_time) - pd.Timedelta(hours=1),
+                    'unix_timestamp_in_ms': bedtime_unix_ms,
+                    'duration_in_ms': int(time_diff_ms),
                     'type': 'awake'
                 }
                 stages_list.append(initial_awake)
@@ -422,8 +444,12 @@ class SphyncsDataLoader(BaseLoader):
             episode_stages.loc[episode_stages['next_time'].isna(), 'next_time'] = end_time
             
             # Calculate duration in milliseconds
-            episode_stages['durationInMs'] = (
-                (episode_stages['next_time'] - episode_stages['timestamp']).dt.total_seconds() * 1000
+            episode_stages['duration_in_ms'] = (
+                (
+                    episode_stages['next_time']
+                    - episode_stages['timestamp']
+                ).dt.total_seconds()
+                * 1000
             ).astype(int)
             
             # Map stage types to standard format
@@ -433,17 +459,18 @@ class SphyncsDataLoader(BaseLoader):
             episode_stages['type'] = episode_stages['type'].fillna('unmeasurable')
             
             # Convert timestamps to unix timestamp in milliseconds
-            episode_stages['unixTimestampInMs'] = episode_stages['timestamp'].apply(
+            episode_stages['unix_timestamp_in_ms'] = episode_stages['timestamp'].apply(
                 lambda x: int(pd.Timestamp(x).value // 10**6)
             )
             
             # Create stage records
             for _, row in episode_stages.iterrows():
                 stage_record = {
-                    'sleepSummaryId': sleep_summary_id,
-                    'isoDate': pd.Timestamp(row['timestamp']),
-                    'unixTimestampInMs': row['unixTimestampInMs'],
-                    'durationInMs': row['durationInMs'],
+                    'sleep_summary_id': sleep_summary_id,
+                    'local_time': pd.Timestamp(row['timestamp']),
+                    'utc_time': pd.Timestamp(row['timestamp']) - pd.Timedelta(hours=1),
+                    'unix_timestamp_in_ms': row['unix_timestamp_in_ms'],
+                    'duration_in_ms': row['duration_in_ms'],
                     'type': row['type']
                 }
                 stages_list.append(stage_record)
@@ -452,18 +479,18 @@ class SphyncsDataLoader(BaseLoader):
         
         # Combine all stages
         if len(all_stages) == 0:
-            return pd.DataFrame()
+            return schema.prepare_sleep_stages(pd.DataFrame())
         
         result_df = pd.DataFrame(all_stages)
         
         # Filter by date range if provided
         if start_date is not None:
             start_date = pd.Timestamp(start_date)
-            result_df = result_df[result_df['isoDate'] >= start_date]
+            result_df = result_df[result_df['local_time'] >= start_date]
         if end_date is not None:
             end_date = pd.Timestamp(end_date)
-            result_df = result_df[result_df['isoDate'] < end_date]
-        
+            result_df = result_df[result_df['local_time'] < end_date]
+
         return result_df.reset_index(drop=True)
 
     def load_pulse_ox(
@@ -473,18 +500,6 @@ class SphyncsDataLoader(BaseLoader):
         return pd.DataFrame()
 
     def load_respiration(
-        self, user_id: str, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        """Return empty DataFrame - not available in SPHYNCS dataset."""
-        return pd.DataFrame()
-
-    def load_sleep_pulse_ox(
-        self, user_id: str, start_date=None, end_date=None
-    ) -> pd.DataFrame:
-        """Return empty DataFrame - not available in SPHYNCS dataset."""
-        return pd.DataFrame()
-
-    def load_sleep_respiration(
         self, user_id: str, start_date=None, end_date=None
     ) -> pd.DataFrame:
         """Return empty DataFrame - not available in SPHYNCS dataset."""
@@ -618,3 +633,6 @@ class SphyncsDataLoader(BaseLoader):
                 user_ids.append(entry)
 
         return sorted(user_ids)
+
+
+__all__ = ["SphyncsDataLoader"]

@@ -1,1085 +1,777 @@
-"""
-This module contains all the functions related to analysis
-of respiration data.
-"""
+"""Respiratory-rate and oxygen-saturation feature extraction."""
 
-# TODO find more efficient way to get sleep timestamps
+from __future__ import annotations
 
-import datetime
+import warnings
 from typing import Union
 
 import numpy as np
 import pandas as pd
 
-from . import constants, loader, utils
-
-_RESPIRATION_METRIC_MEAN_PULSE_OX = "meanPulseOx"
-_RESPIRATION_METRIC_P10_PULSE_OX = "p10PulseOx"
-_RESPIRATION_METRIC_P20_PULSE_OX = "p20PulseOx"
-_RESPIRATION_METRIC_P30_PULSE_OX = "p30PulseOx"
-_RESPIRATION_METRIC_MEAN_AWAKE_BREATHS_PER_MINUTE = "meanAwakeBreathsPerMinute"
-_RESPIRATION_METRIC_MEAN_REST_BREATHS_PER_MINUTE = "meanRestBreathsPerMinute"
+from . import cycle, hierarchy, schema
+from .loader.base import BaseLoader
+from .utils import time as time_utils
 
 
-def get_mean_rest_pulse_ox(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get mean pulse ox value at rest.
+RESPIRATORY_RATE_STATISTIC_MEAN = "respiratory_rate_mean"
+RESPIRATORY_RATE_STATISTIC_MEDIAN = "respiratory_rate_median"
+RESPIRATORY_RATE_STATISTIC_STD = "respiratory_rate_std"
+RESPIRATORY_RATE_STATISTIC_P10 = "respiratory_rate_p10"
+RESPIRATORY_RATE_STATISTIC_P90 = "respiratory_rate_p90"
+RESPIRATORY_RATE_STATISTIC_COUNT = "respiratory_rate_count"
 
-    This function computes the mean pulse ox value during
-    resting sleep periods for the given ``user_id``
-    and for the required time interval from ``start_date`` to
-    ``end_date``. It is also possible to perform a
-    transformation of the retrieved mean pulse ox values
-    by setting the ``kind`` parameter to a valid function
-    accepted by :func:`~pandas.Series.agg`. For example, it is
-    possible to obtain the mean of the mean values by
-    setting the ``kind`` parameter to ``"mean"``. If the
-    ``kind`` argument requires additional positional
-    arguments or keyword arguments, it is possible to set them
-    by passing them to the ``kind_args`` and
-    ``kind_kwargs`` arguments.
-    The function used to load pulse_ox data is the
-    :func:`~loader.BaseLoader.load_sleep_pulse_ox`. If
-    loader-specific arguments are required, you can
-    pass them using the ``loader_kwargs`` argument.
-    The return type depends on the
+SPO2_STATISTIC_MEAN = "spo2_mean"
+SPO2_STATISTIC_MEDIAN = "spo2_median"
+SPO2_STATISTIC_STD = "spo2_std"
+SPO2_STATISTIC_P10 = "spo2_p10"
+SPO2_STATISTIC_MIN = "spo2_min"
+SPO2_STATISTIC_COUNT = "spo2_count"
+SPO2_STATISTIC_BELOW_THRESHOLD_FRACTION = "spo2_below_threshold_fraction"
+SPO2_STATISTIC_BELOW_THRESHOLD_DURATION = "spo2_below_threshold_duration_seconds"
 
-    Parameters
-    ----------
-    loader : :class:`loader.BaseLoader`
-        Initialized data loader, that must implement the method
-        ``load_sleep_pulse_ox(user_id, start_date, end_date).
-    user_id : :class:`str` or :class:`list` or `None`, optional
-        User id for which the metric must be computed, by default ``"all"``.
-        If the parameter is set to ``"all"``, then the ``loader`` must implement the function
-        ``get_user_ids()`` in order to retrieve the list of user ids to
-        use for the metric computation.
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        Start date for the computation of the metric, by default ``None``.
-        If ``None`` is used as a value for the parameter, then the ``start_date`` will
-        be specific for each user, depending on the first date with
-        available data for the user.
-        ``start_date`` is converted to a :class:`datetime.date`, so
-        the first returned value will be related to the sleep occuring
-        on the night starting the day before ``start_date``.
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        End date for the computation of the metric, by default ``None``.
-        If ``None`` is used as a value for the parameter, then the ``end_date`` will be specific
-        for each user, depending on the first date with available data for the user.
-        ``end_date`` is converted to a :class:`datetime.date`, so the
-        last returned value will be related to sleep occuring on the night
-        starting the day before ``end_date``.
-    kind : :class:`str` or ``None``, optional
-        Additional transformation to be performed on the metric, by default ``None``.
-    kind_args : :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default ``[]``
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword arguments to be passed to the function used by the ``kind``
-        method, by default no additional keywords arguments are passed.
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``,
-        by default no keyword arguments are passed.
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
+RESPIRATORY_RATE_STATISTICS = (
+    RESPIRATORY_RATE_STATISTIC_MEAN,
+    RESPIRATORY_RATE_STATISTIC_MEDIAN,
+    RESPIRATORY_RATE_STATISTIC_STD,
+    RESPIRATORY_RATE_STATISTIC_P10,
+    RESPIRATORY_RATE_STATISTIC_P90,
+    RESPIRATORY_RATE_STATISTIC_COUNT,
+)
+SPO2_STATISTICS = (
+    SPO2_STATISTIC_MEAN,
+    SPO2_STATISTIC_MEDIAN,
+    SPO2_STATISTIC_STD,
+    SPO2_STATISTIC_P10,
+    SPO2_STATISTIC_MIN,
+    SPO2_STATISTIC_COUNT,
+    SPO2_STATISTIC_BELOW_THRESHOLD_FRACTION,
+    SPO2_STATISTIC_BELOW_THRESHOLD_DURATION,
+)
+RESPIRATION_STATISTICS = RESPIRATORY_RATE_STATISTICS + SPO2_STATISTICS
 
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_df`` is ``False``
-            - :class:`pd.DataFrame` if ``return_df`` is ``True``. The returned :class:`pd.DataFrame` will
-              have a index of type :class:`pd.MultiIndex` if ``return_multi_index`` is set to
-              ``True``, with the levels of the index being ``"user"`` and ``"calendarDate"``. If
-              ``return_multi_index`` is set to ``False``, then the returned :class:`pd.DataFrame`
-              will have a standard :class:`pd.RangeIndex` and ``"user"`` and ``"calenderDate"``
-              will be two colums of the returned :class:`pd.DataFrame`.
-    """
-    return get_rest_pulse_ox_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_MEAN_PULSE_OX,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def get_p10_rest_pulse_ox(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = False,
-):
-    """Get 10th percentile pulse ox value at rest.
-
-    This function computes the 10-th percentile of
-    pulse ox value during resting sleep periods for the given
-    ``user_id`` and for the required time interval from ``start_date`` to
-    ``end_date``.
-    It is also possible to perform a
-    transformation of the retrieved p10 values
-    by setting the ``kind`` parameter to a valid function
-    accepted by :func:`~pandas.Series.agg`. For example, it is
-    possible to obtain the mean of the mean values by
-    setting the ``kind`` parameter to ``"mean"``. If the
-    ``kind`` argument requires additional positional
-    arguments or keyword arguments, it is possible to set them
-    by passing them to the ``kind_args`` and
-    ``kind_kwargs`` arguments.
-    The function used to load pulse_ox data is the
-    :func:`~loader.BaseLoader.load_sleep_pulse_ox`. If
-    loader-specific arguments are required, you can
-    pass them using the ``loader_kwargs`` argument
-    in a :class:`dict` format.
-
-    Parameters
-    ----------
-    loader : :class:`loader.BaseLoader`
-        Initialized data loader
-    user_id : :class:`str` or :class:`list` or `None`, optional
-        User id for which the metric must be computed, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        Start date for the computation of the metric, by default ``None``
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        End date for the computation of the metric, by default ``None``
-    kind : :class:`str` or ``None``, optional
-        Additional transformation to be performed on the metric, by default ``None``
-    kind_args : :class:`tuple` or :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default None
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword to be passed to the function used by the ``kind`` method, by default None
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
-
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_dict`` is ``True``
-            - :class:`pd.DataFrame` if ``return_dict`` is ``False``
-    """
-    return get_rest_pulse_ox_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_P10_PULSE_OX,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def get_p20_rest_pulse_ox(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = False,
-):
-    """Get 20th percentile pulse ox value at rest.
-
-    This function computes the 20-th percentile of
-    pulse ox value during resting sleep periods for the given
-    ``user_id`` and for the required time interval from ``start_date`` to
-    ``end_date``.
-    It is also possible to perform a
-    transformation of the retrieved p20 values
-    by setting the ``kind`` parameter to a valid function
-    accepted by :func:`~pandas.Series.agg`. For example, it is
-    possible to obtain the mean of the mean values by
-    setting the ``kind`` parameter to ``"mean"``. If the
-    ``kind`` argument requires additional positional
-    arguments or keyword arguments, it is possible to set them
-    by passing them to the ``kind_args`` and
-    ``kind_kwargs`` arguments.
-    The function used to load pulse_ox data is the
-    :func:`~loader.BaseLoader.load_sleep_pulse_ox`. If
-    loader-specific arguments are required, you can
-    pass them using the ``loader_kwargs`` argument
-    in a :class:`dict` format.
-
-    Parameters
-    ----------
-    loader : :class:`loader.BaseLoader`
-        Initialized data loader
-    user_id : :class:`str` or :class:`list` or `None`, optional
-        User id for which the metric must be computed, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        Start date for the computation of the metric, by default ``None``
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        End date for the computation of the metric, by default ``None``
-    kind : :class:`str` or ``None``, optional
-        Additional transformation to be performed on the metric, by default ``None``
-    kind_args : :class:`tuple` or :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default None
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword to be passed to the function used by the ``kind`` method, by default None
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
-
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_dict`` is ``True``
-            - :class:`pd.DataFrame` if ``return_dict`` is ``False``
-    """
-    return get_rest_pulse_ox_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_P20_PULSE_OX,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def get_p30_rest_pulse_ox(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get 30th percentile pulse ox value at rest.
-
-    This function computes the 30-th percentile of
-    pulse ox value during resting sleep periods for the given
-    ``user_id`` and for the required time interval from ``start_date`` to
-    ``end_date``.
-    It is also possible to perform a
-    transformation of the retrieved p30 values
-    by setting the ``kind`` parameter to a valid function
-    accepted by :func:`~pandas.Series.agg`. For example, it is
-    possible to obtain the mean of the mean values by
-    setting the ``kind`` parameter to ``"mean"``. If the
-    ``kind`` argument requires additional positional
-    arguments or keyword arguments, it is possible to set them
-    by passing them to the ``kind_args`` and
-    ``kind_kwargs`` arguments.
-    The function used to load pulse_ox data is the
-    :func:`~loader.BaseLoader.load_sleep_pulse_ox`. If
-    loader-specific arguments are required, you can
-    pass them using the ``loader_kwargs`` argument
-    in a :class:`dict` format.
-
-    Parameters
-    ----------
-    loader : :class:`loader.BaseLoader`
-        Initialized data loader
-    user_id : :class:`str` or :class:`list` or `None`, optional
-        User id for which the metric must be computed, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        Start date for the computation of the metric, by default ``None``
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        End date for the computation of the metric, by default ``None``
-    kind : :class:`str` or ``None``, optional
-        Additional transformation to be performed on the metric, by default ``None``
-    kind_args : :class:`tuple` or :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default None
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword to be passed to the function used by the ``kind`` method, by default None
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
-
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_dict`` is ``True``
-            - :class:`pd.DataFrame` if ``return_dict`` is ``False``
-    """
-    return get_rest_pulse_ox_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_P30_PULSE_OX,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_dict=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def _compute_mean_rest_pulse_ox(rest_pulse_ox: pd.DataFrame) -> pd.Series:
-    return _compute_rest_pulse_ox_statistic(rest_pulse_ox, "mean")
-
-
-def _compute_p10_rest_pulse_ox(rest_pulse_ox: pd.DataFrame) -> pd.Series:
-    return _compute_rest_pulse_ox_statistic(rest_pulse_ox, np.percentile, 10)
-
-
-def _compute_p20_rest_pulse_ox(rest_pulse_ox: pd.DataFrame) -> pd.Series:
-    return _compute_rest_pulse_ox_statistic(rest_pulse_ox, np.percentile, 20)
-
-
-def _compute_p30_rest_pulse_ox(rest_pulse_ox: pd.DataFrame) -> pd.Series:
-    return _compute_rest_pulse_ox_statistic(rest_pulse_ox, np.percentile, 30)
-
-
-def _compute_rest_pulse_ox_statistic(
-    rest_pulse_ox: pd.DataFrame,
-    agg,
-    *agg_args,
-    **agg_kwargs,
-) -> pd.Series:
-    if type(rest_pulse_ox) != pd.DataFrame:
-        raise ValueError(
-            f"rest_pulse_ox must be of type pd.DataFrame and not {type(rest_pulse_ox)}"
-        )
-    if constants.CALENDAR_DATE_COL not in rest_pulse_ox.columns:
-        raise ValueError(
-            f"{constants.CALENDAR_DATE_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
-        )
-    if constants.SPO2_SPO2_COL not in rest_pulse_ox.columns:
-        raise ValueError(
-            f"{constants.SPO2_SPO2_COL} not found among rest_pulse_ox columns {rest_pulse_ox.columns}"
-        )
-    agg_series = rest_pulse_ox.groupby(constants.CALENDAR_DATE_COL)[
-        constants.SPO2_SPO2_COL
-    ].agg(agg, *agg_args, **agg_kwargs)
-    return agg_series
-
-
-_REST_PULSE_OX_STATISTICS_DICT = {
-    _RESPIRATION_METRIC_MEAN_PULSE_OX: _compute_mean_rest_pulse_ox,
-    _RESPIRATION_METRIC_P10_PULSE_OX: _compute_p10_rest_pulse_ox,
-    _RESPIRATION_METRIC_P20_PULSE_OX: _compute_p20_rest_pulse_ox,
-    _RESPIRATION_METRIC_P30_PULSE_OX: _compute_p30_rest_pulse_ox,
+_FAMILY_CONFIG = {
+    "respiratory_rate": {
+        "value_col": schema.RESPIRATORY_RATE_COL,
+        "source_attr": "respiratory_rate_source",
+        "time_columns_attr": "respiratory_rate_time_columns",
+        "sample_loader": "load_respiration",
+        "summary_loader": "load_respiration_summary",
+    },
+    "spo2": {
+        "value_col": schema.SPO2_COL,
+        "source_attr": "spo2_source",
+        "time_columns_attr": "spo2_time_columns",
+        "sample_loader": "load_pulse_ox",
+        "summary_loader": "load_spo2_summary",
+    },
 }
 
 
-def get_rest_pulse_ox_statistic(
-    loader: loader.BaseLoader,
-    metric: Union[str, list, tuple, None] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: str = None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get a rest pulse ox statistic.
+def _statistics_list(statistic) -> list[str]:
+    """Return unique requested feature names, validating core and ``p0``–``p100`` names.
 
-    This function computes a statistic of
-    pulse ox value during resting sleep periods for the given
-    ``user_id`` and for the required time interval from ``start_date`` to
-    ``end_date``.
-    It is also possible to perform a
-    transformation of the retrieved statistic
-    by setting the ``kind`` parameter to a valid function
-    accepted by :func:`~pandas.Series.agg`. For example, it is
-    possible to obtain the mean of the mean values by
-    setting the ``kind`` parameter to ``"mean"``. If the
-    ``kind`` argument requires additional positional
-    arguments or keyword arguments, it is possible to set them
-    by passing them to the ``kind_args`` and
-    ``kind_kwargs`` arguments.
-    The function used to load pulse_ox data is the
-    :func:`~loader.BaseLoader.load_sleep_pulse_ox`. If
-    loader-specific arguments are required, you can
-    pass them using the ``loader_kwargs`` argument
-    in a :class:`dict` format.
-
-    Parameters
-    ----------
-    loader : :class:`loader.BaseLoader`
-        Initialized data loader
-    metric : :class:`str`
-        The statistic that needs to be computed. Available options are:
-
-            - ``"meanPulseOx"``
-            - ``"p10PulseOx"``
-            - ``"p20PulseOx"``
-            - ``"p30PulseOx"``
-
-    user_id : :class:`str` or :class:`list` or `None`, optional
-        User id for which the metric must be computed, by default "all"
-    start_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        Start date for the computation of the metric, by default ``None``
-    end_date : :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or `None`, optional
-        End date for the computation of the metric, by default ``None``
-    kind : :class:`str` or function, optional
-        Additional transformation to be performed on the metric, by default ``None``
-    kind_args : :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default None
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword arguments to be passed to the function used by the ``kind`` method, by default None
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
-
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_dict`` is ``True``
-            - :class:`pd.DataFrame` if ``return_dict`` is ``False``
+    ``None`` requests all core respiratory-rate and SpO2 statistics.
     """
-    return get_rest_pulse_ox_statistics(
-        loader=loader,
-        metrics=metric,
-        user_id=user_id,
+    if statistic is None:
+        return list(RESPIRATION_STATISTICS)
+    statistics = [statistic] if isinstance(statistic, str) else list(statistic)
+    unknown = [
+        name
+        for name in statistics
+        if name not in RESPIRATION_STATISTICS
+        and hierarchy.feature_percentile(name, "respiratory_rate") is None
+        and hierarchy.feature_percentile(name, "spo2") is None
+    ]
+    if unknown:
+        raise ValueError(
+            f"statistic must be one among {list(RESPIRATION_STATISTICS)} or a "
+            f"percentile such as 'spo2_p20', not {sorted(set(unknown))}"
+        )
+    return list(dict.fromkeys(statistics))
+
+
+def _below_threshold_duration(rows, time_col, value_col, threshold, cadence, end):
+    """Estimate seconds below ``threshold`` from timestamped SpO2 ``rows``.
+
+    Each reading represents at most one ``cadence`` up to ``end``; return
+    missing when cadence cannot be inferred.
+    """
+    if cadence is None or rows.empty:
+        return np.nan if cadence is None else 0.0
+    ordered = rows.sort_values(time_col, kind="stable").drop_duplicates(time_col)
+    timestamps = pd.DatetimeIndex(ordered[time_col])
+    next_times = pd.Series(timestamps[1:].append(pd.DatetimeIndex([end])))
+    durations = pd.to_timedelta(next_times.to_numpy() - timestamps.to_numpy())
+    durations = durations.where(durations <= cadence, cadence)
+    durations = durations.where(durations > pd.Timedelta(0), pd.Timedelta(0))
+    below = ordered[value_col].lt(threshold).to_numpy()
+    return float(durations[below].sum().total_seconds())
+
+
+def _summarize_samples(
+    rows, family, statistics, time_col, end, cadence, spo2_threshold
+):
+    """Return requested feature values for one window of canonical sample rows.
+
+    ``family`` selects respiratory rate or SpO2. ``end`` and ``cadence``
+    bound the SpO2 below-threshold duration; unavailable features stay missing.
+    """
+    config = _FAMILY_CONFIG[family]
+    values = rows[config["value_col"]].dropna()
+    result = {name: np.nan for name in statistics}
+    for name in statistics:
+        percentile = hierarchy.feature_percentile(name, family)
+        if percentile is not None:
+            result[name] = values.quantile(percentile) if not values.empty else np.nan
+        elif name.endswith("_mean"):
+            result[name] = values.mean()
+        elif name.endswith("_median"):
+            result[name] = values.median()
+        elif name.endswith("_std"):
+            result[name] = values.std(ddof=1)
+        elif name.endswith("_min"):
+            result[name] = values.min()
+        elif name.endswith("_count"):
+            result[name] = int(values.size)
+        elif name == SPO2_STATISTIC_BELOW_THRESHOLD_FRACTION:
+            result[name] = (
+                float(values.lt(spo2_threshold).mean())
+                if not values.empty
+                else np.nan
+            )
+        elif name == SPO2_STATISTIC_BELOW_THRESHOLD_DURATION:
+            result[name] = _below_threshold_duration(
+                rows,
+                time_col,
+                config["value_col"],
+                spo2_threshold,
+                cadence,
+                end,
+            )
+    return result
+
+
+def _resolve_time_col(loader, family, time_reference, chain):
+    """Return a loader-supported timestamp column for this family and hierarchy."""
+    available = getattr(
+        loader,
+        _FAMILY_CONFIG[family]["time_columns_attr"],
+        schema.RESPIRATION_TIME_COLUMNS,
+    )
+    return hierarchy.resolve_time_col(available, time_reference, chain, family)
+
+
+def _prepare_samples(frame, family):
+    """Return validated canonical sample rows for respiratory rate or SpO2."""
+    if family == "respiratory_rate":
+        return schema.prepare_respiration_samples(frame)
+    return schema.prepare_spo2_samples(frame)
+
+
+def _load_sample_family(loader, family, user, start_date, end_date, loader_kwargs):
+    """Load and normalize one user's dated samples for ``family``."""
+    config = _FAMILY_CONFIG[family]
+    frame = getattr(loader, config["sample_loader"])(
+        user_id=user,
         start_date=start_date,
         end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
+        **loader_kwargs,
+    )
+    return _prepare_samples(frame, family)
+
+
+def _sample_family_trajectory(
+    loader,
+    users,
+    family,
+    statistics,
+    chain,
+    start_date,
+    end_date,
+    time_reference,
+    loader_kwargs,
+    min_coverage,
+    return_coverage,
+    cycle_intervals,
+    spo2_threshold,
+    unresolved_coverage,
+):
+    """Build one family's feature trajectory from raw timestamped samples.
+
+    ``chain[0]`` sets the primary fixed or cycle windows. Each row of the
+    returned ``(user_id, window_start)`` DataFrame contains period bounds,
+    requested values, and optional sample coverage. Unknown coverage streams
+    are recorded in ``unresolved_coverage`` when a threshold is requested.
+    """
+    frames = []
+    resolution = chain[0]
+    is_cycle = resolution in cycle.CYCLE_TYPES
+    time_col = _resolve_time_col(loader, family, time_reference, chain)
+    intervals = cycle_intervals
+    interval_users = (
+        set(intervals.index.get_level_values(0)) if intervals is not None else set()
     )
 
-
-def get_rest_pulse_ox_statistics(
-    loader: loader.BaseLoader,
-    metrics: Union[str, list, tuple, None] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind: Union[str, None] = None,
-    kind_args=[],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get rest pulse ox statistics.
-
-    This function returns a rest pulse ox statistics for each day. Depending on the value
-    of the ``kind`` parameter, the function returns a statistic for rest pulse ox data.
-    The value of the ``kind`` parameter can be any value that is accepted by
-    a transform operation by pandas. By default, the function returns the ``mean``
-    pulse ox at rest.
-
-    Parameters
-    ----------
-    loader: :class:`pywearable.loader.BaseLoader`
-        Instance of a data loader.
-    metrics: :class:`str` or :class:`list`
-        List of rest pulse ox statistic(s) that needs to be retrived. Available options are:
-
-            - ``"meanPulseOx"``
-            - ``"p10PulseOx"``
-            - ``"p20PulseOx"``
-            - ``"p30PulseOx"``
-            - ``None``: compute all statistics
-
-    user_id: :class:`str`, optional
-        Unique identifier of the user for which pulse ox statistics must be computed, by default ``"all"``.
-        If the parameter is set to ``all``, then the function is applied to all the
-        users for which the ``loader`` has data.
-    start_date: :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        Start date from which rest pulse ox must be computed, by default None.
-        If set to ``None``, then the function relies on the implementation of the ``loader``
-        to appropriately handle it.
-    end_date: :class:`datetime.datetime` or :class:`datetime.date` or :class:`str` or None, optional
-        End date to which rest rest pulse ox must be computed, by default None.
-        If set to ``None``, then the function relies on the implementation of the ``loader``
-        to appropriately handle it.
-    kind : :class:`str` or function, optional
-        Additional transformation to be performed on the metric, by default ``None``
-    kind_args : :class:`list`, optional
-        Additional positional arguments to be passed to the function used
-        by the ``kind`` method, by default None
-    kind_kwargs : :class:`dict`, optional
-        Additional keyword arguments to be passed to the function used by the ``kind`` method, by default None
-    loader_kwargs: :class:`dict`
-        Keyword arguemnts for the ``load_sleep_pulse_ox`` loading function of the ``loader``
-    return_dict: :class:`bool`
-        Whether to return a :class:`dict` or a :class:`pd.DataFrame`
-
-    Returns
-    -------
-    :class:`dict` or :class:`pd.DataFrame`
-        the return type can be:
-            - :class:`dict` if ``return_dict`` is ``True``
-            - :class:`pd.DataFrame` if ``return_dict`` is ``False``
-    """
-    # Get user id from the loader
-    user_id = utils.get_user_ids(loader, user_id)
-    # Convert to datetime
-    start_date = utils.check_date(start_date)
-    end_date = utils.check_date(end_date)
-    # Extend range to account for sleep start in prev day and ending next day
-    if not (start_date is None):
-        ext_start_date = start_date - datetime.timedelta(days=1)
-    else:
-        ext_start_date = None
-    if not (end_date is None):
-        ext_end_date = end_date + datetime.timedelta(days=1)
-    else:
-        ext_end_date = None
-    # Check metrics
-    if metrics is None:
-        # Consider all metrics
-        metrics = list(_REST_PULSE_OX_STATISTICS_DICT.keys())
-    if type(metrics) == str:
-        metrics = [metrics]
-
-    # Check args and kwargs
-    if type(kind_args) != list:
-        raise ValueError(f"kind_args must be an iterable, not {type(kind_args)}")
-    if type(kind_kwargs) != dict:
-        raise ValueError(f"kind_kwargs must be of type dict, not {type(kind_kwargs)}")
-    if type(loader_kwargs) != dict:
-        raise ValueError(
-            f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
+    for user in users:
+        user_intervals = None
+        load_start, load_end = start_date, end_date
+        if intervals is not None:
+            if user not in interval_users:
+                continue
+            user_intervals = intervals.xs(user)
+            valid = user_intervals[user_intervals["interval_valid"]]
+            if valid.empty:
+                continue
+            load_start = valid["start_time"].min()
+            load_end = valid["end_time"].max()
+        elif start_date is not None or end_date is not None:
+            padding = pd.Timedelta(days=2)
+            load_start = (
+                None if start_date is None else pd.Timestamp(start_date) - padding
+            )
+            load_end = None if end_date is None else pd.Timestamp(end_date) + padding
+        frame = _load_sample_family(
+            loader,
+            family,
+            user,
+            load_start,
+            load_end,
+            loader_kwargs,
         )
-    both_dates_valid = False
-    if (not (start_date is None)) and (not (end_date is None)):
-        # Let's set up a dataframe in which we will store all the data
-        date_periods = pd.date_range(start_date, end_date, freq="D")
-        multi_index = pd.MultiIndex.from_product(
-            [user_id, date_periods],
-            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
+        frame = frame[frame[time_col].notna()].sort_values(time_col, kind="stable")
+        cadence = time_utils.infer_cadence(
+            frame[time_col], min_gaps=3, min_cluster_fraction=0.5
         )
-        rest_pulse_ox_stat_df = pd.DataFrame(index=multi_index, columns=metrics)
-        both_dates_valid = True
-    else:
-        # Set up a standard df and we will populate it later with indexes
-        rest_pulse_ox_stat_df = pd.DataFrame()
-    for user in user_id:
-        if not (both_dates_valid):
-            user_rest_pulse_ox_stat_df = pd.DataFrame()
-        rest_pulse_ox = loader.load_sleep_pulse_ox(
-            user_id=user,
-            start_date=ext_start_date,
-            end_date=ext_end_date,
-            **loader_kwargs,
-        )
-        if len(rest_pulse_ox) > 0:
-            # Get only data with calendar date between start and end date and reset index
-            if not (start_date is None):
-                rest_pulse_ox = rest_pulse_ox[
-                    rest_pulse_ox[constants.CALENDAR_DATE_COL] >= start_date
-                ].reset_index(drop=True)
-            if not (end_date is None):
-                rest_pulse_ox = rest_pulse_ox[
-                    rest_pulse_ox[constants.CALENDAR_DATE_COL] < end_date
-                ].reset_index(drop=True)
-            for metric in metrics:
-                # Get series with metrics by calendarDate
-                ser = _REST_PULSE_OX_STATISTICS_DICT[metric](
-                    rest_pulse_ox=rest_pulse_ox
-                )
-                if both_dates_valid:
-                    rest_pulse_ox_stat_df.loc[(user, ser.index), metric] = ser.values
-                else:
-                    if len(ser) > 0:
-                        min_date = ser.index.min() if start_date is None else start_date
-                        max_date = ser.index.max() if end_date is None else end_date
-                        user_date_range = pd.date_range(min_date, max_date, freq="D")
-                        ser = ser.reindex(user_date_range)
-                        # We have different dates based on user
-                        ser = ser.set_axis(
-                            pd.MultiIndex.from_product(
-                                [[user], user_date_range],
-                                names=[
-                                    constants.USER_COL,
-                                    constants.CALENDAR_DATE_COL,
-                                ],
-                            )
-                        ).rename(metric)
-                        if len(user_rest_pulse_ox_stat_df) == 0:
-                            # Empty df, first metric
-                            user_rest_pulse_ox_stat_df = ser.to_frame()
-                        else:
-                            user_rest_pulse_ox_stat_df = pd.merge(
-                                user_rest_pulse_ox_stat_df,
-                                ser,
-                                left_index=True,
-                                right_index=True,
-                                how="outer",
-                            )
-            if not both_dates_valid:
-                rest_pulse_ox_stat_df = pd.concat(
-                    (rest_pulse_ox_stat_df, user_rest_pulse_ox_stat_df)
-                )
-    # Perform kind operation by user
-    if not (kind is None):
-        rest_pulse_ox_stat_df = rest_pulse_ox_stat_df.groupby(
-            level=constants.USER_COL
-        ).agg(kind, *kind_args, **kind_kwargs)
-        if return_df:
-            return rest_pulse_ox_stat_df
+
+        if is_cycle:
+            windows = user_intervals
         else:
-            return rest_pulse_ox_stat_df.to_dict(orient="index")
-    # Return based on settings
-    return utils.return_multiindex_df(
-        rest_pulse_ox_stat_df, return_df, return_multi_index
+            bounds = (
+                (load_start, load_end)
+                if user_intervals is not None
+                else hierarchy.observed_bounds(
+                    frame, time_col, start_date, end_date, resolution
+                )
+            )
+            if bounds is None:
+                continue
+            start, end = bounds
+            frame = frame[frame[time_col].ge(start) & frame[time_col].lt(end)]
+            windows = hierarchy.windows_for_resolution(
+                [user], resolution, {user: bounds}
+            ).xs(user)
+
+        timestamps = pd.DatetimeIndex(frame[time_col])
+        records = []
+        for label, window in windows.iterrows():
+            valid_interval = bool(window.get("interval_valid", True))
+            values = {name: np.nan for name in statistics}
+            coverage = np.nan
+            rows = frame.iloc[0:0]
+            if valid_interval:
+                left = timestamps.searchsorted(window["start_time"], side="left")
+                right = timestamps.searchsorted(window["end_time"], side="left")
+                rows = frame.iloc[left:right]
+                coverage = time_utils.sample_coverage(
+                    rows[time_col].nunique(),
+                    window["start_time"],
+                    window["end_time"],
+                    cadence,
+                )
+                accepted = min_coverage is None or (
+                    pd.notna(coverage) and coverage >= min_coverage
+                )
+                if accepted:
+                    values = _summarize_samples(
+                        rows,
+                        family,
+                        statistics,
+                        time_col,
+                        window["end_time"],
+                        cadence,
+                        spo2_threshold,
+                    )
+                elif pd.isna(coverage):
+                    unresolved_coverage.add((user, family))
+            records.append(
+                {
+                    schema.USER_COL: user,
+                    "window_start": label,
+                    "period_start": window["start_time"],
+                    "period_end": window["end_time"],
+                    **(
+                        hierarchy.fixed_window_time_metadata(rows, label, time_col)
+                        if hierarchy.fixed_duration(resolution) is not None
+                        else {}
+                    ),
+                    **values,
+                    **(
+                        {f"{name}__coverage": coverage for name in statistics}
+                        if return_coverage
+                        else {}
+                    ),
+                }
+            )
+        if records:
+            frames.append(
+                pd.DataFrame(records).set_index([schema.USER_COL, "window_start"])
+            )
+    return (
+        pd.concat(frames).sort_index()
+        if frames
+        else hierarchy.empty_trajectory(statistics, return_coverage)
     )
 
 
-def get_mean_rest_breaths_per_minute(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, None] = None,
-    remove_zero: bool = False,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """Get mean rest breaths per minute.
+def _summary_values(row, family, statistics):
+    """Read available features from one canonical provider-summary row.
 
-    Parameters
-    ----------
-        loader: :class:`pywearable.loader.base.BaseLoader`
-            Instance of `LabfrontLoader`.
-        user_id: :class:`str` or :class:`list`, optional
-            ID of the user for which breaths per minute must be computed, by default "all".
-        start_date: :class:`datetime.datetime`, optional
-            Start date from which breaths per minute must be computed, by default None.
-        end_date: :class:`datetime.datetime`, optional
-            End date to which breaths per minute must be computed, by default to None.
-        average: :class:`bool`, optional
-            Whether to average the breaths per minute over the time-range, by default false.
-            If set to `True`, then the breaths per minute are averaged across the time-range,
-            thus returning a dictionary with the average breaths per minute and the valid days
-            over which the average was computed. If set to `False`, the dictionary contains
-            the breaths per minute value for each day.
-        remove_zero: :class:`bool`, optional
-            Whether to remove data with breathsPerMinute equal to 0 from the data, by default False.
-        return_days: :class:`bool`, optional
-            Whether to return the days over which the average value was computed, by default False.
-
-    Returns
-    -------
-    :class:`dict`
-        Dictionary with user id as primary key, calendar days as secondary keys, and breaths per minute as value.
+    Return a name-to-value mapping; statistics absent at this native grain
+    remain missing rather than being reconstructed from summary means.
     """
-    return get_breaths_per_minute_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_MEAN_REST_BREATHS_PER_MINUTE,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        remove_zero=remove_zero,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
+    result = {name: np.nan for name in statistics}
+    if family == "respiratory_rate":
+        mapping = {
+            RESPIRATORY_RATE_STATISTIC_MEAN: schema.RESPIRATORY_RATE_MEAN_COL,
+            RESPIRATORY_RATE_STATISTIC_STD: schema.RESPIRATORY_RATE_STD_COL,
+        }
+    else:
+        mapping = {SPO2_STATISTIC_MEAN: schema.SPO2_MEAN_COL}
+    for statistic, column in mapping.items():
+        if statistic in result:
+            result[statistic] = row.get(column, np.nan)
+    return result
 
 
-def get_mean_awake_breaths_per_minute(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, None] = None,
-    remove_zero: bool = False,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
+def _summary_family_trajectory(
+    loader,
+    users,
+    family,
+    statistics,
+    start_date,
+    end_date,
+    loader_kwargs,
+    min_coverage,
+    return_coverage,
+    unresolved_coverage,
 ):
-    """Get average waking breaths per minute across time-range.
+    """Build one family's native-night trajectory from provider summaries.
 
-    Parameters
-    ----------
-        loader: :class:`pylabfront.loader.Loader`
-            Instance of `LabfrontLoader`.
-        user_id :class:`str` or :class:`list`, optional
-            ID of the user for which breaths per minute must be computed, by default "all".
-        start_date: :class:`datetime.datetime`, optional
-            Start date from which breaths per minute must be computed, by default None.
-        end_date :class:`datetime.datetime`, optional
-            End date to which breaths per minute must be computed, by default None.
-        average: :class:`bool`, optional
-            Whether to average the breaths per minute over the time-range, by default false.
-            If set to `True`, then the breaths per minute are averaged across the time-range,
-            thus returning a dictionary with the average breaths per minute and the valid days
-            over which the average was computed. If set to `False`, the dictionary contains
-            the breaths per minute value for each day.
-        remove_zero: :class:`bool`, optional
-            Whether to remove data with breathsPerMinute equal to 0 from the data, by default False.
-        return_days: :class:`bool`, optional
-            Whether to return the days over which the average value was computed, by default False.
-
-    Returns:
-        :class:`dict`
-        Dictionary with participant id as primary key, calendar days as secondary keys, and average breaths per minute as value.
+    ``start_date``/``end_date`` filter night labels, not artificial sample
+    windows. Return a ``(user_id, window_start)`` DataFrame with period bounds,
+    requested values, and optional provider-reported coverage.
     """
-    return get_breaths_per_minute_statistic(
-        loader=loader,
-        metric=_RESPIRATION_METRIC_MEAN_AWAKE_BREATHS_PER_MINUTE,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        remove_zero=remove_zero,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def _compute_mean_rest_breaths_per_minute(
-    awake_breaths_per_minute, rest_breaths_per_minute
-):
-    return _compute_breaths_per_minute_statistic(rest_breaths_per_minute, agg="mean")
-
-
-def _compute_mean_awake_breaths_per_minute(
-    awake_breths_per_minute, rest_breaths_per_minute
-):
-    return _compute_breaths_per_minute_statistic(awake_breths_per_minute, agg="mean")
-
-
-def _compute_breaths_per_minute_statistic(
-    breaths_per_minute: pd.DataFrame,
-    agg,
-    *agg_args,
-    **agg_kwargs,
-) -> pd.Series:
-    if type(breaths_per_minute) != pd.DataFrame:
-        raise ValueError(
-            f"breaths_per_minute must be of type pd.DataFrame and not {type(breaths_per_minute)}"
-        )
-    if constants.CALENDAR_DATE_COL not in breaths_per_minute.columns:
-        return pd.Series()
-    if constants.RESPIRATION_BREATHS_PER_MINUTE_COL not in breaths_per_minute.columns:
-        return pd.Series()
-    agg_series = breaths_per_minute.groupby(constants.CALENDAR_DATE_COL)[
-        constants.RESPIRATION_BREATHS_PER_MINUTE_COL
-    ].agg(agg, *agg_args, **agg_kwargs)
-    return agg_series
-
-
-_BREATHS_PER_MINUTE_STATISTICS_DICT = {
-    _RESPIRATION_METRIC_MEAN_REST_BREATHS_PER_MINUTE: _compute_mean_rest_breaths_per_minute,
-    _RESPIRATION_METRIC_MEAN_AWAKE_BREATHS_PER_MINUTE: _compute_mean_awake_breaths_per_minute,
-}
-
-
-def get_breaths_per_minute_statistic(
-    loader: loader.BaseLoader,
-    metric: str,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    remove_zero: bool = False,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    return get_breaths_per_minute_statistics(
-        loader=loader,
-        metrics=metric,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        remove_zero=remove_zero,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=return_df,
-        return_multi_index=return_multi_index,
-    )
-
-
-def get_breaths_per_minute_statistics(
-    loader: loader.BaseLoader,
-    metrics: Union[str, list] = None,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    remove_zero: bool = False,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    # Get user id from the loader
-    user_id = utils.get_user_ids(loader, user_id)
-    # Convert to datetime
-    start_date = utils.check_date(start_date)
-    end_date = utils.check_date(end_date)
-    # Extend range to account for sleep start in prev day and ending next day
-    if not (start_date is None):
-        ext_start_date = start_date - datetime.timedelta(days=1)
-    else:
-        ext_start_date = None
-    if not (end_date is None):
-        ext_end_date = end_date + datetime.timedelta(days=1)
-    else:
-        ext_end_date = None
-    # Check metrics
-    if metrics is None:
-        # Consider all metrics
-        metrics = list(_BREATHS_PER_MINUTE_STATISTICS_DICT.keys())
-    if type(metrics) == str:
-        metrics = [metrics]
-
-    # Check args and kwargs
-    if type(kind_args) != list:
-        raise ValueError(f"kind_args must be an iterable, not {type(kind_args)}")
-    if type(kind_kwargs) != dict:
-        raise ValueError(f"kind_kwargs must be of type dict, not {type(kind_kwargs)}")
-    if type(loader_kwargs) != dict:
-        raise ValueError(
-            f"loader_kwargs must be of type dict, not {type(loader_kwargs)}"
-        )
-    both_dates_valid = False
-    if (not (start_date is None)) and (not (end_date is None)):
-        # Let's set up a dataframe in which we will store all the data
-        date_periods = pd.date_range(start_date, end_date, freq="D")
-        multi_index = pd.MultiIndex.from_product(
-            [user_id, date_periods], names=["user", constants.CALENDAR_DATE_COL]
-        )
-        breaths_per_minute_stats_df = pd.DataFrame(index=multi_index, columns=metrics)
-        both_dates_valid = True
-    else:
-        breaths_per_minute_stats_df = pd.DataFrame()
-    for user in user_id:
-        if not (both_dates_valid):
-            user_breaths_per_minute_stats_df = pd.DataFrame()
-        breaths_per_minute = loader.load_respiration(
+    frames = []
+    method = getattr(loader, _FAMILY_CONFIG[family]["summary_loader"])
+    start_date = schema.normalize_time_bound(start_date, schema.LOCAL_TIME_COL)
+    end_date = schema.normalize_time_bound(end_date, schema.LOCAL_TIME_COL)
+    start_date = None if start_date is None else start_date.normalize()
+    end_date = None if end_date is None else end_date.normalize()
+    if start_date is not None and end_date is not None and end_date <= start_date:
+        raise ValueError("end_date must be after start_date")
+    for user in users:
+        summary = method(
             user_id=user,
             start_date=start_date,
             end_date=end_date,
             **loader_kwargs,
         )
-        # Load daily respiration
-        if len(breaths_per_minute) > 0:
-            # Get only data when no sleeping is occurring
-            breaths_per_minute = breaths_per_minute[
-                breaths_per_minute[constants.IS_SLEEPING_COL] == False
-            ].reset_index(drop=True)
-            # Add calendar Date information
-            breaths_per_minute[constants.CALENDAR_DATE_COL] = breaths_per_minute[
-                constants.ISODATE_COL
-            ].dt.normalize()
-            if remove_zero:
-                breaths_per_minute = breaths_per_minute[
-                    breaths_per_minute[constants.RESPIRATION_BREATHS_PER_MINUTE_COL] > 0
-                ].reset_index(drop=True)
-        # Load sleep respiration
-        rest_breaths_per_minute = loader.load_sleep_respiration(
-            user_id=user,
-            start_date=ext_start_date,
-            end_date=ext_end_date,
-            **loader_kwargs,
+        summary = (
+            schema.prepare_respiration_summary(summary)
+            if family == "respiratory_rate"
+            else schema.prepare_spo2_summary(summary)
         )
-        if len(rest_breaths_per_minute) > 0:
-            # Get only data with calendar date between start and end date and reset index
-            if not (start_date is None):
-                rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[constants.CALENDAR_DATE_COL] >= start_date
-                ].reset_index(drop=True)
-            if not (end_date is None):
-                rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[constants.CALENDAR_DATE_COL] < end_date
-                ].reset_index(drop=True)
-            if remove_zero:
-                rest_breaths_per_minute = rest_breaths_per_minute[
-                    rest_breaths_per_minute[
-                        constants.RESPIRATION_BREATHS_PER_MINUTE_COL
-                    ]
-                    > 0
-                ].reset_index(drop=True)
-        for metric in metrics:
-            # Get series with metrics by calendarDate
-            ser = _BREATHS_PER_MINUTE_STATISTICS_DICT[metric](
-                breaths_per_minute, rest_breaths_per_minute
+        if start_date is not None:
+            summary = summary[
+                summary[schema.CALENDAR_DATE_COL]
+                >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            summary = summary[
+                summary[schema.CALENDAR_DATE_COL]
+                < pd.Timestamp(end_date).normalize()
+            ]
+        lower = (
+            start_date if start_date is not None
+            else summary[schema.CALENDAR_DATE_COL].min()
+        )
+        upper = (
+            end_date if end_date is not None
+            else summary[schema.CALENDAR_DATE_COL].max() + pd.Timedelta(days=1)
+        )
+        if pd.isna(lower) or pd.isna(upper):
+            continue
+        expected = pd.date_range(lower, upper, freq="D", inclusive="left")
+        summary = summary.set_index(schema.CALENDAR_DATE_COL)
+        missing = ~expected.isin(summary.index)
+        summary = summary.reindex(expected)
+        summary.loc[missing, f"{family}_coverage"] = 0.0
+        summary = summary.rename_axis(schema.CALENDAR_DATE_COL).reset_index()
+        records = []
+        for row in summary.to_dict(orient="records"):
+            label = pd.Timestamp(row[schema.CALENDAR_DATE_COL]).normalize()
+            period_start = row.get(schema.LOCAL_TIME_COL)
+            period_end = row.get(schema.LOCAL_END_TIME_COL)
+            period_start = (
+                label if pd.isna(period_start) else pd.Timestamp(period_start)
             )
-            if both_dates_valid:
-                breaths_per_minute_stats_df.loc[(user, ser.index), metric] = ser.values
-            else:
-                if len(ser) > 0:
-                    min_date = ser.index.min() if start_date is None else start_date
-                    max_date = ser.index.max() if end_date is None else end_date
-                    user_date_range = pd.date_range(min_date, max_date, freq="D")
-                    ser = ser.reindex(user_date_range)
-                    # We have different dates based on user
-                    ser = ser.set_axis(
-                        pd.MultiIndex.from_product(
-                            [[user], user_date_range],
-                            names=[constants.USER_COL, constants.CALENDAR_DATE_COL],
-                        )
-                    ).rename(metric)
-                    if len(user_breaths_per_minute_stats_df) == 0:
-                        # Empty df, first metric
-                        user_breaths_per_minute_stats_df = ser.to_frame()
-                    else:
-                        user_breaths_per_minute_stats_df = pd.merge(
-                            user_breaths_per_minute_stats_df,
-                            ser,
-                            left_index=True,
-                            right_index=True,
-                            how="outer",
-                        )
-        if not both_dates_valid:
-            breaths_per_minute_stats_df = pd.concat(
-                (breaths_per_minute_stats_df, user_breaths_per_minute_stats_df)
+            period_end = (
+                label + pd.Timedelta(days=1)
+                if pd.isna(period_end)
+                else pd.Timestamp(period_end)
             )
-    # Perform kind operation by user
-    if not (kind is None):
-        breaths_per_minute_stats_df = breaths_per_minute_stats_df.groupby(
-            level="user"
-        ).agg(kind, *kind_args, **kind_kwargs)
-        if return_df:
-            return breaths_per_minute_stats_df
-        else:
-            return breaths_per_minute_stats_df.to_dict(orient="index")
-    return utils.return_multiindex_df(
-        breaths_per_minute_stats_df, return_df, return_multi_index
+            coverage = row.get(f"{family}_coverage", np.nan)
+            accepted = min_coverage is None or (
+                pd.notna(coverage) and coverage >= min_coverage
+            )
+            values = (
+                _summary_values(row, family, statistics)
+                if accepted
+                else {name: np.nan for name in statistics}
+            )
+            if min_coverage is not None and pd.isna(coverage):
+                unresolved_coverage.add((user, family))
+            records.append(
+                {
+                    schema.USER_COL: user,
+                    "window_start": label,
+                    "period_start": period_start,
+                    "period_end": period_end,
+                    **values,
+                    **(
+                        {f"{name}__coverage": coverage for name in statistics}
+                        if return_coverage
+                        else {}
+                    ),
+                }
+            )
+        if records:
+            frames.append(
+                pd.DataFrame(records).set_index([schema.USER_COL, "window_start"])
+            )
+    return (
+        pd.concat(frames).sort_index()
+        if frames
+        else hierarchy.empty_trajectory(statistics, return_coverage)
     )
 
 
 def get_respiration_statistics(
-    loader: loader.BaseLoader,
-    user_id: Union[str, list] = "all",
-    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-    kind=None,
-    kind_args: list = [],
-    kind_kwargs: dict = {},
-    loader_kwargs: dict = {},
-    return_df: bool = True,
-    return_multi_index: bool = True,
-):
-    """_summary_
-
-    _extended_summary_
+    loader: BaseLoader,
+    statistic: Union[str, list, tuple, None] = None,
+    user_id: Union[str, list, None] = "all",
+    start_date=None,
+    end_date=None,
+    resolution: Union[str, pd.Timedelta, list, tuple] = cycle.CYCLE_NIGHT,
+    loader_kwargs: dict | None = None,
+    time_reference: str = "auto",
+    aggregation=None,
+    min_coverage=None,
+    cycle_kwargs: dict | None = None,
+    min_valid_children=None,
+    spo2_threshold: float = 90.0,
+) -> pd.DataFrame:
+    """Extract respiratory-rate and SpO2 features at the requested resolution.
 
     Parameters
     ----------
-    loader : loader.BaseLoader
-        _description_
-    user_id : Union[str, list], optional
-        _description_, by default "all"
-    start_date : Union[datetime.datetime, datetime.date, str, None], optional
-        _description_, by default None
-    end_date : Union[datetime.datetime, datetime.date, str, None], optional
-        _description_, by default None
-    kind : _type_, optional
-        _description_, by default None
-    kind_args : list, optional
-        _description_, by default []
-    kind_kwargs : dict, optional
-        _description_, by default {}
-    loader_kwargs : dict, optional
-        _description_, by default {}
-    return_df : bool, optional
-        _description_, by default True
-    return_multi_index : bool, optional
-        _description_, by default True
+    loader : BaseLoader
+        Supplies canonical samples or provider-native nightly summaries.
+    statistic : str, sequence of str, or None
+        Feature name(s); ``None`` selects all core metrics. Percentiles such as
+        ``spo2_p20`` and ``respiratory_rate_p75`` are also accepted.
+    user_id : str, sequence of str, or None
+        Participant(s); ``"all"`` or ``None`` selects every loader user.
+    start_date, end_date : date-like or None
+        Half-open time or night-label range, ``[start_date, end_date)``.
+    resolution : str, pandas.Timedelta, or sequence
+        Primary window or ascending hierarchy, for example ``"5min"`` or
+        ``["5min", "cycle_night"]``. Provider summaries support only their
+        native ``"cycle_night"`` grain and larger calendar periods.
+    loader_kwargs, cycle_kwargs : dict or None
+        Extra keyword arguments passed to the corresponding loader or cycle
+        interval function.
+    time_reference : {"auto", "local", "utc"}
+        Clock for raw samples; ``"auto"`` uses local time for calendar/cycle
+        windows and UTC for fixed windows when available. Provider summaries
+        are date-labelled and do not support UTC selection.
+    aggregation : str, sequence, or None
+        Operation(s) at each parent level; requires a hierarchy. ``None``
+        uses the shared standard aggregations.
+    min_coverage : float, sequence, or None
+        Minimum valid fraction at each level. Raw primary coverage estimates
+        observed versus expected samples; provider coverage is used only when
+        supplied. Unknown primary coverage fails an explicit threshold.
+    min_valid_children : int, sequence, or None
+        Minimum valid child windows at each parent level.
+    spo2_threshold : float
+        SpO2 percentage threshold for below-threshold fraction and duration;
+        the comparison is strictly below this value.
 
     Returns
     -------
-    _type_
-        _description_
+    pandas.DataFrame
+        Indexed by ``(user_id, utc_time/local_time/calendar_date)`` with one
+        ``__coverage`` column per requested feature. Hierarchical column names
+        include each resolution and aggregation. Unsupported provider-summary
+        features are missing, never inferred from summary means.
+        Below-threshold duration is in seconds. Fixed-duration output also
+        contains the alternate clock and the ``timezone`` UTC offset.
     """
-    rest_pulse_ox_statistics = get_rest_pulse_ox_statistics(
-        loader=loader,
-        metrics=None,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=True,
-        return_multi_index=True,
+    statistics = _statistics_list(statistic)
+    users = loader.resolve_user_ids(user_id)
+    loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
+    cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
+    if not 0 <= spo2_threshold <= 100:
+        raise ValueError("spo2_threshold must be between 0 and 100")
+
+    chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
+    chain = [cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain]
+    families = [
+        family for family in _FAMILY_CONFIG if hierarchy.family_statistics(statistics, family)
+    ]
+    sources = {
+        getattr(loader, _FAMILY_CONFIG[family]["source_attr"], "samples")
+        for family in families
+    }
+    if not sources.issubset({"samples", "provider_summary"}):
+        raise ValueError(
+            "respiratory_rate_source and spo2_source must be 'samples' or "
+            "'provider_summary'"
+        )
+    if len(sources) > 1:
+        raise ValueError(
+            "sample and provider-summary families must be requested separately"
+        )
+    source = next(iter(sources), "samples")
+
+    direct_summary = False
+    if source == "provider_summary":
+        if time_reference == "utc":
+            raise ValueError("provider respiration summaries use local calendar labels")
+        primary = chain[0]
+        if primary == cycle.CYCLE_NIGHT:
+            direct_summary = not hierarchical
+        elif not hierarchical and primary in {"weekly", "monthly", "yearly"}:
+            chain = [cycle.CYCLE_NIGHT, primary]
+            hierarchical = True
+        else:
+            raise ValueError(
+                "provider respiration summaries are available only at their "
+                "native nightly grain or larger calendar resolutions"
+            )
+
+    if not hierarchical and aggregation is not None:
+        raise ValueError("aggregation requires a resolution hierarchy")
+    if not hierarchical and min_valid_children is not None:
+        raise ValueError("min_valid_children requires a resolution hierarchy")
+    hierarchy.normalize_resolution_chain(chain)
+    aggregation_levels = hierarchy.normalize_aggregation_levels(
+        aggregation, len(chain) - 1
     )
-    breaths_per_minute_statistics = get_breaths_per_minute_statistics(
-        loader=loader,
-        metrics=None,
-        user_id=user_id,
-        start_date=start_date,
-        end_date=end_date,
-        kind=kind,
-        kind_args=kind_args,
-        kind_kwargs=kind_kwargs,
-        loader_kwargs=loader_kwargs,
-        return_df=True,
-        return_multi_index=True,
+    coverage_thresholds = hierarchy.normalize_coverage_thresholds(
+        min_coverage, len(chain)
     )
-    respiration_statistics_df = pd.merge(
-        left=rest_pulse_ox_statistics,
-        right=breaths_per_minute_statistics,
-        right_index=True,
-        left_index=True,
-        how="outer",
+    child_thresholds = hierarchy.normalize_valid_child_thresholds(
+        min_valid_children, len(chain)
     )
-    if (not (kind is None)) and (not (return_df)):
-        return respiration_statistics_df.to_dict(orient="index")
-    return utils.return_multiindex_df(
-        respiration_statistics_df, return_df, return_multi_index
+    hierarchy.warn_if_wide(statistics, aggregation_levels)
+
+    cycle_target = next((value for value in chain if value in cycle.CYCLE_TYPES), None)
+    cycle_intervals = (
+        cycle.get_intervals(
+            loader,
+            cycle_type=cycle_target,
+            user_id=users,
+            start_date=start_date,
+            end_date=end_date,
+            **cycle_kwargs,
+        )
+        if source == "samples" and cycle_target is not None
+        else None
     )
+
+    unresolved_coverage = set()
+    fixed_time_col = (
+        _resolve_time_col(loader, families[0], time_reference, chain)
+        if source == "samples" and families
+        else None
+    )
+    family_frames = []
+    for family in families:
+        requested = hierarchy.family_statistics(statistics, family)
+        if source == "provider_summary":
+            frame = _summary_family_trajectory(
+                loader,
+                users,
+                family,
+                requested,
+                start_date,
+                end_date,
+                loader_kwargs,
+                coverage_thresholds[0],
+                True,
+                unresolved_coverage,
+            )
+        else:
+            frame = _sample_family_trajectory(
+                loader,
+                users,
+                family,
+                requested,
+                chain,
+                start_date,
+                end_date,
+                time_reference,
+                loader_kwargs,
+                coverage_thresholds[0],
+                True,
+                cycle_intervals,
+                spo2_threshold,
+                unresolved_coverage,
+            )
+        family_frames.append(frame)
+    trajectory = hierarchy.combine_trajectories(
+        family_frames, statistics, include_coverage=True
+    )
+
+    if coverage_thresholds[0] is not None and unresolved_coverage:
+        warnings.warn(
+            "Primary respiration coverage could not be determined for "
+            f"{len(unresolved_coverage)} user/signal stream(s); features requiring "
+            "a primary coverage threshold were excluded.",
+            UserWarning,
+            stacklevel=2,
+        )
+
+    if hierarchical:
+        trajectory = trajectory.rename(
+            columns={name: f"{name}__{chain[0]}" for name in statistics}
+        )
+        for level, target in enumerate(chain[1:]):
+            parent, membership = hierarchy.parent_windows_from_trajectory(
+                loader,
+                users,
+                trajectory,
+                target,
+                chain[level],
+                start_date,
+                end_date,
+                cycle_kwargs,
+                cycle_intervals if target == cycle_target else None,
+            )
+            if parent is None:
+                return trajectory.iloc[0:0].rename_axis(
+                    index={"window_start": schema.CALENDAR_DATE_COL}
+                )
+            trajectory, _ = hierarchy.aggregate_level(
+                trajectory,
+                parent,
+                target_resolution=target,
+                aggregation=aggregation_levels[level],
+                membership=membership,
+                min_coverage=coverage_thresholds[level + 1],
+                min_valid_children=child_thresholds[level + 1],
+                time_col=fixed_time_col,
+            )
+        index_name = (
+            schema.CALENDAR_DATE_COL
+            if chain[-1] in hierarchy.CALENDAR_RESOLUTIONS
+            or chain[-1] in cycle.CYCLE_TYPES
+            else _resolve_time_col(loader, families[0], time_reference, chain)
+        )
+        trajectory = trajectory.rename_axis(index={"window_start": index_name})
+        if hierarchy.fixed_duration(chain[-1]) is not None:
+            return hierarchy.format_fixed_time_output(trajectory, index_name)
+        return trajectory
+
+    columns = [
+        column
+        for name in statistics
+        for column in (name, f"{name}__coverage")
+    ]
+    result = trajectory[
+        columns
+        + [
+            column
+            for column in hierarchy.TIME_METADATA_COLUMNS
+            if column in trajectory
+        ]
+    ].copy()
+    index_name = (
+        schema.CALENDAR_DATE_COL
+        if direct_summary
+        or chain[0] in hierarchy.CALENDAR_RESOLUTIONS
+        or chain[0] in cycle.CYCLE_TYPES
+        else _resolve_time_col(loader, families[0], time_reference, chain)
+    )
+    result = result.rename_axis(index={"window_start": index_name})
+    if hierarchy.fixed_duration(chain[0]) is not None:
+        return hierarchy.format_fixed_time_output(result, index_name)
+    return result
+
+
+def get_respiration_statistic(loader: BaseLoader, statistic: str, **kwargs):
+    """Return one named respiratory-rate or SpO2 feature.
+
+    ``loader`` and ``kwargs`` have the same meaning as in
+    :func:`get_respiration_statistics`. A direct single-feature request
+    always includes the feature's coverage column.
+    """
+    return get_respiration_statistics(loader, statistic=statistic, **kwargs)
+
+
+def get_five_minute_respiration_statistics(loader: BaseLoader, **kwargs):
+    """Return raw-sample features in non-overlapping five-minute windows.
+
+    Pass feature, user, date, and coverage options via ``kwargs`` as in
+    :func:`get_respiration_statistics`. Provider-only nightly summaries cannot
+    produce this resolution. Output is a DataFrame by user and time.
+    """
+    return get_respiration_statistics(loader, resolution="5min", **kwargs)
+
+
+def get_night_respiration_statistics(loader: BaseLoader, **kwargs):
+    """Return one feature row per main-sleep night.
+
+    Raw samples are grouped by sleep-cycle intervals; provider summaries are
+    returned at their native night labels. ``kwargs`` are forwarded to
+    :func:`get_respiration_statistics`; output is indexed by user and night.
+    """
+    return get_respiration_statistics(loader, resolution=cycle.CYCLE_NIGHT, **kwargs)
+
+
+def get_awake_respiration_statistics(loader: BaseLoader, **kwargs):
+    """Return one raw-sample feature row per awake cycle.
+
+    Pass feature, user, date, and coverage options via ``kwargs`` as in
+    :func:`get_respiration_statistics`. Provider-only nightly summaries cannot
+    produce awake cycles. Output is indexed by user and cycle date.
+    """
+    return get_respiration_statistics(loader, resolution=cycle.CYCLE_AWAKE, **kwargs)
+
+
+__all__ = [
+    "RESPIRATION_STATISTICS",
+    "RESPIRATORY_RATE_STATISTIC_COUNT",
+    "RESPIRATORY_RATE_STATISTIC_MEAN",
+    "RESPIRATORY_RATE_STATISTIC_MEDIAN",
+    "RESPIRATORY_RATE_STATISTIC_P10",
+    "RESPIRATORY_RATE_STATISTIC_P90",
+    "RESPIRATORY_RATE_STATISTIC_STD",
+    "RESPIRATORY_RATE_STATISTICS",
+    "SPO2_STATISTIC_BELOW_THRESHOLD_DURATION",
+    "SPO2_STATISTIC_BELOW_THRESHOLD_FRACTION",
+    "SPO2_STATISTIC_COUNT",
+    "SPO2_STATISTIC_MEAN",
+    "SPO2_STATISTIC_MEDIAN",
+    "SPO2_STATISTIC_MIN",
+    "SPO2_STATISTIC_P10",
+    "SPO2_STATISTIC_STD",
+    "SPO2_STATISTICS",
+    "get_awake_respiration_statistics",
+    "get_five_minute_respiration_statistics",
+    "get_respiration_statistic",
+    "get_respiration_statistics",
+    "get_night_respiration_statistics",
+]

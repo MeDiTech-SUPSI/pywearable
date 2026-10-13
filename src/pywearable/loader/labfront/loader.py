@@ -6,6 +6,7 @@ This module contains all the functions related to the loading of data from Labfr
 import datetime
 import os
 import re
+import warnings
 from pathlib import Path
 from typing import Tuple, Union
 
@@ -13,30 +14,37 @@ import dateutil.parser
 import numpy as np
 import pandas as pd
 
-from ... import constants, sleep, utils
+from ... import schema
 from ..base import BaseLoader
+from ..garmin import (
+    _normalize_garmin_sleep_columns,
+    prepare_epoch_activity_samples,
+)
 from . import constants as lf_constants
 
-# TODO some Labfront folders have midnigt in end-date, other in start-date...
-
 _LABFRONT_METRICS_DICT = {
-    constants.METRIC_HEART_RATE: {
+    lf_constants.METRIC_HEART_RATE: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_HEART_RATE_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
     },
-    constants.METRIC_STRESS: {
+    lf_constants.METRIC_STRESS: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_STRESS_FOLDER,
-        lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_HEART_RATE_FOLDER,
+        lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_STRESS_FOLDER,
     },
-    constants.METRIC_PULSE_OX: {
+    lf_constants.METRIC_PULSE_OX: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
     },
-    constants.METRIC_RESPIRATION: {
+    lf_constants.METRIC_RESPIRATION: {
         lf_constants.DATA_SOURCE_GARMIN_HEALTH_API: lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
         lf_constants.DATA_SOURCE_GARMIN_SDK: lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
     },
 }
+
+# Temporary internal key used to keep export snapshots separate while their
+# rows are reconciled. Public loader output never retains this column.
+_LABFRONT_SOURCE_FILE_COL = "__labfront_source_file"
+_SLEEP_STAGE_CONFLICT_POLICIES = ("drop_night", "raise", "last")
 
 LABFRONT_FILE_INDEX_NAME = ".pywearable_file_index.csv"
 
@@ -49,13 +57,61 @@ class LabfrontLoader(BaseLoader):
 
     Parameters
     ----------
-        data_path: str or Path
-            Path to folder containing Labfront data.
+    data_paths : str, pathlib.Path, or list
+        Path or paths to folders containing Labfront data.
+    reindex_files : bool, optional
+        Rebuild the local Labfront file index, by default False.
+    sleep_stage_on_conflict : {"drop_night", "raise", "last"}, optional
+        How to handle repeated sleep-stage snapshots that cannot be resolved
+        against a sleep summary. ``"drop_night"`` keeps the summary but omits
+        the ambiguous stage rows, ``"raise"`` stops loading, and ``"last"``
+        uses the last snapshot in Labfront file-index order. By default
+        ``"drop_night"``.
     """
 
-    def __init__(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
+    hrv_source = "bbi"
+    respiratory_rate_source = "samples"
+    spo2_source = "samples"
+    activity_source = "samples"
+    activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+    activity_primary_resolution = "15min"
+    provider_features = frozenset(
+        {
+            "garmin_stress_level",
+            "garmin_body_battery",
+            "garmin_daily_average_stress",
+            "garmin_daily_max_stress",
+            "garmin_daily_stress_duration_seconds",
+            "garmin_daily_rest_stress_duration_seconds",
+            "garmin_daily_activity_stress_duration_seconds",
+            "garmin_daily_low_stress_duration_seconds",
+            "garmin_daily_medium_stress_duration_seconds",
+            "garmin_daily_high_stress_duration_seconds",
+            "garmin_daily_stress_qualifier",
+        }
+    )
+    provider_feature_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+
+    def __init__(
+        self,
+        data_paths: Union[str, Path, list],
+        reindex_files: bool = False,
+        sleep_stage_on_conflict: str = "drop_night",
+    ):
         """Constructor method"""
+        self.sleep_stage_on_conflict = self._validate_sleep_stage_conflict_policy(
+            sleep_stage_on_conflict
+        )
         self.set_path(data_paths, reindex_files=reindex_files)
+
+    @staticmethod
+    def _validate_sleep_stage_conflict_policy(on_conflict: str) -> str:
+        if on_conflict not in _SLEEP_STAGE_CONFLICT_POLICIES:
+            raise ValueError(
+                "on_conflict must be one of "
+                f"{_SLEEP_STAGE_CONFLICT_POLICIES}, not {on_conflict}"
+            )
+        return on_conflict
 
     def set_path(self, data_paths: Union[str, Path, list], reindex_files: bool = False):
         """Set path to folder containing Labfront data.
@@ -79,10 +135,6 @@ class LabfrontLoader(BaseLoader):
                 f"data_paths must be either Path, str, or list, not {type(data_paths)}"
             )
         self.file_index = self.get_file_index(reindex_files=reindex_files)
-
-        # self.tasks_dict = self.get_available_questionnaires(
-        #    return_dict=True
-        # ) | self.get_available_todos(return_dict=True)
 
     def get_user_id(self, full_id: str) -> str:
         """Extract user ID from full ID.
@@ -223,7 +275,7 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"Could not get full_id from {id}")
 
     def get_available_questionnaires(
-        self, user_id: Union[str, list] = "all", return_dict: bool = False
+        self, user_id: Union[str, list] = "all"
     ) -> list:
         """Get the list of available questionnaires.
 
@@ -231,27 +283,29 @@ class LabfrontLoader(BaseLoader):
         ----------
             user_id: str or list, optional
                 IDs of the users for which to return available questionnaires, by default "all".
-            return_dict: bool, optional
-                Whether to return a dictionary of the name of the questionnaires and their full ids,
-                or simply a sorted list of the available questionnaires, by default False.
-
         Returns
         -------
-            list
-                alphabetically sorted names of the questionnaires for the user(s).
+        list
+            Alphabetically sorted questionnaire names for the selected users.
         """
-        if lf_constants.FILE_INDEX_TASK_NAME_KEY in self.file_index.columns:
-            return (
-                self.file_index.loc[
-                    self.file_index[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY]
-                    == True,
-                    lf_constants.FILE_INDEX_TASK_NAME_KEY,
-                ]
-                .unique()
-                .tolist()
-            )
-        else:
+        required = {
+            lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY,
+            lf_constants.FILE_INDEX_TASK_NAME_KEY,
+        }
+        if not required.issubset(self.file_index.columns):
             return []
+
+        if user_id == "all":
+            participant_ids = self.get_full_ids()
+        else:
+            requested_ids = [user_id] if isinstance(user_id, str) else list(user_id)
+            participant_ids = [self.get_full_id(value) for value in requested_ids]
+        questionnaires = self.file_index.loc[participant_ids, :]
+        questionnaires = questionnaires.loc[
+            questionnaires[lf_constants.FILE_INDEX_IS_QUESTIONNAIRE_KEY].eq(True),
+            lf_constants.FILE_INDEX_TASK_NAME_KEY,
+        ].dropna()
+        return sorted(questionnaires.astype(str).unique().tolist())
 
     def get_available_todos(
         self, user_id: Union[str, list] = "all", return_dict: bool = False
@@ -579,18 +633,18 @@ class LabfrontLoader(BaseLoader):
             )
         except pd.errors.EmptyDataError:
             return pd.NaT, pd.NaT
-        if constants.CALENDAR_DATE_COL in temp_df:
-            column = constants.CALENDAR_DATE_COL
+        if lf_constants.CALENDAR_DATE_COL in temp_df:
+            column = lf_constants.CALENDAR_DATE_COL
             temp_df[column] = pd.to_datetime(
                 temp_df[column], format="%Y-%m-%d"
             ).dt.tz_localize(None)
             first_date = temp_df[column].min()
             last_date = temp_df[column].max()
-        elif constants.ISODATE_COL in temp_df:
-            column = constants.ISODATE_COL
+        elif lf_constants.ISODATE_COL in temp_df:
+            column = lf_constants.ISODATE_COL
             try:
                 temp_df[column] = pd.to_datetime(
-                    temp_df[constants.ISODATE_COL].str[:-6],
+                    temp_df[lf_constants.ISODATE_COL].str[:-6],
                     utc=True,
                 ).dt.tz_localize(None)
             except:
@@ -598,8 +652,8 @@ class LabfrontLoader(BaseLoader):
                 raise
             first_date = temp_df[column].min().normalize()
             last_date = temp_df[column].max().normalize()
-        elif constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
-            column = constants.UNIXTIMESTAMP_IN_MS_COL
+        elif lf_constants.UNIXTIMESTAMP_IN_MS_COL in temp_df:
+            column = lf_constants.UNIXTIMESTAMP_IN_MS_COL
             temp_df[column] = pd.to_datetime(
                 temp_df[column], unit="ms", utc=True
             ).dt.tz_localize(None)
@@ -607,7 +661,7 @@ class LabfrontLoader(BaseLoader):
             last_date = temp_df[column].max() + pd.Timedelta(hours=14)
         else:
             raise ValueError(
-                f"Could not find column {constants.ISODATE_COL} or {constants.CALENDAR_DATE_COL} or {constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
+                f"Could not find column {lf_constants.ISODATE_COL} or {lf_constants.CALENDAR_DATE_COL} or {lf_constants.UNIXTIMESTAMP_IN_MS_COL} in file {path_to_file}"
             )
 
         return first_date, last_date
@@ -655,7 +709,6 @@ class LabfrontLoader(BaseLoader):
             Metric of interest is a todo, by default False
         task_name : str, optional
             Name of the questionnaire or of the todo, by default None
-
         Returns
         -------
         list
@@ -710,10 +763,8 @@ class LabfrontLoader(BaseLoader):
             end_date = participant_files[
                 lf_constants.FILE_INDEX_LAST_TIMESTAMP_KEY
             ].max()
-        # TODO midnight is present in the previous file for some files
-        # We need to floor start_date to the previous day
-        # since Labfront files contain the midnight in the
-        # file belonging to the previous day
+        # Floor to the previous day because some Labfront files store
+        # midnight in the file belonging to the previous day.
         start_date = pd.Timestamp(
             start_date - datetime.timedelta(microseconds=1)
         ).floor("1d")
@@ -779,6 +830,8 @@ class LabfrontLoader(BaseLoader):
         is_todo: bool = False,
         task_name: str = "",
         filter_on_calendar_date: bool = False,
+        include_source_file: bool = False,
+        filter_rows: bool = True,
     ) -> pd.DataFrame:
         """Load data from a given user in a given time frame.
 
@@ -803,6 +856,18 @@ class LabfrontLoader(BaseLoader):
             Metric of interest is a todo, by default False
         task_name : str, optional
             Name of the questionnaire or of the todo, by default None
+        filter_on_calendar_date : bool, optional
+            Filter rows using their calendar-date column rather than their
+            timestamp column, by default False.
+        include_source_file : bool, optional
+            Add the source CSV path as a temporary internal column. Sleep-stage
+            reconciliation uses it to distinguish repeated export snapshots;
+            it is disabled by default and not part of public loader output.
+        filter_rows : bool, optional
+            Apply the requested bounds to individual rows after selecting the
+            overlapping files, by default True. Snapshot reconciliation sets
+            this to False so it can validate complete exports before clipping
+            the selected rows.
 
         Returns
         -------
@@ -855,7 +920,10 @@ class LabfrontLoader(BaseLoader):
         df_list = []
         for f in files:
             try:
-                df_list.append(pd.read_csv(Path(f), skiprows=n_rows_to_skip))
+                file_data = pd.read_csv(Path(f), skiprows=n_rows_to_skip)
+                if include_source_file:
+                    file_data[_LABFRONT_SOURCE_FILE_COL] = str(Path(f))
+                df_list.append(file_data)
             except pd.errors.EmptyDataError:
                 # We may have empty CSV files
                 continue
@@ -866,28 +934,28 @@ class LabfrontLoader(BaseLoader):
 
         # Convert columns to datetime
         cols_to_sort = []
-        if constants.ISODATE_COL in data.columns:
-            data[constants.ISODATE_COL] = pd.to_datetime(
-                data[constants.ISODATE_COL].str[:-6],
+        if lf_constants.ISODATE_COL in data.columns:
+            data[lf_constants.ISODATE_COL] = pd.to_datetime(
+                data[lf_constants.ISODATE_COL].str[:-6],
                 utc=True,
             ).dt.tz_localize(tz=None)
 
-        if constants.CALENDAR_DATE_COL in data.columns:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
+        if lf_constants.CALENDAR_DATE_COL in data.columns:
+            data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[lf_constants.CALENDAR_DATE_COL], format="%Y-%m-%d"
             )
-            cols_to_sort.append(constants.CALENDAR_DATE_COL)
+            cols_to_sort.append(lf_constants.CALENDAR_DATE_COL)
         data = data.sort_values(by=cols_to_sort, ignore_index=True)
         # Get data only from given start and end dates
-        if (start_date is None) and (end_date is None):
+        if not filter_rows or ((start_date is None) and (end_date is None)):
             return data
         elif not (
-            constants.ISODATE_COL in data.columns
-            or constants.CALENDAR_DATE_COL in data.columns
+            lf_constants.ISODATE_COL in data.columns
+            or lf_constants.CALENDAR_DATE_COL in data.columns
         ):
             return data
         else:
-            date_filter_col = constants.ISODATE_COL
+            date_filter_col = lf_constants.ISODATE_COL
             if filter_on_calendar_date:
                 start_date = (
                     None
@@ -897,7 +965,7 @@ class LabfrontLoader(BaseLoader):
                 end_date = (
                     None if (end_date is None) else pd.Timestamp(end_date).normalize()
                 )
-                date_filter_col = constants.CALENDAR_DATE_COL
+                date_filter_col = lf_constants.CALENDAR_DATE_COL
             if (start_date is None) and (not (end_date is None)):
                 return data[(data[date_filter_col] < end_date)].reset_index(drop=True)
             elif (not (start_date is None)) and (end_date is None):
@@ -968,7 +1036,7 @@ class LabfrontLoader(BaseLoader):
         list
             alphabetically sorted names of the metrics for the participant(s).
         """
-        participant_ids = utils.get_user_ids(self, user_id)
+        participant_ids = self.resolve_user_ids(user_id)
         return sorted(
             self.file_index.loc[participant_ids, :]
             .index.get_level_values(lf_constants.FILE_INDEX_METRIC_KEY)
@@ -1068,7 +1136,6 @@ class LabfrontLoader(BaseLoader):
         ValueError
             if questionnaire name does not exist
         """
-        no_user_id = True
         full_task_id = self.get_task_full_id(questionnaire_name)
 
         if (
@@ -1119,7 +1186,7 @@ class LabfrontLoader(BaseLoader):
         # For each row, we need to get the question and all the options
         option_cols = []
         for col in questions_df.columns:
-            regex_match = re.search("option\dName", col)
+            regex_match = re.search(r"option\dName", col)
             if regex_match:
                 option_cols.append(col)
         for idx, row in questions_df.iterrows():
@@ -1128,7 +1195,7 @@ class LabfrontLoader(BaseLoader):
                 "type": row["questionType"],
                 "description": row["questionDescription"],
             }
-            if row["questionType"] == constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
+            if row["questionType"] == lf_constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
                 continue
             question_options = {}
             for col in option_cols:
@@ -1297,77 +1364,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing Garmin Connect pulse ox data.
         """
-        # We need to load both sleep and daily pulse ox
-        daily_data = self.get_data_from_datetime(
+        return self.get_data_from_datetime(
             user_id=user_id,
             metric=lf_constants.GARMIN_CONNECT_DAILY_PULSE_OX_FOLDER,
             start_date=start_date,
             end_date=end_date,
             filter_on_calendar_date=False,
         ).reset_index(drop=True)
-        # Load sleep pulse ox data
-        sleep_data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_CONNECT_SLEEP_PULSE_OX_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        ).reset_index(drop=True)
-
-        if len(sleep_data) > 0:
-            # Set information about sleep
-            # We need to add information about sleep summaries
-            sleep_summary = self.load_sleep_summary(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-                same_day_filter=False,
-            )
-            sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
-            ]
-
-            sleep_data = sleep_data.merge(
-                right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
-                how="left",
-            )
-
-            sleep_data[constants.IS_SLEEPING_COL] = True
-
-            # Merge dataframes
-            # We need to merge the dataframes because the daily_data already contain sleep_data
-            if len(daily_data) > 0:
-                sleep_data = sleep_data.drop(
-                    [
-                        x
-                        for x in sleep_data.columns
-                        if (
-                            not x
-                            in (
-                                [
-                                    constants.ISODATE_COL,
-                                    constants.CALENDAR_DATE_COL,
-                                    constants.IS_SLEEPING_COL,
-                                ]
-                            )
-                        )
-                    ],
-                    axis=1,
-                )
-                merged_data = daily_data.merge(
-                    sleep_data, on=constants.ISODATE_COL, how="left"
-                )
-                merged_data[constants.IS_SLEEPING_COL] = merged_data[
-                    constants.IS_SLEEPING_COL
-                ].fillna(value=False)
-                return merged_data
-            else:
-                return sleep_data
-        else:
-            daily_data[daily_data[constants.IS_SLEEPING_COL]] = False
-            return daily_data
 
     def load_garmin_connect_respiration(
         self,
@@ -1377,11 +1380,8 @@ class LabfrontLoader(BaseLoader):
     ) -> pd.DataFrame:
         """Load Garmin Connect respiratory data.
 
-        This function loads Garmin Connect respiratory data from a given
-        participant and within a specified date and time range. This
-        function loads both daily and sleep respiratory data. The
-        resulting data frame contains an additional column named 'sleep',
-        equal to 1 for respiratory data acquired during sleep.
+        This function loads Garmin Connect respiratory samples from a given
+        participant and within a specified date and time range.
 
         Parameters
         ----------
@@ -1399,87 +1399,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
              Dataframe containing Garmin Connect respiration data.
         """
-        # We need to load both sleep and daily respiration
-        daily_data = self.get_data_from_datetime(
+        return self.get_data_from_datetime(
             user_id=user_id,
             metric=lf_constants.GARMIN_CONNECT_RESPIRATION_FOLDER,
             start_date=start_date,
             end_date=end_date,
             filter_on_calendar_date=False,
         ).reset_index(drop=True)
-
-        # Get sleep data
-        sleep_data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_CONNECT_SLEEP_RESPIRATION_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        ).reset_index(drop=True)
-
-        # Add calendar date from sleep summary
-        sleep_summary = self.load_sleep_summary(
-            user_id, start_date, end_date, same_day_filter=True
-        ).reset_index(drop=True)
-
-        if len(sleep_summary) > 0:
-            sleep_summary = sleep_summary.loc[
-                :,
-                [
-                    constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                    constants.CALENDAR_DATE_COL,
-                ],
-            ]
-
-        if len(sleep_data) > 0:
-            sleep_data = sleep_data[
-                sleep_data[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summary[constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL].unique()
-                )
-            ].reset_index(drop=True)
-            sleep_data = pd.merge(
-                left=sleep_data,
-                right=sleep_summary,
-                on=constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                how="outer",
-            )
-
-            sleep_data.loc[:, constants.IS_SLEEPING_COL] = True
-            sleep_data = sleep_data.drop(
-                [
-                    x
-                    for x in sleep_data.columns
-                    if (
-                        not x
-                        in (
-                            [
-                                constants.ISODATE_COL,
-                                constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL,
-                                constants.CALENDAR_DATE_COL,
-                                constants.IS_SLEEPING_COL,
-                            ]
-                        )
-                    )
-                ],
-                axis=1,
-            )
-            # Merge dataframes
-            # We need to merge the dataframes because the daily_data already contain sleep_data
-            merged_data = daily_data.merge(
-                sleep_data, on=constants.ISODATE_COL, how="left"
-            )
-            merged_data.loc[
-                merged_data[constants.IS_SLEEPING_COL] != True,
-                constants.IS_SLEEPING_COL,
-            ] = False
-            merged_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                merged_data[constants.CALENDAR_DATE_COL]
-            )
-            return merged_data
-        else:
-            daily_data[constants.CALENDAR_DATE_COL] = pd.NaT
-            daily_data[constants.IS_SLEEPING_COL] = False
-            return daily_data
 
     def load_garmin_connect_sleep_pulse_ox(
         self,
@@ -1496,28 +1422,28 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self._load_sleep_summary_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
-                same_day_filter=False,
+                drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
             ]
 
             sleep_data = sleep_data.merge(
                 right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
+                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
                 how="left",
             )
 
-            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
+            sleep_data = sleep_data.drop([lf_constants.SLEEP_SUMMARY_ID_COL], axis=1)
             # Convert calendar date to pd.Timestamp
             # TODO remove since sleep_summary already has Timestamp on calendarDate
-            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                sleep_data[constants.CALENDAR_DATE_COL]
+            sleep_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_data[lf_constants.CALENDAR_DATE_COL]
             )
         return sleep_data
 
@@ -1536,27 +1462,27 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self._load_sleep_summary_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
-                same_day_filter=False,
+                drop_duplicates=False,
             )
             sleep_summary = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.SLEEP_SUMMARY_ID_COL]
+                :, [lf_constants.CALENDAR_DATE_COL, lf_constants.SLEEP_SUMMARY_ID_COL]
             ]
 
             sleep_data = sleep_data.merge(
                 right=sleep_summary,
-                left_on=constants.SLEEP_SUMMARY_ID_COL,
-                right_on=constants.SLEEP_SUMMARY_ID_COL,
+                left_on=lf_constants.SLEEP_SUMMARY_ID_COL,
+                right_on=lf_constants.SLEEP_SUMMARY_ID_COL,
                 how="left",
             )
 
-            sleep_data = sleep_data.drop([constants.SLEEP_SUMMARY_ID_COL], axis=1)
+            sleep_data = sleep_data.drop([lf_constants.SLEEP_SUMMARY_ID_COL], axis=1)
             # Convert calendar date to pd.Timestamp
-            sleep_data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                sleep_data[constants.CALENDAR_DATE_COL]
+            sleep_data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                sleep_data[lf_constants.CALENDAR_DATE_COL]
             )
         return sleep_data
 
@@ -1660,55 +1586,6 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def _load_garmin_device_all_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        data = self.get_data_from_datetime(
-            user_id=user_id,
-            metric=lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
-            start_date=start_date,
-            end_date=end_date,
-            filter_on_calendar_date=False,
-        )
-        if len(data) > 0:
-            # We need to add calendarDate from sleep summaries
-            # TODO probably better not to depend on sleep module here
-            sleep_timestamps = sleep.get_sleep_timestamps(
-                self,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            # Prepare columns for sleep information
-            data[constants.IS_SLEEPING_COL] = False
-            data[constants.CALENDAR_DATE_COL] = pd.NaT
-            if type(sleep_timestamps) == dict:
-                if user_id in sleep_timestamps.keys():
-                    sleep_timestamps = sleep_timestamps[user_id]
-                    if sleep_timestamps is not None:
-                        # We have a dict with user data
-                        for calendar_date in sleep_timestamps.keys():
-                            bedtime = sleep_timestamps[calendar_date][0]
-                            wakeup = sleep_timestamps[calendar_date][1]
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.CALENDAR_DATE_COL,
-                            ] = pd.Timestamp(
-                                calendar_date.year,
-                                calendar_date.month,
-                                calendar_date.day,
-                            )
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.IS_SLEEPING_COL,
-                            ] = True
-        return data
-
     def load_garmin_device_pulse_ox(
         self,
         user_id: str,
@@ -1734,98 +1611,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing pulse ox data.
         """
-        data = self._load_garmin_device_all_pulse_ox(
-            user_id=user_id, start_date=start_date, end_date=end_date
+        return self.get_data_from_datetime(
+            user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_PULSE_OX_FOLDER,
+            start_date=start_date,
+            end_date=end_date,
+            filter_on_calendar_date=False,
         )
-        # Keep isSleeping information and remove other columns
-        if constants.CALENDAR_DATE_COL in data.columns:
-            data = data.drop(constants.CALENDAR_DATE_COL, axis=1)
-        return data
-
-    def load_garmin_device_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device (SDK) sleep pulse ox data.
-
-        This function loads pulse ox data from a given
-        user and within a specified date and time range,
-        and uses information from :func:`load_sleep_summary`
-        to return values only collected during sleep periods.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None.
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None.
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing sleep pulse ox data.
-        """
-        data = self._load_garmin_device_all_pulse_ox(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if constants.IS_SLEEPING_COL in data.columns:
-            data = data[data[constants.IS_SLEEPING_COL] == True]
-            data = data.drop(constants.IS_SLEEPING_COL, axis=1)
-        return data
-
-    def _load_garmin_device_all_respiration(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device respiration data."""
-        data = self.get_data_from_datetime(
-            user_id,
-            lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
-            start_date,
-            end_date,
-        )
-        # We need to add information about sleep
-        if len(data) > 0:
-            # Let's prepare the columns for sleep information
-            data[constants.IS_SLEEPING_COL] = False
-            data[constants.CALENDAR_DATE_COL] = pd.NaT
-            # Let's load sleep timestamps
-            # We need to add calendarDate from sleep summaries
-            sleep_timestamps = sleep.get_sleep_timestamps(
-                self,
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-            if type(sleep_timestamps) == dict:
-                if user_id in sleep_timestamps.keys():
-                    sleep_timestamps = sleep_timestamps[user_id]
-                    # We have a dict with user data
-                    if not (sleep_timestamps is None):
-                        for calendar_date in sleep_timestamps.keys():
-                            bedtime = sleep_timestamps[calendar_date][0]
-                            wakeup = sleep_timestamps[calendar_date][1]
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.CALENDAR_DATE_COL,
-                            ] = pd.Timestamp(
-                                calendar_date.year,
-                                calendar_date.month,
-                                calendar_date.day,
-                            )
-                            data.loc[
-                                (data[constants.ISODATE_COL] >= bedtime)
-                                & (data[constants.ISODATE_COL] <= wakeup),
-                                constants.IS_SLEEPING_COL,
-                            ] = True
-        return data
 
     def load_garmin_device_respiration(
         self,
@@ -1835,7 +1627,7 @@ class LabfrontLoader(BaseLoader):
     ) -> pd.DataFrame:
         """Load Garmin Device respiration data.
 
-        This function loads steps data from a given
+        This function loads respiratory data from a given
         user and within a specified date and time range.
 
         Parameters
@@ -1852,52 +1644,13 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe containing respiration data.
         """
-        data = self._load_garmin_device_all_respiration(
+        return self.get_data_from_datetime(
             user_id=user_id,
+            metric=lf_constants.GARMIN_DEVICE_RESPIRATION_FOLDER,
             start_date=start_date,
             end_date=end_date,
+            filter_on_calendar_date=False,
         )
-        # We need to remove calendarDate
-        if len(data) > 0:
-            if constants.CALENDAR_DATE_COL in data.columns:
-                data = data.drop(constants.CALENDAR_DATE_COL, axis=1)
-        return data
-
-    def load_garmin_device_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.date] = None,
-        end_date: Union[str, datetime.date, datetime.date] = None,
-    ) -> pd.DataFrame:
-        """Load Garmin Device (SDK) sleep respiration data.
-
-        This function loads respiration data from a given
-        user and within a specified date and time range,
-        and uses information from :func:`load_sleep_summary`
-        to return values only collected during sleep periods.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            ID of the user.
-        start_date : str or datetime.date or datetime.date, optional
-            Start date from which data should be retrieved, by default None.
-        end_date : str or datetime.date or datetime.date, optional
-            End date from which data should be retrieved, by default None.
-
-        Returns
-        -------
-        pd.DataFrame
-            Dataframe containing sleep pulse ox data.
-        """
-        data = self._load_garmin_device_all_respiration(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if len(data) > 0:
-            if constants.IS_SLEEPING_COL in data.columns:
-                data = data[data[constants.IS_SLEEPING_COL] == True]
-                data = data.drop(constants.IS_SLEEPING_COL, axis=1)
-        return data
 
     def load_garmin_device_step(
         self,
@@ -1996,7 +1749,21 @@ class LabfrontLoader(BaseLoader):
             start_date,
             end_date,
         )
-        return data
+        if data.empty:
+            return schema.empty_bbi_frame(["source", "timezone_name"])
+        data = data.copy()
+        data[schema.LOCAL_TIME_COL] = pd.to_datetime(data[lf_constants.ISODATE_COL])
+        data[schema.UTC_TIME_COL] = pd.to_datetime(
+            data[lf_constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+        ).dt.tz_localize(None)
+        if "timezone" in data.columns:
+            data = data.rename(columns={"timezone": "timezone_name"})
+        data[schema.TIMEZONE_COL] = (
+            data[schema.LOCAL_TIME_COL] - data[schema.UTC_TIME_COL]
+        )
+        data[schema.BBI_COL] = pd.to_numeric(data[schema.BBI_COL], errors="coerce")
+        data["source"] = "garmin_device_bbi"
+        return schema.prepare_bbi(data)
 
     def load_daily_summary(
         self,
@@ -2094,193 +1861,30 @@ class LabfrontLoader(BaseLoader):
 
         df = self.load_garmin_connect_epoch(user_id, start_date, end_date)
         steps_df = (
-            df.groupby(constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
+            df.groupby(lf_constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
             .sum()
             .reset_index()
         )
         # add back the most frequent timezone offset
-        steps_df[constants.TIMEZONEOFFSET_IN_MS_COL] = (
-            df.groupby(constants.ISODATE_COL)[constants.TIMEZONEOFFSET_IN_MS_COL]
+        steps_df[lf_constants.TIMEZONEOFFSET_IN_MS_COL] = (
+            df.groupby(lf_constants.ISODATE_COL)[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
             .mean()
-            .reset_index()[constants.TIMEZONEOFFSET_IN_MS_COL]
+            .reset_index()[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
         )
         # add the unix timestamp column
-        steps_df[constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
-            constants.ISODATE_COL
+        steps_df[lf_constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
+            lf_constants.ISODATE_COL
         ].apply(lambda x: int(x.timestamp() * 1000))
         # add sampling frequency column durationInMs
-        steps_df[constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
+        steps_df[lf_constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
         # add a column for calendar date
-        steps_df[constants.CALENDAR_DATE_COL] = steps_df[constants.ISODATE_COL].dt.date
+        steps_df[lf_constants.CALENDAR_DATE_COL] = steps_df[lf_constants.ISODATE_COL].dt.date
         # add a column for cumulative steps at a daily level
         steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(
-            constants.CALENDAR_DATE_COL
+            lf_constants.CALENDAR_DATE_COL
         )[lf_constants.ACTIVITY_STEPS_COL].cumsum()
 
         return steps_df
-
-    def load_hypnogram(
-        self,
-        user_id: str,
-        start_date: Union[str, datetime.date, datetime.datetime],
-        end_date: Union[str, datetime.date, datetime.datetime, None],
-        resolution: float = 1,
-        map_hypnogram: bool = True,
-    ) -> pd.DataFrame:
-        """Load hypnogram for given user for a given day.
-
-        This function allows to load sleep hypnograms starting from sleep data
-        with a given resolution in minutes. The function returns a
-        dictionary, with each key being a :class:`datetime.date`, and each value
-        a :class:`numpy.array` that contains the hypnogram values.
-        The hypnogram can be kept with standard Garmin values for sleep stages,
-        or these values can be mapped to number according to the following
-        convention:
-
-            - unmeasurable -> -1
-            - awake -> 0
-            - light -> 1
-            - deep -> 3
-            - rem -> 4
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            Unique identifier of the user.
-        start_date : str or datetime.date or datetime.date or None
-            Start date for hypnogram loading.
-        end_date : str or datetime.date or datetime.date or None
-            End date for hypnogram loading.
-        resolution : int, optional
-            Desired resolution (in minutes) requested for the hypnogram, by default 1
-
-        Returns
-        -------
-        dict
-            Dictionary with hypnogram values, one per each day.
-
-        Raises
-        ------
-        ValueError
-            If date is passed as str and cannot be parsed.
-        """
-
-        # Load sleep summary and sleep stages data
-        sleep_summaries = self.load_sleep_summary(
-            user_id=user_id, start_date=start_date, end_date=end_date
-        )
-        if len(sleep_summaries) == 0:
-            return {}
-
-        sleep_start_time = sleep_summaries.iloc[0][constants.ISODATE_COL]
-
-        sleep_end_time = pd.to_datetime(
-            (
-                sleep_summaries.iloc[-1][constants.UNIXTIMESTAMP_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants.TIMEZONEOFFSET_IN_MS_COL]
-                + sleep_summaries.iloc[-1][constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                + sleep_summaries.iloc[-1][
-                    constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
-                ]
-            ),
-            unit="ms",
-            utc=True,
-        ).tz_localize(None)
-
-        sleep_start_time = sleep_start_time.to_pydatetime()
-        sleep_end_time = sleep_end_time.to_pydatetime()
-
-        sleep_stages = self.load_sleep_stage(
-            user_id=user_id,
-            start_date=sleep_start_time,
-            end_date=sleep_end_time,
-        )
-
-        # Keep only sleep stages with correct sleep summaries
-        sleep_stages = (
-            sleep_stages[
-                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL].isin(
-                    sleep_summaries[
-                        constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
-                    ].unique()
-                )
-            ]
-            .sort_values(by=[constants.UNIXTIMESTAMP_IN_MS_COL])
-            .reset_index(drop=True)
-        )
-        # set index on sleep summaries
-        sleep_summaries = sleep_summaries.set_index(
-            constants.SLEEP_SUMMARY_SLEEP_SUMMARY_ID_COL
-        )
-        hypnograms = {}
-        for sleep_summary_id, sleep_summary in sleep_summaries.iterrows():
-            calendar_day = sleep_summary[constants.CALENDAR_DATE_COL]
-            sleep_start_time = sleep_summary[constants.ISODATE_COL]
-            sleep_end_time = pd.to_datetime(
-                (
-                    sleep_summary[constants.UNIXTIMESTAMP_IN_MS_COL]
-                    + sleep_summary[
-                        lf_constants.GARMIN_CONNECT_TIMEZONEOFFSET_IN_MS_COL
-                    ]
-                    + sleep_summary[constants.SLEEP_SUMMARY_DURATION_IN_MS_COL]
-                    + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
-                ),
-                unit="ms",
-                utc=True,
-            ).tz_localize(None)
-
-            intervals = int(
-                divmod(
-                    (sleep_end_time - sleep_start_time).total_seconds(), 60 * resolution
-                )[0]
-            )
-            time_delta_intervals = [
-                sleep_start_time + i * datetime.timedelta(minutes=resolution)
-                for i in range(intervals)
-            ]
-
-            daily_sleep_stages = sleep_stages.loc[
-                sleep_stages[constants.SLEEP_STAGE_SLEEP_SUMMARY_ID_COL]
-                == sleep_summary_id
-            ]
-
-            hypnogram = pd.DataFrame(data={constants.ISODATE_COL: time_delta_intervals})
-
-            hypnogram = hypnogram.merge(
-                daily_sleep_stages.loc[
-                    :,
-                    [
-                        constants.ISODATE_COL,
-                        constants.SLEEP_STAGE_SLEEP_TYPE_COL,
-                    ],
-                ],
-                how="left",
-                on=constants.ISODATE_COL,
-            )
-
-            hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram.loc[
-                :, constants.SLEEP_STAGE_SLEEP_TYPE_COL
-            ].ffill()
-            if map_hypnogram:
-                hypnogram[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = hypnogram[
-                    constants.SLEEP_STAGE_SLEEP_TYPE_COL
-                ].map(
-                    {
-                        constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_DEEP_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_LIGHT_STAGE_MAPPED_VALUE,
-                        constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_MAPPED_VALUE,
-                    }
-                )
-            hypnograms[calendar_day] = {}
-            hypnograms[calendar_day]["start_time"] = sleep_start_time.to_pydatetime()
-            hypnograms[calendar_day]["end_time"] = sleep_end_time.to_pydatetime()
-            hypnograms[calendar_day]["values"] = hypnogram[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
-            ].values
-
-        return hypnograms
 
     def load_garmin_metric(
         self,
@@ -2311,15 +1915,113 @@ class LabfrontLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
+        time_col: str = "local_time",
     ) -> pd.DataFrame:
-        return self.load_garmin_metric(
-            metric=constants.METRIC_HEART_RATE,
+        schema.validate_heart_rate_time_col(time_col)
+        requested_start = schema.normalize_time_bound(start_date, time_col)
+        requested_end = schema.normalize_time_bound(end_date, time_col)
+        data = self.load_garmin_metric(
+            metric=lf_constants.METRIC_HEART_RATE,
             user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
+            # Labfront's file index and row filter use local ISO timestamps.
+            # Read a wider interval, then apply the requested clock exactly.
+            start_date=(
+                None
+                if requested_start is None
+                else requested_start - pd.Timedelta(days=1)
+            ),
+            end_date=(
+                None if requested_end is None else requested_end + pd.Timedelta(days=1)
+            ),
             source=source,
             filter_on_calendar_date=False,
         )
+        if data.empty:
+            return schema.empty_heart_rate_frame(
+                ["source", schema.TIMESTAMP_CONFLICT_COL]
+            )
+
+        data = data.copy()
+        data["local_time"] = pd.to_datetime(data[lf_constants.ISODATE_COL])
+        data["utc_time"] = pd.to_datetime(
+            data[lf_constants.UNIXTIMESTAMP_IN_MS_COL], unit="ms", utc=True
+        ).dt.tz_localize(None)
+        if "timezone" in data.columns:
+            data = data.rename(columns={"timezone": "timezone_name"})
+        data["timezone"] = data["local_time"] - data["utc_time"]
+        data["heart_rate"] = pd.to_numeric(
+            data["beatsPerMinute"], errors="coerce"
+        )
+        data = data[data["heart_rate"] > 0]
+        data["source"] = source
+        data[schema.TIMESTAMP_CONFLICT_COL] = (
+            data.groupby("utc_time")["heart_rate"].transform("nunique") > 1
+        )
+        data = data.drop_duplicates(
+            subset=["utc_time", "heart_rate"], keep="last"
+        )
+        data = schema.prepare_heart_rate_samples(data)
+        return (
+            schema.filter_heart_rate_by_time(
+                data, requested_start, requested_end, time_col
+            )
+            .sort_values("utc_time")
+            .reset_index(drop=True)
+        )
+
+    @staticmethod
+    def _prepare_respiratory_samples(
+        data: pd.DataFrame,
+        provider_value_col: str,
+        canonical_value_col: str,
+    ) -> pd.DataFrame:
+        """Translate one Labfront stream into the shared sample schema."""
+        data = data.copy()
+        if (
+            schema.LOCAL_TIME_COL not in data.columns
+            and lf_constants.ISODATE_COL in data.columns
+        ):
+            data[schema.LOCAL_TIME_COL] = data[lf_constants.ISODATE_COL]
+        if (
+            schema.UTC_TIME_COL not in data.columns
+            and lf_constants.UNIXTIMESTAMP_IN_MS_COL in data.columns
+        ):
+            data[schema.UTC_TIME_COL] = pd.to_datetime(
+                data[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
+                unit="ms",
+                errors="coerce",
+                utc=True,
+            ).dt.tz_localize(None)
+        if schema.TIMEZONE_COL in data.columns and not pd.api.types.is_timedelta64_dtype(
+            data[schema.TIMEZONE_COL]
+        ):
+            data = data.rename(columns={schema.TIMEZONE_COL: "timezone_name"})
+        if (
+            schema.TIMEZONE_COL not in data.columns
+            and lf_constants.TIMEZONEOFFSET_IN_MS_COL in data.columns
+        ):
+            data[schema.TIMEZONE_COL] = pd.to_timedelta(
+                pd.to_numeric(
+                    data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                ),
+                unit="ms",
+            )
+        if (
+            canonical_value_col not in data.columns
+            and provider_value_col in data.columns
+        ):
+            data[canonical_value_col] = data[provider_value_col]
+        if (
+            schema.IS_SLEEPING_COL not in data.columns
+            and lf_constants.IS_SLEEPING_COL in data.columns
+        ):
+            data[schema.IS_SLEEPING_COL] = data[lf_constants.IS_SLEEPING_COL]
+        if (
+            schema.CALENDAR_DATE_COL not in data.columns
+            and lf_constants.CALENDAR_DATE_COL in data.columns
+        ):
+            data[schema.CALENDAR_DATE_COL] = data[lf_constants.CALENDAR_DATE_COL]
+        return data
 
     def load_pulse_ox(
         self,
@@ -2329,17 +2031,25 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_pulse_ox(
+            data = self.load_garmin_connect_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_pulse_ox(
+            data = self.load_garmin_device_pulse_ox(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            lf_constants.SPO2_SPO2_COL,
+            schema.SPO2_COL,
+        )
+        return schema.prepare_spo2_samples(data)
 
     def load_questionnaire(
         self,
@@ -2391,63 +2101,32 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_respiration(
+            data = self.load_garmin_connect_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
         else:
-            return self.load_garmin_device_respiration(
+            data = self.load_garmin_device_respiration(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
             )
+        data = data.copy()
+        data["source"] = source
+        data = self._prepare_respiratory_samples(
+            data,
+            lf_constants.RESPIRATION_BREATHS_PER_MINUTE_COL,
+            schema.RESPIRATORY_RATE_COL,
+        )
+        return schema.prepare_respiration_samples(data)
 
-    def load_sleep_pulse_ox(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_sleep_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            return self.load_garmin_device_sleep_pulse_ox(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-
-    def load_sleep_respiration(
-        self,
-        user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ) -> pd.DataFrame:
-        if source == lf_constants.DATA_SOURCE_GARMIN_HEALTH_API:
-            return self.load_garmin_connect_sleep_respiration(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-        else:
-            return self.load_garmin_device_sleep_respiration(
-                user_id=user_id,
-                start_date=start_date,
-                end_date=end_date,
-            )
-
-    def load_sleep_stage(
+    def _load_sleep_stage_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date, None] = None,
         end_date: Union[str, datetime.date, datetime.date, None] = None,
+        on_conflict: Union[str, None] = None,
     ) -> pd.DataFrame:
         """Load Garmin Connect sleep stage data.
 
@@ -2468,36 +2147,247 @@ class LabfrontLoader(BaseLoader):
         pd.DataFrame
             Dataframe with sleep stages data.
         """
+        conflict_policy = (
+            self.sleep_stage_on_conflict
+            if on_conflict is None
+            else self._validate_sleep_stage_conflict_policy(on_conflict)
+        )
+        requested_start = pd.Timestamp(start_date) if start_date is not None else None
+        requested_end = pd.Timestamp(end_date) if end_date is not None else None
         data = self.get_data_from_datetime(
             user_id,
             lf_constants.GARMIN_CONNECT_SLEEP_STAGE_FOLDER,
             start_date,
             end_date,
             filter_on_calendar_date=False,
+            include_source_file=True,
+            filter_rows=False,
         )
 
         if len(data) > 0:
+            summary_start = requested_start - pd.Timedelta(days=2) if requested_start is not None else None
+            summary_end = requested_end + pd.Timedelta(days=2) if requested_end is not None else None
+            summaries = self._load_sleep_summary_raw(
+                user_id, summary_start, summary_end, drop_duplicates=False
+            )
+            data = self._reconcile_sleep_stage_snapshots(
+                data,
+                summaries,
+                on_conflict=conflict_policy,
+            )
             # Change sleep stage values
-            data[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
+            data[lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL] = data[
+                lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL
             ].map(
                 {
-                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: constants.SLEEP_STAGE_REM_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: lf_constants.SLEEP_STAGE_REM_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
                 }
             )
 
-        return data
+            if requested_start is not None:
+                data = data[data[lf_constants.ISODATE_COL] >= requested_start]
+            if requested_end is not None:
+                data = data[data[lf_constants.ISODATE_COL] < requested_end]
 
-    def load_sleep_summary(
+        return data.reset_index(drop=True)
+
+    def load_sleep_stage(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+        on_conflict: Union[str, None] = None,
+    ) -> pd.DataFrame:
+        """Return Garmin sleep stages in the shared snake_case schema.
+
+        ``on_conflict`` overrides the loader-level policy for unresolved
+        repeated export snapshots. Valid values are ``"drop_night"``,
+        ``"raise"``, and ``"last"``. ``"drop_night"`` removes only the
+        ambiguous stage rows; the separate sleep-summary row remains
+        available. ``"last"`` means the last snapshot in the deterministic
+        Labfront file-index order (first timestamp, then last-edit timestamp).
+        """
+        return _normalize_garmin_sleep_columns(
+            self._load_sleep_stage_raw(
+                user_id, start_date, end_date, on_conflict=on_conflict
+            )
+        )
+
+    @staticmethod
+    def _reconcile_sleep_stage_snapshots(
+        sleep_stages: pd.DataFrame,
+        sleep_summaries: pd.DataFrame,
+        on_conflict: str = "drop_night",
+    ) -> pd.DataFrame:
+        """Select one coherent stage export for each Garmin sleep summary.
+
+        Labfront exports can repeat the same Garmin sleep stages in several
+        CSV files, and a later file can contain a revised snapshot. File
+        boundaries are therefore preserved temporarily. Candidate snapshots
+        are matched to the selected summary by comparing the total duration of
+        every stage type. Identical matching snapshots collapse to one;
+        unresolved conflicts follow ``on_conflict``: drop their stage rows,
+        raise an error, or retain the last loaded source snapshot. The
+        temporary source-file column is removed from the result.
+        """
+        on_conflict = LabfrontLoader._validate_sleep_stage_conflict_policy(
+            on_conflict
+        )
+        source_col = _LABFRONT_SOURCE_FILE_COL
+        id_col = lf_constants.SLEEP_SUMMARY_ID_COL
+        record_cols = [col for col in sleep_stages if col != source_col]
+        if sleep_stages.empty:
+            return sleep_stages.drop(columns=source_col, errors="ignore")
+
+        dropped_ids = []
+
+        def normalized(snapshot):
+            return (
+                snapshot[record_cols]
+                .drop_duplicates()
+                .sort_values(record_cols)
+                .reset_index(drop=True)
+            )
+
+        def source_snapshots(rows):
+            return [
+                snapshot.drop_duplicates(subset=record_cols)
+                for _, snapshot in rows.groupby(source_col, sort=False)
+            ]
+
+        def resolve_conflict(summary_id, snapshots, message):
+            if on_conflict == "raise":
+                raise ValueError(message)
+            if on_conflict == "last":
+                return snapshots[-1]
+            dropped_ids.append(summary_id)
+            return None
+
+        def select_without_summary(summary_id, rows):
+            snapshots = source_snapshots(rows)
+            reference = normalized(snapshots[0])
+            if any(not reference.equals(normalized(item)) for item in snapshots[1:]):
+                return resolve_conflict(
+                    summary_id,
+                    snapshots,
+                    "Conflicting Labfront sleep-stage snapshots without "
+                    f"summary {summary_id}.",
+                )
+            return snapshots[0]
+
+        if sleep_summaries.empty:
+            summaries = None
+        else:
+            validation_rank = {
+                "AUTO_TENTATIVE": 1,
+                "AUTO_FINAL": 2,
+                "ENHANCED_TENTATIVE": 3,
+                "ENHANCED_FINAL": 4,
+            }
+            summaries = sleep_summaries.copy()
+            summaries["__validation_rank"] = (
+                summaries["validation"].map(validation_rank).fillna(0)
+            )
+            summaries = (
+                summaries.sort_values(
+                    [
+                        id_col,
+                        "__validation_rank",
+                        lf_constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                    ]
+                )
+                .groupby(id_col, as_index=False)
+                .tail(1)
+                .set_index(id_col)
+            )
+        stage_summary_cols = {
+            lf_constants.SLEEP_STAGE_LIGHT_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_DEEP_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_REM_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_AWAKE_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+            lf_constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE: lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+        }
+
+        def matches(snapshot, summary):
+            actual = snapshot.groupby(lf_constants.SLEEP_STAGE_SLEEP_TYPE_COL)[
+                lf_constants.SLEEP_STAGE_DURATION_IN_MS_COL
+            ].sum()
+            return all(
+                pd.notna(summary[column]) and int(actual.get(stage, 0)) == int(summary[column])
+                for stage, column in stage_summary_cols.items()
+            )
+
+        chosen = []
+        for summary_id, rows in sleep_stages.groupby(id_col, sort=False):
+            if summaries is None or summary_id not in summaries.index:
+                selected = select_without_summary(summary_id, rows)
+                if selected is not None:
+                    chosen.append(selected)
+                continue
+            summary = summaries.loc[summary_id]
+            candidates = []
+            snapshots = source_snapshots(rows)
+            for snapshot in snapshots:
+                if matches(snapshot, summary):
+                    candidates.append(snapshot)
+            if not candidates:
+                combined = rows.drop_duplicates(subset=record_cols)
+                if matches(combined, summary):
+                    selected = combined
+                else:
+                    selected = resolve_conflict(
+                        summary_id,
+                        snapshots,
+                        "No coherent Labfront sleep-stage snapshot matches "
+                        f"summary {summary_id}.",
+                    )
+            else:
+                reference = normalized(candidates[0])
+                if any(
+                    not reference.equals(normalized(snapshot))
+                    for snapshot in candidates[1:]
+                ):
+                    selected = resolve_conflict(
+                        summary_id,
+                        candidates,
+                        "Conflicting Labfront sleep-stage snapshots match "
+                        f"summary {summary_id}.",
+                    )
+                else:
+                    selected = candidates[0]
+            if selected is not None:
+                chosen.append(selected)
+
+        if dropped_ids:
+            displayed_ids = ", ".join(map(str, dropped_ids[:10]))
+            if len(dropped_ids) > 10:
+                displayed_ids += ", ..."
+            warnings.warn(
+                "Dropped ambiguous Labfront sleep-stage snapshots for "
+                f"{len(dropped_ids)} sleep summaries: {displayed_ids}.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if not chosen:
+            return sleep_stages.iloc[0:0].drop(columns=source_col).reset_index(drop=True)
+        return (
+            pd.concat(chosen, ignore_index=True)
+            .drop(columns=source_col)
+            .sort_values(lf_constants.ISODATE_COL)
+            .reset_index(drop=True)
+        )
+
+    def _load_sleep_summary_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
         end_date: Union[str, datetime.date, datetime.date] = None,
-        same_day_filter: bool = True,
+        drop_duplicates: bool = True,
     ) -> pd.DataFrame:
         """Load Garmin Connect sleep summary data.
 
@@ -2512,6 +2402,10 @@ class LabfrontLoader(BaseLoader):
             Start date from which data should be retrieved, by default None
         end_date : str or datetime.date or datetime.date, optional
             End date from which data should be retrieved, by default None
+        drop_duplicates : bool, optional
+            If true, retain the highest-ranked summary for each calendar day.
+            If false, retain all exported summaries so callers can reconcile
+            repeated or revised snapshots.
 
         Returns
         -------
@@ -2527,12 +2421,12 @@ class LabfrontLoader(BaseLoader):
         )
 
         if len(data) > 0:
-            data[constants.CALENDAR_DATE_COL] = pd.to_datetime(
-                data[constants.CALENDAR_DATE_COL],
+            data[lf_constants.CALENDAR_DATE_COL] = pd.to_datetime(
+                data[lf_constants.CALENDAR_DATE_COL],
                 format="%Y-%m-%d",
             ).dt.date
 
-            if same_day_filter:
+            if drop_duplicates:
                 data["validationMap"] = data["validation"].map(
                     {
                         "AUTO_TENTATIVE": 1,
@@ -2545,14 +2439,14 @@ class LabfrontLoader(BaseLoader):
                     data.sort_values(
                         by=(
                             [
-                                constants.CALENDAR_DATE_COL,
+                                lf_constants.CALENDAR_DATE_COL,
                                 "validationMap",
-                                constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
+                                lf_constants.SLEEP_SUMMARY_DURATION_IN_MS_COL,
                             ]
                         ),
                         ascending=True,
                     )
-                    .groupby(constants.CALENDAR_DATE_COL)
+                    .groupby(lf_constants.CALENDAR_DATE_COL)
                     .tail(1)
                 )
                 data = data.drop(["validationMap"], axis=1)
@@ -2560,17 +2454,31 @@ class LabfrontLoader(BaseLoader):
             # Rename columns based on pywearable specs
             data = data.rename(
                 columns={
-                    lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+                    lf_constants.GARMIN_CONNECT_SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: lf_constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
                 }
             )
 
             return data.reset_index(drop=True)
         else:
             return pd.DataFrame()
+
+    def load_sleep_summary(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+        drop_duplicates: bool = True,
+    ) -> pd.DataFrame:
+        """Return Garmin sleep summaries in the shared snake_case schema."""
+        return _normalize_garmin_sleep_columns(
+            self._load_sleep_summary_raw(
+                user_id, start_date, end_date, drop_duplicates=drop_duplicates
+            )
+        )
 
     def load_stress(
         self,
@@ -2580,147 +2488,134 @@ class LabfrontLoader(BaseLoader):
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
     ) -> pd.DataFrame:
         return self.load_garmin_metric(
-            metric=constants.METRIC_STRESS,
+            metric=lf_constants.METRIC_STRESS,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             source=source,
         )
 
-    def load_recovery(
+    def load_provider_feature(
         self,
+        feature: str,
         user_id: str,
-        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        start_date=None,
+        end_date=None,
         source=lf_constants.DATA_SOURCE_GARMIN_HEALTH_API,
-    ):
-        """Load recovery data.
+    ) -> pd.DataFrame:
+        """Load one Garmin feature in the shared provider-feature schema.
 
-        This function returns Garmin Body Battery Recovery data from the
-        given ``user_id`` with the time window defined by ``start_date``
-        and ``end_date``. Recovery is computed considering body battery
-        values at wake up and bedtime, and by comparing the total charge
-        with respect to the available charge.
-
-        Parameters
-        ----------
-        user_id : :class:`str`
-            Unique user identifier for recovery data retrieval.
-        start_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
-            Start date for recovery data retrieval.
-        end_date : :class:`datetime.date` or :class:`datetime.datetime` or :class:`str` or None
-            End date for recovery data retrieval.
-
-        Returns
-        -------
-        :class:`pd.DataFrame`
-            Formatted :class:`pd.DataFrame` with recovery data.
+        Stress and Body Battery samples are translated from Garmin's stress
+        stream, including its negative sentinel values. Daily stress fields
+        are translated from Garmin daily summaries, with durations converted
+        from milliseconds to seconds. This method does not aggregate samples
+        or calculate sleep recovery.
         """
-        sleep_summary = self.load_sleep_summary(
-            user_id=user_id,
-            start_date=start_date,
-            end_date=end_date,
-            same_day_filter=True,
-        )
-        if len(sleep_summary) > 0:
-            # We need to get body battery data for each sleep
-            # Let's retrieve sleep timestamps
-            sleep_summary["wakeup"] = pd.to_datetime(
-                sleep_summary[constants.UNIXTIMESTAMP_IN_MS_COL]
-                + sleep_summary[constants.TIMEZONEOFFSET_IN_MS_COL]
-                + sleep_summary[constants.DURATION_IN_MS_COL]
-                + sleep_summary[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL],
-                utc=True,
-                unit="ms",
-            ).dt.tz_localize(None)
-            sleep_timestamps = sleep_summary.loc[
-                :, [constants.CALENDAR_DATE_COL, constants.ISODATE_COL, "wakeup"]
-            ]
-            # Load body battery for all sleep sessions with 5 minute tolerance
-            min_time = sleep_timestamps[constants.ISODATE_COL].min() - pd.Timedelta(
-                minutes=5
-            )
-            max_time = sleep_timestamps["wakeup"].max() + pd.Timedelta(minutes=5)
-            body_battery = self.load_stress(
-                user_id=user_id,
-                start_date=min_time.to_pydatetime(),
-                end_date=max_time.to_pydatetime(),
+        sample_columns = {
+            "garmin_stress_level": lf_constants.STRESS_STRESS_LEVEL_COL,
+            "garmin_body_battery": lf_constants.STRESS_BODY_BATTERY_COL,
+        }
+        daily_columns = {
+            "garmin_daily_average_stress": (
+                lf_constants.DAILY_SUMMARY_AVG_STRESS_IN_STRESS_LVL_COL
+            ),
+            "garmin_daily_max_stress": (
+                lf_constants.DAILY_SUMMARY_MAX_STRESS_IN_STRESS_LVL_COL
+            ),
+            "garmin_daily_stress_duration_seconds": "stressDurationInMs",
+            "garmin_daily_rest_stress_duration_seconds": (
+                lf_constants.DAILY_SUMMARY_REST_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_activity_stress_duration_seconds": (
+                lf_constants.DAILY_SUMMARY_UNRELIABLE_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_low_stress_duration_seconds": (
+                lf_constants.DAILY_SUMMARY_LOW_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_medium_stress_duration_seconds": (
+                lf_constants.DAILY_SUMMARY_MEDIUM_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_high_stress_duration_seconds": (
+                lf_constants.DAILY_SUMMARY_HIGH_STRESS_DURATION_IN_MS_COL
+            ),
+            "garmin_daily_stress_qualifier": lf_constants.DAILY_SUMMARY_STRESS_SCORE_COL,
+        }
+        if feature in sample_columns:
+            data = self.load_stress(
+                user_id,
+                start_date=start_date,
+                end_date=end_date,
                 source=source,
+            ).copy()
+            if data.empty:
+                return schema.prepare_provider_feature_samples(
+                    pd.DataFrame(columns=[feature]), feature
+                )
+            data[schema.LOCAL_TIME_COL] = pd.to_datetime(
+                data[lf_constants.ISODATE_COL], errors="coerce"
             )
-            if len(body_battery) > 0:
-                if constants.STRESS_BODY_BATTERY_COL in body_battery.columns:
-                    body_battery = body_battery.loc[
-                        :,
-                        [
-                            constants.ISODATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    # Labfront has several duplicates, we take the mean by isoDate and make sure isoDate is monotonic increasing
-                    body_battery = (
-                        body_battery.groupby(constants.ISODATE_COL)[
-                            constants.STRESS_BODY_BATTERY_COL
-                        ]
-                        .mean()
-                        .sort_index()
-                        .reset_index()
-                    )
-                    body_battery_bedtime = pd.merge_asof(
-                        sleep_timestamps,
-                        body_battery,
-                        on=constants.ISODATE_COL,
-                        direction="backward",
-                        tolerance=pd.Timedelta(minutes=5),
-                    ).loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    body_battery_wakeup = pd.merge_asof(
-                        sleep_timestamps,
-                        body_battery,
-                        left_on="wakeup",
-                        right_on=constants.ISODATE_COL,
-                        direction="forward",
-                        tolerance=pd.Timedelta(minutes=5),
-                    ).loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.STRESS_BODY_BATTERY_COL,
-                        ],
-                    ]
-                    sleep_timestamps = pd.merge(
-                        left=body_battery_bedtime,
-                        right=body_battery_wakeup,
-                        how="inner",
-                        on=constants.CALENDAR_DATE_COL,
-                        suffixes=["Bedtime", "Wakeup"],
-                    )
-                    sleep_timestamps[constants.RECOVERY_RECOVERY_COL] = (
-                        sleep_timestamps[constants.STRESS_BODY_BATTERY_WAKING_COL]
-                        - sleep_timestamps[constants.STRESS_BODY_BATTERY_BEDTIME_COL]
-                    ) / (
-                        100
-                        - sleep_timestamps[constants.STRESS_BODY_BATTERY_BEDTIME_COL]
-                    )
-                    # make sure recovery isn't negative, set it to zero if it is
-                    sleep_timestamps[constants.RECOVERY_RECOVERY_COL] = np.maximum(
-                        sleep_timestamps[constants.RECOVERY_RECOVERY_COL], 0
-                    )
-                    sleep_timestamps = sleep_timestamps.reset_index(drop=True)
-                    return sleep_timestamps.loc[
-                        :,
-                        [
-                            constants.CALENDAR_DATE_COL,
-                            constants.RECOVERY_RECOVERY_COL,
-                            constants.STRESS_BODY_BATTERY_BEDTIME_COL,
-                            constants.STRESS_BODY_BATTERY_WAKING_COL,
-                        ],
-                    ]
-        return pd.DataFrame()
+            data[schema.UTC_TIME_COL] = pd.to_datetime(
+                data[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
+                unit="ms",
+                errors="coerce",
+                utc=True,
+            ).dt.tz_localize(None)
+            if lf_constants.TIMEZONEOFFSET_IN_MS_COL in data:
+                data[schema.TIMEZONE_COL] = pd.to_timedelta(
+                    pd.to_numeric(
+                        data[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+                    ),
+                    unit="ms",
+                )
+            else:
+                data[schema.TIMEZONE_COL] = (
+                    data[schema.LOCAL_TIME_COL] - data[schema.UTC_TIME_COL]
+                )
+            data[feature] = pd.to_numeric(
+                data[sample_columns[feature]], errors="coerce"
+            )
+            if feature == "garmin_stress_level":
+                # Garmin uses -1 for unavailable stress and -2 for activity.
+                data.loc[data[feature].lt(0), feature] = np.nan
+            data.loc[data[feature].gt(100), feature] = np.nan
+            if feature == "garmin_body_battery":
+                data.loc[data[feature].lt(0), feature] = np.nan
+            return schema.prepare_provider_feature_samples(data, feature)
+        if feature not in daily_columns:
+            return super().load_provider_feature(
+                feature, user_id, start_date, end_date
+            )
+        data = self.load_daily_summary(user_id, start_date, end_date).copy()
+        if data.empty:
+            return schema.prepare_provider_feature_summary(
+                pd.DataFrame(columns=[schema.CALENDAR_DATE_COL, feature]),
+                feature,
+                numeric=feature != "garmin_daily_stress_qualifier",
+            )
+        order_col = (
+            lf_constants.ISODATE_COL
+            if lf_constants.ISODATE_COL in data.columns
+            else lf_constants.CALENDAR_DATE_COL
+        )
+        data = data.sort_values(order_col, kind="stable").drop_duplicates(
+            lf_constants.CALENDAR_DATE_COL, keep="last"
+        )
+        result = pd.DataFrame(
+            {
+                schema.CALENDAR_DATE_COL: data[lf_constants.CALENDAR_DATE_COL],
+                feature: data[daily_columns[feature]],
+            }
+        )
+        numeric = feature != "garmin_daily_stress_qualifier"
+        if numeric:
+            result[feature] = pd.to_numeric(result[feature], errors="coerce")
+            if feature.endswith("_seconds"):
+                result[feature] = result[feature] / 1000
+            else:
+                result.loc[result[feature].lt(0), feature] = np.nan
+        return schema.prepare_provider_feature_summary(
+            result, feature, numeric=numeric
+        )
 
     def load_steps(
         self,
@@ -2762,3 +2657,43 @@ class LabfrontLoader(BaseLoader):
             raise ValueError(f"Source {source} not supported.")
 
         return data
+
+    def load_activity_samples(
+        self,
+        user_id: str,
+        start_date=None,
+        end_date=None,
+    ) -> pd.DataFrame:
+        """Return Garmin Health API epochs as canonical step intervals.
+
+        Category rows sharing one epoch are collapsed by summing their
+        incremental step counts while counting the epoch duration once.
+        """
+        epochs = self.load_garmin_connect_epoch(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).copy()
+        if epochs.empty:
+            return schema.empty_activity_frame(extra_columns=("source",))
+        epochs[schema.LOCAL_TIME_COL] = pd.to_datetime(
+            epochs[lf_constants.ISODATE_COL], errors="coerce"
+        )
+        epochs[schema.UTC_TIME_COL] = pd.to_datetime(
+            epochs[lf_constants.UNIXTIMESTAMP_IN_MS_COL],
+            unit="ms",
+            errors="coerce",
+            utc=True,
+        ).dt.tz_localize(None)
+        epochs[schema.TIMEZONE_COL] = pd.to_timedelta(
+            pd.to_numeric(epochs[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
+            unit="ms",
+        )
+        epochs[schema.DURATION_IN_MS_COL] = epochs[lf_constants.DURATION_IN_MS_COL]
+        epochs[schema.ACTIVITY_STEPS_COL] = epochs[lf_constants.ACTIVITY_STEPS_COL]
+        if "activityType" in epochs:
+            epochs = epochs.rename(columns={"activityType": "activity_type"})
+        return prepare_epoch_activity_samples(epochs)
+
+
+__all__ = ["LabfrontLoader"]

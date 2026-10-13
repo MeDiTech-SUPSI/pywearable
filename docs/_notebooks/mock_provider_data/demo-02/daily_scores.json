@@ -1,0 +1,47 @@
+{
+  "scoreScale": "0-100",
+  "records": [
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-02",
+      "sleepHealthScore": 50,
+      "dailyStrain_score": 73
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-03",
+      "sleepHealthScore": 47,
+      "dailyStrain_score": 66
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-04",
+      "sleepHealthScore": 92,
+      "dailyStrain_score": 67
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-05",
+      "sleepHealthScore": 89,
+      "dailyStrain_score": 66
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-06",
+      "sleepHealthScore": null,
+      "dailyStrain_score": 69
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-07",
+      "sleepHealthScore": 90,
+      "dailyStrain_score": 66
+    },
+    {
+      "memberCode": "demo-02",
+      "day": "2026-03-08",
+      "sleepHealthScore": 78,
+      "dailyStrain_score": 64
+    }
+  ]
+}
