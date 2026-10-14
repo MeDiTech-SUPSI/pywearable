@@ -11,7 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-      - uses: docker://pandoc/core:3.8
+      - name: Install Pandoc
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pandoc
+          pandoc --version
       - name: Install dependencies
         run: |
           pip install sphinx sphinx_rtd_theme myst_parser nbsphinx
