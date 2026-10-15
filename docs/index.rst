@@ -1,6 +1,11 @@
 pywearable
 ==========
 
+.. image:: /_static/pywearable-logo.png
+   :alt: pywearable logo: a Python-powered smartwatch.
+   :width: 280px
+   :align: center
+
 ``pywearable`` turns wearable exports into analysis-ready trajectories for
 activity, sleep, heart rate, heart-rate variability, respiration, oxygen
 saturation, provider scores, and adherence.
