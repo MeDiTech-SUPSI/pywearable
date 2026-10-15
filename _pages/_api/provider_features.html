@@ -1,0 +1,213 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Provider-native features &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Respiration" href="respiration.html" />
+    <link rel="prev" title="Loaders" href="loader.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="activity.html">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adherence.html">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Provider-native features</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.provider_features.get_available_provider_features"><code class="docutils literal notranslate"><span class="pre">get_available_provider_features()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.provider_features.get_provider_features"><code class="docutils literal notranslate"><span class="pre">get_provider_features()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Provider-native features</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/provider_features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pywearable.provider_features">
+<span id="provider-native-features"></span><h1>Provider-native features<a class="headerlink" href="#module-pywearable.provider_features" title="Link to this heading"></a></h1>
+<p>Extraction of explicitly provider-native wearable features.</p>
+<p>Feature names retain their provider prefix because similarly named vendor
+scores are not assumed to measure the same construct. Timestamped streams can
+be windowed or assigned to cycles; native daily and nightly features can only
+remain at their native grain or be aggregated upward.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.provider_features.get_available_provider_features">
+<span class="sig-prename descclassname"><span class="pre">pywearable.provider_features.</span></span><span class="sig-name descname"><span class="pre">get_available_provider_features</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.provider_features.get_available_provider_features" title="Link to this definition"></a></dt>
+<dd><p>Return provider-feature names implemented by <code class="docutils literal notranslate"><span class="pre">loader</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>) – Loader whose provider-native feature support should be inspected.
+Additional names require a matching entry in the loader’s
+<code class="docutils literal notranslate"><span class="pre">provider_feature_definitions</span></code> mapping.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Sorted feature names accepted by <a class="reference internal" href="#pywearable.provider_features.get_provider_features" title="pywearable.provider_features.get_provider_features"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_provider_features()</span></code></a>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)">list</a> of <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.provider_features.get_provider_features">
+<span class="sig-prename descclassname"><span class="pre">pywearable.provider_features.</span></span><span class="sig-name descname"><span class="pre">get_provider_features</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statistic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_reference</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aggregation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_coverage</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycle_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_valid_children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.provider_features.get_provider_features" title="Link to this definition"></a></dt>
+<dd><p>Extract provider-native features without equating vendors’ metrics.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.BaseLoader"><em>BaseLoader</em></a>) – Loader declaring the requested feature in <code class="docutils literal notranslate"><span class="pre">provider_features</span></code> and
+returning canonical rows from <code class="docutils literal notranslate"><span class="pre">load_provider_feature</span></code>. Custom names
+must also be described by <code class="docutils literal notranslate"><span class="pre">provider_feature_definitions</span></code>.</p></li>
+<li><p><strong>feature</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> or </em><em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Names reported by <a class="reference internal" href="#pywearable.provider_features.get_available_provider_features" title="pywearable.provider_features.get_available_provider_features"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_available_provider_features()</span></code></a>. Features in
+one call must share a native grain. This argument is required because
+a loader can expose unrelated sample, daily, nightly, numeric, and
+categorical provider features that cannot form one implicit result.</p></li>
+<li><p><strong>statistic</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, or </em><em>None</em>) – Primary reduction(s) for timestamped streams. <code class="docutils literal notranslate"><span class="pre">None</span></code> means <code class="docutils literal notranslate"><span class="pre">mean</span></code>.
+Native summaries reject this argument because they are already values.</p></li>
+<li><p><strong>user_id</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><em>sequence</em><em> of </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, or </em><em>None</em>) – Participant selection; <code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">None</span></code> select every loader user.</p></li>
+<li><p><strong>start_date</strong> (<em>date-like</em><em> or </em><em>None</em>) – Half-open sample or native-label range, <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code>.</p></li>
+<li><p><strong>end_date</strong> (<em>date-like</em><em> or </em><em>None</em>) – Half-open sample or native-label range, <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code>.</p></li>
+<li><p><strong>resolution</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Timedelta.html#pandas.Timedelta" title="(in pandas v3.0.6)"><em>pandas.Timedelta</em></a><em>, </em><em>sequence</em><em>, or </em><em>None</em>) – Primary window or increasing hierarchy. <code class="docutils literal notranslate"><span class="pre">None</span></code> selects daily windows
+for samples and the native grain for summaries. Native summaries may
+only remain native or aggregate to week, month, or year.</p></li>
+<li><p><strong>loader_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> or </em><em>None</em>) – Extra arguments for the loader or cycle interval extraction.</p></li>
+<li><p><strong>cycle_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> or </em><em>None</em>) – Extra arguments for the loader or cycle interval extraction.</p></li>
+<li><p><strong>time_reference</strong> (<em>{&quot;auto&quot;</em><em>, </em><em>&quot;local&quot;</em><em>, </em><em>&quot;utc&quot;}</em>) – Clock used by timestamped streams. Native summaries use local labels.</p></li>
+<li><p><strong>aggregation</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><em>sequence</em><em>, or </em><em>None</em>) – Parent-level operation(s); valid only for a hierarchy.</p></li>
+<li><p><strong>min_coverage</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a><em>, </em><em>sequence</em><em>, or </em><em>None</em>) – Minimum valid sample/day/child fraction at each requested level.</p></li>
+<li><p><strong>min_valid_children</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a><em>, </em><em>sequence</em><em>, or </em><em>None</em>) – Minimum valid children at each parent level.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Indexed by participant and time/date, with one <code class="docutils literal notranslate"><span class="pre">__coverage</span></code> column
+per output feature. Hierarchical column names encode resolutions and
+operations.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)">pandas.DataFrame</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="loader.html" class="btn btn-neutral float-left" title="Loaders" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="respiration.html" class="btn btn-neutral float-right" title="Respiration" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

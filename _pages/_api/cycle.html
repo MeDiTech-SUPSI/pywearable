@@ -1,0 +1,190 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cycles &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Heart rate" href="heart_rate.html" />
+    <link rel="prev" title="Adherence" href="adherence.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="activity.html">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adherence.html">Adherence</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Cycles</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.cycle.get_intervals"><code class="docutils literal notranslate"><span class="pre">get_intervals()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Cycles</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/cycle.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pywearable.cycle">
+<span id="cycles"></span><h1>Cycles<a class="headerlink" href="#module-pywearable.cycle" title="Link to this heading"></a></h1>
+<p>Define sleep-based intervals without calculating domain features.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.cycle.get_intervals">
+<span class="sig-prename descclassname"><span class="pre">pywearable.cycle.</span></span><span class="sig-name descname"><span class="pre">get_intervals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycle_type</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">missing_end</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'invalidate'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.cycle.get_intervals" title="Link to this definition"></a></dt>
+<dd><p>Return expected local-time rows for one requested cycle type.</p>
+<p><code class="docutils literal notranslate"><span class="pre">cycle_night</span></code> is the provider main-sleep session. <code class="docutils literal notranslate"><span class="pre">cycle_awake</span></code> runs
+from its getup/session end to the following night’s bedtime, and
+<code class="docutils literal notranslate"><span class="pre">cycle_physiological</span></code> runs from one bedtime to the following bedtime.
+Missing following nights invalidate the latter two by default. Setting
+<code class="docutils literal notranslate"><span class="pre">missing_end='midnight'</span></code> closes a cycle with a known start at the next
+local midnight; it never invents a missing starting boundary. Naps remain
+inside the latter two cycles and do not alter their boundaries. Date
+bounds select cycle <code class="docutils literal notranslate"><span class="pre">calendar_date</span></code> labels; selected intervals retain
+their complete physical boundaries and are never clipped.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.BaseLoader"><em>BaseLoader</em></a>) – Loader exposing canonical sleep summaries or sessions.</p></li>
+<li><p><strong>cycle_type</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – One of <code class="docutils literal notranslate"><span class="pre">cycle_night</span></code>, <code class="docutils literal notranslate"><span class="pre">cycle_awake</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">cycle_physiological</span></code>.</p></li>
+<li><p><strong>user_id</strong> (<em>Union</em><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>, </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em>, </em><em>None</em><em>]</em>) – One participant, several participants, or <code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code>/<code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>start_date</strong> – Half-open range of participant-local sleep calendar labels. Selected
+cycles retain their complete physical intervals.</p></li>
+<li><p><strong>end_date</strong> – Half-open range of participant-local sleep calendar labels. Selected
+cycles retain their complete physical intervals.</p></li>
+<li><p><strong>missing_end</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Policy for an awake or physiological cycle whose following bedtime is
+unavailable. <code class="docutils literal notranslate"><span class="pre">&quot;invalidate&quot;</span></code> leaves it invalid; <code class="docutils literal notranslate"><span class="pre">&quot;midnight&quot;</span></code> uses
+the next local midnight when the starting boundary is known.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">calendar_date)</span></code> frame with <code class="docutils literal notranslate"><span class="pre">start_time</span></code>, <code class="docutils literal notranslate"><span class="pre">end_time</span></code>,
+<code class="docutils literal notranslate"><span class="pre">interval_valid</span></code>, and <code class="docutils literal notranslate"><span class="pre">end_source</span></code> columns.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)">pandas.DataFrame</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If <code class="docutils literal notranslate"><span class="pre">cycle_type</span></code> or <code class="docutils literal notranslate"><span class="pre">missing_end</span></code> is unsupported.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="adherence.html" class="btn btn-neutral float-left" title="Adherence" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="heart_rate.html" class="btn btn-neutral float-right" title="Heart rate" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

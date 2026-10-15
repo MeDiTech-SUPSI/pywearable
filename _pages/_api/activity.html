@@ -1,0 +1,236 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activity &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Adherence" href="adherence.html" />
+    <link rel="prev" title="API reference" href="../api.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Activity</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.activity.get_activity_statistic"><code class="docutils literal notranslate"><span class="pre">get_activity_statistic()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.activity.get_activity_statistics"><code class="docutils literal notranslate"><span class="pre">get_activity_statistics()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.activity.get_daily_activity_statistics"><code class="docutils literal notranslate"><span class="pre">get_daily_activity_statistics()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="adherence.html">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Activity</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/activity.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="activity">
+<h1>Activity<a class="headerlink" href="#activity" title="Link to this heading"></a></h1>
+<p>Use <a class="reference internal" href="#pywearable.activity.get_activity_statistics" title="pywearable.activity.get_activity_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.activity.get_activity_statistics()</span></code></a> as the canonical
+entry point. The fixed-resolution helpers below specialize its defaults and
+share its parameter semantics.</p>
+<p id="module-pywearable.activity">Step-count volume and peak-hour timing across temporal resolutions.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.activity.get_activity_statistic">
+<span class="sig-prename descclassname"><span class="pre">pywearable.activity.</span></span><span class="sig-name descname"><span class="pre">get_activity_statistic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statistic</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.activity.get_activity_statistic" title="Link to this definition"></a></dt>
+<dd><p>Return one named activity feature; see <a class="reference internal" href="#pywearable.activity.get_activity_statistics" title="pywearable.activity.get_activity_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">get_activity_statistics()</span></code></a>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>)</p></li>
+<li><p><strong>statistic</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.activity.get_activity_statistics">
+<span class="sig-prename descclassname"><span class="pre">pywearable.activity.</span></span><span class="sig-name descname"><span class="pre">get_activity_statistics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">statistic</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'daily'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_reference</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">aggregation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_coverage</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycle_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_valid_children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.activity.get_activity_statistics" title="Link to this definition"></a></dt>
+<dd><p>Return step-volume and timing features at one or more resolutions.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>) – Loader exposing timestamped incremental step intervals or calendar-day
+step totals through the shared activity schema.</p></li>
+<li><p><strong>statistic</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><em>tuple</em></a><em> | </em><em>None</em>) – One feature name or a sequence. Timestamped sources support
+<code class="docutils literal notranslate"><span class="pre">activity_steps</span></code>, <code class="docutils literal notranslate"><span class="pre">activity_peak_60min_steps</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">activity_peak_60min_start</span></code>. Daily-summary sources support only
+<code class="docutils literal notranslate"><span class="pre">activity_steps</span></code>. Omitting the argument selects every supported
+feature for that source.</p></li>
+<li><p><strong>user_id</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><em>tuple</em></a><em> | </em><em>None</em>) – One participant, several participants, or <code class="docutils literal notranslate"><span class="pre">&quot;all&quot;</span></code>/<code class="docutils literal notranslate"><span class="pre">None</span></code>.</p></li>
+<li><p><strong>start_date</strong> – Inclusive/exclusive bounds. Calendar resolutions use participant-local
+dates; fixed resolutions use the clock selected by <code class="docutils literal notranslate"><span class="pre">time_reference</span></code>.</p></li>
+<li><p><strong>end_date</strong> – Inclusive/exclusive bounds. Calendar resolutions use participant-local
+dates; fixed resolutions use the clock selected by <code class="docutils literal notranslate"><span class="pre">time_reference</span></code>.</p></li>
+<li><p><strong>resolution</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Timedelta.html#pandas.Timedelta" title="(in pandas v3.0.6)"><em>Timedelta</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><em>tuple</em></a>) – A fixed duration, calendar or sleep-cycle name, or an increasing
+hierarchy. <code class="docutils literal notranslate"><span class="pre">&quot;1h&quot;</span></code> returns hourly step totals. Calendar-day sources
+start at daily resolution. Weekly, monthly, and yearly scalar requests
+are shorthand for daily-to-parent hierarchies.</p></li>
+<li><p><strong>loader_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> | </em><em>None</em>) – Extra keyword arguments passed only to the loader method.</p></li>
+<li><p><strong>time_reference</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;local&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;utc&quot;</span></code>. Calendar and cycle windows
+default to local time; fixed windows prefer UTC when available.</p></li>
+<li><p><strong>aggregation</strong> – Operation at each upper hierarchy level. Activity defaults are
+feature-specific: steps are summed, while peak values and peak clock
+times are averaged. Thus <code class="docutils literal notranslate"><span class="pre">resolution=&quot;weekly&quot;</span></code> returns total weekly
+steps, whereas <code class="docutils literal notranslate"><span class="pre">resolution=[&quot;daily&quot;,</span> <span class="pre">&quot;weekly&quot;],</span> <span class="pre">aggregation=&quot;mean&quot;</span></code>
+returns mean valid daily steps.</p></li>
+<li><p><strong>min_coverage</strong> – Optional threshold per level. For timestamped primary windows,
+coverage is the union of one-minute intervals containing valid heart
+rate and native intervals containing positive steps, divided by the
+requested window duration. For native daily summaries it is value
+availability. At upper levels it is the fraction of valid child
+features. Values below threshold become missing while measured
+coverage remains in <code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__coverage</span></code> columns.</p></li>
+<li><p><strong>cycle_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> | </em><em>None</em>) – Extra arguments passed to <a class="reference internal" href="cycle.html#pywearable.cycle.get_intervals" title="pywearable.cycle.get_intervals"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.cycle.get_intervals()</span></code></a>.</p></li>
+<li><p><strong>min_valid_children</strong> – Optional minimum number of valid children at each upper level.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code> trajectory containing every requested feature
+and its <code class="docutils literal notranslate"><span class="pre">__coverage</span></code> column. An interval contributes when it is
+fully contained in the requested window. Peak 60-minute values require
+one completely observed contiguous hour inside the requested window.
+Fixed-duration output also contains the alternate clock and the
+<code class="docutils literal notranslate"><span class="pre">timezone</span></code> UTC offset for each window.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)">pandas.DataFrame</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.activity.get_daily_activity_statistics">
+<span class="sig-prename descclassname"><span class="pre">pywearable.activity.</span></span><span class="sig-name descname"><span class="pre">get_daily_activity_statistics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.activity.get_daily_activity_statistics" title="Link to this definition"></a></dt>
+<dd><p>Return participant-local daily activity features.</p>
+<p>Timestamped step intervals are aggregated into local calendar days, while
+calendar-day step totals retain their date labels.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../api.html" class="btn btn-neutral float-left" title="API reference" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="adherence.html" class="btn btn-neutral float-right" title="Adherence" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

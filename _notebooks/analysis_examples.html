@@ -1,0 +1,1007 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analyze wearable data with pywearable &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Implement a custom pywearable loader" href="custom_loader.html" />
+    <link rel="prev" title="Visualization guide" href="../_pages/visualization.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Analyze wearable data with pywearable</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Setup">Setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Start-with-loader-capabilities">Start with loader capabilities</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Choose-one-well-supported-example-interval">Choose one well-supported example interval</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Extract-features-across-domains">Extract features across domains</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Sleep-anchored-cycles">Sleep-anchored cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Hierarchies-preserve-the-aggregation-path">Hierarchies preserve the aggregation path</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Imputation-and-trends-are-explicit-trajectory-operations">Imputation and trends are explicit trajectory operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Calendar-and-coverage-views">Calendar and coverage views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Loader-aware-sleep-views">Loader-aware sleep views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Period-comparison">Period comparison</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Analyze wearable data with pywearable</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_notebooks/analysis_examples.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Analyze-wearable-data-with-pywearable">
+<h1>Analyze wearable data with pywearable<a class="headerlink" href="#Analyze-wearable-data-with-pywearable" title="Link to this heading"></a></h1>
+<p>This example guide follows one Oura participant from raw loader access to domain features, sleep-anchored cycles, hierarchies, trajectory post-processing, and visualization. The measurements are real, and calendar dates have been shifted.</p>
+<p>The guide shows how to:</p>
+<ul class="simple">
+<li><p>check which streams a loader exposes;</p></li>
+<li><p>extract activity, heart-rate, HRV, respiration, SpO2, sleep, and provider-native trajectories;</p></li>
+<li><p>distinguish calendar resolutions, sleep cycles, and hierarchical aggregation;</p></li>
+<li><p>impute selected gaps, add a historical trend, and choose a plot.</p></li>
+</ul>
+<section id="Setup">
+<h2>Setup<a class="headerlink" href="#Setup" title="Link to this heading"></a></h2>
+<p>The saved outputs are included for illustration. To run the notebook, set <code class="docutils literal notranslate"><span class="pre">PYWEARABLE_OURA_ROOT</span></code> to the root directory of an Oura API v2 export.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import os
+import warnings
+from pathlib import Path
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib.ticker import FuncFormatter
+from IPython.display import display
+
+from pywearable import (
+    activity,
+    cycle,
+    heart_rate,
+    hrv,
+    provider_features,
+    respiration,
+    schema,
+    sleep,
+    trajectory,
+    visualization,
+)
+from pywearable.loader import OuraLoader
+
+warnings.filterwarnings(
+    &quot;ignore&quot;,
+    message=r&quot;.*Oura heart-rate samples have no unambiguous local offset.*&quot;,
+)
+
+data_root_value = os.environ.get(&quot;PYWEARABLE_OURA_ROOT&quot;)
+if data_root_value is None:
+    raise FileNotFoundError(
+        &quot;Set PYWEARABLE_OURA_ROOT to an Oura API v2 export root.&quot;
+    )
+data_root = Path(data_root_value).expanduser()
+if not data_root.is_dir():
+    raise FileNotFoundError(
+        &quot;PYWEARABLE_OURA_ROOT must point to an Oura API v2 export root.&quot;
+    )
+
+loader = OuraLoader(data_root)
+source_user = loader.get_user_ids()[0]
+public_user = &quot;example-participant&quot;
+print(&quot;Loaded one Oura participant&quot;)
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Loaded one Oura participant
+</pre></div></div>
+</div>
+</section>
+<section id="Start-with-loader-capabilities">
+<h2>Start with loader capabilities<a class="headerlink" href="#Start-with-loader-capabilities" title="Link to this heading"></a></h2>
+<p>What can be extracted always depends on the selected loader. In the current <code class="docutils literal notranslate"><span class="pre">OuraLoader</span></code> implementation, pywearable can access daily activity summaries, subdaily heart rate, provider-computed HRV, nightly respiratory-rate and SpO2 summaries, sleep summaries and stages, and readiness features. Timestamped step intervals are not currently available through this loader, so peak-hour activity and the multi-stream weekly overview cannot be calculated from it.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>capability_table = pd.DataFrame(
+    {
+        &quot;loader setting&quot;: [
+            &quot;activity_source&quot;,
+            &quot;activity_primary_resolution&quot;,
+            &quot;hrv_source&quot;,
+            &quot;respiratory_rate_source&quot;,
+            &quot;spo2_source&quot;,
+            &quot;provider_features&quot;,
+        ],
+        &quot;value&quot;: [
+            loader.activity_source,
+            loader.activity_primary_resolution,
+            loader.hrv_source,
+            loader.respiratory_rate_source,
+            loader.spo2_source,
+            f&quot;{len(loader.provider_features)} Oura readiness features&quot;,
+        ],
+    }
+)
+display(capability_table)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>loader setting</th>
+      <th>value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>activity_source</td>
+      <td>daily_summary</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>activity_primary_resolution</td>
+      <td>daily</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>hrv_source</td>
+      <td>provider_samples</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>respiratory_rate_source</td>
+      <td>provider_summary</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>spo2_source</td>
+      <td>provider_summary</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>provider_features</td>
+      <td>11 Oura readiness features</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Choose-one-well-supported-example-interval">
+<h2>Choose one well-supported example interval<a class="headerlink" href="#Choose-one-well-supported-example-interval" title="Link to this heading"></a></h2>
+<p>For the saved example, the code below selects the 70-day activity interval with the most observed days. Running it on another export selects an interval from that export.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>raw_activity = loader.load_activity_summary(source_user)
+source_start = raw_activity[schema.CALENDAR_DATE_COL].min().normalize()
+source_end = raw_activity[schema.CALENDAR_DATE_COL].max().normalize() + pd.Timedelta(days=1)
+
+all_steps = activity.get_activity_statistics(
+    loader,
+    statistic=activity.ACTIVITY_STATISTIC_STEPS,
+    user_id=source_user,
+    start_date=source_start,
+    end_date=source_end,
+    resolution=&quot;daily&quot;,
+)
+step_series = all_steps.xs(source_user, level=schema.USER_COL)[
+    activity.ACTIVITY_STATISTIC_STEPS
+]
+rolling_support = step_series.notna().rolling(70, min_periods=70).sum()
+final_day = rolling_support.idxmax()
+analysis_start = final_day - pd.Timedelta(days=69)
+analysis_end = final_day + pd.Timedelta(days=1)
+step_times = all_steps.index.get_level_values(schema.CALENDAR_DATE_COL)
+steps = all_steps[(step_times &gt;= analysis_start) &amp; (step_times &lt; analysis_end)]
+
+PUBLIC_MONDAY = pd.Timestamp(&quot;2026-01-05&quot;)
+
+def public_trajectory(frame):
+    # Replace identifiers and shift datetimes while retaining values.
+    rows = frame.reset_index()
+    rows[schema.USER_COL] = public_user
+    datetime_columns = [
+        column
+        for column in rows
+        if pd.api.types.is_datetime64_any_dtype(rows[column])
+    ]
+    if datetime_columns:
+        origin = min(rows[column].dropna().min() for column in datetime_columns)
+        anchor = PUBLIC_MONDAY + pd.Timedelta(days=origin.weekday())
+        for column in datetime_columns:
+            rows[column] = anchor + (rows[column] - origin)
+    return rows
+
+print(f&quot;Selected {len(steps)} study days; {step_series.loc[analysis_start:final_day].notna().sum()} contain steps&quot;)
+display(public_trajectory(steps).head())
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Selected 70 study days; 68 contain steps
+</pre></div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>user_id</th>
+      <th>calendar_date</th>
+      <th>activity_steps</th>
+      <th>activity_steps__coverage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>example-participant</td>
+      <td>2026-01-10</td>
+      <td>3806.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>example-participant</td>
+      <td>2026-01-11</td>
+      <td>26829.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>example-participant</td>
+      <td>2026-01-12</td>
+      <td>16185.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>example-participant</td>
+      <td>2026-01-13</td>
+      <td>10359.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>example-participant</td>
+      <td>2026-01-14</td>
+      <td>6286.0</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Extract-features-across-domains">
+<h2>Extract features across domains<a class="headerlink" href="#Extract-features-across-domains" title="Link to this heading"></a></h2>
+<p>Each domain returns the same trajectory shape: a <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code> index, feature columns, and matching coverage columns. The feature names describe the measurement; the loader determines whether the required stream exists.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>with warnings.catch_warnings():
+    warnings.simplefilter(&quot;ignore&quot;)
+    hourly_hr = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+        user_id=source_user,
+        start_date=analysis_start,
+        end_date=analysis_end,
+        resolution=&quot;1h&quot;,
+        time_reference=&quot;local&quot;,
+    )
+    daily_hr = heart_rate.get_heart_rate_statistics(
+        loader,
+        statistic=[
+            heart_rate.HEART_RATE_STATISTIC_MEAN,
+            heart_rate.HEART_RATE_STATISTIC_REST,
+        ],
+        user_id=source_user,
+        start_date=analysis_start,
+        end_date=analysis_end,
+        resolution=&quot;daily&quot;,
+    )
+
+nightly_sleep = sleep.get_sleep_statistics(
+    loader,
+    statistic=[
+        sleep.SLEEP_STATISTIC_TST,
+        sleep.SLEEP_STATISTIC_WASO,
+        sleep.SLEEP_STATISTIC_BEDTIME,
+        sleep.SLEEP_STATISTIC_SLEEP_SCORE,
+        sleep.SLEEP_STATISTIC_CPD_MIDPOINT,
+        sleep.SLEEP_STATISTIC_CPD_DURATION,
+    ],
+    user_id=source_user,
+    start_date=analysis_start,
+    end_date=analysis_end,
+    resolution=&quot;nightly&quot;,
+)
+nightly_hrv = hrv.get_hrv_statistics(
+    loader,
+    statistic=hrv.HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
+    user_id=source_user,
+    start_date=analysis_start,
+    end_date=analysis_end,
+    resolution=&quot;nightly&quot;,
+)
+breathing = respiration.get_respiration_statistics(
+    loader,
+    statistic=[
+        respiration.RESPIRATORY_RATE_STATISTIC_MEAN,
+        respiration.SPO2_STATISTIC_MEAN,
+    ],
+    user_id=source_user,
+    start_date=source_start,
+    end_date=source_end,
+    resolution=&quot;nightly&quot;,
+)
+readiness = provider_features.get_provider_features(
+    loader,
+    feature=provider_features.OURA_READINESS_SCORE,
+    user_id=source_user,
+    start_date=analysis_start,
+    end_date=analysis_end,
+)
+trajectories = {
+    &quot;Activity&quot;: steps,
+    &quot;Heart rate&quot;: daily_hr,
+    &quot;HRV&quot;: nightly_hrv,
+    &quot;Respiration and SpO2&quot;: breathing,
+    &quot;Sleep&quot;: nightly_sleep,
+    &quot;Oura readiness&quot;: readiness,
+}
+summary = pd.DataFrame(
+    {
+        &quot;rows&quot;: {name: len(frame) for name, frame in trajectories.items()},
+        &quot;feature columns&quot;: {
+            name: sum(
+                not column.endswith(&quot;__coverage&quot;)
+                and column not in {&quot;period_start&quot;, &quot;period_end&quot;}
+                for column in frame.columns
+            )
+            for name, frame in trajectories.items()
+        },
+        &quot;non-missing values&quot;: {
+            name: int(frame.notna().sum().sum())
+            for name, frame in trajectories.items()
+        },
+    }
+)
+display(summary)
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>rows</th>
+      <th>feature columns</th>
+      <th>non-missing values</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Activity</th>
+      <td>70</td>
+      <td>1</td>
+      <td>138</td>
+    </tr>
+    <tr>
+      <th>Heart rate</th>
+      <td>70</td>
+      <td>2</td>
+      <td>66</td>
+    </tr>
+    <tr>
+      <th>HRV</th>
+      <td>70</td>
+      <td>7</td>
+      <td>960</td>
+    </tr>
+    <tr>
+      <th>Respiration and SpO2</th>
+      <td>202</td>
+      <td>2</td>
+      <td>232</td>
+    </tr>
+    <tr>
+      <th>Sleep</th>
+      <td>70</td>
+      <td>6</td>
+      <td>766</td>
+    </tr>
+    <tr>
+      <th>Oura readiness</th>
+      <td>70</td>
+      <td>1</td>
+      <td>130</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Sleep-anchored-cycles">
+<h2>Sleep-anchored cycles<a class="headerlink" href="#Sleep-anchored-cycles" title="Link to this heading"></a></h2>
+<p>A night runs from one main-sleep bedtime to its end, an awake cycle runs from that end to the following bedtime, and a physiological cycle runs from one bedtime to the next.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>cycle_rows = []
+for cycle_type in (
+    cycle.CYCLE_NIGHT,
+    cycle.CYCLE_AWAKE,
+    cycle.CYCLE_PHYSIOLOGICAL,
+):
+    intervals = cycle.get_intervals(
+        loader,
+        cycle_type,
+        user_id=source_user,
+        start_date=analysis_start,
+        end_date=analysis_end,
+    ).xs(source_user, level=schema.USER_COL)
+    valid = intervals[intervals[&quot;interval_valid&quot;]].head(5)
+    cycle_rows.append(
+        pd.DataFrame(
+            {
+                &quot;cycle&quot;: cycle_type,
+                &quot;study row&quot;: range(1, len(valid) + 1),
+                &quot;duration (hours)&quot;: (
+                    valid[&quot;end_time&quot;] - valid[&quot;start_time&quot;]
+                ).dt.total_seconds().div(3600).round(2).to_numpy(),
+            }
+        )
+    )
+display(pd.concat(cycle_rows, ignore_index=True))
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>cycle</th>
+      <th>study row</th>
+      <th>duration (hours)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>cycle_night</td>
+      <td>1</td>
+      <td>8.45</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>cycle_night</td>
+      <td>2</td>
+      <td>7.43</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>cycle_night</td>
+      <td>3</td>
+      <td>7.25</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>cycle_night</td>
+      <td>4</td>
+      <td>7.44</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>cycle_night</td>
+      <td>5</td>
+      <td>7.47</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>cycle_awake</td>
+      <td>1</td>
+      <td>15.77</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>cycle_awake</td>
+      <td>2</td>
+      <td>17.20</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>cycle_awake</td>
+      <td>3</td>
+      <td>15.98</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>cycle_awake</td>
+      <td>4</td>
+      <td>16.98</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>cycle_awake</td>
+      <td>5</td>
+      <td>17.38</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>cycle_physiological</td>
+      <td>1</td>
+      <td>24.22</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>cycle_physiological</td>
+      <td>2</td>
+      <td>24.63</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>cycle_physiological</td>
+      <td>3</td>
+      <td>23.23</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>cycle_physiological</td>
+      <td>4</td>
+      <td>24.42</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>cycle_physiological</td>
+      <td>5</td>
+      <td>24.85</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Hierarchies-preserve-the-aggregation-path">
+<h2>Hierarchies preserve the aggregation path<a class="headerlink" href="#Hierarchies-preserve-the-aggregation-path" title="Link to this heading"></a></h2>
+<p>Here nightly total sleep time is the child level. Weekly means and standard deviations are calculated from valid nights, so each night receives equal weight. The lower-level observations and parent estimates remain visible together.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>hierarchy_ax = visualization.plot_hierarchical_trajectory(
+    loader,
+    sleep.SLEEP_STATISTIC_TST,
+    (&quot;nightly&quot;, &quot;weekly&quot;),
+    user_id=source_user,
+    start_date=analysis_start,
+    end_date=analysis_end,
+    child_label=&quot;Nightly TST&quot;,
+    center_label=&quot;Weekly mean&quot;,
+    range_label=&quot;Weekly mean ± SD&quot;,
+    title=&quot;Nightly total sleep time and weekly context&quot;,
+    ylabel=&quot;Total sleep time (minutes)&quot;,
+    show=False,
+)
+
+def relative_week(value, _):
+    timestamp = pd.Timestamp(mdates.num2date(value)).tz_localize(None)
+    return f&quot;Week {(timestamp.normalize() - analysis_start).days // 7 + 1}&quot;
+
+hierarchy_ax.xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
+hierarchy_ax.xaxis.set_major_formatter(FuncFormatter(relative_week))
+hierarchy_ax.tick_params(axis=&quot;x&quot;, rotation=0)
+hierarchy_ax.set_xlabel(&quot;Study week&quot;)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_12_0.png" src="../_images/_notebooks_analysis_examples_12_0.png" />
+</div>
+</div>
+</section>
+<section id="Imputation-and-trends-are-explicit-trajectory-operations">
+<h2>Imputation and trends are explicit trajectory operations<a class="headerlink" href="#Imputation-and-trends-are-explicit-trajectory-operations" title="Link to this heading"></a></h2>
+<p>Imputation fills eligible gaps and adds <code class="docutils literal notranslate"><span class="pre">__is_imputed</span></code>. Trend estimation then adds participant-specific baseline, normal-range, deviation, and support columns. Coverage continues to describe the source evidence.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>public_steps = public_trajectory(steps).set_index(steps.index.names)[steps.columns]
+filled_steps = trajectory.impute_trajectory(
+    public_steps,
+    activity.ACTIVITY_STATISTIC_STEPS,
+    method=&quot;rolling_median&quot;,
+    window=7,
+    min_periods=4,
+)
+trended_steps = trajectory.compute_trajectory_trend(
+    filled_steps,
+    activity.ACTIVITY_STATISTIC_STEPS,
+    baseline_window=7,
+    min_periods_baseline=4,
+    normal_range_window=21,
+    min_periods_normal_range=10,
+)
+trend_axes = visualization.plot_trajectory_trend(
+    trended_steps,
+    activity.ACTIVITY_STATISTIC_STEPS,
+    show_coverage=True,
+    title=&quot;Daily steps with imputation and historical context&quot;,
+    ylabel=&quot;Steps&quot;,
+    show=False,
+)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_14_0.png" src="../_images/_notebooks_analysis_examples_14_0.png" />
+</div>
+</div>
+</section>
+<section id="Calendar-and-coverage-views">
+<h2>Calendar and coverage views<a class="headerlink" href="#Calendar-and-coverage-views" title="Link to this heading"></a></h2>
+<p>Calendar heatmaps suit daily outcomes. Coverage heatmaps reveal where subdaily observations are available; here the hourly heart-rate view makes the sparse daytime sampling visible. A weekday heart-rate profile is therefore not derived from these data.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>visualization.plot_calendar_heatmap(
+    public_steps,
+    activity.ACTIVITY_STATISTIC_STEPS,
+    title=&quot;Daily steps&quot;,
+    colorbar_label=&quot;Steps&quot;,
+    show=False,
+)
+plt.show()
+
+public_hourly = public_trajectory(hourly_hr).set_index(hourly_hr.index.names)[hourly_hr.columns]
+visualization.plot_coverage_heatmap(
+    public_hourly,
+    heart_rate.HEART_RATE_STATISTIC_MEAN,
+    title=&quot;Hourly heart-rate coverage&quot;,
+    show=False,
+)
+plt.show()
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_16_0.png" src="../_images/_notebooks_analysis_examples_16_0.png" />
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_16_1.png" src="../_images/_notebooks_analysis_examples_16_1.png" />
+</div>
+</div>
+</section>
+<section id="Loader-aware-sleep-views">
+<h2>Loader-aware sleep views<a class="headerlink" href="#Loader-aware-sleep-views" title="Link to this heading"></a></h2>
+<p>Composite plots accept a loader because they coordinate sleep summaries, stages, and heart-rate samples. <code class="docutils literal notranslate"><span class="pre">plot_sleep_summary</span></code> takes inclusive sleep-calendar bounds, so the first selected night retains stages from the preceding civil date.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>sleep_dates = loader.load_sleep_summary(
+    source_user, analysis_start, analysis_end
+)[schema.CALENDAR_DATE_COL]
+summary_start = sleep_dates.iloc[0]
+summary_end = sleep_dates.iloc[min(13, len(sleep_dates) - 1)]
+sleep_axes = visualization.plot_sleep_summary(
+    loader,
+    source_user,
+    summary_start,
+    summary_end,
+    cpd=(&quot;midpoint&quot;, &quot;duration&quot;),
+    title=&quot;Sleep stages, timing, score, and composite phase deviation&quot;,
+    fontsize=9,
+    show=False,
+)
+sleep_axis = sleep_axes[&quot;sleep&quot;]
+sleep_axis.set_yticklabels(
+    [f&quot;Night {index + 1}&quot; for index in range(len(sleep_axis.get_yticks()))]
+)
+sleep_axis.set_ylabel(&quot;Observed night&quot;)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_18_0.png" src="../_images/_notebooks_analysis_examples_18_0.png" />
+</div>
+</div>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[10]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>heart_rate_night = None
+for row in loader.load_sleep_summary(source_user, analysis_start, analysis_end).itertuples(index=False):
+    samples = loader.load_heart_rate(
+        source_user,
+        start_date=row.local_time,
+        end_date=row.local_end_time,
+        time_col=schema.LOCAL_TIME_COL,
+    )
+    if samples[schema.HEART_RATE_COL].notna().any():
+        heart_rate_night = row.calendar_date
+        break
+assert heart_rate_night is not None
+visualization.plot_sleep_heart_rate(
+    loader,
+    source_user,
+    heart_rate_night,
+    show_coverage=True,
+    title=&quot;Heart rate through one observed sleep session&quot;,
+    show=False,
+)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_19_0.png" src="../_images/_notebooks_analysis_examples_19_0.png" />
+</div>
+</div>
+</section>
+<section id="Period-comparison">
+<h2>Period comparison<a class="headerlink" href="#Period-comparison" title="Link to this heading"></a></h2>
+<p>Period comparison expects an already aggregated trajectory. Here the daily step totals are aggregated to weekly sums before consecutive periods are compared.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[11]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>weekly_steps = activity.get_activity_statistics(
+    loader,
+    statistic=activity.ACTIVITY_STATISTIC_STEPS,
+    user_id=source_user,
+    start_date=analysis_start,
+    end_date=analysis_end,
+    resolution=(&quot;daily&quot;, &quot;weekly&quot;),
+    aggregation=&quot;sum&quot;,
+)
+public_weekly = public_trajectory(weekly_steps).set_index(weekly_steps.index.names)[weekly_steps.columns]
+weekly_feature = next(
+    column
+    for column in public_weekly
+    if column.endswith(&quot;__weekly_sum&quot;)
+)
+visualization.plot_period_comparison(
+    public_weekly,
+    weekly_feature,
+    title=&quot;Weekly steps&quot;,
+    ylabel=&quot;Steps&quot;,
+    show=False,
+)
+plt.show()
+<br/></pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_analysis_examples_21_0.png" src="../_images/_notebooks_analysis_examples_21_0.png" />
+</div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../_pages/visualization.html" class="btn btn-neutral float-left" title="Visualization guide" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="custom_loader.html" class="btn btn-neutral float-right" title="Implement a custom pywearable loader" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

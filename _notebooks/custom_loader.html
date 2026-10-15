@@ -1,0 +1,1761 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Implement a custom pywearable loader &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API reference" href="../_pages/api.html" />
+    <link rel="prev" title="Analyze wearable data with pywearable" href="analysis_examples.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Implement a custom pywearable loader</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Inspect-the-fictional-provider-export">Inspect the fictional provider export</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Plan-the-translation">Plan the translation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Implement-the-adapter">Implement the adapter</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Validate-the-canonical-boundary">Validate the canonical boundary</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Use-the-normal-pywearable-APIs">Use the normal pywearable APIs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Visualize-one-integrated-week">Visualize one integrated week</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Compare-the-provider-native-scores">Compare the provider-native scores</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Inspect-nightly-sleep">Inspect nightly sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Inspect-adherence-across-participants">Inspect adherence across participants</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#What-the-adapter-is-responsible-for">What the adapter is responsible for</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_pages/api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Implement a custom pywearable loader</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_notebooks/custom_loader.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="Implement-a-custom-pywearable-loader">
+<h1>Implement a custom pywearable loader<a class="headerlink" href="#Implement-a-custom-pywearable-loader" title="Link to this heading"></a></h1>
+<p>A loader adapts one project or provider to pywearable’s canonical schemas. Domain functions then calculate features without knowing the original file names or field conventions.</p>
+<p>Here we implement <code class="docutils literal notranslate"><span class="pre">WyvernLoader</span></code> for the <strong>Wyvern Band</strong>, a fictional wearable. The example export contains three participants and seven days, with deliberately inconsistent field names, units, and file formats.</p>
+<p>We will inspect the provider files, translate deliberately inconsistent fields into canonical schemas, validate the loader boundary, and then use the normal feature and visualization APIs.</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[1]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>import json
+import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
+import pandas as pd
+from IPython.display import display
+
+REPO_ROOT = Path.cwd().resolve()
+if not (REPO_ROOT / &quot;src&quot; / &quot;pywearable&quot;).is_dir():
+    REPO_ROOT = next(
+        parent
+        for parent in Path.cwd().resolve().parents
+        if (parent / &quot;src&quot; / &quot;pywearable&quot;).is_dir()
+    )
+sys.path.insert(0, str(REPO_ROOT / &quot;src&quot;))
+
+from pywearable import (
+    activity,
+    heart_rate,
+    provider_features,
+    respiration,
+    schema,
+    sleep,
+    visualization,
+)
+from pywearable.loader import BaseLoader
+
+DATA_ROOT = REPO_ROOT / &quot;docs&quot; / &quot;_notebooks&quot; / &quot;mock_provider_data&quot;
+START = pd.Timestamp(&quot;2026-03-02&quot;)
+END = pd.Timestamp(&quot;2026-03-09&quot;)
+
+WYVERN_SLEEP_HEALTH_SCORE = &quot;wyvern_sleep_health_score&quot;
+WYVERN_DAILY_STRAIN_SCORE = &quot;wyvern_daily_strain_score&quot;
+</pre></div>
+</div>
+</div>
+<section id="Inspect-the-fictional-provider-export">
+<h2>Inspect the fictional provider export<a class="headerlink" href="#Inspect-the-fictional-provider-export" title="Link to this heading"></a></h2>
+<p>The export uses one directory per participant and mixes TSV, CSV, and JSON files. Source names mix camel case and snake case, and none is assumed to be canonical.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[2]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>participant_dirs = sorted(
+    path for path in DATA_ROOT.glob(&quot;demo-*&quot;) if path.is_dir()
+)
+participants_source = pd.concat(
+    [
+        pd.read_csv(path / &quot;participant.tsv&quot;, sep=&quot; &quot;)
+        for path in participant_dirs
+    ],
+    ignore_index=True,
+)
+pulse_source = pd.concat(
+    [
+        pd.read_csv(path / &quot;pulse.tsv&quot;, sep=&quot;       &quot;)
+        for path in participant_dirs
+    ],
+    ignore_index=True,
+)
+movement_source = pd.concat(
+    [pd.read_csv(path / &quot;movement.csv&quot;) for path in participant_dirs],
+    ignore_index=True,
+)
+sleep_source = pd.json_normalize(
+    [
+        night
+        for path in participant_dirs
+        for night in json.loads(
+            (path / &quot;sleep.json&quot;).read_text()
+        )[&quot;nights&quot;]
+    ]
+)
+score_source = pd.DataFrame(
+    [
+        record
+        for path in participant_dirs
+        for record in json.loads(
+            (path / &quot;daily_scores.json&quot;).read_text()
+        )[&quot;records&quot;]
+    ]
+)
+inventory = pd.DataFrame(
+    [
+        (&quot;demo-*/participant.tsv&quot;, &quot;TSV&quot;, len(participant_dirs), len(participants_source)),
+        (&quot;demo-*/pulse.tsv&quot;, &quot;TSV&quot;, len(participant_dirs), len(pulse_source)),
+        (&quot;demo-*/movement.csv&quot;, &quot;CSV&quot;, len(participant_dirs), len(movement_source)),
+        (&quot;demo-*/sleep.json&quot;, &quot;JSON&quot;, len(participant_dirs), len(sleep_source)),
+        (&quot;demo-*/daily_scores.json&quot;, &quot;JSON&quot;, len(participant_dirs), len(score_source)),
+    ],
+    columns=[&quot;path pattern&quot;, &quot;format&quot;, &quot;files&quot;, &quot;records&quot;],
+)
+
+display(inventory)
+display(
+    pulse_source.head(3),
+    movement_source.head(3),
+    sleep_source[
+        [
+            &quot;memberCode&quot;,
+            &quot;sleepDate&quot;,
+            &quot;startedAt&quot;,
+            &quot;sleepSeconds&quot;,
+            &quot;nightlyRespiration.meanBreathsPerMinute&quot;,
+        ]
+    ].head(3),
+    score_source.head(3),
+)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>path pattern</th>
+      <th>format</th>
+      <th>files</th>
+      <th>records</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-*/participant.tsv</td>
+      <td>TSV</td>
+      <td>3</td>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-*/pulse.tsv</td>
+      <td>TSV</td>
+      <td>3</td>
+      <td>26499</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-*/movement.csv</td>
+      <td>CSV</td>
+      <td>3</td>
+      <td>1857</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>demo-*/sleep.json</td>
+      <td>JSON</td>
+      <td>3</td>
+      <td>19</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>demo-*/daily_scores.json</td>
+      <td>JSON</td>
+      <td>3</td>
+      <td>21</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>memberCode</th>
+      <th>capturedAtLocal</th>
+      <th>utcOffsetMinutes</th>
+      <th>pulseBpm</th>
+      <th>readingQuality</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:00</td>
+      <td>60</td>
+      <td>52</td>
+      <td>good</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:01</td>
+      <td>60</td>
+      <td>52</td>
+      <td>good</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:02</td>
+      <td>60</td>
+      <td>54</td>
+      <td>good</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>member_code</th>
+      <th>intervalStart</th>
+      <th>intervalSeconds</th>
+      <th>stepCount</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:00</td>
+      <td>900</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:15</td>
+      <td>900</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-01</td>
+      <td>2026-03-02T00:30</td>
+      <td>900</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>memberCode</th>
+      <th>sleepDate</th>
+      <th>startedAt</th>
+      <th>sleepSeconds</th>
+      <th>nightlyRespiration.meanBreathsPerMinute</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-01</td>
+      <td>2026-03-02</td>
+      <td>2026-03-01T23:22:00</td>
+      <td>28200</td>
+      <td>14.8</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-01</td>
+      <td>2026-03-03</td>
+      <td>2026-03-02T23:47:00</td>
+      <td>27540</td>
+      <td>14.8</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-01</td>
+      <td>2026-03-04</td>
+      <td>2026-03-03T22:51:00</td>
+      <td>29880</td>
+      <td>16.7</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>memberCode</th>
+      <th>day</th>
+      <th>sleepHealthScore</th>
+      <th>dailyStrain_score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-01</td>
+      <td>2026-03-02</td>
+      <td>80.0</td>
+      <td>63</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-01</td>
+      <td>2026-03-03</td>
+      <td>79.0</td>
+      <td>69</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-01</td>
+      <td>2026-03-04</td>
+      <td>77.0</td>
+      <td>71</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Plan-the-translation">
+<h2>Plan the translation<a class="headerlink" href="#Plan-the-translation" title="Link to this heading"></a></h2>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Source field</p></th>
+<th class="head"><p>Canonical field</p></th>
+<th class="head"><p>Conversion</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">capturedAtLocal</span></code>, <code class="docutils literal notranslate"><span class="pre">utcOffsetMinutes</span></code>, <code class="docutils literal notranslate"><span class="pre">pulseBpm</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">local_time</span></code>, <code class="docutils literal notranslate"><span class="pre">utc_time</span></code>, <code class="docutils literal notranslate"><span class="pre">timezone</span></code>, <code class="docutils literal notranslate"><span class="pre">heart_rate</span></code></p></td>
+<td><p>Parse the local clock, subtract the offset for UTC, and retain numeric beats per minute.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">movement.csv</span></code>: <code class="docutils literal notranslate"><span class="pre">intervalStart</span></code>, <code class="docutils literal notranslate"><span class="pre">intervalSeconds</span></code>, <code class="docutils literal notranslate"><span class="pre">stepCount</span></code>; <code class="docutils literal notranslate"><span class="pre">participant.tsv</span></code>: <code class="docutils literal notranslate"><span class="pre">utcOffsetMinutes</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">local_time</span></code>, <code class="docutils literal notranslate"><span class="pre">utc_time</span></code>, <code class="docutils literal notranslate"><span class="pre">timezone</span></code>, <code class="docutils literal notranslate"><span class="pre">duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">activity_steps</span></code></p></td>
+<td><p>Use the participant metadata offset for both clocks, convert seconds to milliseconds, and preserve zero-step intervals.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">nightKey</span></code>, <code class="docutils literal notranslate"><span class="pre">sleepDate</span></code>, <code class="docutils literal notranslate"><span class="pre">startedAt</span></code>, <code class="docutils literal notranslate"><span class="pre">endedAt</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">sleep_summary_id</span></code>, <code class="docutils literal notranslate"><span class="pre">calendar_date</span></code>, <code class="docutils literal notranslate"><span class="pre">local_time</span></code>, <code class="docutils literal notranslate"><span class="pre">local_end_time</span></code></p></td>
+<td><p>Retain the provider’s night identifier and sleep-calendar label; parse session bounds.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">sleepSeconds</span></code>, <code class="docutils literal notranslate"><span class="pre">awakeSeconds</span></code>, <code class="docutils literal notranslate"><span class="pre">unmeasurableSeconds</span></code>, stage totals</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">awake_duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">unmeasurable_sleep_duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">light_sleep_duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">deep_sleep_duration_in_ms</span></code>,
+<code class="docutils literal notranslate"><span class="pre">rem_sleep_duration_in_ms</span></code></p></td>
+<td><p>Convert seconds to milliseconds and aggregate stage durations by night.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">stageSegments[].startedAt</span></code>, <code class="docutils literal notranslate"><span class="pre">durationSeconds</span></code>, <code class="docutils literal notranslate"><span class="pre">stageCode</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">local_time</span></code>, <code class="docutils literal notranslate"><span class="pre">duration_in_ms</span></code>, <code class="docutils literal notranslate"><span class="pre">type</span></code>, linked by <code class="docutils literal notranslate"><span class="pre">sleep_summary_id</span></code></p></td>
+<td><p>Flatten stage intervals and map provider codes to canonical sleep-stage values.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">nightlyRespiration.meanBreathsPerMinute</span></code>, <code class="docutils literal notranslate"><span class="pre">stdBreathsPerMinute</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">respiratory_rate_mean</span></code>, <code class="docutils literal notranslate"><span class="pre">respiratory_rate_std</span></code>, indexed by <code class="docutils literal notranslate"><span class="pre">calendar_date</span></code></p></td>
+<td><p>Expose the available nightly summary without inventing respiration samples.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">sleepHealthScore</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">overall_sleep_score</span></code> and <code class="docutils literal notranslate"><span class="pre">wyvern_sleep_health_score</span></code></p></td>
+<td><p>Make the score available in sleep views while retaining its provider-native feature name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">dailyStrain_score</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">wyvern_daily_strain_score</span></code></p></td>
+<td><p>Retain the fictional provider prefix and native daily grain.</p></td>
+</tr>
+</tbody>
+</table>
+<p>A <code class="docutils literal notranslate"><span class="pre">BaseLoader</span></code> subclass implements the required sleep and heart-rate methods. Optional methods are added only for streams present in the export. Capability attributes tell pywearable which clocks and source grains are available.</p>
+</section>
+<section id="Implement-the-adapter">
+<h2>Implement the adapter<a class="headerlink" href="#Implement-the-adapter" title="Link to this heading"></a></h2>
+<p>Each method returns canonical columns and applies <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code> to the clock documented by that method. Schema preparers normalize types, add optional columns, and validate required fields. Returning a typed empty canonical frame is preferable to inventing observations when a supported interval has no rows.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[3]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>class WyvernLoader(BaseLoader):
+    &#39;&#39;&#39;Adapt participant-folder exports from the fictional Wyvern Band.&#39;&#39;&#39;
+
+    activity_source = &quot;samples&quot;
+    activity_primary_resolution = &quot;15min&quot;
+    activity_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+    heart_rate_time_columns = (schema.UTC_TIME_COL, schema.LOCAL_TIME_COL)
+    respiratory_rate_source = &quot;provider_summary&quot;
+    provider_features = frozenset(
+        {WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE}
+    )
+    provider_feature_definitions = {
+        WYVERN_SLEEP_HEALTH_SCORE: {&quot;grain&quot;: &quot;daily&quot;, &quot;numeric&quot;: True},
+        WYVERN_DAILY_STRAIN_SCORE: {&quot;grain&quot;: &quot;daily&quot;, &quot;numeric&quot;: True},
+    }
+
+    _stage_codes = {
+        &quot;AWK&quot;: schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+        &quot;LT&quot;: schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+        &quot;DP&quot;: schema.SLEEP_STAGE_DEEP_STAGE_VALUE,
+        &quot;REM&quot;: schema.SLEEP_STAGE_REM_STAGE_VALUE,
+        &quot;UNM&quot;: schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+        &quot;ASL&quot;: &quot;asleep&quot;,
+    }
+
+    def __init__(self, data_root):
+        &#39;&#39;&#39;Read every participant directory into source-shaped tables.
+
+        Each ``demo-*`` directory is self-contained. TSV, CSV, and
+        JSON records are concatenated here, but no canonical
+        conversion occurs until a ``load_*`` method is called.
+        &#39;&#39;&#39;
+        data_root = Path(data_root)
+        participant_dirs = sorted(
+            path for path in data_root.glob(&quot;demo-*&quot;) if path.is_dir()
+        )
+        self._participants = pd.concat(
+            [
+                pd.read_csv(path / &quot;participant.tsv&quot;, sep=&quot; &quot;)
+                for path in participant_dirs
+            ],
+            ignore_index=True,
+        )
+        self._heart_rate = pd.concat(
+            [
+                pd.read_csv(path / &quot;pulse.tsv&quot;, sep=&quot;       &quot;)
+                for path in participant_dirs
+            ],
+            ignore_index=True,
+        )
+        self._activity = pd.concat(
+            [pd.read_csv(path / &quot;movement.csv&quot;) for path in participant_dirs],
+            ignore_index=True,
+        )
+
+        sleep_nights = [
+            night
+            for path in participant_dirs
+            for night in json.loads(
+                (path / &quot;sleep.json&quot;).read_text()
+            )[&quot;nights&quot;]
+        ]
+        self._sleep = pd.json_normalize(sleep_nights)
+        stage_rows = []
+        for night in sleep_nights:
+            for segment in night[&quot;stageSegments&quot;]:
+                stage_rows.append(
+                    {
+                        &quot;memberCode&quot;: night[&quot;memberCode&quot;],
+                        &quot;nightKey&quot;: night[&quot;nightKey&quot;],
+                        **segment,
+                    }
+                )
+        self._stages = pd.DataFrame(stage_rows)
+
+        self._scores = pd.DataFrame(
+            [
+                record
+                for path in participant_dirs
+                for record in json.loads(
+                    (path / &quot;daily_scores.json&quot;).read_text()
+                )[&quot;records&quot;]
+            ]
+        )
+
+    def get_user_ids(self):
+        &#39;&#39;&#39;Return participant identifiers read from ``participant.tsv``.&#39;&#39;&#39;
+        return sorted(self._participants[&quot;memberCode&quot;].unique())
+
+    @staticmethod
+    def _filter(frame, column, start_date, end_date):
+        &#39;&#39;&#39;Apply half-open ``[start_date, end_date)`` canonical bounds.&#39;&#39;&#39;
+        values = pd.to_datetime(frame[column])
+        mask = pd.Series(True, index=frame.index)
+        if start_date is not None:
+            mask &amp;= values &gt;= pd.Timestamp(start_date)
+        if end_date is not None:
+            mask &amp;= values &lt; pd.Timestamp(end_date)
+        return frame.loc[mask].copy()
+
+    @staticmethod
+    def _utc_from_local(local_time, offset_minutes):
+        &#39;&#39;&#39;Subtract provider UTC offsets from naive local timestamps.&#39;&#39;&#39;
+        return pd.to_datetime(local_time) - pd.to_timedelta(
+            offset_minutes, unit=&quot;m&quot;
+        )
+
+    def load_heart_rate(
+        self,
+        user_id,
+        start_date=None,
+        end_date=None,
+        time_col=schema.LOCAL_TIME_COL,
+    ):
+        &#39;&#39;&#39;Convert ``pulse.tsv`` rows to canonical heart-rate samples.
+
+        ``capturedAtLocal`` becomes ``local_time``; the per-row
+        minute offset supplies both ``timezone`` and ``utc_time``;
+        ``pulseBpm`` becomes numeric ``heart_rate``. Filtering uses
+        the caller-selected canonical clock.
+        &#39;&#39;&#39;
+        rows = self._heart_rate[
+            self._heart_rate[&quot;memberCode&quot;].eq(user_id)
+        ].copy()
+        local_time = pd.to_datetime(rows[&quot;capturedAtLocal&quot;])
+        offsets = pd.to_timedelta(rows[&quot;utcOffsetMinutes&quot;], unit=&quot;m&quot;)
+        canonical = pd.DataFrame(
+            {
+                schema.UTC_TIME_COL: self._utc_from_local(
+                    local_time, rows[&quot;utcOffsetMinutes&quot;]
+                ),
+                schema.LOCAL_TIME_COL: local_time,
+                schema.TIMEZONE_COL: offsets,
+                schema.HEART_RATE_COL: rows[&quot;pulseBpm&quot;],
+            }
+        )
+        canonical = schema.prepare_heart_rate_samples(canonical)
+        return self._filter(canonical, time_col, start_date, end_date)
+
+    def load_activity_samples(self, user_id, start_date=None, end_date=None, **kwargs):
+        &#39;&#39;&#39;Convert ``movement.csv`` intervals to canonical activity samples.
+
+        The participant metadata supplies the UTC offset missing
+        from each movement row. ``intervalSeconds`` is converted to
+        ``duration_in_ms`` and ``stepCount`` to ``activity_steps``;
+        observed zero-step intervals remain observations, not nulls.
+        &#39;&#39;&#39;
+        rows = self._activity[
+            self._activity[&quot;member_code&quot;].eq(user_id)
+        ].copy()
+        local_time = pd.to_datetime(rows[&quot;intervalStart&quot;])
+        offset_minutes = self._participants.set_index(&quot;memberCode&quot;).loc[
+            user_id, &quot;utcOffsetMinutes&quot;
+        ]
+        canonical = pd.DataFrame(
+            {
+                schema.UTC_TIME_COL: self._utc_from_local(
+                    local_time, offset_minutes
+                ),
+                schema.LOCAL_TIME_COL: local_time,
+                schema.TIMEZONE_COL: pd.to_timedelta(
+                    offset_minutes, unit=&quot;m&quot;
+                ),
+                schema.DURATION_IN_MS_COL: rows[&quot;intervalSeconds&quot;] * 1_000,
+                schema.ACTIVITY_STEPS_COL: rows[&quot;stepCount&quot;],
+            }
+        )
+        canonical = schema.prepare_activity_samples(canonical)
+        return self._filter(
+            canonical, schema.LOCAL_TIME_COL, start_date, end_date
+        )
+
+    def load_sleep_summary(self, user_id, start_date=None, end_date=None, drop_duplicates=True):
+        &#39;&#39;&#39;Convert nightly JSON records to canonical sleep summaries.
+
+        Provider session identifiers, calendar labels, and local
+        bounds are retained. Durations are converted from seconds
+        to milliseconds, flattened stage intervals are totaled by
+        type, and ``sleepHealthScore`` is joined as canonical
+        ``overall_sleep_score`` for sleep-specific displays.
+        &#39;&#39;&#39;
+        rows = self._sleep[self._sleep[&quot;memberCode&quot;].eq(user_id)].copy()
+        score_rows = self._scores[
+            self._scores[&quot;memberCode&quot;].eq(user_id)
+        ][[&quot;memberCode&quot;, &quot;day&quot;, &quot;sleepHealthScore&quot;]]
+        rows = rows.merge(
+            score_rows,
+            left_on=[&quot;memberCode&quot;, &quot;sleepDate&quot;],
+            right_on=[&quot;memberCode&quot;, &quot;day&quot;],
+            how=&quot;left&quot;,
+        )
+        stage_totals = (
+            self._stages[self._stages[&quot;memberCode&quot;].eq(user_id)]
+            .groupby([&quot;nightKey&quot;, &quot;stageCode&quot;])[&quot;durationSeconds&quot;]
+            .sum()
+            .unstack(fill_value=0)
+        )
+        rows = rows.merge(stage_totals, on=&quot;nightKey&quot;, how=&quot;left&quot;)
+
+        def stage_duration(code):
+            return rows.get(code, pd.Series(0, index=rows.index)) * 1_000
+
+        canonical = pd.DataFrame(
+            {
+                schema.SLEEP_SUMMARY_ID_COL: rows[&quot;nightKey&quot;],
+                schema.CALENDAR_DATE_COL: rows[&quot;sleepDate&quot;],
+                schema.LOCAL_TIME_COL: rows[&quot;startedAt&quot;],
+                schema.LOCAL_END_TIME_COL: rows[&quot;endedAt&quot;],
+                schema.DURATION_IN_MS_COL: rows[&quot;sleepSeconds&quot;] * 1_000,
+                schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL: rows[&quot;awakeSeconds&quot;] * 1_000,
+                schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL: rows[&quot;unmeasurableSeconds&quot;] * 1_000,
+                schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL: stage_duration(&quot;LT&quot;),
+                schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL: stage_duration(&quot;DP&quot;),
+                schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL: stage_duration(&quot;REM&quot;),
+                schema.SLEEP_SUMMARY_OVERALL_SLEEP_SCORE_COL: rows[&quot;sleepHealthScore&quot;],
+            }
+        )
+        canonical = schema.prepare_sleep_summary(canonical)
+        canonical = self._filter(
+            canonical, schema.CALENDAR_DATE_COL, start_date, end_date
+        )
+        if drop_duplicates:
+            canonical = canonical.drop_duplicates(schema.CALENDAR_DATE_COL)
+        return canonical.reset_index(drop=True)
+
+    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+        &#39;&#39;&#39;Convert flattened stage segments to canonical intervals.
+
+        ``startedAt`` becomes ``local_time``, seconds become
+        ``duration_in_ms``, and Wyvern stage codes map to canonical
+        ``type`` values. ``nightKey`` preserves the required link
+        to ``sleep_summary_id``. Bounds use interval overlap.
+        &#39;&#39;&#39;
+        rows = self._stages[
+            self._stages[&quot;memberCode&quot;].eq(user_id)
+        ].copy()
+        canonical = pd.DataFrame(
+            {
+                schema.SLEEP_SUMMARY_ID_COL: rows[&quot;nightKey&quot;],
+                schema.LOCAL_TIME_COL: rows[&quot;startedAt&quot;],
+                schema.DURATION_IN_MS_COL: rows[&quot;durationSeconds&quot;] * 1_000,
+                schema.SLEEP_STAGE_SLEEP_TYPE_COL: rows[&quot;stageCode&quot;].map(
+                    self._stage_codes
+                ),
+            }
+        )
+        canonical = schema.prepare_sleep_stages(canonical)
+        stage_end = canonical[schema.LOCAL_TIME_COL] + pd.to_timedelta(
+            canonical[schema.DURATION_IN_MS_COL], unit=&quot;ms&quot;
+        )
+        mask = pd.Series(True, index=canonical.index)
+        if start_date is not None:
+            mask &amp;= stage_end &gt; pd.Timestamp(start_date)
+        if end_date is not None:
+            mask &amp;= canonical[schema.LOCAL_TIME_COL] &lt; pd.Timestamp(end_date)
+        return canonical.loc[mask].reset_index(drop=True)
+
+    def load_respiration_summary(
+        self, user_id, start_date=None, end_date=None
+    ):
+        &#39;&#39;&#39;Expose the nightly respiration summary stored in ``sleep.json``.
+
+        The two provider fields map directly to canonical
+        ``respiratory_rate_mean`` and ``respiratory_rate_std`` at
+        ``calendar_date`` grain. No sample-level stream is created.
+        &#39;&#39;&#39;
+        rows = self._sleep[self._sleep[&quot;memberCode&quot;].eq(user_id)].copy()
+        canonical = pd.DataFrame(
+            {
+                schema.CALENDAR_DATE_COL: rows[&quot;sleepDate&quot;],
+                schema.RESPIRATORY_RATE_MEAN_COL: rows[
+                    &quot;nightlyRespiration.meanBreathsPerMinute&quot;
+                ],
+                schema.RESPIRATORY_RATE_STD_COL: rows[
+                    &quot;nightlyRespiration.stdBreathsPerMinute&quot;
+                ],
+            }
+        )
+        canonical = schema.prepare_respiration_summary(canonical)
+        return self._filter(
+            canonical, schema.CALENDAR_DATE_COL, start_date, end_date
+        ).reset_index(drop=True)
+
+    def load_provider_feature(
+        self, feature, user_id, start_date=None, end_date=None, **kwargs
+    ):
+        &#39;&#39;&#39;Convert a named daily score to a canonical provider feature.
+
+        ``daily_scores.json`` uses ``day`` plus two differently
+        styled score names. The requested source column is renamed
+        to its registered Wyvern feature and returned at canonical
+        ``calendar_date`` grain, preserving missing score values.
+        &#39;&#39;&#39;
+        source_columns = {
+            WYVERN_SLEEP_HEALTH_SCORE: &quot;sleepHealthScore&quot;,
+            WYVERN_DAILY_STRAIN_SCORE: &quot;dailyStrain_score&quot;,
+        }
+        if feature not in source_columns:
+            raise ValueError(f&quot;WyvernLoader does not provide {feature!r}&quot;)
+        rows = self._scores[self._scores[&quot;memberCode&quot;].eq(user_id)]
+        canonical = pd.DataFrame(
+            {
+                schema.CALENDAR_DATE_COL: rows[&quot;day&quot;],
+                feature: rows[source_columns[feature]],
+            }
+        )
+        canonical = schema.prepare_provider_feature_summary(
+            canonical, feature
+        )
+        return self._filter(
+            canonical, schema.CALENDAR_DATE_COL, start_date, end_date
+        ).reset_index(drop=True)
+
+
+loader = WyvernLoader(DATA_ROOT)
+print(&quot;Participants:&quot;, loader.get_user_ids())
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Participants: [&#39;demo-01&#39;, &#39;demo-02&#39;, &#39;demo-03&#39;]
+</pre></div></div>
+</div>
+</section>
+<section id="Validate-the-canonical-boundary">
+<h2>Validate the canonical boundary<a class="headerlink" href="#Validate-the-canonical-boundary" title="Link to this heading"></a></h2>
+<p>Before using domain functions, inspect each loader method directly. Required columns, dtypes, sorting, duplicate handling, and empty intervals are part of the loader contract.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[4]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>participant = loader.get_user_ids()[0]
+hr = loader.load_heart_rate(
+    participant, START, START + pd.Timedelta(hours=1)
+)
+activity_samples = loader.load_activity_samples(
+    participant, START, START + pd.Timedelta(hours=1)
+)
+summaries = loader.load_sleep_summary(participant, START, END)
+stage_intervals = loader.load_sleep_stage(participant, START, END)
+respiration_summary = loader.load_respiration_summary(
+    participant, START, END
+)
+
+assert set(schema.HEART_RATE_REQUIRED_COLUMNS) &lt;= set(hr)
+assert set(schema.ACTIVITY_SAMPLE_REQUIRED_COLUMNS) &lt;= set(activity_samples)
+assert set(schema.SLEEP_SUMMARY_REQUIRED_COLUMNS) &lt;= set(summaries)
+assert set(schema.SLEEP_STAGE_REQUIRED_COLUMNS) &lt;= set(stage_intervals)
+assert {
+    schema.CALENDAR_DATE_COL,
+    schema.RESPIRATORY_RATE_MEAN_COL,
+} &lt;= set(respiration_summary)
+assert loader.load_respiration(participant, START, END).empty
+assert loader.load_heart_rate(
+    participant, END, END + pd.Timedelta(days=1)
+).empty
+assert provider_features.get_available_provider_features(loader) == [
+    WYVERN_DAILY_STRAIN_SCORE,
+    WYVERN_SLEEP_HEALTH_SCORE,
+]
+
+display(hr.head(3), activity_samples.head(3), summaries.head(3))
+print(&quot;Canonical loader checks passed&quot;)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>utc_time</th>
+      <th>local_time</th>
+      <th>timezone</th>
+      <th>heart_rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2026-03-01 23:00:00</td>
+      <td>2026-03-02 00:00:00</td>
+      <td>0 days 01:00:00</td>
+      <td>52</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2026-03-01 23:01:00</td>
+      <td>2026-03-02 00:01:00</td>
+      <td>0 days 01:00:00</td>
+      <td>52</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2026-03-01 23:02:00</td>
+      <td>2026-03-02 00:02:00</td>
+      <td>0 days 01:00:00</td>
+      <td>54</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>utc_time</th>
+      <th>local_time</th>
+      <th>timezone</th>
+      <th>duration_in_ms</th>
+      <th>activity_steps</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2026-03-01 23:00:00</td>
+      <td>2026-03-02 00:00:00</td>
+      <td>0 days 01:00:00</td>
+      <td>900000</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2026-03-01 23:15:00</td>
+      <td>2026-03-02 00:15:00</td>
+      <td>0 days 01:00:00</td>
+      <td>900000</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2026-03-01 23:30:00</td>
+      <td>2026-03-02 00:30:00</td>
+      <td>0 days 01:00:00</td>
+      <td>900000</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>sleep_summary_id</th>
+      <th>calendar_date</th>
+      <th>local_time</th>
+      <th>local_end_time</th>
+      <th>duration_in_ms</th>
+      <th>awake_duration_in_ms</th>
+      <th>unmeasurable_sleep_duration_in_ms</th>
+      <th>light_sleep_duration_in_ms</th>
+      <th>deep_sleep_duration_in_ms</th>
+      <th>rem_sleep_duration_in_ms</th>
+      <th>overall_sleep_score</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>demo-01-night-20260302</td>
+      <td>2026-03-02</td>
+      <td>2026-03-01 23:22:00</td>
+      <td>2026-03-02 07:16:00</td>
+      <td>28200000.0</td>
+      <td>240000.0</td>
+      <td>0.0</td>
+      <td>13740000.0</td>
+      <td>6000000.0</td>
+      <td>8460000.0</td>
+      <td>80.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>demo-01-night-20260303</td>
+      <td>2026-03-03</td>
+      <td>2026-03-02 23:47:00</td>
+      <td>2026-03-03 07:49:00</td>
+      <td>27540000.0</td>
+      <td>120000.0</td>
+      <td>1260000.0</td>
+      <td>15960000.0</td>
+      <td>3480000.0</td>
+      <td>8100000.0</td>
+      <td>79.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>demo-01-night-20260304</td>
+      <td>2026-03-04</td>
+      <td>2026-03-03 22:51:00</td>
+      <td>2026-03-04 07:13:00</td>
+      <td>29880000.0</td>
+      <td>240000.0</td>
+      <td>0.0</td>
+      <td>20880000.0</td>
+      <td>3060000.0</td>
+      <td>5940000.0</td>
+      <td>77.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<div class="highlight"><pre>
+Canonical loader checks passed
+</pre></div></div>
+</div>
+</section>
+<section id="Use-the-normal-pywearable-APIs">
+<h2>Use the normal pywearable APIs<a class="headerlink" href="#Use-the-normal-pywearable-APIs" title="Link to this heading"></a></h2>
+<p>Once the adapter returns canonical streams, no project-specific code is needed for feature extraction.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[5]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>daily_steps = activity.get_activity_statistics(
+    loader,
+    statistic=activity.ACTIVITY_STATISTIC_STEPS,
+    user_id=&quot;all&quot;,
+    start_date=START,
+    end_date=END,
+    resolution=&quot;daily&quot;,
+)
+daily_hr = heart_rate.get_heart_rate_statistics(
+    loader,
+    statistic=[
+        heart_rate.HEART_RATE_STATISTIC_MEAN,
+        heart_rate.HEART_RATE_STATISTIC_REST,
+    ],
+    user_id=participant,
+    start_date=START,
+    end_date=END,
+    resolution=&quot;daily&quot;,
+)
+nightly_sleep = sleep.get_sleep_statistics(
+    loader,
+    statistic=[
+        sleep.SLEEP_STATISTIC_TIB,
+        sleep.SLEEP_STATISTIC_TST,
+        sleep.SLEEP_STATISTIC_WASO,
+        sleep.SLEEP_STATISTIC_BEDTIME,
+    ],
+    user_id=participant,
+    start_date=START,
+    end_date=END,
+    resolution=&quot;nightly&quot;,
+)
+nightly_respiration = respiration.get_respiration_statistics(
+    loader,
+    statistic=[
+        respiration.RESPIRATORY_RATE_STATISTIC_MEAN,
+        respiration.RESPIRATORY_RATE_STATISTIC_STD,
+    ],
+    user_id=participant,
+    start_date=START,
+    end_date=END,
+    resolution=&quot;cycle_night&quot;,
+)
+daily_scores = provider_features.get_provider_features(
+    loader,
+    feature=[WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE],
+    user_id=&quot;all&quot;,
+    start_date=START,
+    end_date=END,
+)
+
+display(
+    daily_steps.head(6),
+    daily_hr.head(3),
+    nightly_sleep.head(3),
+    nightly_respiration.head(3),
+    daily_scores.head(6),
+)
+</pre></div>
+</div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>activity_steps</th>
+      <th>activity_steps__coverage</th>
+    </tr>
+    <tr>
+      <th>user_id</th>
+      <th>calendar_date</th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="6" valign="top">demo-01</th>
+      <th>2026-03-02</th>
+      <td>13041.0</td>
+      <td>0.960417</td>
+    </tr>
+    <tr>
+      <th>2026-03-03</th>
+      <td>14648.0</td>
+      <td>0.911806</td>
+    </tr>
+    <tr>
+      <th>2026-03-04</th>
+      <td>19407.0</td>
+      <td>0.979167</td>
+    </tr>
+    <tr>
+      <th>2026-03-05</th>
+      <td>15370.0</td>
+      <td>0.992361</td>
+    </tr>
+    <tr>
+      <th>2026-03-06</th>
+      <td>12968.0</td>
+      <td>0.989583</td>
+    </tr>
+    <tr>
+      <th>2026-03-07</th>
+      <td>8285.0</td>
+      <td>0.905556</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>heart_rate_mean</th>
+      <th>heart_rate_mean__coverage</th>
+      <th>heart_rate_rest</th>
+      <th>heart_rate_rest__coverage</th>
+    </tr>
+    <tr>
+      <th>user_id</th>
+      <th>local_time</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="3" valign="top">demo-01</th>
+      <th>2026-03-02</th>
+      <td>66.378655</td>
+      <td>0.950000</td>
+      <td>50.666667</td>
+      <td>0.950000</td>
+    </tr>
+    <tr>
+      <th>2026-03-03</th>
+      <td>74.034884</td>
+      <td>0.895833</td>
+      <td>47.266667</td>
+      <td>0.895833</td>
+    </tr>
+    <tr>
+      <th>2026-03-04</th>
+      <td>78.236061</td>
+      <td>0.959028</td>
+      <td>52.000000</td>
+      <td>0.959028</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>sleep_TIB</th>
+      <th>sleep_TIB__coverage</th>
+      <th>sleep_TST</th>
+      <th>sleep_TST__coverage</th>
+      <th>sleep_WASO</th>
+      <th>sleep_WASO__coverage</th>
+      <th>sleep_bedtime</th>
+      <th>sleep_bedtime__coverage</th>
+    </tr>
+    <tr>
+      <th>user_id</th>
+      <th>calendar_date</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="3" valign="top">demo-01</th>
+      <th>2026-03-02</th>
+      <td>474.0</td>
+      <td>1.0</td>
+      <td>470.0</td>
+      <td>1.0</td>
+      <td>4.0</td>
+      <td>1.0</td>
+      <td>2026-03-01 23:22:00</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-03</th>
+      <td>461.0</td>
+      <td>1.0</td>
+      <td>438.0</td>
+      <td>1.0</td>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>2026-03-02 23:47:00</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-04</th>
+      <td>502.0</td>
+      <td>1.0</td>
+      <td>498.0</td>
+      <td>1.0</td>
+      <td>4.0</td>
+      <td>1.0</td>
+      <td>2026-03-03 22:51:00</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>respiratory_rate_mean</th>
+      <th>respiratory_rate_mean__coverage</th>
+      <th>respiratory_rate_std</th>
+      <th>respiratory_rate_std__coverage</th>
+    </tr>
+    <tr>
+      <th>user_id</th>
+      <th>calendar_date</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="3" valign="top">demo-01</th>
+      <th>2026-03-02</th>
+      <td>14.8</td>
+      <td>NaN</td>
+      <td>1.0</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>2026-03-03</th>
+      <td>14.8</td>
+      <td>NaN</td>
+      <td>1.2</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>2026-03-04</th>
+      <td>16.7</td>
+      <td>NaN</td>
+      <td>2.1</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area rendered_html docutils container">
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>wyvern_sleep_health_score</th>
+      <th>wyvern_sleep_health_score__coverage</th>
+      <th>wyvern_daily_strain_score</th>
+      <th>wyvern_daily_strain_score__coverage</th>
+    </tr>
+    <tr>
+      <th>user_id</th>
+      <th>calendar_date</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="6" valign="top">demo-01</th>
+      <th>2026-03-02</th>
+      <td>80.0</td>
+      <td>1.0</td>
+      <td>63</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-03</th>
+      <td>79.0</td>
+      <td>1.0</td>
+      <td>69</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-04</th>
+      <td>77.0</td>
+      <td>1.0</td>
+      <td>71</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-05</th>
+      <td>78.0</td>
+      <td>1.0</td>
+      <td>63</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-06</th>
+      <td>80.0</td>
+      <td>1.0</td>
+      <td>64</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>2026-03-07</th>
+      <td>76.0</td>
+      <td>1.0</td>
+      <td>63</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+</section>
+<section id="Visualize-one-integrated-week">
+<h2>Visualize one integrated week<a class="headerlink" href="#Visualize-one-integrated-week" title="Link to this heading"></a></h2>
+<p>The weekly overview needs timestamped activity samples, heart rate, and sleep stages. Implementing those three streams makes the loader-aware visualization available automatically.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[6]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>visualization.plot_weekly_overview(
+    loader,
+    participant,
+    START,
+    END,
+    title=&quot;Wyvern mock export: one integrated week&quot;,
+    show=False,
+)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_custom_loader_12_0.png" src="../_images/_notebooks_custom_loader_12_0.png" />
+</div>
+</div>
+</section>
+<section id="Compare-the-provider-native-scores">
+<h2>Compare the provider-native scores<a class="headerlink" href="#Compare-the-provider-native-scores" title="Link to this heading"></a></h2>
+<p>These scores remain provider-specific: pywearable can align and aggregate them, but does not equate them with similarly named scores from another device. A sleep-health score is absent when no nightly sleep result is available; daytime strain can still be present when activity data exists.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[7]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>score_participant = &quot;demo-02&quot;
+score_axes = visualization.plot_trajectory(
+    daily_scores,
+    [WYVERN_SLEEP_HEALTH_SCORE, WYVERN_DAILY_STRAIN_SCORE],
+    user_id=score_participant,
+    title=f&quot;Provider-native daily scores: {score_participant}&quot;,
+    ylabel=&quot;Score (0-100)&quot;,
+    show_imputed=False,
+    show_coverage=True,
+    show=False,
+)
+score_axes[&quot;trajectory&quot;].set_ylim(0, 100)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_custom_loader_14_0.png" src="../_images/_notebooks_custom_loader_14_0.png" />
+</div>
+</div>
+</section>
+<section id="Inspect-nightly-sleep">
+<h2>Inspect nightly sleep<a class="headerlink" href="#Inspect-nightly-sleep" title="Link to this heading"></a></h2>
+<p>The compact sleep view uses the canonical summaries and native stage intervals. Because the loader maps <code class="docutils literal notranslate"><span class="pre">sleepHealthScore</span></code> to canonical <code class="docutils literal notranslate"><span class="pre">overall_sleep_score</span></code>, it can also be displayed beside each night; unavailable nights and scores remain blank.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[8]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>sleep_participant = &quot;demo-02&quot;
+visualization.plot_sleep_summary(
+    loader,
+    sleep_participant,
+    start_date=START,
+    end_date=END - pd.Timedelta(days=1),
+    show_scores=True,
+    title=f&quot;Seven sleep-calendar dates: {sleep_participant}&quot;,
+    show=False,
+)
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_custom_loader_16_0.png" src="../_images/_notebooks_custom_loader_16_0.png" />
+</div>
+</div>
+</section>
+<section id="Inspect-adherence-across-participants">
+<h2>Inspect adherence across participants<a class="headerlink" href="#Inspect-adherence-across-participants" title="Link to this heading"></a></h2>
+<p>To inspect adherence during the study, aggregate heart-rate coverage into 10-minute windows and compare its local-time pattern for each participant.</p>
+<div class="nbinput docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[9]:
+</pre></div>
+</div>
+<div class="input_area highlight-ipython3 notranslate"><div class="highlight"><pre><span></span>ten_minute_heart_rate = heart_rate.get_heart_rate_statistics(
+    loader,
+    statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
+    user_id=&quot;all&quot;,
+    start_date=START,
+    end_date=END,
+    resolution=&quot;10min&quot;,
+)
+
+participants = loader.get_user_ids()
+fig, axes = plt.subplots(
+    len(participants), 1, figsize=(12, 8), constrained_layout=True
+)
+for user_id, axis in zip(participants, axes):
+    visualization.plot_coverage_heatmap(
+        ten_minute_heart_rate,
+        heart_rate.HEART_RATE_STATISTIC_MEAN,
+        user_id=user_id,
+        interval=&quot;10min&quot;,
+        title=f&quot;{user_id}: 10-minute heart-rate coverage&quot;,
+        ax=axis,
+        show=False,
+    )
+plt.show()
+</pre></div>
+</div>
+</div>
+<div class="nboutput nblast docutils container">
+<div class="prompt empty docutils container">
+</div>
+<div class="output_area docutils container">
+<img alt="../_images/_notebooks_custom_loader_18_0.png" src="../_images/_notebooks_custom_loader_18_0.png" />
+</div>
+</div>
+</section>
+<section id="What-the-adapter-is-responsible-for">
+<h2>What the adapter is responsible for<a class="headerlink" href="#What-the-adapter-is-responsible-for" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Preserve the provider’s native resolution and units.</p></li>
+<li><p>Expose UTC and local clocks only when they are known.</p></li>
+<li><p>Apply <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code> consistently.</p></li>
+<li><p>Keep observed zero distinct from missing data.</p></li>
+<li><p>Return canonical empty frames for supported but empty intervals.</p></li>
+<li><p>Raise a clear error for unsupported provider-native features.</p></li>
+<li><p>Link every sleep-stage interval to a <code class="docutils literal notranslate"><span class="pre">sleep_summary_id</span></code>.</p></li>
+<li><p>Test duplicate records, timezone changes, empty intervals, and one end-to-end domain function for every implemented stream.</p></li>
+</ul>
+<p>Once those responsibilities are met, downstream analysis remains independent of the original source structure.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="analysis_examples.html" class="btn btn-neutral float-left" title="Analyze wearable data with pywearable" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../_pages/api.html" class="btn btn-neutral float-right" title="API reference" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
