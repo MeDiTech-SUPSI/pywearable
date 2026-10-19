@@ -5,9 +5,10 @@ name: tests
 
 on:
   push:
-    branches: [ "0.1.x" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "0.1.x" ]
+    branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
