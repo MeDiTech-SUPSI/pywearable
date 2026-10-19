@@ -94,6 +94,82 @@ class TesseraeCSVLoader(BaseLoader):
                 ]
             )
 
+    def load_bbi(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        bbi_folder = self.root_folder / user_id / "GarminPA"
+        pattern = os.path.join(bbi_folder, "*BBI*.csv")
+        bbi_files = glob.glob(pattern)
+        if len(bbi_files) == 0:
+            return schema.empty_bbi_frame(["source"])
+        query = f"""
+                SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+            """
+        bbi = (
+            self.con.execute(query)
+            .df()
+            .drop(
+                ["ParticipantID", "tz_source"],
+                axis=1,
+            )
+            .rename(columns={"Timestamp": "utc_time"})
+        )
+        if len(bbi) == 0:
+            return schema.empty_bbi_frame(["source"])
+        bbi["utc_time"] = pd.to_datetime(bbi["utc_time"], utc=True).dt.tz_localize(None)
+        bbi["timezone"] = bbi["local_time"] - bbi["utc_time"]
+        # we may have some milliseconds difference between utc and local time
+        bbi["timezone"] = bbi["timezone"].dt.round("1min")
+
+        if not (start_date is None):
+            bbi = bbi[bbi["local_time"] >= pd.Timestamp(start_date)]
+        if not (end_date is None):
+            bbi = bbi[bbi["local_time"] < pd.Timestamp(end_date)]
+        bbi["source"] = "garmin_pa_bbi"
+        return schema.prepare_bbi(bbi)
+
+    def load_calories(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        calories_folder = self.root_folder / user_id / "GarminPA"
+        pattern = os.path.join(calories_folder, "*Calories*.csv")
+        calories_files = glob.glob(pattern)
+        if len(calories_files) == 0:
+            return pd.DataFrame()
+        query = f"""
+                    SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+                """
+        calories = (
+            self.con.execute(query)
+            .df()
+            .drop(
+                ["ParticipantID", "tz_source"],
+                axis=1,
+            )
+            .rename(columns={"Timestamp": "utc_time"})
+        )
+        calories["utc_time"] = pd.to_datetime(
+            calories["utc_time"], utc=True
+        ).dt.tz_localize(None)
+
+        if not (start_date is None):
+            calories = calories[calories["local_time"] >= pd.Timestamp(start_date)]
+        if not (end_date is None):
+            calories = calories[calories["local_time"] < pd.Timestamp(end_date)]
+        return calories
+
     def load_daily_summary(
         self,
         user_id: str,
@@ -133,6 +209,13 @@ class TesseraeCSVLoader(BaseLoader):
                     (daily_summary["calendar_date"] < pd.Timestamp(end_date)),
                     :,
                 ]
+
+            if drop_duplicates:
+                daily_summary = daily_summary.sort_values(
+                    by=["calendar_date", "steps"]
+                ).drop_duplicates(
+                    subset="calendar_date", keep="last", ignore_index=True
+                )
             return daily_summary
         else:
             return pd.DataFrame()
@@ -184,13 +267,57 @@ class TesseraeCSVLoader(BaseLoader):
                 ]
             )
 
+    def load_floors(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        floors_folder = self.root_folder / user_id / "GarminPA"
+        pattern = os.path.join(floors_folder, "*Floors*.csv")
+        floors_files = glob.glob(pattern)
+        if len(floors_files) == 0:
+            return pd.DataFrame()
+        query = f"""
+            SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+        """
+        floors = (
+            self.con.execute(query)
+            .df()
+            .drop(
+                ["ParticipantID", "tz_source"],
+                axis=1,
+            )
+            .rename(columns={"Timestamp": "utc_time"})
+        )
+        floors["utc_time"] = pd.to_datetime(
+            floors["utc_time"], utc=True
+        ).dt.tz_localize(None)
+
+        if not (start_date is None):
+            floors = floors[floors["local_time"] >= pd.Timestamp(start_date)]
+        if not (end_date is None):
+            floors = floors[floors["local_time"] < pd.Timestamp(end_date)]
+        return floors
+
     def load_heart_rate(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
         time_col: str = "local_time",
+        source="garmin_health_api",
     ):
+        if source == "garmin_pa":
+            return self.load_heart_rate_from_garmin_pa(
+                user_id=user_id,
+                start_date=start_date,
+                end_date=end_date,
+                time_col=time_col,
+            )
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
         schema.validate_heart_rate_time_col(time_col)
@@ -214,6 +341,49 @@ class TesseraeCSVLoader(BaseLoader):
             )
             hr["local_time"] = pd.to_datetime(hr["local_time"])
             hr["timezone"] = hr["local_time"] - hr["utc_time"]
+            hr["heart_rate"] = pd.to_numeric(hr["beats_per_minute"], errors="coerce")
+            hr = hr[hr["heart_rate"] > 0]
+            hr = hr.drop_duplicates(subset="utc_time", keep="last")
+            hr = schema.prepare_heart_rate_samples(hr)
+            return (
+                schema.filter_heart_rate_by_time(hr, start_date, end_date, time_col)
+                .sort_values("utc_time")
+                .reset_index(drop=True)
+            )
+        else:
+            return schema.empty_heart_rate_frame(["tz_source", "beats_per_minute"])
+
+    def load_heart_rate_from_garmin_pa(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+        time_col: str = "local_time",
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        schema.validate_heart_rate_time_col(time_col)
+        # Load all files
+        heart_rate_folder = self.root_folder / user_id / "GarminPA"
+
+        pattern = os.path.join(heart_rate_folder, "*_HR_*.csv")
+        hr_files = glob.glob(pattern)
+        if len(hr_files) > 0:
+            query = f"""
+                        SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+                    """
+            hr = (
+                self.con.execute(query)
+                .df()
+                .drop(["ParticipantID", "tz_source"], axis=1)
+                .rename(columns={"Timestamp": "utc_time", "hr": "beats_per_minute"})
+            )
+
+            hr["utc_time"] = pd.to_datetime(hr["utc_time"], utc=True).dt.tz_localize(
+                None
+            )
+            hr["local_time"] = pd.to_datetime(hr["local_time"])
+            hr["timezone"] = hr["local_time"] - hr["utc_time"]
             hr["timezone_offset"] = hr["timezone"]
             hr["heart_rate"] = pd.to_numeric(hr["beats_per_minute"], errors="coerce")
             hr = hr[hr["heart_rate"] > 0]
@@ -228,6 +398,44 @@ class TesseraeCSVLoader(BaseLoader):
             return schema.empty_heart_rate_frame(
                 ["timezone_offset", "tz_source", "beats_per_minute"]
             )
+
+    def load_hrv_series(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+        time_col: str = "local_time",
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        schema.validate_heart_rate_time_col(time_col)
+        # Load all files
+        heart_rate_folder = self.root_folder / user_id / "GarminPA"
+
+        pattern = os.path.join(heart_rate_folder, "*HRV*.csv")
+        hrv_series_files = glob.glob(pattern)
+        if len(hrv_series_files) > 0:
+            query = f"""
+                            SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+                        """
+            hrv = (
+                self.con.execute(query)
+                .df()
+                .drop(["ParticipantID"], axis=1)
+                .rename(columns={"Timestamp": "utc_time", "start_time": "local_time"})
+            )
+            print(hrv)
+            print(hrv.columns)
+
+            hrv["utc_time"] = pd.to_datetime(hrv["utc_time"], utc=True).dt.tz_localize(
+                None
+            )
+            hrv["local_time"] = pd.to_datetime(hrv["local_time"])
+            hrv = hrv.drop_duplicates(subset="utc_time", keep="last")
+
+            return hrv.sort_values("utc_time").reset_index(drop=True)
+        else:
+            return pd.DataFrame()
 
     def load_move_iq(
         self,
@@ -262,6 +470,10 @@ class TesseraeCSVLoader(BaseLoader):
             )
 
             moveiq = moveiq.drop_duplicates(subset="utc_time", keep="last")
+            if not (start_date is None):
+                moveiq = moveiq[moveiq["local_time"] >= start_date]
+            if not (end_date is None):
+                moveiq = moveiq[moveiq["local_time"] < end_date]
             return moveiq.sort_values("utc_time", ignore_index=True)
         else:
             return pd.DataFrame(
@@ -758,41 +970,6 @@ class TesseraeCSVLoader(BaseLoader):
             return delta.total_seconds() * 1000
 
 
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
-__all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
