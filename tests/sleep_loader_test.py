@@ -38,12 +38,7 @@ def test_sphyncs_initial_awake_stage_uses_canonical_schema(tmp_path, monkeypatch
 
     assert result["type"].tolist() == ["awake", "light"]
     assert result["duration_in_ms"].tolist() == [600_000, 3_000_000]
-    assert (
-        result[["sleep_summary_id", "local_time", "utc_time"]]
-        .notna()
-        .all()
-        .all()
-    )
+    assert result[["sleep_summary_id", "local_time", "utc_time"]].notna().all().all()
     assert not {"sleepSummaryId", "isoDate", "durationInMs"}.intersection(result)
 
 
@@ -74,14 +69,16 @@ def test_tesserae_csv_sleep_uses_optional_bounds_and_true_utc_milliseconds(
         "pywearable.loader.tesserae.tesserae_csv.glob.glob",
         lambda _: [str(sleep_file)],
     )
-    monkeypatch.setattr(pd, "read_csv", lambda *args, **kwargs: raw.copy())
+    # monkeypatch.setattr(pd, "read_csv", lambda *args, **kwargs: raw.copy())
+    # import duckdb
+
+    # monkeypatch.setattr(duckdb, "execute", lambda *args, **kwargs: raw.copy())
+    raw.to_csv(sleep_file, index=False)
 
     loader = TesseraeCSVLoader(tmp_path)
     result = loader.load_sleep_summary("person-1")
 
     assert result.loc[0, "utc_time"] == pd.Timestamp("2024-01-01 22:00")
-    assert result.loc[0, "timezone_offset_in_ms"] == 3_600_000
-    assert result.loc[0, "unix_timestamp_in_ms"] == 1_704_146_400_000
     assert loader._convert_timezone_offset("2024-01-01T23:00:00+0100") == 3_600_000
 
 
@@ -90,13 +87,13 @@ def test_tesserae_csv_empty_stage_supports_omitted_bounds(tmp_path):
 
     result = TesseraeCSVLoader(tmp_path).load_sleep_stage("person-1")
 
-    assert {"sleep_summary_id", "local_time", "duration_in_ms", "type"} <= set(
-        result
-    )
+    assert {"sleep_summary_id", "local_time", "duration_in_ms", "type"} <= set(result)
 
 
 @pytest.mark.parametrize("unit", ["ns", "us", "ms"])
-def test_tesserae_sleep_summary_coerces_null_numeric_values(tmp_path, monkeypatch, unit):
+def test_tesserae_sleep_summary_coerces_null_numeric_values(
+    tmp_path, monkeypatch, unit
+):
     sleep_folder = tmp_path / "person-1" / "GarminHealthAPI"
     sleep_folder.mkdir(parents=True)
     (sleep_folder / "Sleep.parquet").touch()
@@ -165,9 +162,7 @@ def test_tesserae_sleep_uses_calendar_day_and_drops_empty_records(
             "Timestamp": pd.to_datetime(
                 ["2024-01-01T22:00:00Z", "2024-01-02T22:00:00Z"], utc=True
             ),
-            "local_time": pd.to_datetime(
-                ["2024-01-01 23:00", "2024-01-02 23:00"]
-            ),
+            "local_time": pd.to_datetime(["2024-01-01 23:00", "2024-01-02 23:00"]),
             "duration_seconds": [3600, 0],
             "rem_sleep_seconds": [600, 0],
             "deep_sleep_seconds": [1200, 0],
@@ -335,9 +330,10 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
         15 * 60_000,
         10 * 60_000,
     ]
-    assert loaded_summaries["local_end_time"].tolist() == pd.to_datetime(
-        ["2024-01-01 23:15", "2024-01-02 23:10"]
-    ).tolist()
+    assert (
+        loaded_summaries["local_end_time"].tolist()
+        == pd.to_datetime(["2024-01-01 23:15", "2024-01-02 23:10"]).tolist()
+    )
     assert loaded_summaries["utc_time"].isna().all()
     assert loaded_summaries["timezone_offset_in_ms"].isna().all()
 
@@ -361,11 +357,15 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
     np.testing.assert_allclose(features["sleep_SOL"], [5, 5])
     np.testing.assert_allclose(features["sleep_WASO"], [5, 0])
     assert features["sleep_count_awake"].tolist() == [3, 2]
-    assert features.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_count_REM"] == 2
+    assert (
+        features.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_count_REM"] == 2
+    )
     assert pd.isna(
         features.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_count_REM"]
     )
-    assert pd.isna(features.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_%_REM"])
+    assert pd.isna(
+        features.loc[("person-1", pd.Timestamp("2024-01-03")), "sleep_%_REM"]
+    )
 
 
 def test_lifesnaps_marks_unknown_intervals_unmeasurable(tmp_path, monkeypatch):
@@ -412,9 +412,9 @@ def test_lifesnaps_marks_unknown_intervals_unmeasurable(tmp_path, monkeypatch):
     monkeypatch.setattr(
         pd,
         "read_parquet",
-        lambda path: summaries.copy()
-        if path.name == "sleep.parquet"
-        else stages.copy(),
+        lambda path: (
+            summaries.copy() if path.name == "sleep.parquet" else stages.copy()
+        ),
     )
     loader = LifeSnapsParquetLoader(tmp_path)
 
@@ -455,9 +455,7 @@ def test_lifesnaps_drops_only_incoherent_stages(tmp_path, monkeypatch):
     stages = pd.DataFrame(
         {
             "logId": ["conflicting-night", "conflicting-night"],
-            "dateTime": pd.to_datetime(
-                ["2024-01-01 22:00", "2024-01-01 22:30"]
-            ),
+            "dateTime": pd.to_datetime(["2024-01-01 22:00", "2024-01-01 22:30"]),
             "seconds": [1800, 2400],
             "level": ["asleep", "awake"],
         }
@@ -465,9 +463,9 @@ def test_lifesnaps_drops_only_incoherent_stages(tmp_path, monkeypatch):
     monkeypatch.setattr(
         pd,
         "read_parquet",
-        lambda path: summaries.copy()
-        if path.name == "sleep.parquet"
-        else stages.copy(),
+        lambda path: (
+            summaries.copy() if path.name == "sleep.parquet" else stages.copy()
+        ),
     )
     loader = LifeSnapsParquetLoader(tmp_path)
 

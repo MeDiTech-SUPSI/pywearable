@@ -655,10 +655,10 @@ class TesseraeCSVLoader(BaseLoader):
                 ]
             )
         query = f"""
-            SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+            SELECT * FROM read_csv('{pattern}', union_by_name=True);
         """
+        # , types={{'Timestamp':'VARCHAR'}});
         sleep_summary = self.con.execute(query).df()
-
         # We need to assign a sleep summary Id
         sleep_summary["sleep_summary_id"] = (
             sleep_summary["ParticipantID"] + "-" + sleep_summary.index.astype(str)
@@ -970,6 +970,18 @@ class TesseraeCSVLoader(BaseLoader):
             return delta.total_seconds() * 1000
 
 
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
