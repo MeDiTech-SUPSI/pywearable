@@ -6,3 +6,4 @@ pytest-mock
 sphinx
 sphinx-rtd-theme
 nbsphinx
+duckdb
