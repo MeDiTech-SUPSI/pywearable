@@ -1,0 +1,351 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>What can I extract? &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Sleep-anchored cycles" href="cycles.html" />
+    <link rel="prev" title="Tesserae" href="_data_sources/tesserae.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data sources</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">What can I extract?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#activity">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heart-rate">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#heart-rate-variability">Heart-rate variability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#respiration-and-oxygen-saturation">Respiration and oxygen saturation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sleep">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#provider-native-features">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adherence">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">What can I extract?</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_pages/features.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="what-can-i-extract">
+<h1>What can I extract?<a class="headerlink" href="#what-can-i-extract" title="Link to this heading"></a></h1>
+<p>Feature functions return a trajectory with one row per participant and time
+window. Pass one feature name, a list of names, or <code class="docutils literal notranslate"><span class="pre">None</span></code> where documented
+to request all features in a domain.</p>
+<div class="admonition important">
+<p class="admonition-title">Important</p>
+<p>The features listed here are capabilities of pywearable, not a guarantee
+that every loader can calculate all of them. A feature is available only
+when the selected loader supplies its required source stream, time
+information, and sufficient source resolution. For example, daily activity
+summaries support daily step totals, while peak-hour activity requires
+timestamped activity samples. See <a class="reference internal" href="data_sources.html"><span class="doc">Data sources</span></a> for the streams
+exposed by each built-in loader.</p>
+</div>
+<p>The examples below use the canonical functions. Named getters such as
+<a class="reference internal" href="_api/sleep.html#pywearable.sleep.get_total_sleep_time" title="pywearable.sleep.get_total_sleep_time"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.sleep.get_total_sleep_time()</span></code></a> and
+<a class="reference internal" href="_api/heart_rate.html#pywearable.heart_rate.get_daily_mean_heart_rate" title="pywearable.heart_rate.get_daily_mean_heart_rate"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.heart_rate.get_daily_mean_heart_rate()</span></code></a> are equivalent
+convenience entry points.</p>
+<section id="activity">
+<h2>Activity<a class="headerlink" href="#activity" title="Link to this heading"></a></h2>
+<p>Use <code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.activity.get_activity_statistics()</span></code> to study accumulated
+movement and the most active hour.</p>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Activity features</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Question</p></th>
+<th class="head"><p>Feature</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>How many steps were recorded?</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">activity_steps</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>How many steps occurred in the most active 60 minutes?</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">activity_peak_60min_steps</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>When did that 60-minute peak begin?</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">activity_peak_60min_start</span></code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Peak-hour features require timestamped activity samples. Loaders backed only
+by daily summaries can still provide daily step totals.</p>
+<p>Heart-rate presence can establish wear coverage, but explicit unknown step
+counts remain missing rather than becoming zero or a complete total.</p>
+</section>
+<section id="heart-rate">
+<h2>Heart rate<a class="headerlink" href="#heart-rate" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/heart_rate.html#pywearable.heart_rate.get_heart_rate_statistics" title="pywearable.heart_rate.get_heart_rate_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.heart_rate.get_heart_rate_statistics()</span></code></a> for heart-rate
+samples. Available summaries include <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">median</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>,
+<code class="docutils literal notranslate"><span class="pre">std</span></code>, <code class="docutils literal notranslate"><span class="pre">p10</span></code>, <code class="docutils literal notranslate"><span class="pre">p90</span></code>, and <code class="docutils literal notranslate"><span class="pre">count</span></code>. <code class="docutils literal notranslate"><span class="pre">heart_rate_rest</span></code> estimates the
+resting value for daily, nightly, or sleep-cycle windows.</p>
+<p>For example, request several nightly summaries in one call:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pywearable</span> <span class="kn">import</span> <span class="n">cycle</span><span class="p">,</span> <span class="n">heart_rate</span>
+
+<span class="n">nightly_hr</span> <span class="o">=</span> <span class="n">heart_rate</span><span class="o">.</span><span class="n">get_heart_rate_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="p">[</span>
+        <span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_MEAN</span><span class="p">,</span>
+        <span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_MIN</span><span class="p">,</span>
+        <span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_REST</span><span class="p">,</span>
+    <span class="p">],</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-02-01&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">cycle</span><span class="o">.</span><span class="n">CYCLE_NIGHT</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="heart-rate-variability">
+<h2>Heart-rate variability<a class="headerlink" href="#heart-rate-variability" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/hrv.html#pywearable.hrv.get_hrv_statistics" title="pywearable.hrv.get_hrv_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.hrv.get_hrv_statistics()</span></code></a> for beat-to-beat interval data.</p>
+<table class="docutils align-default" id="id2">
+<caption><span class="caption-text">HRV feature families</span><a class="headerlink" href="#id2" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Family</p></th>
+<th class="head"><p>Features</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Time domain</p></td>
+<td><p>RMSSD, SDNN, pNN20, pNN50, median, minimum, mean, and maximum NN,
+SDNN/RMSSD, CVNN, CVSD, and IQRNN</p></td>
+</tr>
+<tr class="row-odd"><td><p>Frequency domain</p></td>
+<td><p>VLF, LF, and HF power, plus the LF/HF ratio</p></td>
+</tr>
+</tbody>
+</table>
+<p>The default implementation is self-contained. Install the <code class="docutils literal notranslate"><span class="pre">neurokit</span></code> extra
+when the NeuroKit backend is required by an analysis protocol. With
+<code class="docutils literal notranslate"><span class="pre">statistic=None</span></code>, the built-in backend returns the features listed above,
+whereas the NeuroKit backend returns its broader time- and frequency-domain
+set. Supplying <code class="docutils literal notranslate"><span class="pre">statistic</span></code> always limits the output to the requested names.
+Frequency-domain values from different backends are not interchangeable.</p>
+<p>Raw BBI data use five-minute primary windows. A shorter <code class="docutils literal notranslate"><span class="pre">window_step</span></code> creates
+overlapping estimates, which can still feed larger hierarchy levels. During
+sleep-cycle extraction, <code class="docutils literal notranslate"><span class="pre">awake</span></code> and <code class="docutils literal notranslate"><span class="pre">unmeasurable</span></code> stages are excluded by
+default; <code class="docutils literal notranslate"><span class="pre">sleep_stages_to_remove</span></code> configures or disables this filter. The
+observed timestamps are retained when handling missing BBI rows.</p>
+</section>
+<section id="respiration-and-oxygen-saturation">
+<h2>Respiration and oxygen saturation<a class="headerlink" href="#respiration-and-oxygen-saturation" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/respiration.html#pywearable.respiration.get_respiration_statistics" title="pywearable.respiration.get_respiration_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.respiration.get_respiration_statistics()</span></code></a> for respiratory
+rate and SpO2.</p>
+<ul class="simple">
+<li><p>Respiratory rate supports mean, median, standard deviation, p10, p90, and
+sample count.</p></li>
+<li><p>SpO2 supports mean, median, standard deviation, p10, minimum, and sample
+count.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">spo2_below_threshold_fraction</span></code> and
+<code class="docutils literal notranslate"><span class="pre">spo2_below_threshold_duration_seconds</span></code> quantify time below a selected
+threshold.</p></li>
+</ul>
+<p>Night and awake-cycle helpers are available through
+<a class="reference internal" href="_api/respiration.html#pywearable.respiration.get_night_respiration_statistics" title="pywearable.respiration.get_night_respiration_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.respiration.get_night_respiration_statistics()</span></code></a> and
+<a class="reference internal" href="_api/respiration.html#pywearable.respiration.get_awake_respiration_statistics" title="pywearable.respiration.get_awake_respiration_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.respiration.get_awake_respiration_statistics()</span></code></a>.</p>
+</section>
+<section id="sleep">
+<h2>Sleep<a class="headerlink" href="#sleep" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/sleep.html#pywearable.sleep.get_sleep_statistics" title="pywearable.sleep.get_sleep_statistics"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.sleep.get_sleep_statistics()</span></code></a> for one row per main sleep
+or for calendar aggregates derived from those nights.</p>
+<table class="docutils align-default" id="id3">
+<caption><span class="caption-text">Sleep feature groups</span><a class="headerlink" href="#id3" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 24.0%" />
+<col style="width: 76.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Group</p></th>
+<th class="head"><p>Available information</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Duration and continuity</p></td>
+<td><p>Time in bed (TIB), total sleep time (TST), sleep period time (SPT),
+wake after sleep onset (WASO), sleep efficiency (SE), and sleep
+maintenance efficiency (SME)</p></td>
+</tr>
+<tr class="row-odd"><td><p>Stage composition</p></td>
+<td><p>Deep, light, REM, NREM, awake, and unmeasurable durations; stage
+percentages; and stage counts</p></td>
+</tr>
+<tr class="row-even"><td><p>Latencies</p></td>
+<td><p>Sleep onset latency (SOL), get-up latency, and deep, light, and REM
+stage latencies</p></td>
+</tr>
+<tr class="row-odd"><td><p>Fragmentation</p></td>
+<td><p>Awakening count, awakening index, median awakening duration, stage
+transition count, and stage transition index</p></td>
+</tr>
+<tr class="row-even"><td><p>Timing</p></td>
+<td><p>Bedtime, sleep onset, wake-up, get-up, and midpoint</p></td>
+</tr>
+<tr class="row-odd"><td><p>Regularity</p></td>
+<td><p>Composite phase deviation (CPD) for midpoint and duration</p></td>
+</tr>
+<tr class="row-even"><td><p>Provider summary</p></td>
+<td><p>Nightly sleep score when supplied by the source</p></td>
+</tr>
+</tbody>
+</table>
+<p>Durations and latencies are expressed in minutes. Efficiencies and stage
+percentages are percentages. Timing features are participant-local clock
+values and remain meaningful across midnight. CPD midpoint and duration are
+expressed in hours.</p>
+<p>The Sleep Regularity Index (SRI) compares sleep/wake state with the same local
+time on the previous day. Use <a class="reference internal" href="_api/sleep.html#pywearable.sleep.get_sleep_regularity" title="pywearable.sleep.get_sleep_regularity"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.sleep.get_sleep_regularity()</span></code></a>
+for SRI with comparable-epoch coverage, or
+<a class="reference internal" href="_api/sleep.html#pywearable.sleep.get_sleep_regularity_index" title="pywearable.sleep.get_sleep_regularity_index"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.sleep.get_sleep_regularity_index()</span></code></a> for the SRI series alone.</p>
+</section>
+<section id="provider-native-features">
+<h2>Provider-native features<a class="headerlink" href="#provider-native-features" title="Link to this heading"></a></h2>
+<p>Some useful outcomes are calculated by individual wearable providers rather
+than by pywearable. Their availability therefore depends on both the provider
+and the loader: Garmin measures are expected only from Garmin-backed sources,
+for example, while Oura readiness requires Oura data.
+<a class="reference internal" href="_api/provider_features.html#pywearable.provider_features.get_available_provider_features" title="pywearable.provider_features.get_available_provider_features"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.provider_features.get_available_provider_features()</span></code></a> reports
+which provider-native features the current loader can supply. They currently
+include:</p>
+<ul class="simple">
+<li><p>Garmin stress and Body Battery measures;</p></li>
+<li><p>Fitbit stress-management scores and components; and</p></li>
+<li><p>Oura readiness scores and components.</p></li>
+</ul>
+<p>Provider names remain part of these feature names because their definitions
+are provider-specific:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">pywearable</span> <span class="kn">import</span> <span class="n">provider_features</span>
+
+<span class="n">available</span> <span class="o">=</span> <span class="n">provider_features</span><span class="o">.</span><span class="n">get_available_provider_features</span><span class="p">(</span><span class="n">loader</span><span class="p">)</span>
+<span class="n">readiness</span> <span class="o">=</span> <span class="n">provider_features</span><span class="o">.</span><span class="n">get_provider_features</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">feature</span><span class="o">=</span><span class="n">provider_features</span><span class="o">.</span><span class="n">OURA_READINESS_SCORE</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-02-01&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="adherence">
+<h2>Adherence<a class="headerlink" href="#adherence" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/adherence.html#pywearable.adherence.get_adherence" title="pywearable.adherence.get_adherence"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.adherence.get_adherence()</span></code></a> to quantify how much of each
+requested time window is represented by valid heart-rate, beat-to-beat
+interval, or sleep data.</p>
+</section>
+<section id="next-steps">
+<h2>Next steps<a class="headerlink" href="#next-steps" title="Link to this heading"></a></h2>
+<p>Choose the time scale and aggregation path in <a class="reference internal" href="resolutions.html"><span class="doc">Resolutions and hierarchies</span></a>. The domain
+pages in <a class="reference internal" href="api.html"><span class="doc">API reference</span></a> document the exact function parameters; exported feature
+constants mirror the names shown here.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="_data_sources/tesserae.html" class="btn btn-neutral float-left" title="Tesserae" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cycles.html" class="btn btn-neutral float-right" title="Sleep-anchored cycles" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,406 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canonical schema &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=80d5e7a1" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Sleep" href="sleep.html" />
+    <link rel="prev" title="Respiration" href="respiration.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="activity.html">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adherence.html">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Canonical schema</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_activity_frame"><code class="docutils literal notranslate"><span class="pre">empty_activity_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_activity_summary"><code class="docutils literal notranslate"><span class="pre">empty_activity_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_bbi_frame"><code class="docutils literal notranslate"><span class="pre">empty_bbi_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_heart_rate_frame"><code class="docutils literal notranslate"><span class="pre">empty_heart_rate_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_respiration_frame"><code class="docutils literal notranslate"><span class="pre">empty_respiration_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.empty_spo2_frame"><code class="docutils literal notranslate"><span class="pre">empty_spo2_frame()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.filter_heart_rate_by_time"><code class="docutils literal notranslate"><span class="pre">filter_heart_rate_by_time()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.normalize_time_bound"><code class="docutils literal notranslate"><span class="pre">normalize_time_bound()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_activity_samples"><code class="docutils literal notranslate"><span class="pre">prepare_activity_samples()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_activity_summary"><code class="docutils literal notranslate"><span class="pre">prepare_activity_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_bbi"><code class="docutils literal notranslate"><span class="pre">prepare_bbi()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_heart_rate_samples"><code class="docutils literal notranslate"><span class="pre">prepare_heart_rate_samples()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_provider_feature_samples"><code class="docutils literal notranslate"><span class="pre">prepare_provider_feature_samples()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_provider_feature_summary"><code class="docutils literal notranslate"><span class="pre">prepare_provider_feature_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_respiration_samples"><code class="docutils literal notranslate"><span class="pre">prepare_respiration_samples()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_respiration_summary"><code class="docutils literal notranslate"><span class="pre">prepare_respiration_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_sleep_sessions"><code class="docutils literal notranslate"><span class="pre">prepare_sleep_sessions()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_sleep_stages"><code class="docutils literal notranslate"><span class="pre">prepare_sleep_stages()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_sleep_summary"><code class="docutils literal notranslate"><span class="pre">prepare_sleep_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_spo2_samples"><code class="docutils literal notranslate"><span class="pre">prepare_spo2_samples()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.prepare_spo2_summary"><code class="docutils literal notranslate"><span class="pre">prepare_spo2_summary()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.schema.validate_heart_rate_time_col"><code class="docutils literal notranslate"><span class="pre">validate_heart_rate_time_col()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Canonical schema</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/schema.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pywearable.schema">
+<span id="canonical-schema"></span><h1>Canonical schema<a class="headerlink" href="#module-pywearable.schema" title="Link to this heading"></a></h1>
+<p>Canonical columns and validation shared by loaders and domain modules.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_activity_frame">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_activity_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_activity_frame" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical activity-sample columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_activity_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_activity_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_activity_summary" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical daily-activity columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_bbi_frame">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_bbi_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_bbi_frame" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical BBI columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_heart_rate_frame">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_heart_rate_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_heart_rate_frame" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical heart-rate columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_respiration_frame">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_respiration_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_respiration_frame" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical respiration columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.empty_spo2_frame">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">empty_spo2_frame</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">extra_columns</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.empty_spo2_frame" title="Link to this definition"></a></dt>
+<dd><p>Return an empty table containing the canonical SpO2 columns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.filter_heart_rate_by_time">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">filter_heart_rate_by_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_col</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'utc_time'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.filter_heart_rate_by_time" title="Link to this definition"></a></dt>
+<dd><p>Filter canonical heart-rate samples over <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>frame</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a>)</p></li>
+<li><p><strong>time_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.normalize_time_bound">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">normalize_time_bound</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_col</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.normalize_time_bound" title="Link to this definition"></a></dt>
+<dd><p>Return a timezone-naive bound in the selected clock.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>time_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_activity_samples">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_activity_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_activity_samples" title="Link to this definition"></a></dt>
+<dd><p>Normalize canonical timestamped incremental step intervals.</p>
+<p>Each row represents a half-open interval beginning at <code class="docutils literal notranslate"><span class="pre">utc_time</span></code> or
+<code class="docutils literal notranslate"><span class="pre">local_time</span></code> with <code class="docutils literal notranslate"><span class="pre">duration_in_ms</span></code> and an incremental
+<code class="docutils literal notranslate"><span class="pre">activity_steps</span></code> count. Zero-step intervals are valid observations.
+Exact duplicates are coalesced; conflicting duplicate intervals retain one
+row with a missing step count.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_activity_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_activity_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_activity_summary" title="Link to this definition"></a></dt>
+<dd><p>Normalize canonical calendar-day step totals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_bbi">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_bbi</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_bbi" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize canonical beat-to-beat interval samples.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_heart_rate_samples">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_heart_rate_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_heart_rate_samples" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize canonical timestamped heart-rate samples.</p>
+<p>Loaders must translate vendor columns before calling this function.
+Duplicate and conflicting exports are preserved so each loader can apply
+its documented reconciliation policy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_provider_feature_samples">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_provider_feature_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_provider_feature_samples" title="Link to this definition"></a></dt>
+<dd><p>Validate canonical timestamped samples for one provider-native feature.</p>
+<p>Loaders must translate vendor columns before calling this function. Exact
+timestamp duplicates collapse to one row. If repeated rows disagree about
+the feature value, one row is retained with that value missing; downstream
+coverage therefore records the conflict without selecting an arbitrary
+export revision.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>feature</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_provider_feature_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_provider_feature_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">feature</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">numeric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_provider_feature_summary" title="Link to this definition"></a></dt>
+<dd><p>Validate one canonical provider feature at native daily grain.</p>
+<p>The input must already use <code class="docutils literal notranslate"><span class="pre">calendar_date</span></code> and the canonical feature
+name. The loader must resolve exact export duplicates or revisions first;
+this validator rejects any remaining duplicate date rather than choosing
+one provider value silently.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>feature</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p></li>
+<li><p><strong>numeric</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.0.6)"><em>DataFrame</em></a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_respiration_samples">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_respiration_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_respiration_samples" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize timestamped respiratory-rate samples.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_respiration_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_respiration_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_respiration_summary" title="Link to this definition"></a></dt>
+<dd><p>Validate provider-native nightly respiratory-rate summaries.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_sleep_sessions">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_sleep_sessions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_sleep_sessions" title="Link to this definition"></a></dt>
+<dd><p>Validate and order sleep sessions used by full-day trajectories.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_sleep_stages">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_sleep_stages</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_sleep_stages" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize canonical sleep-stage intervals.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_sleep_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_sleep_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_sleep_summary" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize a canonical nightly sleep summary.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_spo2_samples">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_spo2_samples</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_spo2_samples" title="Link to this definition"></a></dt>
+<dd><p>Validate and normalize timestamped oxygen-saturation samples.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.prepare_spo2_summary">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">prepare_spo2_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.prepare_spo2_summary" title="Link to this definition"></a></dt>
+<dd><p>Validate provider-native nightly oxygen-saturation summaries.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.schema.validate_heart_rate_time_col">
+<span class="sig-prename descclassname"><span class="pre">pywearable.schema.</span></span><span class="sig-name descname"><span class="pre">validate_heart_rate_time_col</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_col</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.schema.validate_heart_rate_time_col" title="Link to this definition"></a></dt>
+<dd><p>Validate the timestamp used to filter heart-rate samples.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>time_col</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="respiration.html" class="btn btn-neutral float-left" title="Respiration" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sleep.html" class="btn btn-neutral float-right" title="Sleep" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
