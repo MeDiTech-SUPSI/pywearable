@@ -15,6 +15,7 @@ dependencies = [
     "matplotlib",
     "scipy",
     "python-dateutil",
+    "duckdb",
 ]
 authors = [
     { name = "Davide Marzorati", email = "davide.marzorati@supsi.ch" },

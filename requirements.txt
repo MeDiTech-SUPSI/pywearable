@@ -3,5 +3,6 @@ pandas>=2.0
 matplotlib
 scipy
 python-dateutil
+duckdb
 pyarrow
 fastparquet
