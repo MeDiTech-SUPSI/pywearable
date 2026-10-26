@@ -3528,9 +3528,9 @@ def get_sleep_statistics(
 ) -> pd.DataFrame:
     """Return main-sleep features at night level or along a hierarchy.
 
-    Requesting ``"weekly"``, ``"monthly"``, or ``"yearly"`` as a single
-    resolution is shorthand for a ``nightly`` hierarchy ending at that
-    calendar resolution. Resolution sequences explicitly define each
+    Requesting a calendar parent as a single resolution is shorthand for
+    a ``nightly`` hierarchy ending at that calendar resolution. Resolution
+    sequences explicitly define each
     increasingly larger level, for example
     ``["nightly", "weekly", "monthly"]``. Upper levels give each valid child
     row equal weight and return immediate ``valid / expected`` coverage in
