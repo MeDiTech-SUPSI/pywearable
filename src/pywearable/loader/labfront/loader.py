@@ -2495,6 +2495,47 @@ class LabfrontLoader(BaseLoader):
             source=source,
         )
 
+    @staticmethod
+    def _reconcile_daily_summary_snapshots(data, value_columns):
+        """Prefer the longest same-period snapshot; leave unresolved values missing."""
+        data = data.drop_duplicates()
+        value_columns = [column for column in value_columns if column in data]
+        records = []
+        ambiguous_days = 0
+        for _, versions in data.groupby(lf_constants.CALENDAR_DATE_COL, sort=True):
+            start_col = next(
+                (
+                    column
+                    for column in (lf_constants.UNIXTIMESTAMP_IN_MS_COL, lf_constants.ISODATE_COL)
+                    if column in versions and versions[column].notna().all()
+                ),
+                None,
+            )
+            different_periods = start_col is not None and versions[start_col].nunique() > 1
+            same_period = start_col is not None and not different_periods
+            if same_period and lf_constants.DURATION_IN_MS_COL in versions:
+                duration = pd.to_numeric(versions[lf_constants.DURATION_IN_MS_COL], errors="coerce")
+                duration = duration.where(np.isfinite(duration) & duration.gt(0))
+                if duration.notna().any():
+                    versions = versions.loc[duration.eq(duration.max())]
+            selected = versions.iloc[0].copy()
+            conflicts = (
+                value_columns
+                if different_periods
+                else [column for column in value_columns if versions[column].nunique(dropna=False) > 1]
+            )
+            if conflicts:
+                selected[conflicts] = np.nan
+                ambiguous_days += 1
+            records.append(selected)
+        if ambiguous_days:
+            warnings.warn(
+                f"Ambiguous Garmin daily-summary snapshots for {ambiguous_days} date(s); "
+                "conflicting provider values are left missing.",
+                stacklevel=2,
+            )
+        return pd.DataFrame(records, columns=data.columns).reset_index(drop=True)
+
     def load_provider_feature(
         self,
         feature: str,
@@ -2592,14 +2633,7 @@ class LabfrontLoader(BaseLoader):
                 feature,
                 numeric=feature != "garmin_daily_stress_qualifier",
             )
-        order_col = (
-            lf_constants.ISODATE_COL
-            if lf_constants.ISODATE_COL in data.columns
-            else lf_constants.CALENDAR_DATE_COL
-        )
-        data = data.sort_values(order_col, kind="stable").drop_duplicates(
-            lf_constants.CALENDAR_DATE_COL, keep="last"
-        )
+        data = self._reconcile_daily_summary_snapshots(data, daily_columns.values())
         result = pd.DataFrame(
             {
                 schema.CALENDAR_DATE_COL: data[lf_constants.CALENDAR_DATE_COL],
