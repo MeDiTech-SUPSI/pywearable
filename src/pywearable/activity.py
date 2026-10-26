@@ -51,7 +51,7 @@ def _prepare_chain(resolution, source: str) -> tuple[list[str], bool]:
     chain, _ = hierarchy.normalize_resolution_chain(resolution)
     chain = [cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain]
     hierarchy.normalize_resolution_chain(chain)
-    if chain[0] in {"weekly", "monthly", "yearly"}:
+    if chain[0] in hierarchy.CALENDAR_RESOLUTIONS and chain[0] != "daily":
         chain = ["daily", *chain]
     if source == "daily_summary" and chain[0] != "daily":
         raise ValueError(

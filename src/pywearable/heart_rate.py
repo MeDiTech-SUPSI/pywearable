@@ -426,9 +426,7 @@ def _heart_rate_period_end(start, resolution):
     if canonical in hierarchy.CALENDAR_RESOLUTIONS:
         spec = time_utils.get_resampling_spec(canonical, time_reference="local")
         period_start = time_utils.get_calendar_period_start(start, spec.rule)
-        if spec.rule == "d":
-            return period_start + pd.Timedelta(days=1)
-        return pd.date_range(period_start, periods=2, freq=spec.rule)[1]
+        return time_utils.get_calendar_period_end(period_start, spec.rule)
     return start + pd.Timedelta(canonical)
 
 
@@ -528,9 +526,13 @@ def _compute_hr_statistics(
     if heart_rate.empty:
         return pd.DataFrame()
 
-    grouped = heart_rate.resample(
-        rule=rule, on=time_col, label="left", closed="left"
-    )[schema.HEART_RATE_COL]
+    if rule == "seasonal":
+        labels = heart_rate[time_col].map(lambda value: time_utils.get_calendar_period_start(value, rule))
+        grouped = heart_rate.groupby(labels, sort=True)[schema.HEART_RATE_COL]
+    else:
+        grouped = heart_rate.resample(
+            rule=rule, on=time_col, label="left", closed="left"
+        )[schema.HEART_RATE_COL]
     frames = []
     reductions = [
         HEART_RATE_REDUCTIONS[statistic]
@@ -570,6 +572,13 @@ def _compute_hr_statistics(
         frames.append(rest.to_frame())
 
     heart_rate_stats = pd.concat(frames, axis=1).reindex(columns=statistics)
+    if rule == "seasonal":
+        starts = time_utils.get_calendar_window_starts(
+            heart_rate_stats.index.min(), heart_rate_stats.index.max(), rule, include_end=True
+        )
+        heart_rate_stats = heart_rate_stats.reindex(starts.rename(time_col))
+        if HEART_RATE_STATISTIC_COUNT in statistics:
+            heart_rate_stats[HEART_RATE_STATISTIC_COUNT] = heart_rate_stats[HEART_RATE_STATISTIC_COUNT].fillna(0)
 
     if not calendar_based and schema.TIMEZONE_COL in heart_rate.columns:
         offsets = (
@@ -1457,12 +1466,7 @@ def _single_resolution_hr_trajectory(
         canonical_starts = starts.map(
             lambda value: time_utils.get_calendar_period_start(value, spec.rule)
         )
-        if spec.rule == "d":
-            ends = canonical_starts + pd.Timedelta(days=1)
-        else:
-            ends = canonical_starts.map(
-                lambda value: pd.date_range(value, periods=2, freq=spec.rule)[1]
-            )
+        ends = canonical_starts.map(lambda value: time_utils.get_calendar_period_end(value, spec.rule))
     else:
         ends = starts + pd.Timedelta(canonical)
     period_starts = starts.copy()

@@ -168,6 +168,15 @@ def get_resampling_spec(
     elif resolution == "year" or resolution == "yearly":
         rule = "YS"
         calendar_based = True
+    elif resolution == "seasonal":
+        rule = "seasonal"
+        calendar_based = True
+    elif resolution == "seasonal_meteorological":
+        rule = "QS-DEC"
+        calendar_based = True
+    elif resolution in {"quarter", "quarterly"}:
+        rule = "QS-JAN"
+        calendar_based = True
     else:
         try:
             pd.Timedelta(resolution)
@@ -196,7 +205,24 @@ def get_calendar_period_start(value, rule: str) -> pd.Timestamp:
         return timestamp.to_period("M").start_time
     if rule == "YS":
         return timestamp.to_period("Y").start_time
+    if rule == "QS-JAN":
+        return timestamp.to_period("Q-DEC").start_time
+    if rule == "QS-DEC":
+        return timestamp.to_period("Q-FEB").start_time
+    if rule == "seasonal":
+        shifted = timestamp - pd.DateOffset(days=20)
+        return shifted.to_period("Q-FEB").start_time + pd.Timedelta(days=20)
     raise ValueError(f"Rule {rule} is not a supported calendar resolution.")
+
+
+def get_calendar_period_end(value, rule: str) -> pd.Timestamp:
+    """Return the exclusive canonical end of the calendar period containing value."""
+    start = get_calendar_period_start(value, rule)
+    if rule == "seasonal":
+        return start + pd.DateOffset(months=3)
+    if rule == "d":
+        return start + pd.Timedelta(days=1)
+    return pd.date_range(start, periods=2, freq=rule)[1]
 
 
 def get_calendar_window_starts(
@@ -209,12 +235,20 @@ def get_calendar_window_starts(
         return pd.DatetimeIndex([])
 
     canonical_start = get_calendar_period_start(start, rule)
-    canonical_boundaries = pd.date_range(
-        start=canonical_start,
-        end=end,
-        freq=rule,
-        inclusive="both",
-    )
+    if rule == "seasonal":
+        canonical_boundaries = pd.date_range(
+            start=canonical_start,
+            end=end,
+            freq=pd.DateOffset(months=3),
+            inclusive="both",
+        )
+    else:
+        canonical_boundaries = pd.date_range(
+            start=canonical_start,
+            end=end,
+            freq=rule,
+            inclusive="both",
+        )
     starts = [start]
     starts.extend(
         boundary

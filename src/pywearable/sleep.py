@@ -3429,9 +3429,9 @@ def _hierarchical_sleep_statistics(
 ):
     if chain[0] != "nightly":
         raise ValueError("sleep hierarchies must start with nightly resolution")
-    if any(target not in {"weekly", "monthly", "yearly"} for target in chain[1:]):
+    if any(target not in hierarchy.CALENDAR_RESOLUTIONS or target == "daily" for target in chain[1:]):
         raise ValueError(
-            "nightly sleep features can be aggregated to weekly, monthly, or yearly"
+            "nightly sleep features require calendar parents larger than daily"
         )
     aggregation_levels = hierarchy.normalize_aggregation_levels(
         aggregation, len(chain) - 1
@@ -3614,10 +3614,9 @@ def get_sleep_statistics(
                 chronotype=chronotype,
                 min_coverage=min_coverage,
             )
-        if target not in {"weekly", "monthly", "yearly"}:
+        if target not in hierarchy.CALENDAR_RESOLUTIONS:
             raise ValueError(
-                "sleep statistics resolution must be nightly, daily, weekly, "
-                "monthly, or yearly"
+                "sleep statistics resolution must be nightly, daily, or a larger calendar resolution"
             )
         chain = ["nightly", target]
         if min_coverage is None:

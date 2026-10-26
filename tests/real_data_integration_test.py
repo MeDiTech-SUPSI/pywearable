@@ -254,6 +254,31 @@ def test_weekly_sleep_uses_equal_night_weights_and_calendar_coverage(wearable):
     assert weekly.loc[START, f"{feature}__coverage"] == pytest.approx(first_week.notna().sum() / 7)
 
 
+@pytest.mark.parametrize("resolution", ["seasonal", "seasonal_meteorological", "quarterly"])
+def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(wearable, resolution):
+    source, loader = wearable
+    native = _raw_nights(source)
+    expected = (
+        native["total_sleep_duration"] / 60
+        if source == "oura"
+        else (native["durationInMs"] - native["unmeasurableSleepInMs"]) / 60_000
+    )
+    result = sleep.get_sleep_statistics(
+        loader, statistic="sleep_TST", resolution=resolution, aggregation="mean", **BOUNDS
+    )
+    column = f"sleep_TST__nightly__{resolution}_mean"
+    assert len(result) == 1
+    assert result.iloc[0][column] == pytest.approx(expected.mean())
+    assert result.iloc[0][f"{column}__coverage"] == pytest.approx(len(native) / 30)
+    assert result.iloc[0]["period_start"] == START
+    assert result.iloc[0]["period_end"] == END
+    filtered = sleep.get_sleep_statistics(
+        loader, statistic="sleep_TST", resolution=resolution, aggregation="mean", min_coverage=.9, **BOUNDS
+    )
+    assert filtered[column].isna().all()
+    assert filtered.iloc[0][f"{column}__coverage"] == pytest.approx(len(native) / 30)
+
+
 def test_sleep_cycles_match_night_boundaries_and_retain_context(wearable):
     source, loader = wearable
     summaries = loader.load_sleep_summary(USER, START, END)
