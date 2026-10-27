@@ -46,6 +46,7 @@ class OuraLoader(BaseLoader):
     activity_source = "daily_summary"
     activity_time_columns = (schema.LOCAL_TIME_COL,)
     activity_primary_resolution = "daily"
+    sleep_sessions_include_naps = True
     provider_features = frozenset(
         {
             "oura_readiness_score",

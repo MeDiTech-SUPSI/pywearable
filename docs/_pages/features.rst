@@ -153,6 +153,16 @@ percentages are percentages. Timing features are participant-local clock
 values and remain meaningful across midnight. CPD midpoint and duration are
 expressed in hours.
 
+For main sleep plus naps, use
+:func:`pywearable.sleep.get_total_sleep_time_24h`. Sleep day D runs from 18:00
+on D-1 to 18:00 on D; sessions crossing that boundary remain assigned to the
+day in which they started. The helper sums native sleep-stage durations in
+minutes, separately from nightly statistics. It requires an all-session loader
+that advertises nap support.
+The accompanying ``__coverage`` column is the classified fraction of returned
+session time, not 24-hour wear coverage or proof that all naps were detected.
+Days without classified session time remain missing.
+
 The Sleep Regularity Index (SRI) compares sleep/wake state with the same local
 time on the previous day. Use :func:`pywearable.sleep.get_sleep_regularity`
 for SRI with comparable-epoch coverage, or

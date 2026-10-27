@@ -210,6 +210,45 @@ def test_sleep_features_match_native_summaries_and_missing_nights(wearable):
     )
 
 
+def test_24h_sleep_totals_match_native_oura_stage_grid(loaders):
+    expected = {}
+    nap_sleep = {}
+    for record in _json("sleep"):
+        start = pd.Timestamp(record["bedtime_start"]).tz_localize(None)
+        end = pd.Timestamp(record["bedtime_end"]).tz_localize(None)
+        day = start.normalize()
+        if start.hour >= 18:
+            day += pd.Timedelta(days=1)
+        if day not in DATES:
+            continue
+        asleep, classified, duration = expected.get(day, (0.0, 0.0, 0.0))
+        duration += (end - start).total_seconds()
+        for position, phase in enumerate(record["sleep_phase_5_min"]):
+            epoch_start = start + pd.Timedelta(minutes=5 * position)
+            epoch_end = min(epoch_start + pd.Timedelta(minutes=5), end)
+            seconds = max(0.0, (epoch_end - epoch_start).total_seconds())
+            if phase in "1234":
+                classified += seconds
+            if phase in "123":
+                asleep += seconds
+                if record["type"] != "long_sleep":
+                    nap_sleep[day] = nap_sleep.get(day, 0.0) + seconds
+        expected[day] = asleep, classified, duration
+    result = sleep.get_total_sleep_time_24h(loaders["oura"], **BOUNDS).xs(USER)
+    pd.testing.assert_index_equal(result.index, DATES.rename("calendar_date"))
+    for day, row in result.iterrows():
+        asleep, classified, duration = expected.get(day, (0.0, 0.0, 0.0))
+        if classified:
+            assert row["sleep_TST_24h"] == pytest.approx(asleep / 60)
+            assert row["sleep_TST_24h__coverage"] == pytest.approx(classified / duration)
+        else:
+            assert pd.isna(row["sleep_TST_24h"])
+            assert row["sleep_TST_24h__coverage"] == 0
+    assert nap_sleep[pd.Timestamp("2024-04-06")] > 0
+    with pytest.raises(ValueError, match="nightly-only"):
+        sleep.get_total_sleep_time_24h(loaders["labfront"], **BOUNDS)
+
+
 def test_monthly_heart_rate_timestamps_and_unrecoverable_local_offsets(wearable):
     source, loader = wearable
     if source == "oura":

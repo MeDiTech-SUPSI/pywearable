@@ -16,6 +16,7 @@ from .utils import time as time_utils
 
 SLEEP_STATISTIC_TIB = "sleep_TIB"
 SLEEP_STATISTIC_TST = "sleep_TST"
+SLEEP_STATISTIC_TST_24H = "sleep_TST_24h"
 SLEEP_STATISTIC_WASO = "sleep_WASO"
 SLEEP_STATISTIC_SPT = "sleep_SPT"
 SLEEP_STATISTIC_DEEP_DURATION = "sleep_deep"
@@ -1052,6 +1053,130 @@ def get_sleep_regularity_index(
         resolution=resolution,
         include_naps=include_naps,
     )[SLEEP_STATISTIC_SRI]
+
+
+def _session_sleep_durations(session, stages):
+    """Return observed sleep, classified time, and session duration in seconds."""
+    session_seconds = (session.local_end_time - session.local_time).total_seconds()
+    if "local_time_uncertain" in stages:
+        stages = stages[~stages["local_time_uncertain"].fillna(False)]
+    if stages.empty:
+        return 0.0, 0.0, session_seconds
+    intervals = pd.DataFrame(
+        {
+            "start": stages[schema.LOCAL_TIME_COL].clip(lower=session.local_time),
+            "end": (
+                stages[schema.LOCAL_TIME_COL]
+                + pd.to_timedelta(stages[schema.DURATION_IN_MS_COL], unit="ms")
+            ).clip(upper=session.local_end_time),
+            "type": stages[schema.SLEEP_STAGE_SLEEP_TYPE_COL],
+        }
+    )
+    intervals = intervals[intervals["end"] > intervals["start"]]
+    intervals = intervals.drop_duplicates().sort_values("start")
+    if intervals["start"].lt(intervals["end"].cummax().shift()).any():
+        raise ValueError("Sleep stages must not overlap within a sleep session")
+    known = intervals["type"].ne(schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE)
+    asleep = known & intervals["type"].ne(schema.SLEEP_STAGE_AWAKE_STAGE_VALUE)
+    seconds = (intervals["end"] - intervals["start"]).dt.total_seconds()
+    return seconds[asleep].sum(), seconds[known].sum(), session_seconds
+
+
+def get_total_sleep_time_24h(
+    loader: BaseLoader,
+    user_id: Union[str, list] = "all",
+    start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+) -> pd.DataFrame:
+    """Return observed main-sleep and nap minutes per local sleep day.
+
+    Date D spans 18:00 on D-1 to 18:00 on D. Whole sessions are assigned by
+    their start, including sessions crossing 18:00. Bounds select these date
+    labels, including ``start_date`` and excluding ``end_date``.
+
+    ``sleep_TST_24h`` sums native classified sleep durations;
+    ``sleep_TST_24h__coverage`` is the classified fraction (0-1) of returned
+    session time, not 24-hour wear coverage or evidence that no naps were
+    missed. Days without classified session time remain missing, not zero sleep.
+    Loaders must advertise ``sleep_sessions_include_naps = True`` and expose
+    all-session stages. This helper is separate from nightly statistics.
+    """
+    if not loader.sleep_sessions_include_naps:
+        raise ValueError(
+            "24-hour sleep totals require sleep_sessions_include_naps = True; "
+            "nightly-only loaders cannot account for naps"
+        )
+    first, last = [
+        None if value is None else pd.Timestamp(value).tz_localize(None).normalize()
+        for value in (start_date, end_date)
+    ]
+    if first is not None and last is not None and last <= first:
+        raise ValueError("end_date must be after start_date")
+    records = []
+    for user in loader.resolve_user_ids(user_id):
+        load_start = None if first is None else first - pd.Timedelta(days=1)
+        load_end = None if last is None else last + pd.Timedelta(days=1)
+        sessions = schema.prepare_sleep_sessions(
+            loader.load_sleep_sessions(user, load_start, load_end)
+        )
+        sessions["sleep_day"] = (
+            sessions[schema.LOCAL_TIME_COL] - pd.Timedelta(hours=18)
+        ).dt.normalize() + pd.Timedelta(days=1)
+        if first is not None:
+            sessions = sessions[sessions["sleep_day"] >= first]
+        if last is not None:
+            sessions = sessions[sessions["sleep_day"] < last]
+        day_start = first if first is not None else sessions["sleep_day"].min()
+        day_end = (
+            last if last is not None
+            else sessions["sleep_day"].max() + pd.Timedelta(days=1)
+        )
+        if pd.isna(day_start) or pd.isna(day_end):
+            continue
+        if sessions[schema.LOCAL_TIME_COL].lt(
+            sessions[schema.LOCAL_END_TIME_COL].cummax().shift()
+        ).any():
+            raise ValueError("Sleep sessions must not overlap for 24-hour totals")
+        totals = {}
+        if not sessions.empty:
+            stages = schema.prepare_sleep_stages(
+                loader.load_sleep_session_stages(user, load_start, load_end)
+            )
+            stage_groups = {
+                key: rows for key, rows in stages.groupby(schema.SLEEP_SUMMARY_ID_COL)
+            }
+            for session in sessions.itertuples(index=False):
+                durations = _session_sleep_durations(
+                    session, stage_groups.get(session.id, stages.iloc[0:0])
+                )
+                totals[session.sleep_day] = (
+                    totals.get(session.sleep_day, np.zeros(3)) + durations
+                )
+        for day in pd.date_range(day_start, day_end, inclusive="left"):
+            asleep, classified, duration = totals.get(day, (0.0, 0.0, 0.0))
+            records.append(
+                {
+                    schema.USER_COL: user,
+                    schema.CALENDAR_DATE_COL: day,
+                    SLEEP_STATISTIC_TST_24H: asleep / 60 if classified else np.nan,
+                    f"{SLEEP_STATISTIC_TST_24H}__coverage": (
+                        classified / duration if duration else 0.0
+                    ),
+                }
+            )
+    if not records:
+        index = pd.MultiIndex.from_arrays(
+            [[], pd.DatetimeIndex([])],
+            names=[schema.USER_COL, schema.CALENDAR_DATE_COL],
+        )
+        return pd.DataFrame(
+            columns=[SLEEP_STATISTIC_TST_24H, f"{SLEEP_STATISTIC_TST_24H}__coverage"],
+            index=index,
+            dtype=float,
+        )
+    return pd.DataFrame(records).set_index(
+        [schema.USER_COL, schema.CALENDAR_DATE_COL]
+    ).sort_index()
 
 
 def get_sleep_wake_trajectory(
@@ -3696,6 +3821,7 @@ __all__ = [
     "SLEEP_STATISTIC_STAGE_TRANSITION_INDEX",
     "SLEEP_STATISTIC_TIB",
     "SLEEP_STATISTIC_TST",
+    "SLEEP_STATISTIC_TST_24H",
     "SLEEP_STATISTIC_UNMEASURABLE_DURATION",
     "SLEEP_STATISTIC_VALIDATION",
     "SLEEP_STATISTIC_WAKEUP",
@@ -3746,6 +3872,7 @@ __all__ = [
     "get_stage_transition_index",
     "get_time_in_bed",
     "get_total_sleep_time",
+    "get_total_sleep_time_24h",
     "get_unmeasurable_duration",
     "get_wake_after_sleep_onset",
     "get_wakeup_time",
