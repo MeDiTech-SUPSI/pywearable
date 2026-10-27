@@ -491,7 +491,7 @@ class TesseraeCSVLoader(BaseLoader):
     ) -> pd.DataFrame:
         """
         Tesserae dataset doesn't have pulse ox data.
-        This function will always return an empty :class:`pandas.DataFranme`
+        This function will always return an empty :class:`pandas.DataFrame`
         """
         return pd.DataFrame(columns=["utc_time", "local_time", "timezone", "pulse_ox"])
 
@@ -500,7 +500,7 @@ class TesseraeCSVLoader(BaseLoader):
     ) -> pd.DataFrame:
         """
         Tesserae dataset doesn't have respiration data.
-        This function will always return an empty :class:`pandas.DataFranme`
+        This function will always return an empty :class:`pandas.DataFrame`
         """
         return pd.DataFrame(
             columns=["utc_time", "local_time", "timezone", "breaths_per_minute"]
