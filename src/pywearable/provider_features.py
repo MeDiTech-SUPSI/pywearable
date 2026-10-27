@@ -655,8 +655,9 @@ def get_provider_features(
         Extra arguments for the loader or cycle interval extraction.
     time_reference : {"auto", "local", "utc"}
         Clock used by timestamped streams. Native summaries use local labels.
-    aggregation : str, sequence, or None
-        Parent-level operation(s); valid only for a hierarchy.
+    aggregation : str, collections.abc.Callable, sequence, or None
+        Parent-level built-in names or named Series-to-scalar callables;
+        valid only for a hierarchy.
     min_coverage : float, sequence, or None
         Minimum valid sample/day/child fraction at each requested level.
     min_valid_children : int, sequence, or None

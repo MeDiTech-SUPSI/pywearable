@@ -116,6 +116,37 @@ operations::
 This produces weekly mean and standard-deviation branches, followed by monthly means of each
 branch.
 
+Custom aggregations
+-------------------
+
+``aggregation`` also accepts named Python functions, alone or mixed with
+built-in names. Each function receives a chronologically sorted copy of one
+feature's :class:`pandas.Series`, including missing rows, its feature name,
+and the ``(user_id, window_start)`` index. It must return one numeric scalar
+or a missing value. For clock-valued features such as bedtime, custom
+functions must instead return a time/datetime scalar or a missing value.
+
+Different functions can run at successive levels; use the existing nested
+lists to specify operations per level::
+
+    def interquartile_range(values):
+        return values.quantile(0.75) - values.quantile(0.25)
+
+    def median_observed(values):
+        return values.median()
+
+    yearly = sleep.get_sleep_statistics(
+        loader,
+        statistic="sleep_TST",
+        resolution=["nightly", "weekly", "yearly"],
+        aggregation=[[interquartile_range], [median_observed]],
+        min_coverage=[0.8, 0.7, 0.8],
+    )
+
+This computes weekly interquartile ranges, then the yearly median of those
+values. Output names use each function's ``__name__``. Custom functions share
+the usual coverage and valid-child requirements.
+
 Coverage and support
 --------------------
 
