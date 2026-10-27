@@ -153,6 +153,9 @@ percentages are percentages. Timing features are participant-local clock
 values and remain meaningful across midnight. CPD midpoint and duration are
 expressed in hours.
 
+SOL measures the interval from the provider-reported session start to the first
+scored sleep stage, not from an independently recorded attempt-to-sleep time.
+
 For main sleep plus naps, use
 :func:`pywearable.sleep.get_total_sleep_time_24h`. Sleep day D runs from 18:00
 on D-1 to 18:00 on D; sessions crossing that boundary remain assigned to the

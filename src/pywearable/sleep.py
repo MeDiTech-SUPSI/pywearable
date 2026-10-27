@@ -501,6 +501,9 @@ def get_sleep_onset_latency(
 ) -> pd.DataFrame:
     """Return nightly sleep-onset latency.
 
+    Measured from the provider-reported session start to the first scored
+    sleep stage, not from an independently recorded attempt-to-sleep time.
+
     The result is a :class:`pandas.DataFrame` with the feature and its
     ``__coverage`` column, indexed by ``user_id`` and ``calendar_date``.
     """
