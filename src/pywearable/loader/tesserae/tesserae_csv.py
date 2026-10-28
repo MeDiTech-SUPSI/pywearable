@@ -755,6 +755,191 @@ class TesseraeCSVLoader(BaseLoader):
         else:
             return pd.DataFrame()
 
+    ###
+    # Additional summaries
+    ###
+    def load_adjusted_imputed_sleep_summary(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        adj_imp_sleep_summary_folder = self.root_folder / user_id / "GarminSummary"
+
+        pattern = os.path.join(adj_imp_sleep_summary_folder, "*AdjImputedSleep*.csv")
+        adj_imp_sleep_summary_files = glob.glob(pattern)
+        if len(adj_imp_sleep_summary_files) > 0:
+            query = f"""
+                SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+            """
+            adj_imp_sleep_summary = (
+                self.con.execute(query).df().drop(["ParticipantID"], axis=1)
+            ).rename(columns={"date": "calendar_date"})
+            adj_imp_sleep_summary["calendar_date"] = pd.to_datetime(
+                adj_imp_sleep_summary["calendar_date"]
+            )
+            adj_imp_sleep_summary["timezone_offset"] = adj_imp_sleep_summary[
+                "Timestamp"
+            ].apply(lambda x: self._convert_timezone_offset(x))
+
+            adj_imp_sleep_summary = adj_imp_sleep_summary.drop(["Timestamp"], axis=1)
+            for col in ["adjusted_bed_time", "adjusted_wakeup_time"]:
+                adj_imp_sleep_summary[col] = adj_imp_sleep_summary[
+                    "calendar_date"
+                ] + pd.to_timedelta(
+                    adj_imp_sleep_summary[col].replace("NULL", None).astype(float),
+                    unit="h",
+                )
+            adj_imp_sleep_summary["adjusted_sleep_duration"] = pd.to_timedelta(
+                adj_imp_sleep_summary["adjusted_sleep_duration"]
+                .replace("NULL", None)
+                .astype(float),
+                unit="h",
+            )
+
+            if not (start_date is None):
+                adj_imp_sleep_summary = adj_imp_sleep_summary.loc[
+                    adj_imp_sleep_summary["calendar_date"]
+                    >= pd.Timestamp(start_date).normalize()
+                ]
+            if not (end_date is None):
+                adj_imp_sleep_summary = adj_imp_sleep_summary.loc[
+                    adj_imp_sleep_summary["calendar_date"]
+                    < pd.Timestamp(end_date).normalize()
+                ]
+
+        return adj_imp_sleep_summary
+
+    def load_heart_rate_summary(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        hr_summary_folder = self.root_folder / user_id / "GarminSummary"
+
+        pattern = os.path.join(hr_summary_folder, "*HRSummary*.csv")
+        hr_summary_files = glob.glob(pattern)
+        if len(hr_summary_files) > 0:
+            query = f"""
+                        SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+                    """
+            hr_summary = (
+                self.con.execute(query).df().drop(["ParticipantID"], axis=1)
+            ).rename(
+                columns={
+                    "date": "calendar_date",
+                    "ave_hr": "average_heart_rate",
+                    "median_hr": "median_heart_rate",
+                    "mode_hr": "mode_heart_rate",
+                    "min_hr": "min_heart_rate",
+                    "max_hr": "max_heart_rate",
+                    "range_hr": "range_heart_rate",
+                }
+            )
+            for col in [
+                "average_heart_rate",
+                "median_heart_rate",
+                "mode_heart_rate",
+                "min_heart_rate",
+                "max_heart_rate",
+                "range_heart_rate",
+            ]:
+                hr_summary[col] = hr_summary[col].replace("NULL", None).astype(float)
+            hr_summary["calendar_date"] = pd.to_datetime(hr_summary["calendar_date"])
+            hr_summary["timezone_offset"] = hr_summary["Timestamp"].apply(
+                lambda x: self._convert_timezone_offset(x)
+            )
+            hr_summary["timezone_change"] = hr_summary["timezone_change"].replace(
+                "NULL", None
+            )
+            hr_summary = hr_summary.drop(["Timestamp"], axis=1)
+
+            if not (start_date is None):
+                hr_summary = hr_summary.loc[
+                    hr_summary["calendar_date"] >= pd.Timestamp(start_date).normalize()
+                ]
+            if not (end_date is None):
+                hr_summary = hr_summary.loc[
+                    hr_summary["calendar_date"] < pd.Timestamp(end_date).normalize()
+                ]
+
+        return hr_summary
+
+    def load_stress_summary(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
+        # Load all files
+        stress_summary_folder = self.root_folder / user_id / "GarminSummary"
+
+        pattern = os.path.join(stress_summary_folder, "*Stress*.csv")
+        stress_summary_files = glob.glob(pattern)
+        if len(stress_summary_files) > 0:
+            query = f"""
+                        SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
+                    """
+            stress_summary = (
+                self.con.execute(query).df().drop(["ParticipantID"], axis=1)
+            ).rename(
+                columns={
+                    "date": "calendar_date",
+                    "ave_stress": "average_stress",
+                    "median_stress": "median_stress",
+                    "mode_stress": "mode_stress",
+                    "min_stress": "min_stress",
+                    "max_stress": "max_stress",
+                    "range_stress": "range_stress",
+                }
+            )
+            for col in [
+                "average_stress",
+                "median_stress",
+                "mode_stress",
+                "min_stress",
+                "max_stress",
+                "range_stress",
+            ]:
+                stress_summary[col] = (
+                    stress_summary[col].replace("NULL", None).astype(float)
+                )
+
+            stress_summary["calendar_date"] = pd.to_datetime(
+                stress_summary["calendar_date"]
+            )
+            stress_summary["timezone_offset"] = stress_summary["Timestamp"].apply(
+                lambda x: self._convert_timezone_offset(x)
+            )
+            stress_summary["timezone_change"] = stress_summary[
+                "timezone_change"
+            ].replace("NULL", None)
+            stress_summary = stress_summary.drop(["Timestamp"], axis=1)
+
+            if not (start_date is None):
+                stress_summary = stress_summary.loc[
+                    stress_summary["calendar_date"]
+                    >= pd.Timestamp(start_date).normalize()
+                ]
+            if not (end_date is None):
+                stress_summary = stress_summary.loc[
+                    stress_summary["calendar_date"] < pd.Timestamp(end_date).normalize()
+                ]
+
+        return stress_summary
+
+    ###
+    # Surveys
+    ###
     def load_daily_survey(
         self,
         user_id: str,
@@ -970,6 +1155,23 @@ class TesseraeCSVLoader(BaseLoader):
             return delta.total_seconds() * 1000
 
 
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
+__all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
 __all__ = ["TesseraeCSVLoader"]
