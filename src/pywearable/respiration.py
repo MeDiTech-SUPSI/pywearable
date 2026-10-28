@@ -552,7 +552,7 @@ def get_respiration_statistics(
         primary = chain[0]
         if primary == cycle.CYCLE_NIGHT:
             direct_summary = not hierarchical
-        elif not hierarchical and primary in {"weekly", "monthly", "yearly"}:
+        elif not hierarchical and primary in hierarchy.CALENDAR_RESOLUTIONS and primary != "daily":
             chain = [cycle.CYCLE_NIGHT, primary]
             hierarchical = True
         else:

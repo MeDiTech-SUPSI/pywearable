@@ -1,0 +1,10 @@
+Header Length,5
+Powered by Labfront
+Documentation,https://help.labfront.com/data-documentation
+projectId,projectTitle,participantId,participantInsignia
+00000000-0000-4000-8000-000000000001,Wearable regression fixtures,00000001-0000-4000-8000-000000000001,participant-01
+
+timezoneOffsetInMs,unixTimestampInMs,isoDate,breathsPerMinute
+7200000,1712223780000,2024-04-04T11:43:00.000+02:00,16.09
+7200000,1712225760000,2024-04-04T12:16:00.000+02:00,10.38
+7200000,1712254260000,2024-04-04T20:11:00.000+02:00,18.18

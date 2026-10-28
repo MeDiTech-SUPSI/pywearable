@@ -18,7 +18,8 @@ Choose a resolution
      - ``"5min"``, ``"1h"``, ``"12h"``
      - Regular windows on a physical timeline
    * - Calendar
-     - ``"daily"``, ``"weekly"``, ``"monthly"``, ``"yearly"``
+     - ``"daily"``, ``"weekly"``, ``"monthly"``, ``"seasonal"``,
+       ``"seasonal_meteorological"``, ``"quarterly"``, ``"yearly"``
      - Participant-local calendar summaries
    * - Nightly
      - ``"nightly"``
@@ -27,6 +28,15 @@ Choose a resolution
      - ``"cycle_night"``, ``"cycle_awake"``,
        ``"cycle_physiological"``
      - Physical streams aligned to an individual's sleep schedule
+
+The three-month calendars use fixed boundaries at midnight:
+
+* ``"seasonal"``: 21 March, 21 June, 21 September, and 21 December.
+* ``"seasonal_meteorological"``: 1 March, 1 June, 1 September, and 1 December.
+* ``"quarterly"`` (alias ``"quarter"``): 1 January, 1 April, 1 July, and 1 October.
+
+They can also be hierarchy parents, for example
+``resolution=("nightly", "seasonal")``.
 
 For timestamped streams, fixed windows use UTC by default when UTC timestamps
 are available. Calendar and sleep-anchored windows use participant-local time.

@@ -165,6 +165,8 @@ cython_debug/
 #.idea/
 
 data/
+!/tests/data/
+!/tests/data/**
 data_*/
 **/.DS_Store
 

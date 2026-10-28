@@ -37,8 +37,7 @@ Choose a plot
      - Typical within-day pattern for each weekday
      - Subdaily trajectory
    * - :func:`~pywearable.visualization.plot_period_comparison`
-     - Consecutive daily, weekly, monthly, or yearly values and percentage
-       changes
+     - Consecutive period summaries and percentage changes
      - Aggregated trajectory
    * - :func:`~pywearable.visualization.plot_sleep_summary`
      - Sleep stages, timing, score, and optional CPD panels across nights

@@ -27,6 +27,7 @@ class LifeSnapsParquetLoader(BaseLoader):
     activity_source = "samples"
     activity_time_columns = (schema.LOCAL_TIME_COL,)
     activity_primary_resolution = "1min"
+    sleep_sessions_include_naps = True
     provider_features = frozenset(
         {
             "fitbit_stress_management_score",

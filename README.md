@@ -31,8 +31,8 @@ supported sources, with a focus on longitudinal sleep and physiological data.
   fragmentation, and regularity; heart rate and HRV; activity; respiration and
   oxygen saturation; and provider-native scores.
 - **Flexible time scales.** Work with fixed-duration, daily, nightly, weekly,
-  monthly, or yearly windows, including sleep-anchored night, awake, and
-  physiological cycles.
+  monthly, seasonal, quarterly, or yearly windows, including sleep-anchored
+  night, awake, and physiological cycles.
 - **Hierarchical extraction.** Build broader summaries from qualified child
   windows, such as weekly means of nightly sleep duration.
 - **Coverage-aware outputs.** Return pandas DataFrames indexed by participant

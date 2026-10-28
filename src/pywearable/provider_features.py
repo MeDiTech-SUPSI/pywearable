@@ -261,7 +261,7 @@ def _prepare_chain(resolution, grain):
     native = grain
     if not hierarchical and chain[0] == native:
         return chain, False
-    allowed_parents = {"weekly", "monthly", "yearly"}
+    allowed_parents = set(hierarchy.CALENDAR_RESOLUTIONS) - {"daily"}
     if not hierarchical and chain[0] in allowed_parents:
         chain = [native, chain[0]]
         hierarchy.normalize_resolution_chain(chain)
@@ -272,7 +272,7 @@ def _prepare_chain(resolution, grain):
     label = "native daily" if native == "daily" else "native cycle_night"
     raise ValueError(
         f"{label} provider features can only remain at that grain or be "
-        "aggregated to weekly, monthly, or yearly resolutions"
+        "aggregated to larger calendar resolutions"
     )
 
 

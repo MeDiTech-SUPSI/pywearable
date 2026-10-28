@@ -34,6 +34,7 @@ class BaseLoader(ABC):
     provider_features = frozenset()
     provider_feature_definitions = {}
     provider_feature_time_columns = schema.HEART_RATE_TIME_COLUMNS
+    sleep_sessions_include_naps = False
 
     def __init__(self):
         pass
@@ -80,7 +81,8 @@ class BaseLoader(ABC):
 
         Loaders without a separate all-session source expose their nightly
         summaries as main-sleep sessions. Provider implementations can
-        override this method to include naps and other non-main sessions.
+        override this method to include naps and other non-main sessions,
+        advertising this with ``sleep_sessions_include_naps = True``.
         """
         summaries = self.load_sleep_summary(
             user_id=user_id,

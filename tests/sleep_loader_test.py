@@ -352,6 +352,9 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
     assert loaded_stages["timezone_offset_in_ms"].isna().all()
 
     features = sleep.get_sleep_statistics(loader, user_id="person-1")
+    full_day = sleep.get_total_sleep_time_24h(loader, user_id="person-1")
+    np.testing.assert_allclose(full_day["sleep_TST_24h"], [85, 60])
+    assert full_day["sleep_TST_24h__coverage"].eq(1).all()
     np.testing.assert_allclose(features["sleep_TIB"], [75, 70])
     np.testing.assert_allclose(features["sleep_TST"], [60, 60])
     np.testing.assert_allclose(features["sleep_SOL"], [5, 5])

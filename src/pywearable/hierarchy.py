@@ -23,7 +23,9 @@ from .utils import time as time_utils
 
 
 STANDARD_AGGREGATIONS = ("mean", "std", "median", "min", "max", "p10", "p90")
-CALENDAR_RESOLUTIONS = ("daily", "weekly", "monthly", "yearly")
+CALENDAR_RESOLUTIONS = (
+    "daily", "weekly", "monthly", "seasonal", "seasonal_meteorological", "quarterly", "yearly",
+)
 TIME_METADATA_COLUMNS = (
     schema.UTC_TIME_COL,
     schema.LOCAL_TIME_COL,
@@ -33,6 +35,7 @@ RESOLUTION_ALIASES = {
     "day": "daily",
     "week": "weekly",
     "month": "monthly",
+    "quarter": "quarterly",
     "year": "yearly",
     "night": "nightly",
     "natural": "nightly",
@@ -89,11 +92,17 @@ def _validate_resolution_chain(chain: list[str]) -> None:
     if "nightly" in chain[1:]:
         raise ValueError("nightly can only be the primary sleep resolution")
 
-    calendar_order = {"daily": 0, "weekly": 1, "monthly": 2, "yearly": 3}
+    calendar_order = {
+        "daily": 0, "weekly": 1, "monthly": 2,
+        "seasonal": 3, "seasonal_meteorological": 3, "quarterly": 3, "yearly": 4,
+    }
     calendar_minimum = {
         "daily": pd.Timedelta(days=1),
         "weekly": pd.Timedelta(days=7),
         "monthly": pd.Timedelta(days=28),
+        "seasonal": pd.Timedelta(days=90),
+        "seasonal_meteorological": pd.Timedelta(days=90),
+        "quarterly": pd.Timedelta(days=90),
         "yearly": pd.Timedelta(days=365),
     }
     for index, (left, right) in enumerate(zip(chain, chain[1:])):
@@ -108,9 +117,9 @@ def _validate_resolution_chain(chain: list[str]) -> None:
             valid = left_fixed < pd.Timedelta(days=1)
         elif left in CALENDAR_RESOLUTIONS and right in CALENDAR_RESOLUTIONS:
             valid = calendar_order[left] < calendar_order[right]
-        elif left in CYCLE_TYPES and right in {"weekly", "monthly", "yearly"}:
+        elif left in CYCLE_TYPES and right in CALENDAR_RESOLUTIONS and right != "daily":
             valid = True
-        elif left == "nightly" and right in {"weekly", "monthly", "yearly"}:
+        elif left == "nightly" and right in CALENDAR_RESOLUTIONS and right != "daily":
             valid = True
         if not valid:
             raise ValueError("resolutions must move from smaller to larger windows")
@@ -428,12 +437,7 @@ def observed_bounds(frame, time_col, start_date, end_date, resolution):
             return time_utils.get_calendar_period_start(value, spec.rule)
 
         def period_end(value):
-            beginning = period_start(value)
-            return (
-                beginning + pd.Timedelta(days=1)
-                if spec.rule == "d"
-                else pd.date_range(beginning, periods=2, freq=spec.rule)[1]
-            )
+            return time_utils.get_calendar_period_end(value, spec.rule)
 
     else:
         duration = pd.Timedelta(resolution)
