@@ -2,7 +2,7 @@
 
 Domain modules compute the primary feature rows. This module validates the
 resolution and aggregation specifications, constructs larger parent windows,
-and aggregates each child trajectory with equal child weighting. Child rows
+and applies built-in or custom reducers to each child trajectory. Child rows
 must use a ``(user_id, window_start)`` index and provide ``period_start`` and
 ``period_end`` columns. Cycle boundaries are supplied by :mod:`pywearable.cycle`.
 """
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import datetime
 import warnings
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from numbers import Integral, Real
 
 import numpy as np
@@ -151,20 +151,39 @@ def family_statistics(statistics, family: str) -> list[str]:
     return [name for name in statistics if name.startswith(f"{family}_")]
 
 
-def _normalize_operations(value, allow_sum: bool = False) -> list[str]:
-    """Return a unique ordered list of supported aggregation operation names."""
+def aggregation_name(operation: str | Callable) -> str:
+    """Return a built-in name or the declared name of a custom reducer."""
+    if isinstance(operation, str):
+        return operation
+    name = getattr(operation, "__name__", None)
+    if not callable(operation) or not isinstance(name, str) or not name.isidentifier():
+        raise ValueError(
+            "custom aggregations must be named callables, not lambdas or unnamed callables"
+        )
+    return name
+
+
+def _normalize_operations(value, allow_sum: bool = False) -> list[str | Callable]:
+    """Validate and deduplicate built-in names and named custom reducers."""
     if value is None:
         return list(STANDARD_AGGREGATIONS)
-    if isinstance(value, str):
+    if isinstance(value, str) or callable(value):
         operations = [value]
     elif isinstance(value, (list, tuple)):
         operations = list(value)
     else:
-        raise ValueError("aggregation operations must be strings or lists")
-    operations = [operation.lower() for operation in operations]
+        raise ValueError(
+            "aggregation operations must be strings or lists of names and named callables"
+        )
+    operations = [
+        operation.lower() if isinstance(operation, str) else operation
+        for operation in operations
+    ]
     supported = (*STANDARD_AGGREGATIONS, "sum") if allow_sum else STANDARD_AGGREGATIONS
     if not operations or any(
-        operation not in supported and not is_percentile(operation)
+        not callable(operation)
+        and operation not in supported
+        and not is_percentile(operation)
         for operation in operations
     ):
         supported_message = (
@@ -174,9 +193,24 @@ def _normalize_operations(value, allow_sum: bool = False) -> list[str]:
         )
         raise ValueError(
             f"aggregation operations must be {supported_message}, or percentiles "
-            "such as p10 and p90"
+            "such as p10 and p90, or named callables"
         )
-    return list(dict.fromkeys(operations))
+    unique = {}
+    for operation in operations:
+        name = aggregation_name(operation)
+        if name in unique:
+            previous = unique[name]
+            if previous is operation or (
+                isinstance(previous, str)
+                and isinstance(operation, str)
+                and previous == operation
+            ):
+                continue
+            raise ValueError(
+                f"aggregation names must be unique within a level: {name!r}"
+            )
+        unique[name] = operation
+    return list(unique.values())
 
 
 def normalize_aggregation_levels(aggregation, level_count: int):
@@ -191,7 +225,7 @@ def normalize_aggregation_levels(aggregation, level_count: int):
         return [None] * level_count
     if level_count == 1:
         return [aggregation]
-    if isinstance(aggregation, str):
+    if isinstance(aggregation, str) or callable(aggregation):
         return [aggregation] * level_count
     if not isinstance(aggregation, (list, tuple)) or len(aggregation) != level_count:
         raise ValueError(
@@ -199,7 +233,7 @@ def normalize_aggregation_levels(aggregation, level_count: int):
         )
     # A nested sequence removes the ambiguity between branching operations and
     # one specification per hierarchy level.
-    if all(isinstance(value, str) for value in aggregation):
+    if all(isinstance(value, str) or callable(value) for value in aggregation):
         raise ValueError(
             "for more than two resolutions, nest operation lists by level"
         )
@@ -304,7 +338,7 @@ def warn_if_wide(features, aggregation_levels, threshold: int = 500) -> int:
         operations = resolve_feature_operations(current, specification)
         width = sum(len(values) for values in operations.values())
         current = [
-            f"{feature}__{operation}"
+            f"{feature}__{aggregation_name(operation)}"
             for feature, values in operations.items()
             for operation in values
         ]
@@ -317,14 +351,39 @@ def warn_if_wide(features, aggregation_levels, threshold: int = 500) -> int:
     return width
 
 
-def aggregate_values(values: pd.Series, operation: str, temporal: bool = False):
+def aggregate_values(
+    values: pd.Series, operation: str | Callable, temporal: bool = False
+):
     """Aggregate one feature over one parent window.
 
     Numeric features use ordinary scalar statistics. Temporal features use a
     circular mean and standard deviation; their ordered statistics are
     evaluated on a noon-to-noon clock so times around midnight remain adjacent.
     Temporal standard deviation is returned in minutes.
+    Custom reducers receive a sorted copy of the named Series, including gaps,
+    and must return a numeric scalar, or a clock time for temporal features.
     """
+    if callable(operation):
+        name = aggregation_name(operation)
+        if not values.notna().any():
+            return None if temporal else np.nan
+        result = operation(values.sort_index(kind="stable").copy())
+        if not pd.api.types.is_scalar(result):
+            raise TypeError(f"custom aggregation {name!r} must return one scalar")
+        if pd.isna(result):
+            return None if temporal else np.nan
+        expected = (
+            (datetime.time, datetime.datetime, np.datetime64) if temporal else Real
+        )
+        if not isinstance(result, expected):
+            kind = "a clock time or datetime scalar" if temporal else "a numeric scalar"
+            raise TypeError(
+                f"custom aggregation {name!r} must return {kind} or a missing value"
+            )
+        return (
+            time_utils.clock_time(time_utils.clock_seconds(result))
+            if temporal else result
+        )
     values = values.dropna()
     if values.empty:
         return np.nan if operation == "std" or not temporal else None
@@ -782,7 +841,7 @@ def aggregate_level(
     half of its duration overlaps a parent; exact ties use the parent containing
     the child's midpoint under half-open boundaries. Membership determines the
     expected children, while feature missingness determines which are valid.
-    Each valid child has equal weight. Output names append
+    Built-in numeric summaries give each valid child equal weight. Output names append
     ``__{target_resolution}_{operation}``, and each output currently receives
     immediate ``valid / expected`` coverage. When ``min_coverage`` or
     ``min_valid_children`` is set, an output failing either threshold is
@@ -859,7 +918,7 @@ def aggregate_level(
                 valid_count / expected_count if expected_count else np.nan
             )
             for operation in operations[feature]:
-                output = f"{feature}__{target_resolution}_{operation}"
+                output = f"{feature}__{target_resolution}_{aggregation_name(operation)}"
                 is_temporal = feature in temporal_features
                 value = aggregate_values(
                     selected[feature], operation, temporal=is_temporal

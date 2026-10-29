@@ -116,6 +116,52 @@ operations::
 This produces weekly mean and standard-deviation branches, followed by monthly means of each
 branch.
 
+Custom aggregations
+-------------------
+
+``aggregation`` also accepts named Python functions, alone or mixed with
+built-in names. Each function receives a chronologically sorted copy of one
+feature's :class:`pandas.Series`, including missing rows, its feature name,
+and the ``(user_id, window_start)`` index. It must return one numeric scalar
+or a missing value. For clock-valued features such as bedtime, custom
+functions must instead return a time/datetime scalar or a missing value.
+
+For example, a custom aggregation can combine quantiles into a robust
+coefficient of variation, ``(p90 - p10) / median``. Compared with classical
+mean/standard-deviation-based summaries, this may be useful for describing
+within-night RMSSD variability in noisy wearable data with less sensitivity
+to extreme values. The following example then computes its monthly IQR::
+
+    import numpy as np
+    import pandas as pd
+    from pywearable import hrv
+
+    def robust_coefficient_of_variation(values):
+        observed = values.dropna()
+        median = observed.median()
+        if pd.isna(median) or median <= 0:
+            return np.nan
+        return (observed.quantile(0.90) - observed.quantile(0.10)) / median
+
+    def interquartile_range(values):
+        return values.quantile(0.75) - values.quantile(0.25)
+
+    monthly = hrv.get_hrv_statistics(
+        loader,
+        statistic="hrv_rmssd",
+        resolution=["5min", "nightly", "monthly"],
+        aggregation=[[robust_coefficient_of_variation], [interquartile_range]],
+        sleep_stages_to_remove=["awake", "unmeasurable"],
+        min_coverage=[0.7, 0.7, 0.7],
+        min_valid_children=[None, 12, 10],
+    )
+
+This raw-BBI example uses available non-wake sleep stages and requires at
+least 12 qualified five-minute estimates per night and 10 qualified nights
+per month, as well as the coverage thresholds. The monthly result describes
+between-night variation in robust CV, not the IQR of all five-minute RMSSD
+estimates pooled across the month.
+
 Coverage and support
 --------------------
 

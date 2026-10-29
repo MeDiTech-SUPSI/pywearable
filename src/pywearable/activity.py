@@ -615,7 +615,8 @@ def get_activity_statistics(
         ``"auto"``, ``"local"``, or ``"utc"``. Calendar and cycle windows
         default to local time; fixed windows prefer UTC when available.
     aggregation
-        Operation at each upper hierarchy level. Activity defaults are
+        Built-in names or named Series-to-scalar callables at each upper
+        hierarchy level. Activity defaults are
         feature-specific: steps are summed, while peak values and peak clock
         times are averaged. Thus ``resolution="weekly"`` returns total weekly
         steps, whereas ``resolution=["daily", "weekly"], aggregation="mean"``

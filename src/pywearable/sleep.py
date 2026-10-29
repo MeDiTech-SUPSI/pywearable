@@ -3701,8 +3701,8 @@ def get_sleep_statistics(
         Optional participant-to-chronotype mapping used by composite phase
         deviation features.
     aggregation
-        Operation or branching operations for each parent level. It is valid
-        only when the request contains a parent resolution.
+        Built-in names or named Series-to-scalar callables for each parent
+        level, optionally branching. Requires a parent resolution.
     min_coverage
         Optional minimum feature coverage at each requested level. When the
         calendar resolution and threshold are each given as one value, the

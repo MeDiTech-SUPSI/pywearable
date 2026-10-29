@@ -1193,8 +1193,8 @@ def get_hrv_statistics(
         ``"auto"``, ``"local"``, or ``"utc"`` for fixed windows. Calendar
         and sleep-cycle parents require participant-local time.
     aggregation
-        Operation or branching operations for each parent level. It is valid
-        only when the request forms a hierarchy.
+        Built-in names or named Series-to-scalar callables for each parent
+        level, optionally branching. Requires a hierarchy.
     min_coverage
         Optional minimum coverage at each requested level. A scalar applies
         to every level; a sequence supplies one value per resolution.

@@ -1776,8 +1776,9 @@ def get_heart_rate_statistics(
         Clock used for fixed windows. ``auto`` selects UTC for purely subdaily
         extraction and local time when calendar or cycle parents require it.
         Explicit UTC is invalid when any sleep-defined cycle is requested.
-    aggregation : str, sequence, nested sequence, or None
-        Operations for levels above the primary one. ``None`` uses the
+    aggregation : str, collections.abc.Callable, sequence, nested sequence, or None
+        Built-in names or named Series-to-scalar callables above the primary
+        level. ``None`` uses the
         standard numeric operations. With more than one upper level, provide
         one nested specification per level, for example
         ``[["mean"], ["mean", "p90"]]``.

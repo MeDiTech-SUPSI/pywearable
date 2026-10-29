@@ -210,6 +210,124 @@ def test_sleep_features_match_native_summaries_and_missing_nights(wearable):
     )
 
 
+@pytest.mark.parametrize("qualified", [False, True])
+def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable, qualified):
+    source, loader = wearable
+
+    def slope_per_day(values):
+        observed = values.dropna()
+        if len(observed) < 2:
+            return np.nan
+        times = observed.index.get_level_values("window_start")
+        elapsed = (times - times[0]) / pd.Timedelta(days=1)
+        return float(np.polyfit(elapsed, observed.to_numpy(dtype=float), 1)[0])
+
+    def median_observed(values):
+        return values.median()
+
+    native = _raw_nights(source)
+    duration = (
+        native["total_sleep_duration"] / 60 if source == "oura"
+        else (native["durationInMs"] - native["unmeasurableSleepInMs"]) / 60_000
+    ).reindex(DATES)
+    labels = DATES - pd.to_timedelta(DATES.weekday, unit="D")
+    expected_slopes = []
+    for _, group in duration.groupby(labels):
+        observed = group.dropna()
+        value = np.nan
+        if len(observed) >= 2:
+            times = np.asarray(
+                (observed.index - observed.index[0]) / pd.Timedelta(days=1), dtype=float
+            )
+            times -= times.mean()
+            value = np.sum(times * (observed - observed.mean())) / np.sum(times ** 2)
+        if qualified and (observed.size / group.size < 0.9 or observed.size < 4):
+            value = np.nan
+        expected_slopes.append(value)
+    valid_slopes = pd.Series(expected_slopes).dropna()
+    coverage = valid_slopes.size / len(expected_slopes)
+    expected = valid_slopes.median()
+    if qualified and (coverage < 0.8 or len(valid_slopes) < 3):
+        expected = np.nan
+
+    result = sleep.get_sleep_statistics(
+        loader, **BOUNDS, statistic="sleep_TST",
+        resolution=["nightly", "weekly", "monthly"],
+        aggregation=[[slope_per_day], [median_observed]],
+        min_coverage=[0.8, 0.9, 0.8] if qualified else None,
+        min_valid_children=[None, 4, 3] if qualified else None,
+    )
+    feature = "sleep_TST__nightly__weekly_slope_per_day__monthly_median_observed"
+    assert result[feature].iloc[0] == pytest.approx(expected, nan_ok=True)
+    assert result[feature + "__coverage"].iloc[0] == pytest.approx(coverage)
+
+
+@pytest.mark.parametrize("domain", ["heart_rate", "activity", "respiration", "provider", "hrv"])
+@pytest.mark.parametrize("qualified", [False, True])
+def test_custom_reducers_follow_builtin_hierarchies_across_domains(wearable, domain, qualified):
+    source, loader = wearable
+
+    def mean_observed(values):
+        return values.mean()
+
+    def median_observed(values):
+        return values.median()
+
+    bounds = dict(BOUNDS)
+    chain = ["daily", "weekly", "monthly"]
+    options = {}
+    if domain == "heart_rate":
+        extract = heart_rate.get_heart_rate_statistics
+        options["statistic"] = "heart_rate_mean"
+    elif domain == "activity":
+        extract = activity.get_activity_statistics
+        options["statistic"] = "activity_steps"
+    elif domain == "respiration":
+        extract = respiration.get_respiration_statistics
+        options["statistic"] = "respiratory_rate_mean"
+        chain[0] = "cycle_night"
+    elif domain == "provider":
+        extract = provider_features.get_provider_features
+        options["feature"] = (
+            "oura_readiness_score" if source == "oura"
+            else "garmin_daily_stress_duration_seconds"
+        )
+    else:
+        extract = hrv.get_hrv_statistics
+        options["statistic"] = "hrv_rmssd"
+        chain = ["5min", "1h", "daily"]
+        bounds.update(start_date="2024-04-11", end_date="2024-04-12")
+    options.update(
+        **bounds, resolution=chain,
+        min_coverage=[None, 0.9, 0.9] if qualified else None,
+        min_valid_children=[None, 2, 2] if qualified else None,
+    )
+    custom = extract(
+        loader, **options, aggregation=[[mean_observed], [median_observed]],
+    )
+    reference = extract(loader, **options, aggregation=[["mean"], ["median"]])
+    custom = custom.rename(columns=lambda name: name.replace(
+        "_mean_observed", "_mean"
+    ).replace("_median_observed", "_median"))
+    pd.testing.assert_frame_equal(custom, reference)
+
+
+def test_direct_callable_repeats_at_successive_real_data_levels(wearable):
+    _, loader = wearable
+
+    def median_observed(values):
+        return values.median()
+
+    options = dict(
+        **BOUNDS, statistic="sleep_TST",
+        resolution=["nightly", "weekly", "monthly"],
+    )
+    custom = sleep.get_sleep_statistics(loader, **options, aggregation=median_observed)
+    reference = sleep.get_sleep_statistics(loader, **options, aggregation="median")
+    custom = custom.rename(columns=lambda name: name.replace("_median_observed", "_median"))
+    pd.testing.assert_frame_equal(custom, reference)
+
+
 def test_24h_sleep_totals_match_native_oura_stage_grid(loaders):
     expected = {}
     nap_sleep = {}

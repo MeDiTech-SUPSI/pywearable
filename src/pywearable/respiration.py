@@ -495,8 +495,9 @@ def get_respiration_statistics(
         Clock for raw samples; ``"auto"`` uses local time for calendar/cycle
         windows and UTC for fixed windows when available. Provider summaries
         are date-labelled and do not support UTC selection.
-    aggregation : str, sequence, or None
-        Operation(s) at each parent level; requires a hierarchy. ``None``
+    aggregation : str, collections.abc.Callable, sequence, or None
+        Built-in names or named Series-to-scalar callables at each parent
+        level; requires a hierarchy. ``None``
         uses the shared standard aggregations.
     min_coverage : float, sequence, or None
         Minimum valid fraction at each level. Raw primary coverage estimates
