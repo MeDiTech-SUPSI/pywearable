@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from pywearable import hierarchy
+from pywearable import hierarchy, hrv
+from tests.helpers import LoaderBase
 
 
 def slope_per_day(values):
@@ -23,6 +24,191 @@ def slope_per_day(values):
 def median_observed(values):
     """Summarize the preceding level without pooling its original samples."""
     return values.median()
+
+
+def robust_coefficient_of_variation(values):
+    """Return a quantile-based robust CV using p10, median, and p90."""
+    observed = values.dropna()
+    median = observed.median()
+    if pd.isna(median) or median <= 0:
+        return np.nan
+    return (observed.quantile(0.90) - observed.quantile(0.10)) / median
+
+
+def interquartile_range(values):
+    """Return the IQR of available preceding-level estimates."""
+    return values.quantile(0.75) - values.quantile(0.25)
+
+
+class NightlyRMSSDLoader(LoaderBase):
+    """Expose known five-minute RMSSD levels and excluded stage windows."""
+
+    def __init__(self, night_count=3):
+        patterns = [
+            np.linspace(20, 60, 20),
+            np.linspace(20, 100, 20),
+            np.linspace(40, 80, 20),
+        ]
+        self.levels = [patterns[index % len(patterns)] for index in range(night_count)]
+        sessions, stages, samples = [], [], []
+        for position, levels in enumerate(self.levels):
+            start = pd.Timestamp("2024-01-01 22:00") + pd.Timedelta(days=position)
+            session_id = f"night-{position}"
+            sessions.append({
+                "id": session_id,
+                "calendar_date": start.normalize() + pd.Timedelta(days=1),
+                "type": "main_sleep", "main_sleep": True,
+                "local_time": start,
+                "local_end_time": start + pd.Timedelta(minutes=110),
+                "time_in_bed_seconds": 6600.0,
+            })
+            for offset, stage, duration in [
+                (0, "awake", 5), (5, "deep", 100), (105, "unmeasurable", 5),
+            ]:
+                stages.append({
+                    "sleep_summary_id": session_id,
+                    "local_time": start + pd.Timedelta(minutes=offset),
+                    "duration_in_ms": duration * 60_000, "type": stage,
+                })
+            for window, rmssd in enumerate([300.0, *levels, 240.0]):
+                times = pd.date_range(
+                    start + pd.Timedelta(minutes=5 * window), periods=300, freq="s",
+                )
+                samples.append(pd.DataFrame({
+                    "local_time": times,
+                    "utc_time": times - pd.Timedelta(hours=1),
+                    "timezone": pd.Timedelta(hours=1),
+                    "bbi": np.resize([1000 - rmssd / 2, 1000 + rmssd / 2], 300),
+                }))
+        self.sessions = pd.DataFrame(sessions)
+        self.stages = pd.DataFrame(stages)
+        self.bbi = pd.concat(samples, ignore_index=True)
+
+    def get_user_ids(self):
+        return ["participant"]
+
+    def load_sleep_sessions(self, user_id, start_date=None, end_date=None):
+        selected = self.sessions
+        dates = selected["calendar_date"]
+        if start_date is not None:
+            selected = selected[dates >= pd.Timestamp(start_date).normalize()]
+        if end_date is not None:
+            selected = selected[selected["calendar_date"] < pd.Timestamp(end_date).normalize()]
+        return selected.copy()
+
+    def load_sleep_stage(self, *args, **kwargs):
+        return self.stages.copy()
+
+    def load_bbi(self, *args, **kwargs):
+        return self.bbi.copy()
+
+
+@pytest.mark.parametrize("values, expected", [
+    ([], np.nan), ([0.0, 0.0], np.nan), ([40.0, 40.0, np.nan], 0.0),
+    ([20.0, 40.0, 60.0], 0.8),
+])
+def test_robust_coefficient_of_variation_handles_missing_and_zero(values, expected):
+    actual = hierarchy.aggregate_values(
+        pd.Series(values, dtype=float), robust_coefficient_of_variation,
+    )
+    assert np.isclose(actual, expected, equal_nan=True)
+
+
+def test_robust_coefficient_of_variation_limits_one_extreme_estimate():
+    baseline = pd.Series(np.linspace(20, 60, 20))
+    contaminated = baseline.copy()
+    contaminated.iloc[-1] = 6000.0
+    assert robust_coefficient_of_variation(contaminated) == pytest.approx(
+        robust_coefficient_of_variation(baseline)
+    )
+    assert contaminated.std() / contaminated.mean() > 5 * (
+        baseline.std() / baseline.mean()
+    )
+
+
+@pytest.mark.parametrize("coverage", [None, [0.7, 0.7, 0.7]])
+def test_hrv_nightly_relative_spread_then_monthly_iqr(coverage):
+    loader = NightlyRMSSDLoader()
+    common = dict(
+        loader=loader, user_id="participant", statistic="hrv_rmssd",
+        start_date="2024-01-02", end_date="2024-01-05",
+        sleep_stages_to_remove=["awake", "unmeasurable"],
+    )
+    nightly = hrv.get_hrv_statistics(
+        **common, resolution=["5min", "nightly"],
+        aggregation=robust_coefficient_of_variation,
+        min_coverage=None if coverage is None else coverage[:2],
+        min_valid_children=[None, 12],
+    )
+    feature = "hrv_rmssd__5min__cycle_night_robust_coefficient_of_variation"
+    expected = np.array([
+        (np.quantile(levels, 0.9) - np.quantile(levels, 0.1)) / np.median(levels)
+        for levels in loader.levels
+    ])
+    np.testing.assert_allclose(nightly[feature], expected)
+    np.testing.assert_allclose(nightly[feature + "__coverage"], 20 / 22)
+    unfiltered = hrv.get_hrv_statistics(
+        **{**common, "sleep_stages_to_remove": None},
+        resolution=["5min", "nightly"], aggregation=robust_coefficient_of_variation,
+    )
+    assert not np.allclose(unfiltered[feature], expected)
+    monthly = hrv.get_hrv_statistics(
+        **common, resolution=["5min", "nightly", "monthly"],
+        aggregation=[[robust_coefficient_of_variation], [interquartile_range]],
+        min_coverage=coverage, min_valid_children=[None, 12, 2],
+    )
+    output = feature + "__monthly_interquartile_range"
+    assert monthly[output].iloc[0] == pytest.approx(
+        np.quantile(expected, 0.75) - np.quantile(expected, 0.25)
+    )
+    assert monthly[output + "__coverage"].iloc[0] == 1.0
+
+
+def test_hrv_relative_spread_qualification_propagates_to_month():
+    common = dict(
+        loader=NightlyRMSSDLoader(), user_id="participant", statistic="hrv_rmssd",
+        start_date="2024-01-02", end_date="2024-01-05",
+        resolution=["5min", "nightly", "monthly"],
+        aggregation=[[robust_coefficient_of_variation], [interquartile_range]],
+    )
+    output = (
+        "hrv_rmssd__5min__cycle_night_robust_coefficient_of_variation"
+        "__monthly_interquartile_range"
+    )
+    insufficient_nights = hrv.get_hrv_statistics(
+        **common, min_valid_children=[None, 12, 4],
+    )
+    assert pd.isna(insufficient_nights[output].iloc[0])
+    assert insufficient_nights[output + "__coverage"].iloc[0] == 1.0
+    rejected_nights = hrv.get_hrv_statistics(
+        **common, min_coverage=[0.7, 0.95, 0.7],
+    )
+    assert pd.isna(rejected_nights[output].iloc[0])
+    assert rejected_nights[output + "__coverage"].iloc[0] == 0.0
+
+
+def test_documented_monthly_hrv_relative_spread_request():
+    loader = NightlyRMSSDLoader(night_count=30)
+    monthly = hrv.get_hrv_statistics(
+        loader, statistic="hrv_rmssd",
+        resolution=["5min", "nightly", "monthly"],
+        aggregation=[[robust_coefficient_of_variation], [interquartile_range]],
+        sleep_stages_to_remove=["awake", "unmeasurable"],
+        min_coverage=[0.7, 0.7, 0.7],
+        min_valid_children=[None, 12, 10],
+    )
+    expected_nightly = [
+        (np.quantile(levels, 0.9) - np.quantile(levels, 0.1)) / np.median(levels)
+        for levels in loader.levels
+    ]
+    feature = (
+        "hrv_rmssd__5min__cycle_night_robust_coefficient_of_variation"
+        "__monthly_interquartile_range"
+    )
+    assert monthly[feature].iloc[0] == pytest.approx(
+        np.quantile(expected_nightly, 0.75) - np.quantile(expected_nightly, 0.25)
+    )
+    assert monthly[feature + "__coverage"].iloc[0] == 1.0
 
 
 def _children():
