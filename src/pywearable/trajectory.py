@@ -10,7 +10,7 @@ only by default.
 from __future__ import annotations
 
 import datetime
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import numpy as np
 import pandas as pd
@@ -795,7 +795,7 @@ def aggregate_trajectory_by_weekday(
     trajectory: pd.DataFrame,
     features: str | Sequence[str] | None = None,
     *,
-    aggregation: str = "mean",
+    aggregation: str | Callable = "mean",
     include_imputed: bool = False,
     temporal_features: str | Sequence[str] | None = None,
 ) -> pd.DataFrame:
@@ -815,7 +815,11 @@ def aggregate_trajectory_by_weekday(
         ``__coverage`` column is selected.
     aggregation
         ``"mean"``, ``"median"``, ``"min"``, ``"max"``, ``"std"``, or a
-        percentile such as ``"p90"``. Clock features use circular operations.
+        percentile such as ``"p90"``, or a named Python function. Custom
+        functions receive a sorted copy of the named Series, including its
+        participant/time index and missing rows, and return one numeric scalar
+        or a missing value. Clock features require a clock-valued result;
+        built-in operations use circular clock statistics where applicable.
     include_imputed
         Include values marked by ``<feature>__is_imputed``. They are excluded
         by default.
@@ -830,11 +834,18 @@ def aggregate_trajectory_by_weekday(
     """
     selected = _trajectory_features(trajectory, features)
     temporal = _clock_features(trajectory, selected, temporal_features)
-    if (
-        aggregation not in {"mean", "median", "min", "max", "std"}
-        and not hierarchy.is_percentile(aggregation)
+    if callable(aggregation):
+        hierarchy.aggregation_name(aggregation)
+    elif (
+        not isinstance(aggregation, str)
+        or (
+            aggregation not in {"mean", "median", "min", "max", "std"}
+            and not hierarchy.is_percentile(aggregation)
+        )
     ):
-        raise ValueError("aggregation must be mean, median, min, max, std, or pXX")
+        raise ValueError(
+            "aggregation must be mean, median, min, max, std, pXX, or a named callable"
+        )
 
     times = _time_values(trajectory)
     users = trajectory.index.get_level_values(schema.USER_COL)

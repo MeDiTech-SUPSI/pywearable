@@ -122,8 +122,9 @@ Summarize a typical week
 
 :func:`pywearable.trajectory.aggregate_trajectory_by_weekday` combines all
 Mondays, all Tuesdays, and so on within each participant. It supports mean,
-median, min, max, standard deviation, and percentiles such as ``p90``. This is
-a descriptive weekday profile, not a chronological parent hierarchy.
+median, min, max, standard deviation, percentiles such as ``p90``, and named
+Python functions. This is a descriptive weekday profile, not a chronological
+parent hierarchy.
 
 The function accepts daily or subdaily feature trajectories. With daily rows,
 it returns one summary for each weekday. With subdaily rows, it collapses all
@@ -136,6 +137,19 @@ patterns.
         daily_steps,
         features="activity_steps",
         aggregation="median",
+    )
+
+Custom functions receive a chronologically ordered Series with its feature
+name, participant/time index, and missing values, and return one scalar.
+Clock-valued features require a clock-valued result. For example::
+
+    def interquartile_range(values):
+        return values.quantile(0.75) - values.quantile(0.25)
+
+    weekday_variability = trajectory.aggregate_trajectory_by_weekday(
+        daily_steps,
+        features="activity_steps",
+        aggregation=interquartile_range,
     )
 
 Use :func:`pywearable.visualization.plot_weekly_profile` when the source is a

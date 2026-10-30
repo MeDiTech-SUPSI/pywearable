@@ -1,4 +1,5 @@
 import datetime
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -432,3 +433,161 @@ def test_weekday_aggregation_uses_circular_clock_means():
     result = trajectory.aggregate_trajectory_by_weekday(frame, "sleep_bedtime")
 
     assert result.loc[("user", "Monday"), "sleep_bedtime"] == datetime.time(0, 0)
+
+
+def test_weekday_custom_aggregation_preserves_context_support_and_input():
+    frame = _trajectory([7.0, np.nan, 1.0, 20.0, 10.0])
+    frame.index = pd.MultiIndex.from_arrays(
+        [
+            ["a", "a", "a", "b", "b"],
+            pd.to_datetime([
+                "2024-01-15", "2024-01-08", "2024-01-01",
+                "2024-01-08", "2024-01-01",
+            ]),
+        ],
+        names=["user_id", "calendar_date"],
+    )
+    original = frame.copy(deep=True)
+    received = []
+
+    def slope_per_day(values):
+        assert values.name == "metric"
+        assert values.index.names == ["user_id", "calendar_date"]
+        assert values.index.is_monotonic_increasing
+        received.append(values.copy())
+        observed = values.dropna()
+        dates = observed.index.get_level_values("calendar_date")
+        elapsed = (dates[-1] - dates[0]) / pd.Timedelta(days=1)
+        result = (observed.iloc[-1] - observed.iloc[0]) / elapsed
+        values.iloc[0] = -1000.0
+        return result
+
+    result = trajectory.aggregate_trajectory_by_weekday(
+        frame, "metric", aggregation=slope_per_day
+    )
+
+    assert result.loc[("a", "Monday"), "metric"] == pytest.approx(6 / 14)
+    assert result.loc[("b", "Monday"), "metric"] == pytest.approx(10 / 7)
+    assert [len(values) for values in received] == [3, 2]
+    assert [values.isna().sum() for values in received] == [1, 0]
+    for user in ("a", "b"):
+        monday = result.loc[(user, "Monday")]
+        assert monday["metric__support"] == 2
+        assert monday["metric__coverage"] == pytest.approx(
+            frame.xs(user)["metric__coverage"].mean()
+        )
+        assert pd.isna(result.loc[(user, "Tuesday"), "metric"])
+    pd.testing.assert_frame_equal(frame, original)
+
+
+def test_weekday_custom_aggregation_respects_imputation_option():
+    frame = _trajectory([0.0, 100.0, 8.0])
+    frame.index = pd.MultiIndex.from_product(
+        [["user"], pd.date_range("2024-01-01", periods=3, freq="7D")],
+        names=["user_id", "calendar_date"],
+    )
+    frame["metric__is_imputed"] = [False, True, False]
+
+    def interquartile_range(values):
+        return values.quantile(0.75) - values.quantile(0.25)
+
+    for include_imputed, expected, support in ((False, 4.0, 2), (True, 50.0, 3)):
+        result = trajectory.aggregate_trajectory_by_weekday(
+            frame, "metric", aggregation=interquartile_range,
+            include_imputed=include_imputed,
+        )
+        monday = result.loc[("user", "Monday")]
+        assert monday["metric"] == expected
+        assert monday["metric__support"] == support
+        assert monday["metric__coverage"] == pytest.approx(
+            frame["metric__coverage"].mean()
+        )
+
+
+def test_weekday_custom_aggregation_preserves_clock_values():
+    frame = _trajectory(
+        [pd.Timestamp("2023-12-31 23:30"), pd.Timestamp("2024-01-08 00:30")],
+        feature="sleep_bedtime",
+    )
+    frame.index = pd.MultiIndex.from_product(
+        [["user"], pd.date_range("2024-01-01", periods=2, freq="7D")],
+        names=["user_id", "calendar_date"],
+    )
+
+    def latest_bedtime(values):
+        return max(
+            values.dropna(),
+            key=lambda value: ((value.hour - 12) % 24, value.minute),
+        )
+
+    result = trajectory.aggregate_trajectory_by_weekday(
+        frame, "sleep_bedtime", aggregation=latest_bedtime
+    )
+
+    assert result.loc[("user", "Monday"), "sleep_bedtime"] == datetime.time(0, 30)
+
+
+@pytest.mark.parametrize("returned, feature, message", [
+    ([1.0, 2.0], "metric", "one scalar"),
+    ("invalid", "metric", "numeric scalar"),
+    (3.0, "sleep_bedtime", "clock time"),
+])
+def test_weekday_custom_aggregation_validates_return_type(returned, feature, message):
+    value = datetime.time(23, 30) if feature == "sleep_bedtime" else 1.0
+    frame = _trajectory([value], feature=feature)
+
+    def invalid_result(values):
+        return returned
+
+    with pytest.raises(TypeError, match=message):
+        trajectory.aggregate_trajectory_by_weekday(
+            frame, feature, aggregation=invalid_result
+        )
+
+
+@pytest.mark.parametrize("aggregation", [
+    lambda values: values.mean(), partial(np.mean), "iqr", ["mean"],
+])
+def test_weekday_aggregation_rejects_unnamed_or_unsupported_operations(aggregation):
+    with pytest.raises(ValueError):
+        trajectory.aggregate_trajectory_by_weekday(
+            _trajectory([1.0]), "metric", aggregation=aggregation
+        )
+
+
+def test_weekday_custom_aggregation_skips_empty_and_all_missing_series():
+    def unexpected_call(values):
+        raise AssertionError("Empty or all-missing series must not call the reducer")
+
+    result = trajectory.aggregate_trajectory_by_weekday(
+        _trajectory([np.nan]), "metric", aggregation=unexpected_call
+    )
+
+    assert result["metric"].isna().all()
+    assert result["metric__support"].eq(0).all()
+
+
+def test_weekday_custom_aggregation_can_return_missing():
+    frame = _trajectory([1.0])
+
+    def unavailable(values):
+        return np.nan
+
+    result = trajectory.aggregate_trajectory_by_weekday(
+        frame, "metric", aggregation=unavailable
+    )
+
+    monday = result.loc[("user", "Monday")]
+    assert pd.isna(monday["metric"])
+    assert monday["metric__support"] == 1
+    assert monday["metric__coverage"] == frame["metric__coverage"].iloc[0]
+
+
+def test_weekday_custom_aggregation_propagates_callback_errors():
+    def failing_reducer(values):
+        raise RuntimeError("Custom calculation failed")
+
+    with pytest.raises(RuntimeError, match="Custom calculation failed"):
+        trajectory.aggregate_trajectory_by_weekday(
+            _trajectory([1.0]), "metric", aggregation=failing_reducer
+        )
