@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adherence &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Cycles" href="cycle.html" />
+    <link rel="prev" title="Activity" href="activity.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="activity.html">Activity</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Adherence</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.adherence.get_adherence"><code class="docutils literal notranslate"><span class="pre">get_adherence()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.adherence.get_daily_wearing_time"><code class="docutils literal notranslate"><span class="pre">get_daily_wearing_time()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Adherence</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/adherence.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pywearable.adherence">
+<span id="adherence"></span><h1>Adherence<a class="headerlink" href="#module-pywearable.adherence" title="Link to this heading"></a></h1>
+<p>Measure data availability for wearable physiological streams.</p>
+<p>The module exposes adherence for heart rate, beat-to-beat intervals (BBI),
+and sleep summaries.  Each stream has a different native availability model:</p>
+<ul class="simple">
+<li><p>heart rate measures the fraction of physical time represented by occupied
+one-minute bins;</p></li>
+<li><p>BBI measures the positive interval duration represented in a window; and</p></li>
+<li><p>sleep measures the presence of a usable main-sleep summary for each local
+calendar date.</p></li>
+</ul>
+<p>Scalar resolutions report that native coverage directly.  Resolution chains
+instead turn coverage at each non-final level into a valid/invalid child and
+report the fraction of expected children that remain valid at the final level.
+Unsupported streams and inapplicable metric/resolution combinations are
+represented by missing values, while supported streams with no observations
+have zero adherence.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.adherence.get_adherence">
+<span class="sig-prename descclassname"><span class="pre">pywearable.adherence.</span></span><span class="sig-name descname"><span class="pre">get_adherence</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_id</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'all'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'daily'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_reference</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'auto'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_coverage</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">loader_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cycle_kwargs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">check_sleep_validation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.adherence.get_adherence" title="Link to this definition"></a></dt>
+<dd><p>Return final data-availability adherence over <code class="docutils literal notranslate"><span class="pre">[start_date,</span> <span class="pre">end_date)</span></code>.</p>
+<p>Heart-rate adherence is the fraction of physical time represented by
+one-minute bins containing at least one positive sample.  BBI adherence is
+positive BBI duration divided by expected physical duration.  Sleep
+adherence is usable main-sleep-summary presence over expected local dates.</p>
+<p>A scalar resolution reports raw coverage directly.  A resolution sequence
+qualifies children at every non-final level and reports final
+<code class="docutils literal notranslate"><span class="pre">valid</span> <span class="pre">children</span> <span class="pre">/</span> <span class="pre">expected</span> <span class="pre">children</span></code> coverage.  Children have equal
+weight, irrespective of their physical duration.  Sleep enters a hierarchy
+at its native daily grain, so lower fixed resolutions are ignored rather
+than populated with artificial observations.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>) – Loader providing the requested streams and user identifiers.</p></li>
+<li><p><strong>metric</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><em>tuple</em></a><em> | </em><em>None</em>) – One metric name, a sequence of names, or <code class="docutils literal notranslate"><span class="pre">None</span></code> for all of
+<code class="docutils literal notranslate"><span class="pre">'heart_rate'</span></code>, <code class="docutils literal notranslate"><span class="pre">'sleep'</span></code>, and <code class="docutils literal notranslate"><span class="pre">'bbi'</span></code>.  Output columns follow the
+requested order and are named <code class="docutils literal notranslate"><span class="pre">&lt;metric&gt;_adherence</span></code>.</p></li>
+<li><p><strong>user_id</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><em>None</em>) – One user, a sequence of users, <code class="docutils literal notranslate"><span class="pre">'all'</span></code>, or <code class="docutils literal notranslate"><span class="pre">None</span></code>.  <code class="docutils literal notranslate"><span class="pre">None</span></code> is an
+alias for <code class="docutils literal notranslate"><span class="pre">'all'</span></code>.</p></li>
+<li><p><strong>start_date</strong> – Required half-open bounds, normalized to the clock selected by
+<code class="docutils literal notranslate"><span class="pre">time_reference</span></code>.  Sleep calendar bounds are always local.</p></li>
+<li><p><strong>end_date</strong> – Required half-open bounds, normalized to the clock selected by
+<code class="docutils literal notranslate"><span class="pre">time_reference</span></code>.  Sleep calendar bounds are always local.</p></li>
+<li><p><strong>resolution</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Timedelta.html#pandas.Timedelta" title="(in pandas v3.1)"><em>Timedelta</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)"><em>list</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.15)"><em>tuple</em></a>) – A fixed resolution, calendar resolution, cycle type, or an ordered
+resolution chain accepted by
+the shared resolution normalization. <code class="docutils literal notranslate"><span class="pre">'nightly'</span></code>
+is an alias for <code class="docutils literal notranslate"><span class="pre">cycle_night</span></code> for physical streams and for
+date-labelled nightly sleep-summary availability for sleep.</p></li>
+<li><p><strong>time_reference</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – <code class="docutils literal notranslate"><span class="pre">'auto'</span></code>, <code class="docutils literal notranslate"><span class="pre">'local'</span></code>, or <code class="docutils literal notranslate"><span class="pre">'utc'</span></code>.  <code class="docutils literal notranslate"><span class="pre">'auto'</span></code> selects UTC for
+fixed physical windows and local time for calendar or cycle windows.
+All requested physical metrics must support the selected clock.  UTC
+cannot represent sleep calendar adherence.</p></li>
+<li><p><strong>min_coverage</strong> – Optional number or sequence with one entry per requested resolution.
+On non-final levels, a child qualifies when measured coverage is at
+least this threshold.  <code class="docutils literal notranslate"><span class="pre">None</span></code> qualifies any child with positive
+coverage.  The final entry is not applied because final coverage is
+the returned value.  Consequently, this argument has no filtering
+effect for a scalar resolution.</p></li>
+<li><p><strong>loader_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> | </em><em>None</em>) – Optional mapping keyed by metric name.  Each value is forwarded to
+that metric’s loader method.  Heart-rate <code class="docutils literal notranslate"><span class="pre">time_col</span></code> is controlled by
+<code class="docutils literal notranslate"><span class="pre">time_reference</span></code> and sleep <code class="docutils literal notranslate"><span class="pre">drop_duplicates</span></code> is controlled here,
+so callers may not override them.</p></li>
+<li><p><strong>cycle_kwargs</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)"><em>dict</em></a><em> | </em><em>None</em>) – Optional keyword arguments forwarded to
+<a class="reference internal" href="cycle.html#pywearable.cycle.get_intervals" title="pywearable.cycle.get_intervals"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.cycle.get_intervals()</span></code></a>.</p></li>
+<li><p><strong>check_sleep_validation</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – If true, sleep-summary rows labelled <code class="docutils literal notranslate"><span class="pre">MANUAL</span></code> or <code class="docutils literal notranslate"><span class="pre">AUTO_MANUAL</span></code> in
+the canonical <code class="docutils literal notranslate"><span class="pre">validation</span></code> column do not count as observed nights.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Final adherence values indexed by <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code>.  The time index
+is named <code class="docutils literal notranslate"><span class="pre">utc_time</span></code> or <code class="docutils literal notranslate"><span class="pre">local_time</span></code> for fixed windows and
+<code class="docutils literal notranslate"><span class="pre">calendar_date</span></code> for calendar or cycle outputs.  Values lie in
+<code class="docutils literal notranslate"><span class="pre">[0,</span> <span class="pre">1]</span></code>; missing values indicate an unsupported stream or an
+inapplicable metric/resolution combination.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)">pandas.DataFrame</a></p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If bounds, metric names, resolutions, thresholds, clocks, or forwarded
+    keyword structures are invalid.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p><code class="docutils literal notranslate"><span class="pre">resolution='daily'</span></code> measures raw coverage across each day.  In contrast,
+<code class="docutils literal notranslate"><span class="pre">resolution=['5min',</span> <span class="pre">'daily']</span></code> measures the fraction of five-minute
+children that satisfy the primary threshold.  These quantities coincide
+only under particular sampling patterns.</p>
+<p class="rubric">Examples</p>
+<p>Direct five-minute coverage for heart rate and BBI:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_adherence</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">metric</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;heart_rate&#39;</span><span class="p">,</span> <span class="s1">&#39;bbi&#39;</span><span class="p">],</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s1">&#39;participant-01&#39;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s1">&#39;2024-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s1">&#39;2024-01-02&#39;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="s1">&#39;5min&#39;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Fraction of qualifying five-minute heart-rate windows in each night:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">get_adherence</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">metric</span><span class="o">=</span><span class="s1">&#39;heart_rate&#39;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s1">&#39;2024-01-01&#39;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s1">&#39;2024-02-01&#39;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;5min&#39;</span><span class="p">,</span> <span class="n">cycle</span><span class="o">.</span><span class="n">CYCLE_NIGHT</span><span class="p">],</span>
+    <span class="n">min_coverage</span><span class="o">=</span><span class="p">[</span><span class="mf">0.8</span><span class="p">,</span> <span class="kc">None</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.adherence.get_daily_wearing_time">
+<span class="sig-prename descclassname"><span class="pre">pywearable.adherence.</span></span><span class="sig-name descname"><span class="pre">get_daily_wearing_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">loader</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">user_id</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_date</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ceil_to_24</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.adherence.get_daily_wearing_time" title="Link to this definition"></a></dt>
+<dd><p>Return daily hours represented by one-minute heart-rate occupancy.</p>
+<p>Each daily adherence fraction is multiplied by the exact requested
+local-day duration, so partial first and last days remain partial.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>loader</strong> (<a class="reference internal" href="loader.html#pywearable.loader.BaseLoader" title="pywearable.loader.base.BaseLoader"><em>BaseLoader</em></a>) – Loader providing timestamped heart-rate samples.</p></li>
+<li><p><strong>user_id</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – One user identifier.</p></li>
+<li><p><strong>start_date</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Timestamp.html#pandas.Timestamp" title="(in pandas v3.1)"><em>Timestamp</em></a>) – Required half-open local-time bounds.</p></li>
+<li><p><strong>end_date</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Timestamp.html#pandas.Timestamp" title="(in pandas v3.1)"><em>Timestamp</em></a>) – Required half-open local-time bounds.</p></li>
+<li><p><strong>ceil_to_24</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – If true, clip reported daily hours at 24.  Adherence is already capped
+at one, so this only preserves the historical option.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>Local-date-indexed hours named <code class="docutils literal notranslate"><span class="pre">'daily-hr'</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Series.html#pandas.Series" title="(in pandas v3.1)">pandas.Series</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="activity.html" class="btn btn-neutral float-left" title="Activity" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="cycle.html" class="btn btn-neutral float-right" title="Cycles" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

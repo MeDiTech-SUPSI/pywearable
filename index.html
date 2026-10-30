@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pywearable &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="_static/pywearable-logo.png"/>
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Getting started" href="_pages/getting_started.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="#" class="icon icon-home">
+            pywearable
+              <img src="_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_pages/getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_pages/api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="#" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">pywearable</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="pywearable">
+<h1>pywearable<a class="headerlink" href="#pywearable" title="Link to this heading"></a></h1>
+<a class="reference internal image-reference" href="_images/pywearable-logo.png"><img alt="pywearable logo: a Python-powered smartwatch." class="align-center" src="_images/pywearable-logo.png" style="width: 280px;" />
+</a>
+<p><code class="docutils literal notranslate"><span class="pre">pywearable</span></code> turns wearable exports into analysis-ready trajectories for
+activity, sleep, heart rate, heart-rate variability, respiration, oxygen
+saturation, provider scores, and adherence.</p>
+<p>A typical workflow has three steps: choose a loader, extract one or more
+features at the resolution needed by the analysis, and inspect or visualize
+the resulting trajectory. The user guide introduces each step with runnable
+examples; the API reference lists every supported parameter.</p>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_pages/getting_started.html">Getting started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/getting_started.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/getting_started.html#instantiate-a-loader">Instantiate a loader</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/getting_started.html#compute-feature-trajectories">Compute feature trajectories</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/getting_started.html#visualize-the-result">Visualize the result</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/data_sources.html">Data sources</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_data_sources/labfront.html">Labfront</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_data_sources/lifesnaps.html">LifeSnaps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_data_sources/oura.html">Oura</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_data_sources/tesserae.html">Tesserae</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/data_sources.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/features.html">What can I extract?</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#activity">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#heart-rate">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#heart-rate-variability">Heart-rate variability</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#respiration-and-oxygen-saturation">Respiration and oxygen saturation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#sleep">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#provider-native-features">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#adherence">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/features.html#next-steps">Next steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/cycles.html">Sleep-anchored cycles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/cycles.html#define-cycle-boundaries">Define cycle boundaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/cycles.html#use-cycles-in-feature-extraction">Use cycles in feature extraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/cycles.html#missing-boundaries">Missing boundaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/cycles.html#date-labels-and-physical-intervals">Date labels and physical intervals</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/resolutions.html">Resolutions and hierarchies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#choose-a-resolution">Choose a resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#build-a-hierarchy">Build a hierarchy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#available-operations">Available operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#custom-aggregations">Custom aggregations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#coverage-and-support">Coverage and support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#direct-and-hierarchical-summaries-answer-different-questions">Direct and hierarchical summaries answer different questions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/resolutions.html#date-bounds">Date bounds</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/trajectories.html">Working with feature trajectories</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/trajectories.html#impute-selected-gaps">Impute selected gaps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/trajectories.html#add-historical-context">Add historical context</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/trajectories.html#summarize-a-typical-week">Summarize a typical week</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/metrics.html">Data model and missingness</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/metrics.html#loader-frames">Loader frames</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/metrics.html#feature-trajectories">Feature trajectories</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/metrics.html#sleep-stages">Sleep stages</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="_pages/visualization.html">Visualization guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#choose-a-plot">Choose a plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#trajectory-and-trend">Trajectory and trend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#calendar-views">Calendar views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#coverage-heatmaps">Coverage heatmaps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#typical-within-day-profiles">Typical within-day profiles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#sleep-views">Sleep views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#adherence-monitoring">Adherence monitoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/visualization.html#save-and-customize">Save and customize</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+</div>
+<div class="toctree-wrapper compound">
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="_pages/api.html">API reference</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/activity.html">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/adherence.html">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/sleep.html">Sleep</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/trajectory.html">Trajectory processing</a></li>
+<li class="toctree-l2"><a class="reference internal" href="_pages/_api/visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section id="indices">
+<h1>Indices<a class="headerlink" href="#indices" title="Link to this heading"></a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="_pages/getting_started.html" class="btn btn-neutral float-right" title="Getting started" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

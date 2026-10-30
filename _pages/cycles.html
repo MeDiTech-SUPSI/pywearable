@@ -1,0 +1,208 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sleep-anchored cycles &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Resolutions and hierarchies" href="resolutions.html" />
+    <link rel="prev" title="What can I extract?" href="features.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">What can I extract?</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Sleep-anchored cycles</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#define-cycle-boundaries">Define cycle boundaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#use-cycles-in-feature-extraction">Use cycles in feature extraction</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#missing-boundaries">Missing boundaries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#date-labels-and-physical-intervals">Date labels and physical intervals</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Sleep-anchored cycles</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_pages/cycles.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sleep-anchored-cycles">
+<h1>Sleep-anchored cycles<a class="headerlink" href="#sleep-anchored-cycles" title="Link to this heading"></a></h1>
+<p>Calendar days are not always the most useful unit for wearable data. A sleep
+session commonly crosses midnight, and the waking interval that follows it
+belongs naturally to the same sleep-wake sequence. pywearable therefore
+provides three participant-local cycle definitions.</p>
+<a class="reference internal image-reference" href="../_images/cycles.svg"><img alt="Heart rate across several days, repeated in three panels with night, awake, and physiological cycle intervals shaded." class="align-center" src="../_images/cycles.svg" style="width: 94%;" />
+</a>
+<dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">cycle_night</span></code></dt><dd><p>The provider-designated main-sleep session, from bedtime to session end.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">cycle_awake</span></code></dt><dd><p>The interval from the end of one main sleep to the following main sleep’s
+bedtime.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">cycle_physiological</span></code></dt><dd><p>The interval from one main sleep’s bedtime to the following main sleep’s
+bedtime. It contains both the night and the waking interval that follows.</p>
+</dd>
+</dl>
+<p>Naps remain observations within the awake and physiological cycles; they do
+not create new boundaries.</p>
+<section id="define-cycle-boundaries">
+<h2>Define cycle boundaries<a class="headerlink" href="#define-cycle-boundaries" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/cycle.html#pywearable.cycle.get_intervals" title="pywearable.cycle.get_intervals"><code class="xref py py-func docutils literal notranslate"><span class="pre">pywearable.cycle.get_intervals()</span></code></a> to define and inspect the exact
+intervals:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">cycle</span>
+
+<span class="n">intervals</span> <span class="o">=</span> <span class="n">cycle</span><span class="o">.</span><span class="n">get_intervals</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">cycle_type</span><span class="o">=</span><span class="n">cycle</span><span class="o">.</span><span class="n">CYCLE_PHYSIOLOGICAL</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-01-08&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The result contains <code class="docutils literal notranslate"><span class="pre">start_time</span></code>, <code class="docutils literal notranslate"><span class="pre">end_time</span></code>, <code class="docutils literal notranslate"><span class="pre">interval_valid</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">end_source</span></code> for each requested sleep calendar date. Feature functions use
+this same interval calculation internally when <code class="docutils literal notranslate"><span class="pre">resolution</span></code> is set to a
+cycle. Calling it directly is useful when the boundaries themselves need to
+be inspected or reused.</p>
+</section>
+<section id="use-cycles-in-feature-extraction">
+<h2>Use cycles in feature extraction<a class="headerlink" href="#use-cycles-in-feature-extraction" title="Link to this heading"></a></h2>
+<p>Cycle names can be passed wherever the domain supports cycle aggregation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">heart_rate</span>
+
+<span class="n">awake_hr</span> <span class="o">=</span> <span class="n">heart_rate</span><span class="o">.</span><span class="n">get_heart_rate_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_MEAN</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-02-01&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="n">cycle</span><span class="o">.</span><span class="n">CYCLE_AWAKE</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>They can also form the first meaningful parent in a hierarchy. For example,
+<code class="docutils literal notranslate"><span class="pre">(&quot;5min&quot;,</span> <span class="pre">&quot;cycle_night&quot;,</span> <span class="pre">&quot;monthly&quot;)</span></code> validates five-minute windows,
+summarizes each night, and then aggregates nights by month.</p>
+</section>
+<section id="missing-boundaries">
+<h2>Missing boundaries<a class="headerlink" href="#missing-boundaries" title="Link to this heading"></a></h2>
+<p>An awake or physiological cycle needs the following night’s bedtime. When
+that boundary is unavailable, the cycle is invalid by default. Set
+<code class="docutils literal notranslate"><span class="pre">missing_end=&quot;midnight&quot;</span></code> through <code class="docutils literal notranslate"><span class="pre">cycle_kwargs</span></code> only when the analysis
+protocol defines the next local midnight as an acceptable endpoint. A missing
+starting boundary is never inferred.</p>
+</section>
+<section id="date-labels-and-physical-intervals">
+<h2>Date labels and physical intervals<a class="headerlink" href="#date-labels-and-physical-intervals" title="Link to this heading"></a></h2>
+<p>Cycle rows are indexed by sleep calendar date. Date bounds select those row
+labels, while the returned start and end timestamps preserve the complete
+interval. Thus a night assigned to January 1 can include its bedtime on
+December 31.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="features.html" class="btn btn-neutral float-left" title="What can I extract?" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="resolutions.html" class="btn btn-neutral float-right" title="Resolutions and hierarchies" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
