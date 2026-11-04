@@ -15,9 +15,6 @@ install the ``parquet`` optional dependency::
 
     loader = TesseraeParquetLoader("path/to/tesserae-parquet")
 
-Both loaders expose canonical timestamped activity and heart-rate samples.
-The Parquet loader also exposes BBI data when present.
-
 See :class:`pywearable.loader.TesseraeCSVLoader` and
 :class:`pywearable.loader.TesseraeParquetLoader` for their APIs.
 
