@@ -627,7 +627,6 @@ class TesseraeParquetLoader(BaseLoader):
             return pd.DataFrame(
                 columns=["utc_time", date_col] + numeric_columns + categorical_coluns,
             )
-        print(df)
         df["utc_time"] = df["utc_time"].dt.tz_convert("UTC").dt.tz_localize(None)
         if date_col == "date":
             df = df.rename(columns={date_col: "calendar_date"})
@@ -804,8 +803,9 @@ class TesseraeParquetLoader(BaseLoader):
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
+        date_col: str = "date",
     ) -> pd.DataFrame:
-        summaries = [
+        garmin_summaries = [
             "activity_summary",
             "adj_imputed_sleep_summary",
             "daily_summary",
@@ -813,21 +813,56 @@ class TesseraeParquetLoader(BaseLoader):
             "hrv_summary",
             "stress_summary",
         ]
+        gimbal_summaries = [
+            "interaction_summary",
+            "beacon_summary",
+            "home_office_hours",
+        ]
+        contextual_summaries = ["noaa_storm_events", "weather_summary"]
+        mapping = ["beacons", "participant_info"]
+        mixed = [
+            "home_office_hours_loc",
+            "hrv_summary_baseline",
+            "hrv_work_desk_home_summary",
+            "pa_summary",
+        ]
         metric_map = {
+            # Garmin
             "activity_summary": "ActivitySummary.parquet",
             "adj_imputed_sleep_summary": "AdjImputedSleep.parquet",
             "daily_summary": "DailySummaries.parquet",
             "hr_summary": "HRSummary.parquet",
             "hrv_summary": "HRVSummary.parquet",
             "stress_summary": "StressSummary.parquet",
+            # Gimbal
+            "beacon_summary": "BeaconSummary.parquet",
+            "interaction_summary": "InteractionSummary.parquet",
+            "home_office_hours": "HomeOfficeHours.parquet",
+            # Contextual
+            "noaa_storm_events": "NOAAStormEvents.parquet",
+            "weather_summary": "WeatherSummary.parquet",
+            # Mapping
+            "beacons": "Beacons.parquet",
+            "participant_info": "ParticipantInfo.parquet",
+            # Mixed
+            "home_office_hours_loc": "HomeOfficeHoursLoc.parquet",
+            "hrv_summary_baseline": "HRVSummaryBaseline.parquet",
+            "hrv_work_desk_home_summary": "HRVWorkDeskHomeSummary",
+            "pa_summary": "PASummary.parquet",
         }
-        if metric in summaries:
-            path_to_file = (
-                self.root_folder
-                / "_global_metrics"
-                / "GarminSummary"
-                / metric_map[metric]
-            )
+        if metric in garmin_summaries:
+            folder = "GarminSummary"
+        elif metric in gimbal_summaries:
+            folder = "GimbalSummary"
+        elif metric in contextual_summaries:
+            folder = "Contextual"
+        elif metric in mapping:
+            folder = "Mapping"
+        elif metric in mixed:
+            folder = "Mixed"
+        path_to_file = (
+            self.root_folder / "_global_metrics" / folder / metric_map[metric]
+        )
         if not path_to_file.exists():
             return pd.DataFrame()
         df = (
@@ -835,9 +870,17 @@ class TesseraeParquetLoader(BaseLoader):
             .drop(["ParticipantID", "tz_source", "Timestamp"], axis=1, errors="ignore")
             .rename(columns={"local_time": "calendar_date", "date": "calendar_date"})
         )
-        print(df)
-        df["calendar_date"] = pd.to_datetime(df["calendar_date"])
-
+        if date_col == "date":
+            date_col = "calendar_date"
+            df["calendar_date"] = pd.to_datetime(df["calendar_date"])
+        elif date_col is None:
+            return df
+        else:
+            df[date_col] = pd.to_datetime(df[date_col])
+        if not (start_date is None):
+            df = df[df[date_col] >= pd.Timestamp(start_date).dt.normalize()]
+        if not (end_date is None):
+            df = df[df[date_col] < pd.Timestamp(end_date).dt.normalize()]
         return df
 
     def load_daily_summary(
@@ -847,6 +890,8 @@ class TesseraeParquetLoader(BaseLoader):
         end_date: Union[pd.Timestamp, None] = None,
         drop_duplicates: bool = True,
     ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         daily_summary = self._load_global_metric(
             metric="daily_summary",
             user_id=user_id,
@@ -877,6 +922,8 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         activity_summary = self._load_global_metric(
             metric="activity_summary",
             user_id=user_id,
@@ -903,6 +950,8 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         adj_sleep_summary = self._load_global_metric(
             metric="adj_imputed_sleep_summary",
             user_id=user_id,
@@ -945,6 +994,8 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         hr_summary = self._load_global_metric(
             metric="hr_summary",
             user_id=user_id,
@@ -990,6 +1041,8 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         hrv_summary = self._load_global_metric(
             metric="hrv_summary",
             user_id=user_id,
@@ -1058,7 +1111,8 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
-
+        if not user_id in self.user_ids:
+            raise ValueError(f"User id {user_id} is not valid")
         stress_summary = self._load_global_metric(
             metric="stress_summary",
             user_id=user_id,
@@ -1103,7 +1157,7 @@ class TesseraeParquetLoader(BaseLoader):
     #############################################################
     #                   Phone
     #############################################################
-    def _load_metric(
+    def _load_standard_metric(
         self,
         user_id: str,
         folder: str,
@@ -1114,56 +1168,48 @@ class TesseraeParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         if not user_id in self.user_ids:
             raise ValueError(f"User id {user_id} is not valid")
-        # Load all files
-        if folder == "Gimbal":
-            folder = self.root_folder / user_id / "data-pub-onreq" / user_id / "Gimbal"
-        else:
-            folder = self.root_folder / user_id / folder
 
-        pattern = os.path.join(folder, f"*_{metric}_*.csv")
-        files = glob.glob(pattern)
-        if len(files) > 0:
-            query = f"""
-                        SELECT * FROM read_csv('{pattern}', union_by_name=True, types={{'Timestamp':'VARCHAR'}});
-                    """
-            df = (
-                self.con.execute(query)
-                .df()
-                .drop(["ParticipantID"], axis=1)
-                # .rename(columns={"Timestamp": "utc_time"})
-            )
-            if "utc_time" in df.columns:
-                df = df.drop("utc_time", axis=1)
-            df = df.rename(columns={"Timestamp": "utc_time"})
-            df["timezone_offset"] = df["utc_time"].apply(
-                lambda x: self._convert_timezone_offset(x)
-            )
-            df["utc_time"] = pd.to_datetime(df["utc_time"], utc=True).dt.tz_localize(
-                None
-            )
-            if date_col == "date":
-                df = df.rename(columns={date_col: "calendar_date"})
-                date_col = "calendar_date"
-            elif date_col == None:
-                df["local_time"] = df["utc_time"] + pd.to_timedelta(
-                    df["timezone_offset"], unit="ms"
-                )
-                date_col = "local_time"
-            df[date_col] = pd.to_datetime(df[date_col])
+        metric_map = {
+            "pedometer": "Pedometer.parquet",
+            "wifi": "Wifi.parquet",
+            "beacon_callback": "BeaconCallback.parquet",
+            "beacon_place": "BeaconPlace.parquet",
+            "beacon_sighting": "BeaconSighting.parquet",
+            # "stress_summary": "StressSummary.parquet",
+        }
 
-            if not (start_date is None):
-                df = df.loc[df[date_col] >= pd.Timestamp(start_date)]
-            if not (end_date is None):
-                df = df.loc[df[date_col] < pd.Timestamp(end_date)]
-
-            return df
-        else:
+        path_to_file = self.root_folder / user_id / folder / metric_map[metric.lower()]
+        if not path_to_file.exists():
             return pd.DataFrame()
+
+        df = pd.read_parquet(path_to_file)
+        df = df.drop(["ParticipantID", "utc_time"], axis=1, errors="ignore")
+
+        df = df.rename(columns={"Timestamp": "utc_time"})
+        df["utc_time"] = pd.to_datetime(df["utc_time"], utc=True).dt.tz_localize(None)
+        df["timezone_offset"] = df["local_time"] - df["utc_time"]
+
+        if date_col == "date":
+            df = df.rename(columns={date_col: "calendar_date"})
+            date_col = "calendar_date"
+        elif date_col == None:
+            df["local_time"] = df["utc_time"] + pd.to_timedelta(
+                df["timezone_offset"], unit="ms"
+            )
+            date_col = "local_time"
+        df[date_col] = pd.to_datetime(df[date_col])
+
+        if not (start_date is None):
+            df = df.loc[df[date_col] >= pd.Timestamp(start_date)]
+        if not (end_date is None):
+            df = df.loc[df[date_col] < pd.Timestamp(end_date)]
+
+        return df
 
     def load_phone_pedometer(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        pedometer = self._load_metric(
+        pedometer = self._load_standard_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -1188,7 +1234,7 @@ class TesseraeParquetLoader(BaseLoader):
     def load_phone_wifi(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_standard_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -1203,24 +1249,21 @@ class TesseraeParquetLoader(BaseLoader):
     def load_weather_summary(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Contextual",
-            metric="WeatherSummary",
-            date_col="date",
+            metric="weather_summary",
         )
 
     def load_noaa_storm_events(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Contextual",
-            metric="NOAAStormEvents",
+            metric="noaa_storm_events",
             date_col="start_time",
         )
 
@@ -1230,24 +1273,24 @@ class TesseraeParquetLoader(BaseLoader):
     def load_beacon_callback(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_standard_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             folder="Gimbal",
-            metric="BeaconCallback",
+            metric="beacon_callback",
             date_col="local_time",
         )
 
     def load_beacon_place(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        gimbal_beacon_place = self._load_metric(
+        gimbal_beacon_place = self._load_standard_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             folder="Gimbal",
-            metric="BeaconPlace",
+            metric="beacon_place",
             date_col="local_time",
         )
         if len(gimbal_beacon_place) > 0:
@@ -1255,18 +1298,17 @@ class TesseraeParquetLoader(BaseLoader):
                 gimbal_beacon_place[col] = pd.to_datetime(
                     gimbal_beacon_place[col].replace("NULL", np.nan)
                 )
-            print(gimbal_beacon_place.columns)
         return gimbal_beacon_place
 
     def load_beacon_sighting(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        gimbal_beacon_sighting = self._load_metric(
+        gimbal_beacon_sighting = self._load_standard_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
             folder="Gimbal",
-            metric="BeaconSighting",
+            metric="beacon_sighting",
             date_col="local_time",
         )
         return gimbal_beacon_sighting
@@ -1274,26 +1316,22 @@ class TesseraeParquetLoader(BaseLoader):
     def load_beacon_summary(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        gimbal_beacon_summary = self._load_metric(
+        gimbal_beacon_summary = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="GimbalSummary",
-            metric="BeaconSummary",
-            date_col="date",
+            metric="beacon_summary",
         )
         return gimbal_beacon_summary
 
     def load_home_office_hours(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        home_office_hours = self._load_metric(
+        home_office_hours = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="GimbalSummary",
-            metric="HomeOfficeHours",
-            date_col="date",
+            metric="home_office_hours",
         )
         if len(home_office_hours) > 0:
             for col in ["home_hours", "office_hours"]:
@@ -1305,13 +1343,11 @@ class TesseraeParquetLoader(BaseLoader):
     def load_interaction_summary(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
-        interaction_summary = self._load_metric(
+        interaction_summary = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="GimbalSummary",
-            metric="InteractionSummary",
-            date_col="date",
+            metric="interaction_summary",
         )
         return interaction_summary
 
@@ -1324,13 +1360,12 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mapping",
-            metric="Beacons",
-            date_col="local_time",
+            metric="beacons",
+            date_col="calendar_date",
         )
 
     def load_mapping_participant_info(
@@ -1339,12 +1374,11 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mapping",
-            metric="ParticipantInfo",
+            metric="participant_info",
             date_col=None,
         )
 
@@ -1357,13 +1391,11 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        home_office_hours = self._load_metric(
+        home_office_hours = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mixed",
-            metric="HomeOfficeHoursLoc",
-            date_col="date",
+            metric="home_office_hours_loc",
         )
         if len(home_office_hours) > 0:
             for col in ["home_hours", "office_hours"]:
@@ -1378,13 +1410,11 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        hrv_summary_baseline = self._load_metric(
+        hrv_summary_baseline = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mixed",
-            metric="HRVSummaryBaseline",
-            date_col="date",
+            metric="hrv_summary_baseline",
         )
         columns = [
             "num_windows",
@@ -1438,13 +1468,11 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        hrv = self._load_metric(
+        hrv = self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mixed",
-            metric="HRVWorkDeskHomeSummary",
-            date_col="date",
+            metric="hrv_work_desk_home_summary",
         )
         if len(hrv) > 0:
             columns = [
@@ -1467,17 +1495,15 @@ class TesseraeParquetLoader(BaseLoader):
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        return self._load_metric(
+        return self._load_global_metric(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            folder="Mixed",
-            metric="PASummary",
-            date_col="date",
+            metric="pa_summary",
         )
 
     ##########################################
-    #       Use information
+    #       Survey information
     ##########################################
 
     def load_daily_survey(
