@@ -28,8 +28,8 @@ high_resolution_metrics_map = {
         "Intensity",
         "Steps",
     ],
-    "Phone": ["Pedometer"],
-    "Gimbal": ["BeaconSighting", "BeaconPlace"],
+    "Phone": ["Pedometer", "Wifi"],
+    "Gimbal": ["BeaconCallback", "BeaconSighting", "BeaconPlace"],
 }
 
 low_resolutions_metrics_map = {
@@ -41,13 +41,15 @@ low_resolutions_metrics_map = {
         "HRVSummary",
         "StressSummary",
     ],
-    "GimbalSummary": [
-        "BeaconSummary",
-        "InteractionSummary",
-    ],
+    "GimbalSummary": ["BeaconSummary", "InteractionSummary", "HomeOfficeHours"],
     "GroundTruthSurvey": ["DailiesScored", "IGTBDemographics", "IGTBScored"],
     "Mapping": ["Beacons", "ParticipantInfo"],
-    "Mixed": ["HRVSummaryBaseline", "HRVWorkDeskHomeSummary", "PASummary"],
+    "Mixed": [
+        "HomeOfficeHoursLoc",
+        "HRVSummaryBaseline",
+        "HRVWorkDeskHomeSummary",
+        "PASummary",
+    ],
     "Contextual": ["NOAAStormEvents", "WeatherSummary"],
 }
 
