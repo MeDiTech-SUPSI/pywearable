@@ -188,8 +188,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             heart_rate["utc_time"] = pd.NaT
             heart_rate["timezone"] = pd.NaT
             heart_rate[schema.TIMESTAMP_CONFLICT_COL] = (
-                heart_rate.groupby("local_time")["heart_rate"].transform("nunique")
-                > 1
+                heart_rate.groupby("local_time")["heart_rate"].transform("nunique") > 1
             )
             heart_rate = schema.prepare_heart_rate_samples(heart_rate)
             return (
@@ -297,13 +296,11 @@ class LifeSnapsParquetLoader(BaseLoader):
         spo2 = schema.prepare_spo2_summary(spo2)
         if start_date is not None:
             spo2 = spo2[
-                spo2[schema.CALENDAR_DATE_COL]
-                >= pd.Timestamp(start_date).normalize()
+                spo2[schema.CALENDAR_DATE_COL] >= pd.Timestamp(start_date).normalize()
             ]
         if end_date is not None:
             spo2 = spo2[
-                spo2[schema.CALENDAR_DATE_COL]
-                < pd.Timestamp(end_date).normalize()
+                spo2[schema.CALENDAR_DATE_COL] < pd.Timestamp(end_date).normalize()
             ]
         return spo2.reset_index(drop=True)
 
@@ -338,7 +335,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         else:
             return pd.DataFrame(columns=["isoDate", "calories"])
 
-    def load_temperature(
+    def load_computed_temperature(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -346,16 +343,61 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "computed_temperature.parquet"
         if file_path.exists():
-            calories = pd.read_parquet(file_path)
-            # .rename(
-            # columns={"dateTime": "isoDate", "value": "calories"}
-            # )
-            print(calories)
-            raise
-            calories["isoDate"] = pd.to_datetime(calories["isoDate"])
-            return calories
+            temperature = pd.read_parquet(file_path)
+
+            for col in ["sleep_start", "sleep_end"]:
+                temperature[col] = pd.to_datetime(
+                    temperature[col], utc=True, format="ISO8601"
+                ).dt.tz_localize(None)
+
+            if not (start_date is None):
+                temperature = temperature[
+                    temperature["sleep_start"] >= pd.Timestamp(start_date)
+                ]
+            if not (end_date is None):
+                temperature = temperature[
+                    temperature["sleep_start"] < pd.Timestamp(end_date)
+                ]
+            return temperature
         else:
-            return pd.DataFrame(columns=["isoDate", "calories"])
+            return pd.DataFrame(
+                columns=[
+                    "sleep_start",
+                    "sleep_end",
+                    "temperature_samples",
+                    "nightly_temperature",
+                    "baseline_relative_sample_sum",
+                    "baseline_relative_sample_sum_of_squares",
+                    "baseline_relative_nightly_standard_deviation",
+                    "baseline_relative_sample_standard_deviation",
+                ]
+            )
+
+    def load_wrist_temperature(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "wrist_temperature.parquet"
+        if file_path.exists():
+            temperature = pd.read_parquet(file_path).rename(
+                columns={"recorded_time": "local_time"}
+            )
+
+            temperature["local_time"] = pd.to_datetime(temperature["local_time"])
+
+            if not (start_date is None):
+                temperature = temperature[
+                    temperature["local_time"] >= pd.Timestamp(start_date)
+                ]
+            if not (end_date is None):
+                temperature = temperature[
+                    temperature["local_time"] < pd.Timestamp(end_date)
+                ]
+            return temperature
+        else:
+            return pd.DataFrame(columns=["local_time", "temperature"])
 
     def _load_sleep_stages(
         self,
@@ -367,6 +409,7 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "sleep_stages.parquet"
         if file_path.exists():
+
             def read_stages(path):
                 stages = pd.read_parquet(path).rename(
                     columns={
@@ -695,9 +738,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         sessions["time_in_bed_seconds"] = (
             pd.to_numeric(sessions["timeInBed"], errors="coerce") * 60
         )
-        sessions = sessions.rename(
-            columns={"logId": "id", "mainSleep": "main_sleep"}
-        )
+        sessions = sessions.rename(columns={"logId": "id", "mainSleep": "main_sleep"})
         if start_date is not None:
             sessions = sessions[
                 sessions["calendar_date"] >= pd.Timestamp(start_date).normalize()
@@ -742,9 +783,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             if "mainSleep" in sleep.columns:
                 sleep = sleep[sleep["mainSleep"].eq(True)]
 
-            minutes_asleep = pd.to_numeric(
-                sleep.get("minutesAsleep"), errors="coerce"
-            )
+            minutes_asleep = pd.to_numeric(sleep.get("minutesAsleep"), errors="coerce")
             time_in_bed = pd.to_numeric(sleep.get("timeInBed"), errors="coerce")
             wake_source = (
                 sleep["wake_minutes"]
@@ -755,19 +794,17 @@ class LifeSnapsParquetLoader(BaseLoader):
             staged_sleep = sleep["type"].eq("stages")
             unmeasurable = pd.Series(0.0, index=sleep.index)
             unmeasurable.loc[staged_sleep] = (
-                time_in_bed - minutes_asleep - wake_minutes
-            ).loc[staged_sleep].clip(lower=0)
+                (time_in_bed - minutes_asleep - wake_minutes)
+                .loc[staged_sleep]
+                .clip(lower=0)
+            )
             minutes_awake = time_in_bed - minutes_asleep - unmeasurable
-            sleep["duration_in_ms"] = (
-                minutes_asleep + unmeasurable
-            ) * 60_000
+            sleep["duration_in_ms"] = (minutes_asleep + unmeasurable) * 60_000
             sleep["awake_duration_in_ms"] = minutes_awake * 60_000
             for stage in ("deep", "light", "rem"):
                 if f"{stage}_minutes" in sleep.columns:
                     sleep[f"{stage}_sleep_duration_in_ms"] = (
-                        pd.to_numeric(
-                            sleep[f"{stage}_minutes"], errors="coerce"
-                        )
+                        pd.to_numeric(sleep[f"{stage}_minutes"], errors="coerce")
                         * 60_000
                     )
             sleep["unmeasurable_sleep_duration_in_ms"] = unmeasurable * 60_000
@@ -956,9 +993,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         survey = pd.read_parquet(
             self.root_folder / f"{survey_name}_scored.parquet"
         ).copy()
-        survey["submitdate"] = pd.to_datetime(
-            survey["submitdate"], errors="coerce"
-        )
+        survey["submitdate"] = pd.to_datetime(survey["submitdate"], errors="coerce")
         return self._filter_survey_rows(
             survey, user_id, start_date, end_date, "submitdate"
         )
