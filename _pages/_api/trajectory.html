@@ -1,0 +1,295 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trajectory processing &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Visualization" href="visualization.html" />
+    <link rel="prev" title="Sleep" href="sleep.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API reference</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="activity.html">Activity</a></li>
+<li class="toctree-l2"><a class="reference internal" href="adherence.html">Adherence</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cycle.html">Cycles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="heart_rate.html">Heart rate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="hrv.html">HRV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="loader.html">Loaders</a></li>
+<li class="toctree-l2"><a class="reference internal" href="provider_features.html">Provider-native features</a></li>
+<li class="toctree-l2"><a class="reference internal" href="respiration.html">Respiration</a></li>
+<li class="toctree-l2"><a class="reference internal" href="schema.html">Canonical schema</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sleep.html">Sleep</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Trajectory processing</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.trajectory.aggregate_trajectory_by_weekday"><code class="docutils literal notranslate"><span class="pre">aggregate_trajectory_by_weekday()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.trajectory.compute_trajectory_trend"><code class="docutils literal notranslate"><span class="pre">compute_trajectory_trend()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#pywearable.trajectory.impute_trajectory"><code class="docutils literal notranslate"><span class="pre">impute_trajectory()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="visualization.html">Visualization</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../api.html">API reference</a></li>
+      <li class="breadcrumb-item active">Trajectory processing</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_api/trajectory.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-pywearable.trajectory">
+<span id="trajectory-processing"></span><h1>Trajectory processing<a class="headerlink" href="#module-pywearable.trajectory" title="Link to this heading"></a></h1>
+<p>Analysis utilities for canonical wearable feature trajectories.</p>
+<p>The functions in this module operate on the <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code> DataFrames
+returned by pywearable feature modules.  Imputation is explicit, leaves
+coverage unchanged, and records which values it fills.  Trend estimates are
+computed independently for each participant and use historical observations
+only by default.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.trajectory.aggregate_trajectory_by_weekday">
+<span class="sig-prename descclassname"><span class="pre">pywearable.trajectory.</span></span><span class="sig-name descname"><span class="pre">aggregate_trajectory_by_weekday</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trajectory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">aggregation</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'mean'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_imputed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temporal_features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.trajectory.aggregate_trajectory_by_weekday" title="Link to this definition"></a></dt>
+<dd><p>Aggregate repeated calendar weekdays within each participant.</p>
+<p>This operation is intentionally separate from resolution hierarchies:
+Mondays across different weeks are a descriptive group, not one
+chronological parent window.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>trajectory</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)"><em>DataFrame</em></a>) – Canonical <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code> trajectory with feature coverage columns.
+Daily, nightly, cycle, and subdaily trajectories are all accepted.</p></li>
+<li><p><strong>features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Feature name or names. By default, every value column paired with a
+<code class="docutils literal notranslate"><span class="pre">__coverage</span></code> column is selected.</p></li>
+<li><p><strong>aggregation</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Callable" title="(in Python v3.15)"><em>Callable</em></a>) – <code class="docutils literal notranslate"><span class="pre">&quot;mean&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;median&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;min&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;max&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;std&quot;</span></code>, or a
+percentile such as <code class="docutils literal notranslate"><span class="pre">&quot;p90&quot;</span></code>, or a named Python function. Custom
+functions receive a sorted copy of the named Series, including its
+participant/time index and missing rows, and return one numeric scalar
+or a missing value. Clock features require a clock-valued result;
+built-in operations use circular clock statistics where applicable.</p></li>
+<li><p><strong>include_imputed</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Include values marked by <code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__is_imputed</span></code>. They are excluded
+by default.</p></li>
+<li><p><strong>temporal_features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Additional selected columns to interpret as clock-valued features.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>One row for every participant and Monday-through-Sunday label. Each
+feature is accompanied by <code class="docutils literal notranslate"><span class="pre">__support</span></code> and mean input <code class="docutils literal notranslate"><span class="pre">__coverage</span></code>.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)">pandas.DataFrame</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.trajectory.compute_trajectory_trend">
+<span class="sig-prename descclassname"><span class="pre">pywearable.trajectory.</span></span><span class="sig-name descname"><span class="pre">compute_trajectory_trend</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trajectory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">baseline_method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ma'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">baseline_window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_periods_baseline</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_range_method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ma'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">normal_range_window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">30</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_periods_normal_range</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">std_multiplier</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_current</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">include_imputed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temporal_features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.trajectory.compute_trajectory_trend" title="Link to this definition"></a></dt>
+<dd><p>Add participant-specific historical baselines and normal ranges.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>trajectory</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)"><em>DataFrame</em></a>) – Canonical <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code> trajectory DataFrame. Every selected
+feature must have a matching <code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__coverage</span></code> column.</p></li>
+<li><p><strong>features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Feature name or names to analyze. If omitted, all feature/coverage
+column pairs are selected.</p></li>
+<li><p><strong>baseline_method</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Independently selected historical estimators: <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">&quot;cumulative_mean&quot;</span></code>. The baseline describes the expected value;
+the normal-range method independently determines its center and
+standard deviation.</p></li>
+<li><p><strong>normal_range_method</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Independently selected historical estimators: <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">&quot;cumulative_mean&quot;</span></code>. The baseline describes the expected value;
+the normal-range method independently determines its center and
+standard deviation.</p></li>
+<li><p><strong>baseline_window</strong> – For <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code>, either a number of preceding rows or an elapsed-time
+window. For <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>, the exponential span. Ignored by cumulative
+means.</p></li>
+<li><p><strong>normal_range_window</strong> – For <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code>, either a number of preceding rows or an elapsed-time
+window. For <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>, the exponential span. Ignored by cumulative
+means.</p></li>
+<li><p><strong>min_periods_baseline</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a>) – Minimum observed values required for the corresponding estimate.</p></li>
+<li><p><strong>min_periods_normal_range</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a>) – Minimum observed values required for the corresponding estimate.</p></li>
+<li><p><strong>std_multiplier</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)"><em>float</em></a>) – Non-negative number of standard deviations below and above the normal
+center used for range bounds.</p></li>
+<li><p><strong>include_current</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Include the value on the current row in historical estimates. The
+default <code class="docutils literal notranslate"><span class="pre">False</span></code> makes every estimate strictly backward-looking.</p></li>
+<li><p><strong>include_imputed</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)"><em>bool</em></a>) – Include values marked by <code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__is_imputed</span></code> as estimator input.
+They are excluded by default.</p></li>
+<li><p><strong>temporal_features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Additional selected features to interpret as clock times. Canonical
+temporal features and datetime-like columns are detected automatically.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A copy of the input with these columns for every selected feature:
+<code class="docutils literal notranslate"><span class="pre">__trend_baseline</span></code>, <code class="docutils literal notranslate"><span class="pre">__trend_normal_center</span></code>,
+<code class="docutils literal notranslate"><span class="pre">__trend_normal_std</span></code>, <code class="docutils literal notranslate"><span class="pre">__trend_normal_lower</span></code>,
+<code class="docutils literal notranslate"><span class="pre">__trend_normal_upper</span></code>, <code class="docutils literal notranslate"><span class="pre">__trend_deviation</span></code>, and support counts for
+the baseline and normal range.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)">pandas.DataFrame</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Participants are always analyzed independently. Numeric deviations and
+standard deviations retain the feature’s units. Clock-valued centers and
+bounds remain clock values; their deviation and circular standard
+deviation are expressed in minutes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="pywearable.trajectory.impute_trajectory">
+<span class="sig-prename descclassname"><span class="pre">pywearable.trajectory.</span></span><span class="sig-name descname"><span class="pre">impute_trajectory</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">trajectory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'ma'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">7</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_periods</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fallback</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">temporal_features</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#pywearable.trajectory.impute_trajectory" title="Link to this definition"></a></dt>
+<dd><p>Fill missing values in one or more canonical feature trajectories.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>trajectory</strong> (<a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)"><em>DataFrame</em></a>) – DataFrame indexed by <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">time)</span></code>. A timezone index level is
+optional. Every selected feature must have a matching
+<code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__coverage</span></code> column.</p></li>
+<li><p><strong>features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Feature name or names to impute. If omitted, all feature/coverage
+column pairs are selected.</p></li>
+<li><p><strong>method</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a>) – Estimator used for missing values. Historical choices are <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code>
+(trailing moving mean), <code class="docutils literal notranslate"><span class="pre">&quot;rolling_median&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">&quot;cumulative_mean&quot;</span></code>. Retrospective choices are <code class="docutils literal notranslate"><span class="pre">&quot;user_mean&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;user_median&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;population_mean&quot;</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">&quot;population_median&quot;</span></code>.</p></li>
+<li><p><strong>window</strong> – For <code class="docutils literal notranslate"><span class="pre">&quot;ma&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;rolling_median&quot;</span></code>, either the number of preceding
+rows or an elapsed-time window such as <code class="docutils literal notranslate"><span class="pre">&quot;30D&quot;</span></code>. For <code class="docutils literal notranslate"><span class="pre">&quot;ema&quot;</span></code>, the
+exponential span. Ignored by the other methods.</p></li>
+<li><p><strong>min_periods</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)"><em>int</em></a>) – Minimum number of observed values required by a historical estimator.</p></li>
+<li><p><strong>fallback</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><em>None</em>) – Optional <code class="docutils literal notranslate"><span class="pre">&quot;user_mean&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;user_median&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;population_mean&quot;</span></code>,
+or <code class="docutils literal notranslate"><span class="pre">&quot;population_median&quot;</span></code> used when a historical estimator has
+insufficient support. No fallback is applied by default.</p></li>
+<li><p><strong>temporal_features</strong> (<a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em> | </em><a class="reference external" href="https://docs.python.org/3/library/collections.abc.html#collections.abc.Sequence" title="(in Python v3.15)"><em>Sequence</em></a><em>[</em><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)"><em>str</em></a><em>] </em><em>| </em><em>None</em>) – Additional selected features to interpret as clock times. Canonical
+sleep times, peak-activity start times, and datetime-like columns are
+recognized automatically.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A copy with fillable values replaced and one boolean
+<code class="docutils literal notranslate"><span class="pre">&lt;feature&gt;__is_imputed</span></code> column per selected feature. Input rows and
+coverage columns are unchanged.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p><a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html#pandas.DataFrame" title="(in pandas v3.1)">pandas.DataFrame</a></p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Historical estimates are participant-specific, use observations preceding
+the missing row, and never use values filled by this or an earlier call.
+Full-user methods compute the mean or median from all observed values for
+that participant in the complete supplied trajectory. Population methods
+compute one mean or median from all observed values across every
+participant and date in the supplied trajectory, then use it for every
+participant; no loader or external cohort data is consulted. Clock
+features are aggregated by time of day and restored on the missing row’s
+relevant calendar date.</p>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sleep.html" class="btn btn-neutral float-left" title="Sleep" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="visualization.html" class="btn btn-neutral float-right" title="Visualization" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
