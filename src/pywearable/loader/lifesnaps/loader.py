@@ -1,3 +1,4 @@
+import ast
 import os
 import warnings
 from pathlib import Path
@@ -948,6 +949,9 @@ class LifeSnapsParquetLoader(BaseLoader):
         result.loc[~valid, feature] = np.nan
         return schema.prepare_provider_feature_summary(result, feature)
 
+    ############################################
+    #           Surveys and profile
+    ############################################
     @staticmethod
     def _filter_survey_rows(
         survey: pd.DataFrame,
@@ -1028,6 +1032,562 @@ class LifeSnapsParquetLoader(BaseLoader):
         return self._filter_survey_rows(
             sema, user_id, start_date, end_date, "CREATED_TS"
         )
+
+    #############################################
+    #       Miscellaneous metrics
+    #############################################
+    def load_altitude(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "altitude.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "local_time", "value": "altitude"}
+            )
+            df["altitude"] = pd.to_numeric(df["altitude"])
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(columns=["local_time", "altitude"])
+
+    def load_hrv_histogram(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = (
+            self.root_folder / user_id / "heart_rate_variability_histogram.parquet"
+        )
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df["bucket_values"] = df["bucket_values"].apply(ast.literal_eval)
+            df = df.explode("bucket_values", ignore_index=True)
+            df["bucket_values"] = pd.to_numeric(df["bucket_values"])
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(columns=["local_time", "bucket_values"])
+
+    def load_afib_ecg_recordings(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "afib_ecg_readings.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={"reading_time": "local_time"}
+            )
+
+            df["waveform_samples"] = (
+                df["waveform_samples"].str.replace("  ", ",").apply(ast.literal_eval)
+            )
+
+            df = df.explode("waveform_samples", ignore_index=True)
+            df["waveform_samples"] = pd.to_numeric(df["waveform_samples"])
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "reading_id",
+                "local_time",
+                "wire_id",
+                "result_classification",
+                "heart_rate",
+                "heart_rate_alert",
+                "firmware_version",
+                "device_app_version",
+                "hardware_version",
+                "waveform_samples",
+            ]
+        )
+
+    def load_badge(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "badge.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "local_time", "badgeType": "badge_type"}
+            )
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(columns=["badge_type", "value", "local_time", "unit"])
+
+    def load_distance(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "distance.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(columns=["badge_type", "value", "local_time", "unit"])
+
+    def load_lightly_active_minutes(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "lightly_active_minutes.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="mixed", dayfirst=False
+            ).dt.normalize()
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["local_time", "value"])
+
+    def load_moderately_active_minutes(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "moderately_active_minutes.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="mixed", dayfirst=False
+            ).dt.normalize()
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["local_time", "value"])
+
+    def load_sedentary_minutes(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "sedentary_minutes.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="mixed", dayfirst=False
+            ).dt.normalize()
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["local_time", "value"])
+
+    def load_very_active_minutes(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "very_active_minutes.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="mixed", dayfirst=False
+            ).dt.normalize()
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["local_time", "value"])
+
+    def load_water_logs(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "water_logs.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={
+                    "date": "calendar_date",
+                    "waterAmount": "water_amount",
+                    "measurementUnit": "measurement_unit",
+                }
+            )
+            # TODO unsure about the format of date in the water logs
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="%m/%d/%y"
+            ).dt.normalize()
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=["id", "calendar_date", "water_amount", "measurement_unit"]
+        )
+
+    def load_resting_heart_rate(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "resting_heart_rate.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={
+                    "dateTime": "calendar_date",
+                },
+            )
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="mixed"
+            ).dt.normalize()
+
+            df = df.dropna(subset="date").drop("date", axis=1)
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["calendar_date", "value", "error"])
+
+    def load_time_in_heart_rate_zones(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "time_in_heart_rate_zones.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={
+                    "dateTime": "calendar_date",
+                },
+            )
+            df.columns = df.columns.str.lower()
+
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="%m/%d/%y %H:%M:%S"
+            ).dt.normalize()
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "calendar_date",
+                "below_default_zone_1",
+                "in_default_zone_1",
+                "in_default_zone_2",
+                "in_default_zone_3",
+            ]
+        )
+
+    def load_mindfulness_goals(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "mindfulness_goals.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={
+                    "date": "calendar_date",
+                },
+            )
+            df["calendar_date"] = (
+                pd.to_datetime(df["calendar_date"], format="mixed")
+                .dt.normalize()
+                .dt.tz_localize(None)
+            )
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "calendar_date",
+                "days",
+                "default_goal",
+            ]
+        )
+
+    def load_mindfulness_sessions(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "mindfulness_sessions.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={"start_date_time": "start_time", "end_date_time": "end_time"}
+            )
+            pairs = (
+                df["stress_metrics"]
+                .reset_index(drop=True)
+                .str.extractall(r"(?P<key>[^{}\s=]+)\s*=\s*(?P<value>[^{}\s=]+)")
+                .reset_index()
+                .rename(columns={"level_0": "row"})
+            )
+
+            wide = (
+                pairs.pivot(index="row", columns="key", values="value")
+                .reindex(range(len(df)))
+                .apply(pd.to_numeric, errors="raise")
+            )
+
+            wide.index = df.index
+            wide.columns.name = None
+            df = pd.concat([df, wide.add_prefix("stress_")], axis=1)
+            for col in ["start_time", "end_time"]:
+                df[col] = pd.to_datetime(df[col], format="ISO8601")
+            if not (start_date is None):
+                df = df[df["start_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["start_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "session_id",
+                "activity:name",
+                "average_heart_rate",
+                "start_heart_rate",
+                "end_heart_rate",
+                "duration",
+                "start_time",
+                "end_time",
+                "pause_times",
+                "stress_Score6",
+                "stress_derivScore",
+                "stress_hrvBaseline",
+                "stress_hrvSessionRsmmd",
+                "stress_meanScore",
+                "stress_peakScore",
+            ]
+        )
+
+    def load_mindfulness_eda_data_sessions(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "mindfulness_eda_data_sessions.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"timestamp": "local_time"})
+            df["local_time"] = pd.to_datetime(df["local_time"]).dt.tz_localize(None)
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame()
+
+    def load_journal_entries(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "journal_entries.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"log_time": "local_time"})
+            df["local_time"] = pd.to_datetime(df["local_time"]).dt.tz_localize(None)
+            pairs = (
+                df["meta"]  # Replace with your source column name.
+                .reset_index(drop=True)
+                .str.extractall(r"(?P<key>[^,{}\s=]+)\s*=\s*(?P<value>[^,{}\s=]+)")
+                .rename_axis(index=["row", "match"])
+                .reset_index()
+            )
+
+            wide = (
+                pairs.pivot(index="row", columns="key", values="value")
+                .reindex(range(len(df)))
+                .rename_axis(columns=None)
+            )
+            wide.index = df.index
+
+            df = pd.concat([df, wide], axis=1).drop(["meta"], axis=1)
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "entry_id",
+                "local_time",
+                "log_type",
+                "value",
+                "entry_category",
+                "platform",
+                "source",
+                "user_id",
+                "firstSource",
+                "firstValue",
+                "logSource",
+                "mindfulnessSessionId",
+                "updateDatetime",
+            ]
+        )
+
+    def load_exercise(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "exercise.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(
+                columns={
+                    "startTime": "local_time",
+                    "originalStartTime": "original_local_time",
+                }
+            )
+            columns = {
+                "sedentary": "sedentary_minutes",
+                "lightly": "lightly_active_minutes",
+                "fairly": "fairly_active_minutes",
+                "very": "very_active_minutes",
+            }
+
+            records = [
+                (
+                    {item["name"]: item["minutes"] for item in cell}
+                    if isinstance(cell, (list, np.ndarray))
+                    else {}
+                )
+                for cell in df["activityLevel"]
+            ]
+
+            wide = (
+                pd.json_normalize(records)
+                .reindex(columns=list(columns))
+                .rename(columns=columns)
+            )
+            wide.index = df.index
+            df = pd.concat([df, wide], axis=1).drop(["activityLevel"], axis=1)
+
+            columns = {
+                "OUT_OF_ZONE": "out_of_zone_minutes",
+                "FAT_BURN": "fat_burn_minutes",
+                "CARDIO": "cardio_minutes",
+                "PEAK": "peak_minutes",
+            }
+
+            records = [
+                (
+                    {item["type"]: item["minutes"] for item in cell}
+                    if isinstance(cell, (list, np.ndarray))
+                    else {}
+                )
+                for cell in df["activeZoneMinutes.minutesInHeartRateZones"]
+            ]
+
+            wide = (
+                pd.json_normalize(records)
+                .reindex(columns=list(columns))
+                .rename(columns=columns)
+            )
+            wide.index = df.index
+            df = pd.concat([df, wide], axis=1).drop(
+                ["activeZoneMinutes.minutesInHeartRateZones"], axis=1
+            )
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame()
+
+    def load_demographic_vo2_max(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "demographic_vo2_max.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="%m/%d/%y %H:%M:%S"
+            ).dt.normalize()
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(
+            columns=[
+                "local_time",
+                "demographicVO2Max",
+                "demographicVO2MaxError",
+                "filteredDemographicVO2Max",
+                "filteredDemographicVO2MaxError",
+            ]
+        )
+
+    def load_estimated_oxygen_variation(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "estimated_oxygen_variation.parquet"
+        if file_path.exists():
+            df = pd.read_parquet(file_path).rename(columns={"timestamp": "local_time"})
+            df["local_time"] = pd.to_datetime(
+                df["local_time"], format="%m/%d/%y %H:%M:%S"
+            )
+
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+            return df
+        return pd.DataFrame(columns=["local_time", "Infrared to Red Signal Ratio"])
 
 
 __all__ = ["LifeSnapsParquetLoader"]
