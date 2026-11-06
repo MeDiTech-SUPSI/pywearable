@@ -1527,7 +1527,7 @@ class TesseraeParquetLoader(BaseLoader):
         daily_survey = pd.read_parquet(path)
         daily_survey = daily_survey[daily_survey["ParticipantID"] == user_id].copy()
         daily_survey["date"] = pd.to_datetime(daily_survey["date"])
-        daily_survey = daily_survey.rename(columns={"date": "calendarDate"})
+        daily_survey = daily_survey.rename(columns={"date": "calendar_date"})
         for column in (
             "survey_sent_datetime",
             "survey_start_datetime",
@@ -1550,7 +1550,7 @@ class TesseraeParquetLoader(BaseLoader):
             "ParticipantID",
             "Timestamp",
             "timezone_change",
-            "calendarDate",
+            "calendar_date",
             "timezoneOffsetInMs",
         }
         response_columns = [
@@ -1565,11 +1565,11 @@ class TesseraeParquetLoader(BaseLoader):
         ).drop(["ParticipantID", "Timestamp", "timezone_change"], axis=1)
         if start_date is not None:
             daily_survey = daily_survey.loc[
-                daily_survey["calendarDate"] >= pd.Timestamp(start_date)
+                daily_survey["calendar_date"] >= pd.Timestamp(start_date)
             ]
         if end_date is not None:
             daily_survey = daily_survey.loc[
-                daily_survey["calendarDate"] < pd.Timestamp(end_date)
+                daily_survey["calendar_date"] < pd.Timestamp(end_date)
             ]
         return daily_survey.reset_index(drop=True)
 
@@ -1607,12 +1607,12 @@ class TesseraeParquetLoader(BaseLoader):
         demographics["igtb.datetime"] = pd.to_datetime(
             demographics["igtb.datetime"], errors="coerce"
         )
-        demographics = demographics.rename(columns={"igtb.datetime": "isoDate"})
+        demographics = demographics.rename(columns={"igtb.datetime": "local_time"})
         utc_time = pd.to_datetime(
             demographics["Timestamp"], errors="coerce", utc=True
         ).dt.tz_localize(None)
         demographics["timezoneOffsetInMs"] = (
-            demographics["isoDate"] - utc_time
+            demographics["local_time"] - utc_time
         ).dt.total_seconds() * 1000
         text_columns = demographics.select_dtypes(include=["object", "string"]).columns
         for column in text_columns:
@@ -1624,7 +1624,7 @@ class TesseraeParquetLoader(BaseLoader):
             "ParticipantID",
             "Timestamp",
             "timezone_change",
-            "isoDate",
+            "local_time",
             "timezoneOffsetInMs",
         }
         response_columns = [
@@ -1635,7 +1635,7 @@ class TesseraeParquetLoader(BaseLoader):
                 demographics[column] = pd.to_numeric(
                     demographics[column], errors="coerce"
                 )
-        demographics["calendarDate"] = demographics["isoDate"].dt.normalize()
+        demographics["calendar_date"] = demographics["local_time"].dt.normalize()
         demographics = demographics.rename(
             columns={column: f"demographics_{column}" for column in response_columns}
         ).drop(

@@ -112,9 +112,7 @@ def test_labfront_load_questionnaire_returns_raw_responses(monkeypatch):
 
     monkeypatch.setattr(loader, "get_data_from_datetime", load_raw)
 
-    result = loader.load_questionnaire(
-        "alice", "2024-01-01", "2024-01-02", "Morning"
-    )
+    result = loader.load_questionnaire("alice", "2024-01-01", "2024-01-02", "Morning")
 
     pd.testing.assert_frame_equal(result, expected)
     assert calls == [
@@ -130,9 +128,7 @@ def test_labfront_load_questionnaire_returns_raw_responses(monkeypatch):
     ]
 
 
-def test_lifesnaps_raw_survey_parses_dates_and_preserves_answers(
-    tmp_path, monkeypatch
-):
+def test_lifesnaps_raw_survey_parses_dates_and_preserves_answers(tmp_path, monkeypatch):
     (tmp_path / "person-1").mkdir()
     raw = pd.DataFrame(
         {
@@ -178,9 +174,7 @@ def test_lifesnaps_scored_survey_is_loaded_without_raw_survey_join(
         {
             "user_id": ["person-1", "person-1", "person-2"],
             "type": ["panas", "panas", "panas"],
-            "submitdate": pd.to_datetime(
-                ["2021-05-31", "2021-06-07", "2021-06-07"]
-            ),
+            "submitdate": pd.to_datetime(["2021-05-31", "2021-06-07", "2021-06-07"]),
             "positive_affect_score": [25, 31, 17],
             "negative_affect_score": [10, 8, 20],
         }
@@ -279,9 +273,7 @@ def test_tesserae_csv_questionnaire_filters_are_optional(tmp_path):
     assert filtered["survey_stress"].tolist() == [5.0]
 
 
-def test_tesserae_parquet_loads_daily_and_demographic_responses(
-    tmp_path, monkeypatch
-):
+def test_tesserae_parquet_loads_daily_and_demographic_responses(tmp_path, monkeypatch):
     (tmp_path / "person-1").mkdir()
     survey_folder = tmp_path / "_global_metrics" / "GroundTruthSurvey"
     survey_folder.mkdir(parents=True)
@@ -352,9 +344,7 @@ def test_tesserae_parquet_loads_daily_and_demographic_responses(
             }
         ),
     }
-    monkeypatch.setattr(
-        pd, "read_parquet", lambda path: tables[Path(path).name].copy()
-    )
+    monkeypatch.setattr(pd, "read_parquet", lambda path: tables[Path(path).name].copy())
     loader = TesseraeParquetLoader(tmp_path)
 
     csv_root = tmp_path / "csv"
