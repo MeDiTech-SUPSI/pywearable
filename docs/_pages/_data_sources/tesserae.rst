@@ -8,8 +8,14 @@ layout::
 
     loader = TesseraeCSVLoader("path/to/tesserae-csv")
 
-For repeatedly analysing a local conversion, use the Parquet loader and
-install the ``parquet`` optional dependency::
+Detailed description of the Tesserae dataset is available on OSF: `Tesserae <https://osf.io/yvw2f/overview>`_.
+
+The CSV version of the dataset is quite memory consuming, so pywearable offers a 
+useful command that you can use to convert the full dataset in Parquet format::
+
+    pywearable convert tesserae-parquet SOURCE_DIR OUTPUT_DIR
+
+Afterwards, you can use the Tesserae loader for Parquet files::
 
     from pywearable.loader import TesseraeParquetLoader
 
