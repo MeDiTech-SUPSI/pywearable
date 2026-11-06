@@ -1,4 +1,5 @@
 import datetime
+import os
 import warnings
 from ast import literal_eval
 from typing import Union
@@ -11,11 +12,11 @@ try:
     from bson.objectid import ObjectId
 except ImportError:
     warnings.warn(
-        "pymongo was not detected, but is required when using LifeSnapsLoader",
+        "pymongo was not detected, but is required when using LifeSnapsMongoDBLoader",
         category=ImportWarning,
     )
 
-from ... import schema as lf_constants
+from ... import schema
 
 # from ... import constants, utils
 from ..base import BaseLoader
@@ -125,7 +126,12 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         Port of the pymongo DB instance.
     """
 
-    def __init__(self, host: str = "localhost", port: int = 27017):
+    def __init__(
+        self,
+        host: str = "localhost",
+        port: int = 27017,
+        scored_survey_folder: os.PathLike = None,
+    ):
         try:
             import pymongo
         except ImportError:
@@ -137,6 +143,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         self.fitbit_collection = self.db[lf_constants.DB_FITBIT_COLLECTION_NAME]
         self.surveys_collection = self.db[lf_constants.DB_SURVEYS_COLLECTION_NAME]
         # self.sema_collection =
+
+        self.scored_survey_folder = scored_survey_folder
 
     def get_user_ids(self) -> list:
         """Get available user ids.
@@ -297,8 +305,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
             sleep_summary_df = sleep_summary_df.rename(
                 columns={
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY: constants.ISODATE_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY: constants.CALENDAR_DATE_COL,
+                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY: "local_time",
+                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY: "calendar_date",
                     lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY: constants.SLEEP_SUMMARY_ID_COL,
                     lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DURATION_KEY: constants.DURATION_IN_MS_COL,
                 }
