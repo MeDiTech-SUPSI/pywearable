@@ -781,7 +781,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_computed_temperature(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -821,7 +821,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_daily_spo2(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -862,7 +862,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_device_temperature(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -901,7 +901,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_wrist_temperature(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -938,7 +938,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_altitude(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -973,7 +973,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_distance(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
@@ -1004,7 +1004,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_stress(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
@@ -1037,7 +1037,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_time_in_heart_rate_zones(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -1074,7 +1074,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_demographic_vo2_max(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
@@ -1115,7 +1115,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_estimated_oxygen_variation(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
@@ -1146,7 +1146,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_exercise(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
@@ -1177,7 +1177,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_afib_ecg_recordings(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -1266,7 +1266,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_hrv_samples(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1293,7 +1293,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_resting_heart_rate(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1317,7 +1317,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_badge(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1342,7 +1342,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_spo2_summary(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1376,7 +1376,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_hrv_summary(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1399,7 +1399,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_calories(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1414,7 +1414,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_respiration_summary(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1484,7 +1484,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_profile(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[
             datetime.datetime, datetime.date, str, pd.Timestamp, None
         ] = None,
@@ -1698,7 +1698,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_very_active_minutes(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1716,7 +1716,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_lightly_active_minutes(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1732,7 +1732,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_moderately_active_minutes(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1748,7 +1748,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_sedentary_minutes(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
@@ -1764,7 +1764,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
     def load_water_logs(
         self,
-        user_id: Union[ObjectId, str],
+        user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
