@@ -2525,3 +2525,6 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         pass
+
+
+__all__ = ["LifeSnapsMongoDBLoader"]

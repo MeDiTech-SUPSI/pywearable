@@ -17,7 +17,7 @@ The first-release public loaders are:
      - :class:`pywearable.loader.LabfrontLoader`
      - Extracted Labfront study exports
    * - LifeSnaps
-     - :class:`pywearable.loader.LifeSnapsParquetLoader`
+     - :class:`pywearable.loader.LifeSnapsParquetLoader` or :class:`pywearable.loader.LifeSnapsMongoDBLoader`
      - Locally converted Parquet version of the LifeSnaps dataset
    * - Oura
      - :class:`pywearable.loader.OuraLoader`
