@@ -298,6 +298,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         spo2[schema.CALENDAR_DATE_COL] = (
             pd.to_datetime(spo2["local_time"], errors="coerce")
             .dt.normalize()
+            .dt.tz_localize("UTC")
             .dt.tz_convert(None)
         )
         spo2["source"] = "fitbit_daily_spo2"
@@ -1198,9 +1199,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["calendar_date", "value"])
 
@@ -1219,9 +1220,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["calendar_date", "value"])
 
@@ -1240,9 +1241,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["calendar_date", "value"])
 
@@ -1261,9 +1262,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["calendar_date", "value"])
 
@@ -1288,9 +1289,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             ).dt.normalize()
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=["id", "calendar_date", "water_amount", "measurement_unit"]
@@ -1316,9 +1317,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             df = df.dropna(subset="date").drop("date", axis=1)
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["calendar_date", "value", "error"])
 
@@ -1342,9 +1343,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             ).dt.normalize()
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=[
@@ -1375,9 +1376,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 .dt.tz_localize(None)
             )
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=[
@@ -1418,9 +1419,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             for col in ["start_time", "end_time"]:
                 df[col] = pd.to_datetime(df[col], format="ISO8601")
             if not (start_date is None):
-                df = df[df["start_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["start_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["start_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["start_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=[
@@ -1453,9 +1454,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             df = pd.read_parquet(file_path).rename(columns={"timestamp": "local_time"})
             df["local_time"] = pd.to_datetime(df["local_time"]).dt.tz_localize(None)
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame()
 
@@ -1487,9 +1488,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             df = pd.concat([df, wide], axis=1).drop(["meta"], axis=1)
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=[
@@ -1574,9 +1575,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             )
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame()
 
@@ -1604,9 +1605,9 @@ class LifeSnapsParquetLoader(BaseLoader):
                 }
             )
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(
             columns=[
@@ -1632,9 +1633,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             )
 
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["local_time"] >= pd.Timestamp(start_date).normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["local_time"] < pd.Timestamp(end_date).normalize()]
             return df
         return pd.DataFrame(columns=["local_time", "Infrared to Red Signal Ratio"])
 
