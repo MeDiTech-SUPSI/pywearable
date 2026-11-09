@@ -1,3 +1,4 @@
+import ast
 import datetime
 import os
 import warnings
@@ -20,9 +21,7 @@ from ... import schema
 
 # from ... import constants, utils
 from ..base import BaseLoader
-
-# from ..lifesnaps import constants as lf_constants
-
+from . import constants as lifesnaps_constants
 
 _METRIC_KEY = "metric"
 _METRIC_START_DATE_KEY = "start_date"
@@ -33,84 +32,172 @@ _METRIC_DATE_FORMAT_KEY = "date_format"
 
 _METRIC_DICT = {
     # Fitbit data
-    lf_constants.METRIC_COMP_TEMP: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
-        _METRIC_END_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
+    lifesnaps_constants.METRIC_ALTITUDE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_ALTITUDE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_ALTITUDE_DATETIME_COL,
     },
-    lf_constants.METRIC_DEVICE_TEMP: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_DEVICE_TEMP_RECORDED_TIME_KEY,
+    lifesnaps_constants.METRIC_BADGE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_BADGE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_BADGE_DATETIME_COL,
     },
-    lf_constants.METRIC_ECG: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_AFIB_ECG_READINGS,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_DATETIME_COL,
+    lifesnaps_constants.METRIC_CALORIES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_CALORIES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_CALORIES_DATETIME_COL,
     },
-    lf_constants.METRIC_HRV_DETAILS: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
+    lifesnaps_constants.METRIC_COMP_TEMP: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_COMP_TEMP,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_START_KEY,
+        _METRIC_END_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_COMP_TEMP_SLEEP_END_KEY,
     },
-    lf_constants.METRIC_PROFILE: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_PROFILE,
+    lifesnaps_constants.METRIC_DEMOGRAPHIC_VO2_MAX: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEMOGRAPHIC_VO2_MAX,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DEMOGRAPHIC_VO2_MAX_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_DEVICE_TEMP: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DEVICE_TEMP,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DEVICE_TEMP_RECORDED_TIME_KEY,
+    },
+    lifesnaps_constants.METRIC_DISTANCE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DISTANCE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DISTANCE_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_ECG: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_AFIB_ECG_READINGS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_EST_OXY_VARIATION: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_ESTIMATED_OXYGEN_VARIATION,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_EST_OXY_VAR_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_EXERCISE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_EXERCISE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_EXERCISE_START_TIME_KEY,
+    },
+    lifesnaps_constants.METRIC_HEART_RATE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HEART_RATE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_HEART_RATE_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_HRV_DETAILS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_DETAILS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_HRV_DETAILS_TIMESTAMP_KEY,
+    },
+    lifesnaps_constants.METRIC_HRV_HISTOGRAM: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_HRV_HISTOGRAM,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_HRV_HISTOGRAM_TIMESTAMP_COL,
+    },
+    lifesnaps_constants.METRIC_DAILY_HRV_SUMMARY: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_HRV_SUMMARY,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DAILY_HRV_SUMMARY_TIMESTAMP_KEY,
+    },
+    lifesnaps_constants.METRIC_JOURNAL_ENTRIES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_JOURNAL_ENTRIES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_JOURNAL_ENTRIES_LOG_TIME_COL,
+    },
+    lifesnaps_constants.METRIC_MINDFULNESS_GOALS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MINDFULNESS_GOALS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_MINDFULNESS_GOALS_DATE_COL,
+    },
+    lifesnaps_constants.METRIC_MINDFULNESS_EDA_DATA_SESSIONS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MINDFULNESS_EDA_SESSIONS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_MINDFULNESS_EDA_DATA_SESSIONS_DATE_COL,
+    },
+    lifesnaps_constants.METRIC_MINDFULNESS_SESSIONS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MINDFULNESS_SESSIONS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_MINDFULNESS_SESSIONS_DATE_COL,
+    },
+    lifesnaps_constants.METRIC_PROFILE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_PROFILE,
         _METRIC_START_DATE_KEY: None,
     },
-    lf_constants.METRIC_SPO2: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
+    lifesnaps_constants.METRIC_RESPIRATORY_RATE_SUMMARY: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESPIRATORY_RATE_SUMMARY,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_RESP_RATE_SUMMARY_TIMESTAMP_COL,
     },
-    lf_constants.METRIC_STEPS: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_STEPS_DATETIME_COL,
+    lifesnaps_constants.METRIC_RESTING_HEART_RATE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_RESTING_HEART_RATE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_RESTING_HEART_RATE_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_SPO2: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_DAILY_SPO2,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_SPO2_TIMESTAMP_KEY,
+    },
+    lifesnaps_constants.METRIC_STEPS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STEPS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_STEPS_DATETIME_COL,
         _METRIC_DATE_FORMAT_KEY: "%Y-%m-%dT%H:%M:%S",
     },
-    lf_constants.METRIC_VERY_ACTIVE_MINUTES: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_VERY_ACTIVE_MINUTES,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_VERY_ACTIVE_MIN_DATETIME_COL,
+    lifesnaps_constants.METRIC_STRESS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_STRESS_SCORE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_STRESS_SCORE_DATE_COL,
     },
-    lf_constants.METRIC_WATER_LOGS: {
-        _METRIC_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_WATER_LOGS,
-        _METRIC_START_DATE_KEY: lf_constants.DB_FITBIT_COLLECTION_WATER_LOGS_DATE_COL,
+    lifesnaps_constants.METRIC_MODERATELY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_MODERATELY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_MODERATELY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_VERY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_VERY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_VERY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_LIGHTLY_ACTIVE_MINUTES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_LIGHTLY_ACTIVE_MINUTES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_LIGHTLY_ACTIVE_MIN_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_SEDENTARY_MINUTES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SEDENTARY_MINUTES,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_SEDENTARY_MIN_DATETIME_COL,
+    },
+    lifesnaps_constants.METRIC_TIME_IN_HR_ZONES: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_TIME_IN_HR_ZONES,
+        _METRIC_START_DATE_KEY: "dateTime",
+    },
+    lifesnaps_constants.METRIC_WATER_LOGS: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_WATER_LOGS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_WATER_LOGS_DATE_COL,
+    },
+    lifesnaps_constants.METRIC_WRIST_TEMPERATURE: {
+        _METRIC_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_WRIST_TEMPERATURE,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_WRIST_TEMP_RECORDED_TIME_COL,
     },
     # Questionnaires
     # - BREQ
-    lf_constants.METRIC_QUESTIONNAIRE_BREQ: {
-        _METRIC_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_BREQ,
-        _METRIC_START_DATE_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
-        _METRIC_COLLECTION_KEY: lf_constants.DB_SURVEYS_COLLECTION_NAME,
-        _METRIC_ID_KEY: lf_constants.DB_SURVEYS_COLLECTION_USER_KEY,
-        _METRIC_DATE_FORMAT_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
+    lifesnaps_constants.METRIC_QUESTIONNAIRE_BREQ: {
+        _METRIC_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_BREQ,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
+        _METRIC_COLLECTION_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME,
+        _METRIC_ID_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_USER_KEY,
+        _METRIC_DATE_FORMAT_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
     },
     # - STAI
-    lf_constants.METRIC_QUESTIONNAIRE_STAI: {
-        _METRIC_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_STAI,
-        _METRIC_START_DATE_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
-        _METRIC_COLLECTION_KEY: lf_constants.DB_SURVEYS_COLLECTION_NAME,
-        _METRIC_ID_KEY: lf_constants.DB_SURVEYS_COLLECTION_USER_KEY,
-        _METRIC_DATE_FORMAT_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
+    lifesnaps_constants.METRIC_QUESTIONNAIRE_STAI: {
+        _METRIC_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_STAI,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
+        _METRIC_COLLECTION_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME,
+        _METRIC_ID_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_USER_KEY,
+        _METRIC_DATE_FORMAT_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
     },
     # - PANAS
-    lf_constants.METRIC_QUESTIONNAIRE_PANAS: {
-        _METRIC_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_PANAS,
-        _METRIC_START_DATE_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
-        _METRIC_COLLECTION_KEY: lf_constants.DB_SURVEYS_COLLECTION_NAME,
-        _METRIC_ID_KEY: lf_constants.DB_SURVEYS_COLLECTION_USER_KEY,
-        _METRIC_DATE_FORMAT_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
+    lifesnaps_constants.METRIC_QUESTIONNAIRE_PANAS: {
+        _METRIC_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_PANAS,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
+        _METRIC_COLLECTION_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME,
+        _METRIC_ID_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_USER_KEY,
+        _METRIC_DATE_FORMAT_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
     },
     # - PERSONALITY
-    lf_constants.METRIC_QUESTIONNAIRE_PERSONALITY: {
-        _METRIC_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_BFPT,
-        _METRIC_START_DATE_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
-        _METRIC_COLLECTION_KEY: lf_constants.DB_SURVEYS_COLLECTION_NAME,
-        _METRIC_ID_KEY: lf_constants.DB_SURVEYS_COLLECTION_USER_KEY,
-        _METRIC_DATE_FORMAT_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
+    lifesnaps_constants.METRIC_QUESTIONNAIRE_PERSONALITY: {
+        _METRIC_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_BFPT,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
+        _METRIC_COLLECTION_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME,
+        _METRIC_ID_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_USER_KEY,
+        _METRIC_DATE_FORMAT_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
     },
     # - STAGE AND PROCESSES OF CHANGE
-    lf_constants.METRIC_QUESTIONNAIRE_TTM: {
-        _METRIC_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_TTMSPBF,
-        _METRIC_START_DATE_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
-        _METRIC_COLLECTION_KEY: lf_constants.DB_SURVEYS_COLLECTION_NAME,
-        _METRIC_ID_KEY: lf_constants.DB_SURVEYS_COLLECTION_USER_KEY,
-        _METRIC_DATE_FORMAT_KEY: lf_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
+    lifesnaps_constants.METRIC_QUESTIONNAIRE_TTM: {
+        _METRIC_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATA_TYPE_TTMSPBF,
+        _METRIC_START_DATE_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_KEY,
+        _METRIC_COLLECTION_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME,
+        _METRIC_ID_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_USER_KEY,
+        _METRIC_DATE_FORMAT_KEY: lifesnaps_constants.DB_SURVEYS_COLLECTION_DATE_FORMAT,
     },
 }
 
@@ -139,9 +226,11 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         self.host = host
         self.port = port
         self.client = pymongo.MongoClient(self.host, self.port)
-        self.db = self.client[lf_constants.DB_NAME]
-        self.fitbit_collection = self.db[lf_constants.DB_FITBIT_COLLECTION_NAME]
-        self.surveys_collection = self.db[lf_constants.DB_SURVEYS_COLLECTION_NAME]
+        self.db = self.client[lifesnaps_constants.DB_NAME]
+        self.fitbit_collection = self.db[lifesnaps_constants.DB_FITBIT_COLLECTION_NAME]
+        self.surveys_collection = self.db[
+            lifesnaps_constants.DB_SURVEYS_COLLECTION_NAME
+        ]
         # self.sema_collection =
 
         self.scored_survey_folder = scored_survey_folder
@@ -163,7 +252,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
-        same_day_filter: bool = True,
+        drop_duplicates: bool = True,
+        main_sleep_only: bool = True,
     ) -> pd.DataFrame:
         """Load sleep summary data.
 
@@ -199,16 +289,14 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             raise ValueError(f"f{user_id} does not exist in DB.")
         # Check users
         user_id = self._check_user_id(user_id)
-        start_date = utils.check_date(start_date)
-        end_date = utils.check_date(end_date)
         # Get some constants for ease of access
-        date_of_sleep_key = f"{lf_constants.DB_DATA_KEY}"
+        date_of_sleep_key = f"{lifesnaps_constants.DB_DATA_KEY}"
         date_of_sleep_key += (
-            f".{lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY}"
+            f".{lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY}"
         )
-        start_sleep_key = f"{lf_constants.DB_DATA_KEY}"
+        start_sleep_key = f"{lifesnaps_constants.DB_DATA_KEY}"
         start_sleep_key += (
-            f".{lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY}"
+            f".{lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY}"
         )
         # Set up filter for dates and times
         date_filter = self._get_start_and_end_date_time_filter_dict(
@@ -222,8 +310,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             [
                 {
                     "$match": {
-                        lf_constants.DB_TYPE_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SLEEP,
-                        lf_constants.DB_ID_KEY: user_id,
+                        lifesnaps_constants.DB_TYPE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SLEEP,
+                        lifesnaps_constants.DB_ID_KEY: user_id,
                     }
                 },
                 {
@@ -246,149 +334,180 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             ]
         )
         # Convert to dataframe
-        sleep_summary_df = pd.DataFrame()
+        stage_value_col_dict = {
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_DEEP_VALUE: schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_LIGHT_VALUE: schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_REM_VALUE: schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE: schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_ASLEEP_VALUE: schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_RESTLESS_VALUE: schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
+        }
+        rows = []
+
         for sleep_summary in filtered_coll:
+
             # For each row, save all fields except sleep levels
-            filtered_dict = {
-                k: sleep_summary[lf_constants.DB_DATA_KEY][k]
-                for k in set(list(sleep_summary[lf_constants.DB_DATA_KEY].keys()))
-                - set(["levels"])
+            row = {
+                key: value
+                for key, value in sleep_summary[lifesnaps_constants.DB_DATA_KEY].items()
+                if key != "levels"
             }
-            # Create a pd.DataFrame with sleep summary data
-            temp_df = pd.DataFrame(
-                filtered_dict,
-                index=[
-                    sleep_summary[lf_constants.DB_DATA_KEY][
-                        lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
-                    ]
-                ],
-            )
+
             # Get sleep stages
             sleep_stages_df = self._merge_sleep_data_and_sleep_short_data(sleep_summary)
             if len(sleep_stages_df) > 0:
                 sleep_stages_df[
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
                 ] = sleep_stages_df[
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
                 ].replace(
                     {"awake": "wake"}
                 )
                 # Get duration for each sleep stage
                 sleep_stages_duration = sleep_stages_df.groupby(
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
                 )[
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY
                 ].sum()
                 # Create dictionary with sleep_stage : duration column name
-                stage_value_col_dict = {
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_DEEP_VALUE: constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_LIGHT_VALUE: constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_REM_VALUE: constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE: constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_ASLEEP_VALUE: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_RESTLESS_VALUE: constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                }
+                duration_ms = dict.fromkeys(stage_value_col_dict.values(), 0)
                 # Save stage duration in sleep summary with ms unit
-                for sleep_stage in stage_value_col_dict.keys():
-                    if sleep_stage in sleep_stages_duration.index:
-                        temp_df[stage_value_col_dict[sleep_stage]] = (
-                            sleep_stages_duration.loc[sleep_stage] * 1000
-                        )
-                    else:
-                        temp_df[stage_value_col_dict[sleep_stage]] = 0
-                sleep_summary_df = pd.concat(
-                    (sleep_summary_df, temp_df), ignore_index=True
-                )
-        if len(sleep_summary_df) > 0:
-            # Set up columns according to pywearable format
-            sleep_summary_df[constants.TIMEZONEOFFSET_IN_MS_COL] = 0
+                for sleep_stage, seconds in sleep_stages_duration.items():
+                    column = stage_value_col_dict.get(sleep_stage)
+                    if column is not None:
+                        duration_ms[column] += seconds * 1000
+                row.update(duration_ms)
+            rows.append(row)
 
-            sleep_summary_df = sleep_summary_df.rename(
-                columns={
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY: "local_time",
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY: "calendar_date",
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY: constants.SLEEP_SUMMARY_ID_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DURATION_KEY: constants.DURATION_IN_MS_COL,
-                }
-            )
+        if len(rows) > 0:
+            sleep_summary_df = pd.DataFrame.from_records(rows)
 
-            sleep_summary_df[constants.DURATION_IN_MS_COL] = (
-                sleep_summary_df[constants.DURATION_IN_MS_COL]
-                - sleep_summary_df[constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
-            )
+            if len(sleep_summary_df) > 0:
 
-            sleep_summary_df[constants.UNIXTIMESTAMP_IN_MS_COL] = (
-                sleep_summary_df[constants.ISODATE_COL] - pd.Timestamp("1970-01-01")
-            ) // pd.Timedelta("1ms")
-
-            sleep_summary_df = sleep_summary_df.sort_values(
-                by=constants.CALENDAR_DATE_COL, ignore_index=True
-            )
-
-            if same_day_filter:
-                # Keep only sleep summary with main sleep as True
-                sleep_summary_df = sleep_summary_df[
-                    sleep_summary_df[
-                        lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_MAIN_SLEEP_KEY
+                sleep_summary_df[schema.TIMEZONE_COL] = 0
+                if main_sleep_only:
+                    # Keep only main sleeps
+                    sleep_summary_df = sleep_summary_df[
+                        sleep_summary_df["mainSleep"] == True
                     ]
-                    == True
-                ].reset_index(drop=True)
-                # Keep sleep summary with longest duration
-                sleep_summary_df = sleep_summary_df.sort_values(
-                    [constants.CALENDAR_DATE_COL, constants.DURATION_IN_MS_COL],
-                    ascending=True,
-                    ignore_index=True,
-                )
-                sleep_summary_df = sleep_summary_df.drop_duplicates(
-                    subset=[constants.CALENDAR_DATE_COL],
-                    keep="last",
-                    ignore_index=True,
+
+                sleep_summary_df = sleep_summary_df.rename(
+                    columns={
+                        lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY: "local_time",
+                        "endTime": "local_end_time",
+                        lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DATE_OF_SLEEP_KEY: "calendar_date",
+                        lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY: schema.SLEEP_SUMMARY_ID_COL,
+                        lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_DURATION_KEY: schema.DURATION_IN_MS_COL,
+                    }
                 )
 
-            # Reorder sleep summary columns
-            sleep_summary_df = sleep_summary_df.loc[
-                :,
-                [
-                    constants.SLEEP_SUMMARY_ID_COL,
-                    constants.TIMEZONEOFFSET_IN_MS_COL,
-                    constants.UNIXTIMESTAMP_IN_MS_COL,
-                    constants.ISODATE_COL,
-                    constants.CALENDAR_DATE_COL,
-                    constants.DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL,
-                    constants.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL,
-                ],
+                sleep_summary_df[schema.DURATION_IN_MS_COL] = (
+                    sleep_summary_df[schema.DURATION_IN_MS_COL]
+                    - sleep_summary_df[schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL]
+                )
+
+                sleep_summary_df = sleep_summary_df.sort_values(
+                    by=schema.CALENDAR_DATE_COL, ignore_index=True
+                )
+
+                sleep_summary_df["utc_time"] = sleep_summary_df["local_time"]
+                # Keep only sleep summary with main sleep as True
+
+                if drop_duplicates:
+
+                    # Keep sleep summary with longest duration
+                    sleep_summary_df = sleep_summary_df.sort_values(
+                        [schema.CALENDAR_DATE_COL, schema.DURATION_IN_MS_COL],
+                        ascending=True,
+                        ignore_index=True,
+                    )
+                    sleep_summary_df = sleep_summary_df.drop_duplicates(
+                        subset=[schema.CALENDAR_DATE_COL],
+                        keep="last",
+                        ignore_index=True,
+                    )
+            return sleep_summary_df
+        return pd.DataFrame()
+
+    def load_sleep_sessions(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return all Fitbit sleep sessions, including non-main sessions."""
+        columns = [
+            "id",
+            "calendar_date",
+            "type",
+            "main_sleep",
+            "local_time",
+            "local_end_time",
+            "time_in_bed_seconds",
+        ]
+        sessions = self.load_sleep_summary(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+            drop_duplicates=False,
+            main_sleep_only=False,
+        ).rename(
+            columns={
+                "sleep_summary_id": "id",
+                "mainSleep": "main_sleep",
+                "endTime": "local_end_time",
+            }
+        )
+
+        if len(sessions) == 0:
+            return pd.DataFrame(columns=columns)
+
+        sessions["local_end_time"] = pd.to_datetime(sessions["local_end_time"])
+        sessions["time_in_bed_seconds"] = (
+            pd.to_numeric(sessions["timeInBed"], errors="coerce") * 60
+        )
+        if start_date is not None:
+            sessions = sessions[
+                sessions["calendar_date"] >= pd.Timestamp(start_date).normalize()
             ]
-        return sleep_summary_df
+        if end_date is not None:
+            sessions = sessions[
+                sessions["calendar_date"] < pd.Timestamp(end_date).normalize()
+            ]
+        return (
+            sessions[columns]
+            .drop_duplicates(subset="id", keep="last")
+            .sort_values("local_time", kind="stable")
+            .reset_index(drop=True)
+        )
 
     def _merge_sleep_data_and_sleep_short_data(self, sleep_entry: dict) -> pd.DataFrame:
         # Get data
-        sleep_data_dict = sleep_entry[lf_constants.DB_DATA_KEY][
-            lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
-        ][lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_KEY]
+        sleep_data_dict = sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
+        ][lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_KEY]
         # Create a pd.DataFrame with sleep data
         sleep_data_df = pd.DataFrame(sleep_data_dict)
         if not (
-            lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_SHORT_DATA_KEY
-            in sleep_entry[lf_constants.DB_DATA_KEY][
-                lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_SHORT_DATA_KEY
+            in sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+                lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
             ].keys()
         ):
             return sleep_data_df
-        sleep_short_data_list = sleep_entry[lf_constants.DB_DATA_KEY][
-            lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
-        ][lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_SHORT_DATA_KEY]
+        sleep_short_data_list = sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
+        ][lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_SHORT_DATA_KEY]
         # Just store column names
         datetime_col = (
-            lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY
         )
         seconds_col = (
-            lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY
         )
-        level_col = lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
+        level_col = (
+            lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY
+        )
         # Create a pd.DataFrame with sleep data
 
         # We need to inject sleep short data in data
@@ -413,7 +532,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
                     sleep_short_data_list_copy.append(
                         {
                             datetime_col: start_dt + i * datetime.timedelta(seconds=30),
-                            level_col: lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE,
+                            level_col: lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE,
                             seconds_col: 30,
                         }
                     )
@@ -421,7 +540,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
                 sleep_short_data_list_copy.append(
                     {
                         datetime_col: start_dt,
-                        level_col: lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE,
+                        level_col: lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE,
                         seconds_col: sleep_short_data_entry[seconds_col],
                     }
                 )
@@ -505,6 +624,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
         include_short_data: bool = True,
+        drop_duplicates: bool = True,
+        main_sleep_only: bool = True,
     ) -> pd.DataFrame:
         """Load sleep stage data.
 
@@ -539,14 +660,10 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         if str(user_id) not in self.get_user_ids():
             raise ValueError(f"f{user_id} does not exist in DB.")
         user_id = self._check_user_id(user_id)
-        start_date = utils.check_date(start_date)
-        end_date = utils.check_date(end_date)
-        if not utils.check_start_and_end_dates(start_date, end_date):
-            raise ValueError(f"{start_date} is greater than {end_date}")
         # Get sleep start key
-        sleep_start_key = f"{lf_constants.DB_DATA_KEY}"
+        sleep_start_key = f"{lifesnaps_constants.DB_DATA_KEY}"
         sleep_start_key += (
-            f".{lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY}"
+            f".{lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_START_TIME_KEY}"
         )
         date_filter = self._get_start_and_end_date_time_filter_dict(
             start_date_key=sleep_start_key,
@@ -558,8 +675,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             [
                 {
                     "$match": {
-                        lf_constants.DB_TYPE_KEY: lf_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SLEEP,
-                        lf_constants.DB_ID_KEY: user_id,
+                        lifesnaps_constants.DB_TYPE_KEY: lifesnaps_constants.DB_FITBIT_COLLECTION_DATA_TYPE_SLEEP,
+                        lifesnaps_constants.DB_ID_KEY: user_id,
                     }
                 },
                 {
@@ -579,8 +696,8 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         sleep_stage_df = pd.DataFrame()
         sleep_summary_ids = []
         for sleep_entry in filtered_coll:
-            log_id = sleep_entry[lf_constants.DB_DATA_KEY][
-                lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
+            log_id = sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+                lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
             ]
             if log_id in sleep_summary_ids:
                 continue
@@ -591,77 +708,75 @@ class LifeSnapsMongoDBLoader(BaseLoader):
                 sleep_data_df = self._merge_sleep_data_and_sleep_short_data(sleep_entry)
             else:
                 # Get data
-                sleep_data_dict = sleep_entry[lf_constants.DB_DATA_KEY][
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
-                ][lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_KEY]
+                sleep_data_dict = sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_KEY
+                ][lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_KEY]
                 # Create a pd.DataFrame with sleep data
                 sleep_data_df = pd.DataFrame(sleep_data_dict)
                 # Add log id to pd.DataFrame
-            sleep_data_df[lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY] = (
-                sleep_entry[lf_constants.DB_DATA_KEY][
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
-                ]
-            )
+            sleep_data_df[
+                lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
+            ] = sleep_entry[lifesnaps_constants.DB_DATA_KEY][
+                lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY
+            ]
 
             sleep_stage_df = pd.concat(
                 (sleep_stage_df, sleep_data_df), ignore_index=True
             )
         if len(sleep_stage_df) > 0:
             # Get isodate column
-            sleep_stage_df[constants.ISODATE_COL] = pd.to_datetime(
+            sleep_stage_df["local_time"] = pd.to_datetime(
                 sleep_stage_df[
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY
                 ],
                 utc=True,
             ).dt.tz_localize(None)
 
             sleep_stage_df = sleep_stage_df.drop(
-                [lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY],
+                [
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_DATETIME_KEY
+                ],
                 axis=1,
             )
-            # Get unix timestamp in milliseconds
-            sleep_stage_df[constants.UNIXTIMESTAMP_IN_MS_COL] = (
-                sleep_stage_df[constants.ISODATE_COL] - pd.Timestamp("1970-01-01")
-            ) // pd.Timedelta("1ms")
 
-            sleep_stage_df = sleep_stage_df.sort_values(
-                by=constants.UNIXTIMESTAMP_IN_MS_COL
-            ).reset_index(drop=True)
+            sleep_stage_df = sleep_stage_df.sort_values(by="local_time").reset_index(
+                drop=True
+            )
 
             sleep_stage_df = sleep_stage_df.rename(
                 columns={
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY: constants.SLEEP_SUMMARY_ID_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY: constants.DURATION_IN_MS_COL,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY: constants.SLEEP_STAGE_SLEEP_TYPE_COL,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LOG_ID_KEY: schema.SLEEP_SUMMARY_ID_COL,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_SECONDS_KEY: schema.DURATION_IN_MS_COL,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_LEVELS_DATA_LEVEL_KEY: schema.SLEEP_STAGE_SLEEP_TYPE_COL,
                 }
             )
-            sleep_stage_df[constants.TIMEZONEOFFSET_IN_MS_COL] = 0
+
             # Convert duration to milliseconds
-            sleep_stage_df[constants.DURATION_IN_MS_COL] *= 1000
-            sleep_stage_df[constants.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stage_df[
-                constants.SLEEP_STAGE_SLEEP_TYPE_COL
+            sleep_stage_df[schema.DURATION_IN_MS_COL] *= 1000
+            sleep_stage_df[schema.SLEEP_STAGE_SLEEP_TYPE_COL] = sleep_stage_df[
+                schema.SLEEP_STAGE_SLEEP_TYPE_COL
             ].map(
                 {
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_REM_VALUE: constants.SLEEP_STAGE_REM_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_LIGHT_VALUE: constants.SLEEP_STAGE_N1_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_DEEP_VALUE: constants.SLEEP_STAGE_N3_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_RESTLESS_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_ASLEEP_VALUE: constants.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
-                    lf_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_AWAKE_VALUE: constants.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_REM_VALUE: schema.SLEEP_STAGE_REM_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_LIGHT_VALUE: schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_DEEP_VALUE: schema.SLEEP_STAGE_DEEP_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_WAKE_VALUE: schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_RESTLESS_VALUE: schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_ASLEEP_VALUE: schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE,
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_SLEEP_DATA_STAGE_AWAKE_VALUE: schema.SLEEP_STAGE_AWAKE_STAGE_VALUE,
                 }
             )
-            sleep_stage_df = sleep_stage_df.loc[
-                :,
-                [
-                    constants.SLEEP_SUMMARY_ID_COL,
-                    constants.TIMEZONEOFFSET_IN_MS_COL,
-                    constants.UNIXTIMESTAMP_IN_MS_COL,
-                    constants.ISODATE_COL,
-                    constants.DURATION_IN_MS_COL,
-                    constants.SLEEP_STAGE_SLEEP_TYPE_COL,
-                ],
-            ]
+            if main_sleep_only:
+                sessions = self.load_sleep_sessions(user_id)
+                main_sleep_ids = sessions.loc[sessions["main_sleep"], "id"]
+                sleep_stage_df = sleep_stage_df[
+                    sleep_stage_df["sleep_summary_id"].isin(main_sleep_ids)
+                ]
+            if drop_duplicates:
+                sleep_stage_df = sleep_stage_df.drop_duplicates(
+                    subset=["sleep_summary_id", "local_time", "type"]
+                )
+
         return sleep_stage_df
 
     def load_computed_temperature(
@@ -698,7 +813,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             If incorrect values for parameters are used.
         """
         return self.load_metric(
-            lf_constants.METRIC_COMP_TEMP,
+            lifesnaps_constants.METRIC_COMP_TEMP,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -739,7 +854,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             Daily SpO2 values.
         """
         return self.load_metric(
-            metric=lf_constants.METRIC_SPO2,
+            metric=lifesnaps_constants.METRIC_SPO2,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -775,14 +890,292 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         pd.DataFrame
             _description_
         """
-        return self.load_metric(
-            metric=lf_constants.METRIC_DEVICE_TEMP,
+        device_temp = self.load_metric(
+            metric=lifesnaps_constants.METRIC_DEVICE_TEMP,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-        )
+        ).rename(columns={"recorded_time": "local_time"})
 
-    def load_ecg(
+        return device_temp
+
+    def load_wrist_temperature(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load wrist temperature.
+
+        This function loads device temperature for a given
+        ``user_id`` with the time period defined by
+        ``start_date`` and ``end_date``.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        return self.load_metric(
+            metric=lifesnaps_constants.METRIC_WRIST_TEMPERATURE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"recorded_time": "local_time"})
+
+    def load_altitude(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load altitude.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_ALTITUDE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"dateTime": "local_time", "value": "altitude"})
+
+        return df
+
+    def load_distance(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Load distance.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            _description_
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_DISTANCE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"dateTime": "local_time", "value": "altitude"})
+
+        return df
+
+    def load_stress(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Load stress score.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            _description_, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Stress score data
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_STRESS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"DATE": "calendar_date", "value": "altitude"})
+        if len(df) > 0:
+            df.columns = df.columns.str.lower()
+            df["updated_at"] = pd.to_datetime(df["updated_at"], format="ISO8601")
+        return df
+
+    def load_time_in_heart_rate_zones(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+        end_date: Union[
+            datetime.datetime, datetime.date, str, pd.Timestamp, None
+        ] = None,
+    ) -> pd.DataFrame:
+        """Load time in heart rate zones data.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : :class:pd.Timestamp or None, optional
+            Start date for data retrieval, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Time in heart rate zones
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_TIME_IN_HR_ZONES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"dateTime": "calendar_date"})
+        if len(df) > 0:
+            df.columns = df.columns.str.replace("value.valuesInZones.", "").str.lower()
+
+        return df
+
+    def load_demographic_vo2_max(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        """Load demographic vo2 max.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : :class:pd.Timestamp or None, optional
+            Start date for data retrieval, by default None
+        end_date : Union[ datetime.datetime, datetime.date, str, pd.Timestamp, None ], optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Time in heart rate zones
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_DEMOGRAPHIC_VO2_MAX,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"dateTime": "calendar_date"})
+        if len(df) > 0:
+            df.columns = df.columns.str.replace("value.", "")
+            df = df.rename(
+                columns={
+                    "demographicVO2Max": "demographic_vo2_max",
+                    "demographicVO2MaxError": "demographic_vo2_max_error",
+                    "filteredDemographicVO2Max": "filtered_demographic_vo2_max",
+                    "filteredDemographicVO2MaxError": "filtered_demographic_vo2_max_error",
+                }
+            )
+
+        return df
+
+    def load_estimated_oxygen_variation(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        """Load estimated oxygen variation.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : :class:`pandas.Timestamp` or ``None``, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`pandas.Timestamp` or ``None``, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Estimated oxygen variation
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_EST_OXY_VARIATION,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"timestamp": "local_time"})
+
+        return df
+
+    def load_exercise(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        """Load exercise data.
+
+        Parameters
+        ----------
+        user_id : :class:`bson.ObjectId` or :class:`str`
+            Unique user identifier.
+        start_date : :class:`pandas.Timestamp` or ``None``, optional
+            Start date for data retrieval, by default None
+        end_date : :class:`pandas.Timestamp` or ``None``, optional
+            End date for data retrieval, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            Estimated oxygen variation
+        """
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_EXERCISE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"timestamp": "local_time"})
+
+        return df
+
+    def load_afib_ecg_recordings(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[
@@ -823,69 +1216,271 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             User profile data.
         """
         ecg = self.load_metric(
-            metric=lf_constants.METRIC_ECG,
+            metric=lifesnaps_constants.METRIC_ECG,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
-        ecg = self._reorder_datetime_columns(ecg)
         if len(ecg) > 0:
             # Reformat wave form samples
             ecg[
-                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
+                lifesnaps_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
             ] = ecg[
-                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
+                lifesnaps_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
             ].apply(
                 lambda x: literal_eval(x.replace("  ", ","))
             )
-            # Get number of samples
-            ecg["nSamples"] = ecg[
-                lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL
-            ].apply(lambda x: len(x))
-            # Get time info
-            ecg["timeInMs"] = ecg["nSamples"].apply(
-                lambda x: [1 / (512 / y) * 1000 if y > 0 else 0 for y in range(x)]
-            )
-            ecg = ecg.drop(["nSamples"], axis=1)
 
             # Explode waveform samples
             ecg = ecg.explode(
                 column=[
-                    lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL,
-                    "timeInMs",
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL,
                 ],
                 ignore_index=True,
             )
-            ecg[constants.UNIXTIMESTAMP_IN_MS_COL] = (
-                ecg[constants.UNIXTIMESTAMP_IN_MS_COL] + ecg["timeInMs"]
-            )
-            ecg[constants.ISODATE_COL] = pd.to_datetime(
-                ecg[constants.UNIXTIMESTAMP_IN_MS_COL]
-                + ecg[constants.TIMEZONEOFFSET_IN_MS_COL],
-                unit="ms",
-                utc=True,
-            ).dt.tz_localize(None)
-            ecg = ecg.drop(["timeInMs"], axis=1)
-            ecg = ecg.rename(
-                columns={
-                    lf_constants.DB_FITBIT_COLLECTION_AFIB_ECG_READINGS_WAVEFORM_SAMPLES_COL: lf_constants.ECG_SAMPLE_VALUE_COL
-                }
-            )
+
         return ecg
 
-    def load_hrv_details(
+    def load_hrv_histogram(
+        self,
+        user_id: str,
+        start_date: pd.Timestamp = None,
+        end_date: pd.Timestamp = None,
+    ) -> pd.DataFrame:
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_HRV_HISTOGRAM,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"timestamp": "local_time"})
+        if len(df) > 0:
+            df["bucket_values"] = df["bucket_values"].apply(ast.literal_eval)
+            df = df.explode("bucket_values", ignore_index=True)
+            df["bucket_values"] = pd.to_numeric(df["bucket_values"])
+            if not (start_date is None):
+                df = df[df["local_time"] >= pd.Timestamp(start_date)]
+            if not (end_date is None):
+                df = df[df["local_time"] < pd.Timestamp(end_date)]
+            return df
+        return pd.DataFrame(columns=["local_time", "bucket_values"])
+
+    def load_hrv_samples(
         self,
         user_id: Union[ObjectId, str],
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         hrv_details = self.load_metric(
-            metric=lf_constants.METRIC_HRV_DETAILS,
+            metric=lifesnaps_constants.METRIC_HRV_DETAILS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(
+            columns={
+                "timestamp": "local_time",
+                "rmssd": schema.HRV_RMSSD_COL,
+                "low_frequency": schema.HRV_LF_POWER_COL,
+                "high_frequency": schema.HRV_HF_POWER_COL,
+                "coverage": schema.HRV_COVERAGE_COL,
+            }
+        )
+        if len(hrv_details) > 0:
+            hrv_details["utc_time"] = pd.NaT
+            hrv_details["timezone"] = pd.NaT
+            hrv_details["source"] = "fitbit_hrv_details"
+
+        return hrv_details
+
+    def load_resting_heart_rate(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_RESTING_HEART_RATE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(
+            columns={
+                "dateTime": "calendar_date",
+                "value.value": "value",
+                "value.error": "error",
+            }
+        )
+        if len(df) > 0:
+            df = df.dropna(subset="value.date", axis=0)
+            df["calendar_date"] = pd.to_datetime(df["calendar_date"])
+            df = df.drop(["value.date"], axis=1)
+        return df
+
+    def load_badge(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_BADGE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(
+            columns={
+                "dateTime": "calendar_date",
+                "value.value": "value",
+                "value.error": "error",
+            }
+        )
+        if len(df) > 0:
+            # df = df.dropna(subset="value.date", axis=0)
+            # df["calendar_date"] = pd.to_datetime(df["calendar_date"])
+            # df = df.drop(["value.date"], axis=1)
+            return df
+        return df
+
+    def load_spo2_summary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        spo2_summary = self.load_metric(
+            metric=lifesnaps_constants.METRIC_SPO2,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"timestamp": "local_time"})
+        if len(spo2_summary) > 0:
+            spo2_summary = spo2_summary.drop_duplicates(
+                subset=["local_time", "average_value"]
+            )
+            spo2_summary["calendar_date"] = spo2_summary["local_time"].dt.normalize()
+
+            for source, target in {
+                "average_value": schema.SPO2_MEAN_COL,
+                "lower_bound": schema.SPO2_LOWER_BOUND_COL,
+                "upper_bound": schema.SPO2_UPPER_BOUND_COL,
+            }.items():
+                if (
+                    source in spo2_summary.columns
+                    and target not in spo2_summary.columns
+                ):
+                    spo2_summary[target] = spo2_summary[source]
+
+            spo2_summary["source"] = "fitbit_daily_spo2"
+            spo2_summary = schema.prepare_spo2_summary(spo2_summary)
+
+        return spo2_summary
+
+    def load_hrv_summary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        hrv_summary = self.load_metric(
+            metric=lifesnaps_constants.METRIC_DAILY_HRV_SUMMARY,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
-        return hrv_details
+        if len(hrv_summary) > 0:
+            hrv_summary = hrv_summary.rename(
+                columns={
+                    "rmssd": "hrv_rmssd",
+                    "nremhr": "fitbit_nrem_heart_rate",
+                    "entropy": "fitbit_entropy",
+                }
+            )
+
+        return hrv_summary
+
+    def load_calories(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        calories = self.load_metric(
+            metric=lifesnaps_constants.METRIC_CALORIES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+        return calories
+
+    def load_respiration_summary(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        respiration = self.load_metric(
+            metric=lifesnaps_constants.METRIC_RESPIRATORY_RATE_SUMMARY,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).drop_duplicates()
+        if len(respiration) == 0:
+            return pd.DataFrame()
+
+        for source, target in {
+            "mean": schema.RESPIRATORY_RATE_MEAN_COL,
+            "standard_deviation": schema.RESPIRATORY_RATE_STD_COL,
+            "full_sleep_breathing_rate": schema.RESPIRATORY_RATE_MEAN_COL,
+            "full_sleep_standard_deviation": schema.RESPIRATORY_RATE_STD_COL,
+        }.items():
+            if source in respiration.columns and target not in respiration.columns:
+                respiration[target] = respiration[source]
+
+        respiration["timestamp"] = pd.to_datetime(
+            respiration["timestamp"], errors="coerce"
+        )
+        respiration["calendar_date"] = respiration["timestamp"].dt.normalize()
+        sleep_summary = self.load_sleep_summary(user_id=user_id)
+        if sleep_summary.empty:
+            return schema.prepare_respiration_summary(pd.DataFrame())
+        sleep_summary = schema.prepare_sleep_summary(sleep_summary)
+        candidates = sleep_summary.dropna(subset=[schema.LOCAL_END_TIME_COL])[
+            [
+                schema.CALENDAR_DATE_COL,
+                schema.LOCAL_TIME_COL,
+                schema.LOCAL_END_TIME_COL,
+                schema.SLEEP_SUMMARY_ID_COL,
+            ]
+        ].sort_values(schema.LOCAL_END_TIME_COL)
+        if candidates.empty:
+            return schema.prepare_respiration_summary(pd.DataFrame())
+        matched = respiration.merge(
+            candidates,
+            left_on="timestamp",
+            right_on=schema.LOCAL_END_TIME_COL,
+            how="left",
+            suffixes=("", "_sleep"),
+            validate="many_to_one",
+        )
+        matched = matched[matched[schema.SLEEP_SUMMARY_ID_COL].notna()].copy()
+        matched_date = matched[f"{schema.CALENDAR_DATE_COL}_sleep"]
+        matched[schema.CALENDAR_DATE_COL] = matched_date.fillna(
+            matched[schema.CALENDAR_DATE_COL]
+        )
+        respiration = matched.drop(columns=[f"{schema.CALENDAR_DATE_COL}_sleep"])
+        respiration["source"] = "fitbit_respiratory_rate_summary"
+        respiration = schema.prepare_respiration_summary(respiration)
+        if start_date is not None:
+            respiration = respiration[
+                respiration[schema.CALENDAR_DATE_COL]
+                >= pd.Timestamp(start_date).normalize()
+            ]
+        if end_date is not None:
+            respiration = respiration[
+                respiration[schema.CALENDAR_DATE_COL]
+                < pd.Timestamp(end_date).normalize()
+            ]
+        return respiration
 
     def load_profile(
         self,
@@ -931,7 +1526,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             User profile data.
         """
         return self.load_metric(
-            metric=lf_constants.METRIC_PROFILE,
+            metric=lifesnaps_constants.METRIC_PROFILE,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -948,11 +1543,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             raise ValueError(f"f{user_id} does not exist in DB.")
         # Check input parameters
         user_id = self._check_user_id(user_id)
-        start_date = utils.check_date(start_date)
-        end_date = utils.check_date(end_date)
-        utils.check_start_and_end_dates(
-            start_date=start_date, end_date=end_date, error="raise"
-        )
+
         # Get start date key from dictionary
         metric_start_key = _METRIC_DICT[metric][_METRIC_START_DATE_KEY]
 
@@ -964,21 +1555,27 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         if metric_start_key is None:
             metric_start_date_key_db = None
         else:
-            metric_start_date_key_db = lf_constants.DB_DATA_KEY + "." + metric_start_key
+            metric_start_date_key_db = (
+                lifesnaps_constants.DB_DATA_KEY + "." + metric_start_key
+            )
 
         if metric_end_key is None:
             metric_end_date_key_db = None
         else:
-            metric_end_date_key_db = lf_constants.DB_DATA_KEY + "." + metric_end_key
+            metric_end_date_key_db = (
+                lifesnaps_constants.DB_DATA_KEY + "." + metric_end_key
+            )
 
         if _METRIC_ID_KEY in _METRIC_DICT[metric].keys():
             user_id_key = _METRIC_DICT[metric][_METRIC_ID_KEY]
         else:
-            user_id_key = lf_constants.DB_ID_KEY
+            user_id_key = lifesnaps_constants.DB_ID_KEY
         if metric_end_key is None:
             metric_end_date_key_db = None
         else:
-            metric_end_date_key_db = lf_constants.DB_DATA_KEY + "." + metric_end_key
+            metric_end_date_key_db = (
+                lifesnaps_constants.DB_DATA_KEY + "." + metric_end_key
+            )
 
         # Setup dictionary for date conversion
         if _METRIC_DATE_FORMAT_KEY in _METRIC_DICT[metric].keys():
@@ -1013,7 +1610,9 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             [
                 {
                     "$match": {
-                        lf_constants.DB_TYPE_KEY: _METRIC_DICT[metric][_METRIC_KEY],
+                        lifesnaps_constants.DB_TYPE_KEY: _METRIC_DICT[metric][
+                            _METRIC_KEY
+                        ],
                         user_id_key: user_id,
                     }
                 },
@@ -1023,7 +1622,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         )
         metric_df = pd.DataFrame()
         list_of_metric_dict = [
-            entry[lf_constants.DB_DATA_KEY] for entry in filtered_coll
+            entry[lifesnaps_constants.DB_DATA_KEY] for entry in filtered_coll
         ]
         metric_df = pd.json_normalize(list_of_metric_dict)
         if len(metric_df) > 0:
@@ -1031,11 +1630,19 @@ class LifeSnapsMongoDBLoader(BaseLoader):
                 metric_df = metric_df.sort_values(by=metric_start_key).reset_index(
                     drop=True
                 )
-        metric_df = self._setup_datetime_columns(df=metric_df, metric=metric)
-        metric_df = self._reorder_datetime_columns(metric_df)
+
         return metric_df
 
     def load_steps(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        """Return Fitbit minute steps in the canonical activity schema."""
+        return self.load_activity_samples(user_id, start_date, end_date)
+
+    def load_activity_samples(
         self,
         user_id: str,
         start_date: Union[
@@ -1069,7 +1676,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         """
 
         steps = self.load_metric(
-            metric=lf_constants.METRIC_STEPS,
+            metric=lifesnaps_constants.METRIC_STEPS,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -1078,20 +1685,15 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         if len(steps) > 0:
             steps = steps.rename(
                 columns={
-                    lf_constants.DB_FITBIT_COLLECTION_STEPS_VALUE_COL: constants.STEPS_STEPS_COL
+                    lifesnaps_constants.DB_FITBIT_COLLECTION_STEPS_VALUE_COL: "activity_steps",
+                    "dateTime": "local_time",
                 }
             )
-            # Compute daily steps column
-            steps[constants.CALENDAR_DATE_COL] = steps[
-                constants.ISODATE_COL
-            ].dt.normalize()
-            steps[constants.STEPS_STEPS_COL] = steps[constants.STEPS_STEPS_COL].astype(
-                "int64"
-            )
-            steps[constants.STEPS_TOTAL_STEPS_COL] = steps.groupby(
-                [constants.CALENDAR_DATE_COL]
-            )[constants.STEPS_STEPS_COL].cumsum()
-            steps = steps.drop([constants.CALENDAR_DATE_COL], axis=1)
+            steps["duration_in_ms"] = 60_000
+            steps["utc_time"] = steps["local_time"]
+            steps["source"] = "fitbit_intraday_steps"
+            steps = schema.prepare_activity_samples(steps)
+
         return steps
 
     def load_very_active_minutes(
@@ -1101,13 +1703,64 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         very_active_minutes = self.load_metric(
-            metric=lf_constants.METRIC_VERY_ACTIVE_MINUTES,
+            metric=lifesnaps_constants.METRIC_VERY_ACTIVE_MINUTES,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
-        very_active_minutes = self._reorder_datetime_columns(very_active_minutes)
+        if len(very_active_minutes) > 0:
+            very_active_minutes = very_active_minutes.rename(
+                columns={"dateTime": "calendar_date"}
+            )
         return very_active_minutes
+
+    def load_lightly_active_minutes(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        minutes = self.load_metric(
+            metric=lifesnaps_constants.METRIC_LIGHTLY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if len(minutes) > 0:
+            minutes = minutes.rename(columns={"dateTime": "calendar_date"})
+        return minutes
+
+    def load_moderately_active_minutes(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        minutes = self.load_metric(
+            metric=lifesnaps_constants.METRIC_MODERATELY_ACTIVE_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if len(minutes) > 0:
+            minutes = minutes.rename(columns={"dateTime": "calendar_date"})
+        return minutes
+
+    def load_sedentary_minutes(
+        self,
+        user_id: Union[ObjectId, str],
+        start_date: Union[datetime.datetime, datetime.date, str, None] = None,
+        end_date: Union[datetime.datetime, datetime.date, str, None] = None,
+    ) -> pd.DataFrame:
+        minutes = self.load_metric(
+            metric=lifesnaps_constants.METRIC_SEDENTARY_MINUTES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if len(minutes) > 0:
+            minutes = minutes.rename(columns={"dateTime": "calendar_date"})
+        return minutes
 
     def load_water_logs(
         self,
@@ -1116,13 +1769,85 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
         water_logs = self.load_metric(
-            metric=lf_constants.METRIC_WATER_LOGS,
+            metric=lifesnaps_constants.METRIC_WATER_LOGS,
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
         )
-        water_logs = self._reorder_datetime_columns(water_logs)
+        if len(water_logs) > 0:
+            water_logs = water_logs.rename(
+                columns={
+                    "date": "calendar_date",
+                    "waterAmount": "water_amount",
+                    "measurementUnit": "measurement_unit",
+                }
+            )
         return water_logs
+
+    def load_heart_rate(
+        self, user_id, start_date=None, end_date=None, time_col="local_time"
+    ):
+        return self.load_metric(
+            metric=lifesnaps_constants.METRIC_HEART_RATE,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def load_mindfulness_goals(self, user_id, start_date=None, end_date=None):
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_MINDFULNESS_GOALS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"date": "calendar_date"})
+        return df
+
+    def load_mindfulness_eda_data_sessions(
+        self, user_id, start_date=None, end_date=None
+    ):
+        return self.load_metric(
+            metric=lifesnaps_constants.METRIC_MINDFULNESS_EDA_DATA_SESSIONS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"timestamp": "local_time"})
+
+    def load_mindfulness_sessions(self, user_id, start_date=None, end_date=None):
+        return self.load_metric(
+            metric=lifesnaps_constants.METRIC_MINDFULNESS_SESSIONS,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def load_journal_entries(self, user_id, start_date=None, end_date=None):
+        df = self.load_metric(
+            metric=lifesnaps_constants.METRIC_JOURNAL_ENTRIES,
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date,
+        ).rename(columns={"log_time": "local_time"})
+
+        if len(df) > 0:
+            df["local_time"] = pd.to_datetime(df["local_time"])
+            pairs = (
+                df["meta"]  # Replace with your source column name.
+                .reset_index(drop=True)
+                .str.extractall(r"(?P<key>[^,{}\s=]+)\s*=\s*(?P<value>[^,{}\s=]+)")
+                .rename_axis(index=["row", "match"])
+                .reset_index()
+            )
+
+            wide = (
+                pairs.pivot(index="row", columns="key", values="value")
+                .reindex(range(len(df)))
+                .rename_axis(columns=None)
+            )
+            wide.index = df.index
+
+            df = pd.concat([df, wide], axis=1).drop(["meta"], axis=1)
+        return df
 
     def _get_start_and_end_date_time_filter_dict(
         self, start_date_key, end_date_key=None, start_date=None, end_date=None
@@ -1214,59 +1939,6 @@ class LifeSnapsMongoDBLoader(BaseLoader):
                         }
                     }
         return date_conversion_dict
-
-    def _setup_datetime_columns(self, df: pd.DataFrame, metric: str):
-        if len(df) > 0:
-            if _METRIC_START_DATE_KEY in _METRIC_DICT[metric].keys():
-                if not (_METRIC_DICT[metric][_METRIC_START_DATE_KEY] is None):
-                    df = df.rename(
-                        columns={
-                            _METRIC_DICT[metric][
-                                _METRIC_START_DATE_KEY
-                            ]: constants.ISODATE_COL
-                        }
-                    )
-                    df[constants.UNIXTIMESTAMP_IN_MS_COL] = df[
-                        constants.ISODATE_COL
-                    ].apply(lambda x: int(x.timestamp() * 1000))
-                    df[constants.TIMEZONEOFFSET_IN_MS_COL] = 0
-        return df
-
-    def _reorder_datetime_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Reorder date and time columns in dataframe.
-
-        This function reorders the columns in a
-        dataframe to the default ordering of:
-
-        - timezoneOffsetInMs
-        - unixTimestampInMs
-        - isoDate
-
-        Parameters
-        ----------
-        df : :class:`pd.DataFrame`
-            DataFrame for which columns order has to be changed.
-
-        Returns
-        -------
-        :class:`pd.DataFrame`
-            DataFrame with columns order changed.
-        """
-        if len(df) > 0:
-            if {
-                constants.ISODATE_COL,
-                constants.UNIXTIMESTAMP_IN_MS_COL,
-                constants.TIMEZONEOFFSET_IN_MS_COL,
-            }.issubset(df.columns):
-                for col_idx, col in enumerate(
-                    [
-                        constants.TIMEZONEOFFSET_IN_MS_COL,
-                        constants.UNIXTIMESTAMP_IN_MS_COL,
-                        constants.ISODATE_COL,
-                    ]
-                ):
-                    df.insert(col_idx, col, df.pop(col))
-        return df
 
     def _check_user_id(self, user_id):
         if not isinstance(user_id, ObjectId):
@@ -1373,7 +2045,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            metric=lf_constants.METRIC_QUESTIONNAIRE_BREQ,
+            metric=lifesnaps_constants.METRIC_QUESTIONNAIRE_BREQ,
         )
         if map_questions:
             breq_questionnaire_df = breq_questionnaire_df.rename(
@@ -1466,7 +2138,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            questionnaire_name=lf_constants.METRIC_QUESTIONNAIRE_PANAS,
+            questionnaire_name=lifesnaps_constants.METRIC_QUESTIONNAIRE_PANAS,
         )
         if map_questions:
             panas_questionnaire = panas_questionnaire.rename(
@@ -1557,7 +2229,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            questionnaire_name=lf_constants.METRIC_QUESTIONNAIRE_STAI,
+            questionnaire_name=lifesnaps_constants.METRIC_QUESTIONNAIRE_STAI,
         )
         if map_questions:
             stai_questionnaire = stai_questionnaire.rename(
@@ -1677,7 +2349,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            questionnaire_name=lf_constants.METRIC_QUESTIONNAIRE_PERSONALITY,
+            questionnaire_name=lifesnaps_constants.METRIC_QUESTIONNAIRE_PERSONALITY,
         )
         if map_questions:
             bfpt_questionnaire = bfpt_questionnaire.rename(
@@ -1807,7 +2479,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
-            questionnaire_name=lf_constants.METRIC_QUESTIONNAIRE_TTM,
+            questionnaire_name=lifesnaps_constants.METRIC_QUESTIONNAIRE_TTM,
         )
         if map_questions:
             ttm_questionnaire = ttm_questionnaire.rename(
@@ -1852,5 +2524,4 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
         end_date: Union[datetime.datetime, datetime.date, str, None] = None,
     ) -> pd.DataFrame:
-        pass
         pass

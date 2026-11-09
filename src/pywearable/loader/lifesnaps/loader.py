@@ -282,7 +282,12 @@ class LifeSnapsParquetLoader(BaseLoader):
         file_path = self.root_folder / user_id / "daily_spo2.parquet"
         if not file_path.exists():
             return schema.prepare_spo2_summary(pd.DataFrame())
-        spo2 = pd.read_parquet(file_path).drop_duplicates().reset_index(drop=True)
+        spo2 = (
+            pd.read_parquet(file_path)
+            .drop_duplicates(subset=["timestamp", "average_value"])
+            .reset_index(drop=True)
+            .rename(columns={"timestamp": "local_time"})
+        )
         for source, target in {
             "average_value": schema.SPO2_MEAN_COL,
             "lower_bound": schema.SPO2_LOWER_BOUND_COL,
@@ -290,9 +295,11 @@ class LifeSnapsParquetLoader(BaseLoader):
         }.items():
             if source in spo2.columns and target not in spo2.columns:
                 spo2[target] = spo2[source]
-        spo2[schema.CALENDAR_DATE_COL] = pd.to_datetime(
-            spo2["timestamp"], errors="coerce"
-        ).dt.normalize()
+        spo2[schema.CALENDAR_DATE_COL] = (
+            pd.to_datetime(spo2["local_time"], errors="coerce")
+            .dt.normalize()
+            .dt.tz_convert(None)
+        )
         spo2["source"] = "fitbit_daily_spo2"
         spo2 = schema.prepare_spo2_summary(spo2)
         if start_date is not None:
@@ -323,18 +330,19 @@ class LifeSnapsParquetLoader(BaseLoader):
         file_path = self.root_folder / user_id / "calories.parquet"
         if file_path.exists():
             calories = pd.read_parquet(file_path).rename(
-                columns={"dateTime": "isoDate", "value": "calories"}
+                columns={"dateTime": "local_time", "value": "calories"}
             )
-            calories["isoDate"] = pd.to_datetime(
-                calories["isoDate"],
+
+            calories["local_time"] = pd.to_datetime(
+                calories["local_time"], format="%m/%d/%y %H:%M:%S"
             )
             if not (start_date is None):
-                calories = calories[calories["isoDate"] >= pd.Timestamp(start_date)]
+                calories = calories[calories["local_time"] >= pd.Timestamp(start_date)]
             if not (end_date is None):
-                calories = calories[calories["isoDate"] < pd.Timestamp(end_date)]
+                calories = calories[calories["local_time"] < pd.Timestamp(end_date)]
             return calories
         else:
-            return pd.DataFrame(columns=["isoDate", "calories"])
+            return pd.DataFrame(columns=["local_time", "calories"])
 
     def load_computed_temperature(
         self,
@@ -373,6 +381,32 @@ class LifeSnapsParquetLoader(BaseLoader):
                     "baseline_relative_sample_standard_deviation",
                 ]
             )
+
+    def load_device_temperature(
+        self,
+        user_id: str,
+        start_date: Union[pd.Timestamp, None] = None,
+        end_date: Union[pd.Timestamp, None] = None,
+    ) -> pd.DataFrame:
+        file_path = self.root_folder / user_id / "device_temperature.parquet"
+        if file_path.exists():
+            temperature = pd.read_parquet(file_path).rename(
+                columns={"recorded_time": "local_time"}
+            )
+
+            temperature["local_time"] = pd.to_datetime(temperature["local_time"])
+
+            if not (start_date is None):
+                temperature = temperature[
+                    temperature["local_time"] >= pd.Timestamp(start_date)
+                ]
+            if not (end_date is None):
+                temperature = temperature[
+                    temperature["local_time"] < pd.Timestamp(end_date)
+                ]
+            return temperature
+        else:
+            return pd.DataFrame(columns=["local_time", "temperature"])
 
     def load_wrist_temperature(
         self,
@@ -613,7 +647,9 @@ class LifeSnapsParquetLoader(BaseLoader):
             if len(conflicting_ids) > 10:
                 displayed_ids += ", ..."
             warnings.warn(
-                "Dropped LifeSnaps sleep stages for "
+                f"Dropped {len(sleep_stages[
+                    sleep_stages["sleep_summary_id"].isin(conflicting_ids)
+                ])} LifeSnaps sleep stages for "
                 f"{len(conflicting_ids)} session(s) whose stage durations conflict "
                 f"with their sleep summaries: {displayed_ids}.",
                 UserWarning,
@@ -624,7 +660,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             ]
         return sleep_stages.reset_index(drop=True)
 
-    def load_hrv_features(
+    def load_hrv_samples(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -671,10 +707,6 @@ class LifeSnapsParquetLoader(BaseLoader):
                     "source",
                 ]
             )
-
-    def load_hrv_samples(self, user_id, start_date=None, end_date=None):
-        """Return Fitbit-provided five-minute HRV estimates in canonical columns."""
-        return self.load_hrv_features(user_id, start_date, end_date)
 
     def load_hrv_summary(self, user_id, start_date=None, end_date=None):
         """Return Fitbit-provided daily HRV summaries without using them as fallback."""
@@ -820,7 +852,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 ]
             if drop_duplicates:
                 sleep = sleep.drop_duplicates(subset="calendar_date", keep="last")
-            return schema.prepare_sleep_summary(sleep)
+            return sleep  # schema.prepare_sleep_summary(sleep)
         return pd.DataFrame(
             columns=[
                 "sleep_summary_id",
@@ -856,6 +888,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                     "value": schema.ACTIVITY_STEPS_COL,
                 }
             )
+
             steps[schema.LOCAL_TIME_COL] = pd.to_datetime(
                 steps[schema.LOCAL_TIME_COL], errors="coerce"
             )
@@ -1066,7 +1099,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             self.root_folder / user_id / "heart_rate_variability_histogram.parquet"
         )
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df = pd.read_parquet(file_path).rename(columns={"timestamp": "local_time"})
             df["bucket_values"] = df["bucket_values"].apply(ast.literal_eval)
             df = df.explode("bucket_values", ignore_index=True)
             df["bucket_values"] = pd.to_numeric(df["bucket_values"])
@@ -1088,6 +1121,8 @@ class LifeSnapsParquetLoader(BaseLoader):
             df = pd.read_parquet(file_path).rename(
                 columns={"reading_time": "local_time"}
             )
+
+            df["local_time"] = pd.to_datetime(df["local_time"]).dt.tz_convert(None)
 
             df["waveform_samples"] = (
                 df["waveform_samples"].str.replace("  ", ",").apply(ast.literal_eval)
@@ -1144,7 +1179,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         file_path = self.root_folder / user_id / "distance.parquet"
         if file_path.exists():
             df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
-
+            df["local_time"] = pd.to_datetime(df["local_time"])
             if not (start_date is None):
                 df = df[df["local_time"] >= pd.Timestamp(start_date)]
             if not (end_date is None):
@@ -1160,16 +1195,18 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "lightly_active_minutes.parquet"
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
-            df["local_time"] = pd.to_datetime(
-                df["local_time"], format="mixed", dayfirst=False
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "calendar_date"}
+            )
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
             return df
-        return pd.DataFrame(columns=["local_time", "value"])
+        return pd.DataFrame(columns=["calendar_date", "value"])
 
     def load_moderately_active_minutes(
         self,
@@ -1179,16 +1216,18 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "moderately_active_minutes.parquet"
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
-            df["local_time"] = pd.to_datetime(
-                df["local_time"], format="mixed", dayfirst=False
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "calendar_date"}
+            )
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
             return df
-        return pd.DataFrame(columns=["local_time", "value"])
+        return pd.DataFrame(columns=["calendar_date", "value"])
 
     def load_sedentary_minutes(
         self,
@@ -1198,16 +1237,18 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "sedentary_minutes.parquet"
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
-            df["local_time"] = pd.to_datetime(
-                df["local_time"], format="mixed", dayfirst=False
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "calendar_date"}
+            )
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
             return df
-        return pd.DataFrame(columns=["local_time", "value"])
+        return pd.DataFrame(columns=["calendar_date", "value"])
 
     def load_very_active_minutes(
         self,
@@ -1217,16 +1258,18 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "very_active_minutes.parquet"
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
-            df["local_time"] = pd.to_datetime(
-                df["local_time"], format="mixed", dayfirst=False
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "calendar_date"}
+            )
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="mixed", dayfirst=False
             ).dt.normalize()
             if not (start_date is None):
-                df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
+                df = df[df["calendar_date"] >= pd.Timestamp(start_date).dt.normalize()]
             if not (end_date is None):
-                df = df[df["local_time"] < pd.Timestamp(end_date).dt.normalize()]
+                df = df[df["calendar_date"] < pd.Timestamp(end_date).dt.normalize()]
             return df
-        return pd.DataFrame(columns=["local_time", "value"])
+        return pd.DataFrame(columns=["calendar_date", "value"])
 
     def load_water_logs(
         self,
@@ -1549,11 +1592,21 @@ class LifeSnapsParquetLoader(BaseLoader):
     ) -> pd.DataFrame:
         file_path = self.root_folder / user_id / "demographic_vo2_max.parquet"
         if file_path.exists():
-            df = pd.read_parquet(file_path).rename(columns={"dateTime": "local_time"})
+            df = pd.read_parquet(file_path).rename(
+                columns={"dateTime": "calendar_date"}
+            )
 
-            df["local_time"] = pd.to_datetime(
-                df["local_time"], format="%m/%d/%y %H:%M:%S"
+            df["calendar_date"] = pd.to_datetime(
+                df["calendar_date"], format="%m/%d/%y %H:%M:%S"
             ).dt.normalize()
+            df = df.rename(
+                columns={
+                    "demographicVO2Max": "demographic_vo2_max",
+                    "demographicVO2MaxError": "demographic_vo2_max_error",
+                    "filteredDemographicVO2Max": "filtered_demographic_vo2_max",
+                    "filteredDemographicVO2MaxError": "filtered_demographic_vo2_max_error",
+                }
+            )
             if not (start_date is None):
                 df = df[df["local_time"] >= pd.Timestamp(start_date).dt.normalize()]
             if not (end_date is None):
