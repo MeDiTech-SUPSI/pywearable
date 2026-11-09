@@ -13,7 +13,6 @@ from scipy import integrate, interpolate, signal
 from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 
-
 HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES = "hrv_rmssd"
 HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL = "hrv_sdnn"
 HRV_STATISTIC_PNN20 = "hrv_pnn20"
@@ -226,17 +225,13 @@ def _pywearable_window_statistics(
     timestamps=None,
     allow_frequency=True,
 ) -> dict:
-    values, segments, timestamps = _valid_bbi_inputs(
-        values, segment_ids, timestamps
-    )
+    values, segments, timestamps = _valid_bbi_inputs(values, segment_ids, timestamps)
     result = {name: np.nan for name in statistics}
     mean_nn = float(np.mean(values)) if values.size else np.nan
     sdnn = compute_sdnn(values)
     rmssd = _compute_rmssd(values, segments)
     operations = {
-        HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: lambda data: (
-            rmssd
-        ),
+        HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES: lambda data: (rmssd),
         HRV_STATISTIC_STANDARD_DEVIATION_NORMAL_TO_NORMAL: lambda data: sdnn,
         HRV_STATISTIC_PNN20: lambda data: _compute_pnn(data, 20, segments),
         HRV_STATISTIC_PNN50: lambda data: _compute_pnn(data, 50, segments),
@@ -251,9 +246,7 @@ def _pywearable_window_statistics(
             float(np.max(data)) if data.size else np.nan
         ),
         HRV_STATISTIC_SDNN_RMSSD_RATIO: lambda data: (
-            sdnn / rmssd
-            if pd.notna(sdnn) and pd.notna(rmssd) and rmssd > 0
-            else np.nan
+            sdnn / rmssd if pd.notna(sdnn) and pd.notna(rmssd) and rmssd > 0 else np.nan
         ),
         HRV_STATISTIC_CVNN: lambda data: (
             sdnn / mean_nn
@@ -274,15 +267,11 @@ def _pywearable_window_statistics(
     for name in set(statistics).intersection(operations):
         result[name] = operations[name](values)
 
-    requested_frequency = set(statistics).intersection(
-        HRV_FREQUENCY_DOMAIN_STATISTICS
-    )
+    requested_frequency = set(statistics).intersection(HRV_FREQUENCY_DOMAIN_STATISTICS)
     if requested_frequency and allow_frequency:
         spectrum = _power_spectrum(values, timestamps)
         powers = {
-            HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER: _band_power(
-                spectrum, 0.0033, 0.04
-            ),
+            HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER: _band_power(spectrum, 0.0033, 0.04),
             HRV_STATISTIC_LOW_FREQUENCY_POWER: _band_power(spectrum, 0.04, 0.15),
             HRV_STATISTIC_HIGH_FREQUENCY_POWER: _band_power(spectrum, 0.15, 0.40),
         }
@@ -368,11 +357,7 @@ def _neurokit_window_statistics(
         "hrv_log_hf": "HRV_LnHF",
     }
     requested_frequency = set(statistics).intersection(frequency_mapping)
-    if (
-        requested_frequency
-        and allow_frequency
-        and np.all(np.diff(interval_times) > 0)
-    ):
+    if requested_frequency and allow_frequency and np.all(np.diff(interval_times) > 0):
         frame = nk.hrv_frequency(
             intervals,
             show=False,
@@ -404,17 +389,14 @@ def _window_statistics(
 
 
 def _statistics_list(statistic, backend: str = "pywearable") -> list[str]:
-    available = (
-        HRV_STATISTICS if backend == "pywearable" else NEUROKIT_HRV_STATISTICS
-    )
+    available = HRV_STATISTICS if backend == "pywearable" else NEUROKIT_HRV_STATISTICS
     if statistic is None:
         return list(available)
     statistics = [statistic] if isinstance(statistic, str) else list(statistic)
     unknown = set(statistics).difference(available)
     if unknown:
         raise ValueError(
-            f"statistic must be one among {list(available)}, "
-            f"not {sorted(unknown)}"
+            f"statistic must be one among {list(available)}, " f"not {sorted(unknown)}"
         )
     return list(dict.fromkeys(statistics))
 
@@ -485,8 +467,7 @@ def _primary_windows(user_id, start, end, window_step, cycle_intervals=None):
     if cycle_intervals is not None:
         valid = cycle_intervals[cycle_intervals["interval_valid"]]
         bounds = [
-            (interval.start_time, interval.end_time)
-            for interval in valid.itertuples()
+            (interval.start_time, interval.end_time) for interval in valid.itertuples()
         ]
     records = []
     for interval_start, interval_end in bounds:
@@ -541,26 +522,27 @@ def _asleep_stage_membership(
 ):
     """Mark retained sleep-stage samples and their contiguous blocks."""
     if not sleep_stages_to_remove:
-        return np.ones(len(timestamps), dtype=bool), np.zeros(len(timestamps), dtype=int)
+        return np.ones(len(timestamps), dtype=bool), np.zeros(
+            len(timestamps), dtype=int
+        )
     if isinstance(sleep_stages_to_remove, str):
         sleep_stages_to_remove = [sleep_stages_to_remove]
     stages_to_remove = {str(value).lower() for value in sleep_stages_to_remove}
     unknown = stages_to_remove.difference(schema.SLEEP_STAGE_ALLOWED_VALUES)
     if unknown:
         raise ValueError(
-            "sleep_stages_to_remove contains unsupported values: "
-            f"{sorted(unknown)}"
+            "sleep_stages_to_remove contains unsupported values: " f"{sorted(unknown)}"
         )
     stages = schema.prepare_sleep_stages(
         loader.load_sleep_stage(user_id, start_date, end_date)
     )
     if stages.empty:
-        return np.ones(len(timestamps), dtype=bool), np.zeros(len(timestamps), dtype=int)
+        return np.ones(len(timestamps), dtype=bool), np.zeros(
+            len(timestamps), dtype=int
+        )
     if "local_time_uncertain" in stages.columns:
         stages = stages[~stages["local_time_uncertain"].fillna(False)]
-    stages = stages[
-        ~stages[schema.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_remove)
-    ]
+    stages = stages[~stages[schema.SLEEP_STAGE_SLEEP_TYPE_COL].isin(stages_to_remove)]
     intervals = stages.assign(
         start_time=stages[schema.LOCAL_TIME_COL],
         end_time=stages[schema.LOCAL_TIME_COL]
@@ -668,10 +650,12 @@ def _raw_bbi_frame_trajectory(
                 backend,
                 rows[_CONTINUITY_SEGMENT_COL],
                 rows[
-                    schema.UTC_TIME_COL
-                    if schema.UTC_TIME_COL in rows
-                    and rows[schema.UTC_TIME_COL].notna().all()
-                    else time_col
+                    (
+                        schema.UTC_TIME_COL
+                        if schema.UTC_TIME_COL in rows
+                        and rows[schema.UTC_TIME_COL].notna().all()
+                        else time_col
+                    )
                 ],
                 rows[_SLEEP_STAGE_SEGMENT_COL].nunique(dropna=False) <= 1,
             )
@@ -694,9 +678,7 @@ def _raw_bbi_frame_trajectory(
             }
         )
     return (
-        pd.DataFrame(records)
-        .set_index([schema.USER_COL, "window_start"])
-        .sort_index()
+        pd.DataFrame(records).set_index([schema.USER_COL, "window_start"]).sort_index()
     )
 
 
@@ -799,9 +781,7 @@ def _provider_primary_trajectory(
     cycle_intervals=None,
 ):
     if window_step != pd.Timedelta(HRV_PRIMARY_RESOLUTION):
-        raise ValueError(
-            "window_step cannot alter provider-computed HRV samples"
-        )
+        raise ValueError("window_step cannot alter provider-computed HRV samples")
     padding = pd.Timedelta(days=2)
     load_start = None if start_date is None else pd.Timestamp(start_date) - padding
     load_end = None if end_date is None else pd.Timestamp(end_date) + padding
@@ -815,9 +795,7 @@ def _provider_primary_trajectory(
     if bounds is None:
         return hierarchy.empty_trajectory(statistics, include_coverage=return_coverage)
     start, end = bounds
-    samples = samples[
-        samples[time_col].ge(start) & samples[time_col].lt(end)
-    ].copy()
+    samples = samples[samples[time_col].ge(start) & samples[time_col].lt(end)].copy()
     if cycle_intervals is not None and not samples.empty:
         valid = cycle_intervals[cycle_intervals["interval_valid"]]
         samples = samples[_interval_mask(samples[time_col], valid)].copy()
@@ -873,9 +851,7 @@ def _provider_primary_trajectory(
             }
         )
     return (
-        pd.DataFrame(records)
-        .set_index([schema.USER_COL, "window_start"])
-        .sort_index()
+        pd.DataFrame(records).set_index([schema.USER_COL, "window_start"]).sort_index()
     )
 
 
@@ -948,9 +924,7 @@ def _primary_trajectory(
                 sleep_stages_to_remove=sleep_stages_to_remove,
             )
         else:
-            raise ValueError(
-                "loader.hrv_source must be 'bbi' or 'provider_samples'"
-            )
+            raise ValueError("loader.hrv_source must be 'bbi' or 'provider_samples'")
         if not frame.empty:
             frames.append(frame)
     if min_coverage is not None and unknown_coverage:
@@ -987,9 +961,7 @@ def compute_hrv_statistics(
     if frame.empty:
         return pd.DataFrame(
             columns=[
-                column
-                for name in statistics
-                for column in (name, f"{name}__coverage")
+                column for name in statistics for column in (name, f"{name}__coverage")
             ]
         )
     trajectory = _raw_bbi_frame_trajectory(
@@ -1126,8 +1098,7 @@ def _hierarchical_hrv_statistics(
         )
     index_name = (
         schema.CALENDAR_DATE_COL
-        if chain[-1] in cycle.CYCLE_TYPES
-        or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS
+        if chain[-1] in cycle.CYCLE_TYPES or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS
         else time_col
     )
     trajectory = trajectory.rename_axis(index={"window_start": index_name})
@@ -1251,10 +1222,9 @@ def get_hrv_statistics(
     if backend not in {"pywearable", "neurokit"}:
         raise ValueError("backend must be 'pywearable' or 'neurokit'")
     step = _normalize_window_step(window_step)
-    if (
-        getattr(loader, "hrv_source", "bbi") == "provider_samples"
-        and step != pd.Timedelta(HRV_PRIMARY_RESOLUTION)
-    ):
+    if getattr(
+        loader, "hrv_source", "bbi"
+    ) == "provider_samples" and step != pd.Timedelta(HRV_PRIMARY_RESOLUTION):
         raise ValueError("window_step cannot alter provider-computed HRV samples")
     loader_kwargs = {} if loader_kwargs is None else dict(loader_kwargs)
     cycle_kwargs = {} if cycle_kwargs is None else dict(cycle_kwargs)
@@ -1284,17 +1254,11 @@ def get_hrv_statistics(
             step,
         )
         columns = [
-            column
-            for name in statistics
-            for column in (name, f"{name}__coverage")
+            column for name in statistics for column in (name, f"{name}__coverage")
         ]
         result = result[
             columns
-            + [
-                column
-                for column in hierarchy.TIME_METADATA_COLUMNS
-                if column in result
-            ]
+            + [column for column in hierarchy.TIME_METADATA_COLUMNS if column in result]
         ].rename_axis(index={"window_start": time_col})
         return hierarchy.format_fixed_time_output(result, time_col)
 
@@ -1480,7 +1444,10 @@ def _night_statistic_wrapper(loader, statistic, coverage=None, **kwargs):
 def get_night_hrv_rmssd(loader, coverage: float | None = None, **kwargs):
     """Return mean five-minute RMSSD for each main-sleep cycle."""
     return _night_statistic_wrapper(
-        loader, HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES, coverage, **kwargs
+        loader,
+        HRV_STATISTIC_ROOT_MEAN_SQUARED_SUCCESSIVE_DIFFERENCES,
+        coverage,
+        **kwargs,
     )
 
 
