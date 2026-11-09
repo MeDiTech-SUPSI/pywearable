@@ -648,7 +648,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 displayed_ids += ", ..."
             warnings.warn(
                 f"Dropped {len(sleep_stages[
-                    sleep_stages["sleep_summary_id"].isin(conflicting_ids)
+                    sleep_stages['sleep_summary_id'].isin(conflicting_ids)
                 ])} LifeSnaps sleep stages for "
                 f"{len(conflicting_ids)} session(s) whose stage durations conflict "
                 f"with their sleep summaries: {displayed_ids}.",
