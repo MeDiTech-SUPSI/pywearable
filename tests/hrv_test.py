@@ -413,6 +413,44 @@ def test_primary_window_step_builds_overlapping_windows():
     )
 
 
+@pytest.mark.parametrize("dtype", ["float32", "Float32", "int32"])
+def test_overlapping_windows_keep_coverage_precision_and_window_offsets(dtype):
+    loader = RawBBILoader()
+    loader.bbi["bbi"] = pd.Series(
+        np.resize([901.01, 907.02, 913.03], len(loader.bbi))
+    ).astype(dtype)
+    loader.bbi.loc[:299, "timezone"] = pd.NaT
+    start = pd.Timestamp("2024-01-01 23:00:30")
+    end = pd.Timestamp("2024-01-01 23:12:30")
+
+    result = hrv.get_hrv_statistics(
+        loader,
+        statistic="hrv_rmssd",
+        user_id="user",
+        start_date=start,
+        end_date=end,
+        resolution="5min",
+        window_step="1min",
+        time_reference="local",
+    ).xs("user")
+
+    expected = []
+    for label in result.index:
+        left = max(start, label)
+        right = min(end, label + pd.Timedelta(minutes=5))
+        selected = loader.bbi["local_time"].between(left, right, inclusive="left")
+        duration_ms = (right - left).total_seconds() * 1000
+        expected.append(min(1.0, loader.bbi.loc[selected, "bbi"].sum() / duration_ms))
+    np.testing.assert_array_equal(result["hrv_rmssd__coverage"], expected)
+    # The first known offset is exactly on the first window's excluded right edge.
+    assert pd.isna(result.iloc[0]["timezone"])
+    assert pd.isna(result.iloc[0]["utc_time"])
+    assert result.iloc[1]["timezone"] == pd.Timedelta(hours=1)
+    assert result.iloc[1]["utc_time"] == result.index[1] - pd.Timedelta(hours=1)
+    assert pd.isna(result.iloc[-1]["timezone"])
+    assert pd.isna(result.iloc[-1]["hrv_rmssd"])
+
+
 def test_overlapping_primary_windows_aggregate_to_night():
     result = hrv.get_hrv_statistics(
         RawBBILoader(),

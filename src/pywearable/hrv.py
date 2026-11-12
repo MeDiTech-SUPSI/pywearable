@@ -95,7 +95,8 @@ _PROVIDER_COLUMNS = {
 
 def _valid_bbi_inputs(values, segment_ids=None, timestamps=None):
     """Return aligned valid BBIs, segment labels, and timestamps."""
-    values = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
+    if not (type(values) is np.ndarray and values.ndim == 1 and values.dtype == float):
+        values = pd.to_numeric(pd.Series(values), errors="coerce").to_numpy(dtype=float)
     valid = np.isfinite(values) & (values > 0)
     segments = None
     if segment_ids is not None:
@@ -104,14 +105,23 @@ def _valid_bbi_inputs(values, segment_ids=None, timestamps=None):
             raise ValueError("segment_ids must contain one value per BBI interval")
     times = None
     if timestamps is not None:
-        times = pd.to_datetime(pd.Series(timestamps), errors="coerce")
+        times = (
+            timestamps
+            if isinstance(timestamps, pd.DatetimeIndex)
+            else pd.DatetimeIndex(
+                pd.to_datetime(pd.Series(timestamps), errors="coerce")
+            )
+        )
         if times.size != values.size:
             raise ValueError("timestamps must contain one value per BBI interval")
-        valid &= times.notna().to_numpy()
+        if times.hasnans:
+            valid &= times.notna()
+    if values.flags.c_contiguous and valid.all():
+        return values, segments, times
     return (
         values[valid],
         None if segments is None else segments[valid],
-        None if times is None else pd.DatetimeIndex(times[valid]),
+        None if times is None else times[valid],
     )
 
 
@@ -628,55 +638,89 @@ def _raw_bbi_frame_trajectory(
             bbi = bbi.reset_index(drop=True)
 
     windows = _primary_windows(user_id, start, end, window_step, cycle_intervals)
+    if time_col not in {schema.UTC_TIME_COL, schema.LOCAL_TIME_COL}:
+        raise ValueError("time_col must be 'utc_time' or 'local_time'")
+    use_utc = time_col == schema.UTC_TIME_COL
+    alternate_col = schema.LOCAL_TIME_COL if use_utc else schema.UTC_TIME_COL
+
+    # Binary searches let a sample participate in every overlapping window.
     timestamps = pd.DatetimeIndex(bbi[time_col])
-    records = []
-    for label, window in windows.iterrows():
-        # Floor-based grouping works only for disjoint windows. Binary searches
-        # let the same sorted BBI rows participate in every overlapping window.
-        left = timestamps.searchsorted(window["start_time"], side="left")
-        right = timestamps.searchsorted(window["end_time"], side="left")
-        rows = bbi.iloc[left:right]
-        duration_ms = (window["end_time"] - window["start_time"]).total_seconds() * 1000
-        coverage = (
-            min(1.0, rows[schema.BBI_COL].sum() / duration_ms)
-            if duration_ms > 0
-            else np.nan
+    lefts = timestamps.searchsorted(
+        pd.DatetimeIndex(windows["start_time"]), side="left"
+    )
+    rights = timestamps.searchsorted(pd.DatetimeIndex(windows["end_time"]), side="left")
+    utc = pd.DatetimeIndex(bbi[schema.UTC_TIME_COL])
+    source_values = bbi[schema.BBI_COL]
+    values = source_values.to_numpy(dtype=float)
+    segments = bbi[_CONTINUITY_SEGMENT_COL].to_numpy()
+    stage_segments = bbi[_SLEEP_STAGE_SEGMENT_COL].to_numpy()
+    needs_timestamps = backend != "pywearable" or not set(statistics).isdisjoint(
+        HRV_FREQUENCY_DOMAIN_STATISTICS
+    )
+
+    # Keep the source precision and sum order for coverage. Nullable/extension
+    # dtypes retain their pandas reduction rather than changing the accumulator.
+    coverage_values = None
+    if isinstance(source_values.dtype, np.dtype) and source_values.dtype.kind in "biuf":
+        coverage_values = source_values.to_numpy()
+        coverage_dtype = {"b": np.int64, "i": np.int64, "u": np.uint64}.get(
+            coverage_values.dtype.kind
         )
+
+    offsets = pd.TimedeltaIndex(bbi[schema.TIMEZONE_COL])
+    known_offsets = np.flatnonzero(offsets.notna())
+    # Find the first known offset at or after each left edge; the right edge
+    # below prevents taking an offset from outside the window.
+    offset_rows = np.append(known_offsets, len(bbi))[
+        np.searchsorted(known_offsets, lefts)
+    ]
+    missing = dict.fromkeys(statistics, np.nan)
+    coverage_columns = [f"{name}__coverage" for name in statistics]
+    records = []
+    for (label, period_start, period_end), left, right, offset_row in zip(
+        windows.itertuples(name=None), lefts, rights, offset_rows
+    ):
+        duration_ms = (period_end - period_start).total_seconds() * 1000
+        coverage = np.nan
+        if duration_ms > 0:
+            observed_ms = (
+                source_values.iloc[left:right].sum()
+                if coverage_values is None
+                else coverage_values[left:right].sum(dtype=coverage_dtype)
+            )
+            coverage = min(1.0, observed_ms / duration_ms)
         accepted = min_coverage is None or coverage >= min_coverage
-        values = (
-            _window_statistics(
-                rows[schema.BBI_COL],
+        features = missing
+        if accepted and (left < right or backend != "pywearable"):
+            window_timestamps = None
+            allow_frequency = False
+            if needs_timestamps:
+                window_timestamps = utc[left:right]
+                if window_timestamps.hasnans:
+                    window_timestamps = timestamps[left:right]
+                stages = stage_segments[left:right]
+                allow_frequency = left == right or np.all(stages == stages[0])
+            features = _window_statistics(
+                values[left:right],
                 statistics,
                 backend,
-                rows[_CONTINUITY_SEGMENT_COL],
-                rows[
-                    (
-                        schema.UTC_TIME_COL
-                        if schema.UTC_TIME_COL in rows
-                        and rows[schema.UTC_TIME_COL].notna().all()
-                        else time_col
-                    )
-                ],
-                rows[_SLEEP_STAGE_SEGMENT_COL].nunique(dropna=False) <= 1,
+                segments[left:right],
+                window_timestamps,
+                allow_frequency,
             )
-            if accepted
-            else {name: np.nan for name in statistics}
-        )
-        records.append(
-            {
-                schema.USER_COL: user_id,
-                "window_start": label,
-                "period_start": window["start_time"],
-                "period_end": window["end_time"],
-                **hierarchy.fixed_window_time_metadata(rows, label, time_col),
-                **values,
-                **(
-                    {f"{name}__coverage": coverage for name in statistics}
-                    if return_coverage
-                    else {}
-                ),
-            }
-        )
+        offset = offsets[offset_row] if offset_row < right else pd.NaT
+        record = {
+            schema.USER_COL: user_id,
+            "window_start": label,
+            "period_start": period_start,
+            "period_end": period_end,
+            alternate_col: label + offset if use_utc else label - offset,
+            schema.TIMEZONE_COL: offset,
+            **features,
+        }
+        if return_coverage:
+            record.update(dict.fromkeys(coverage_columns, coverage))
+        records.append(record)
     return (
         pd.DataFrame(records).set_index([schema.USER_COL, "window_start"]).sort_index()
     )
