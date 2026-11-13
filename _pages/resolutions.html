@@ -1,0 +1,343 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resolutions and hierarchies &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Working with feature trajectories" href="trajectories.html" />
+    <link rel="prev" title="Sleep-anchored cycles" href="cycles.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Resolutions and hierarchies</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#choose-a-resolution">Choose a resolution</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#build-a-hierarchy">Build a hierarchy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#available-operations">Available operations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-aggregations">Custom aggregations</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#coverage-and-support">Coverage and support</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#direct-and-hierarchical-summaries-answer-different-questions">Direct and hierarchical summaries answer different questions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#date-bounds">Date bounds</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Resolutions and hierarchies</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_pages/resolutions.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="resolutions-and-hierarchies">
+<h1>Resolutions and hierarchies<a class="headerlink" href="#resolutions-and-hierarchies" title="Link to this heading"></a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">resolution</span></code> answers two questions: where each row begins and ends, and
+which observations contribute to its value. A scalar requests one level. A
+sequence builds larger windows from validated rows at the preceding level.</p>
+<section id="choose-a-resolution">
+<h2>Choose a resolution<a class="headerlink" href="#choose-a-resolution" title="Link to this heading"></a></h2>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Resolution families</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<thead>
+<tr class="row-odd"><th class="head"><p>Family</p></th>
+<th class="head"><p>Examples</p></th>
+<th class="head"><p>Use it for</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>Fixed duration</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;5min&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;1h&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;12h&quot;</span></code></p></td>
+<td><p>Regular windows on a physical timeline</p></td>
+</tr>
+<tr class="row-odd"><td><p>Calendar</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;daily&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;weekly&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;monthly&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;seasonal&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;seasonal_meteorological&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;quarterly&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;yearly&quot;</span></code></p></td>
+<td><p>Participant-local calendar summaries</p></td>
+</tr>
+<tr class="row-even"><td><p>Nightly</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;nightly&quot;</span></code></p></td>
+<td><p>One main-sleep summary per sleep calendar date</p></td>
+</tr>
+<tr class="row-odd"><td><p>Sleep-anchored cycle</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">&quot;cycle_night&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;cycle_awake&quot;</span></code>,
+<code class="docutils literal notranslate"><span class="pre">&quot;cycle_physiological&quot;</span></code></p></td>
+<td><p>Physical streams aligned to an individual’s sleep schedule</p></td>
+</tr>
+</tbody>
+</table>
+<p>The three-month calendars use fixed boundaries at midnight:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;seasonal&quot;</span></code>: 21 March, 21 June, 21 September, and 21 December.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;seasonal_meteorological&quot;</span></code>: 1 March, 1 June, 1 September, and 1 December.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;quarterly&quot;</span></code> (alias <code class="docutils literal notranslate"><span class="pre">&quot;quarter&quot;</span></code>): 1 January, 1 April, 1 July, and 1 October.</p></li>
+</ul>
+<p>They can also be hierarchy parents, for example
+<code class="docutils literal notranslate"><span class="pre">resolution=(&quot;nightly&quot;,</span> <span class="pre">&quot;seasonal&quot;)</span></code>.</p>
+<p>For timestamped streams, fixed windows use UTC by default when UTC timestamps
+are available. Calendar and sleep-anchored windows use participant-local time.
+Set <code class="docutils literal notranslate"><span class="pre">time_reference=&quot;local&quot;</span></code> when a fixed-window analysis should follow the
+local clock. Fixed-window results keep the selected clock in the index and
+report the other clock together with the per-window <code class="docutils literal notranslate"><span class="pre">timezone</span></code> offset in
+columns. <code class="docutils literal notranslate"><span class="pre">time_reference</span></code> therefore controls window construction without
+discarding the UTC/local correspondence.</p>
+<p>HRV extracted from raw BBI can use overlapping five-minute primary windows.
+<code class="docutils literal notranslate"><span class="pre">window_step=None</span></code> keeps the default five-minute displacement, while a
+shorter step such as <code class="docutils literal notranslate"><span class="pre">&quot;1min&quot;</span></code> starts a new five-minute estimate every
+minute. Only the primary HRV windows overlap; parent resolutions aggregate the
+resulting primary rows normally. Overlapping windows in a sleep cycle must be
+fully contained by that cycle. Provider-computed HRV remains at its native
+five-minute spacing and rejects a non-native <code class="docutils literal notranslate"><span class="pre">window_step</span></code>.</p>
+</section>
+<section id="build-a-hierarchy">
+<h2>Build a hierarchy<a class="headerlink" href="#build-a-hierarchy" title="Link to this heading"></a></h2>
+<p>A hierarchy preserves the analytical path. This is useful when a larger
+period should contain equally weighted smaller units rather than all raw
+samples pooled together.</p>
+<a class="reference internal image-reference" href="../_images/hierarchy.svg"><img alt="Observed nightly total sleep time with weekly means and standard-deviation bands." class="align-center" src="../_images/hierarchy.svg" style="width: 92%;" />
+</a>
+<p>This example uses de-identified nightly total sleep time from an Oura export.
+Study-week labels replace the original calendar dates.</p>
+<p>For example, this request calculates a mean heart rate for each day, keeps
+days with at least 70% coverage, and then averages valid days within each
+calendar week:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">heart_rate</span>
+
+<span class="n">weekly</span> <span class="o">=</span> <span class="n">heart_rate</span><span class="o">.</span><span class="n">get_heart_rate_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_MEAN</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-04-01&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;daily&quot;</span><span class="p">,</span> <span class="s2">&quot;weekly&quot;</span><span class="p">),</span>
+    <span class="n">aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span>
+    <span class="n">min_coverage</span><span class="o">=</span><span class="p">(</span><span class="mf">0.70</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="n">min_valid_children</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The result includes <code class="docutils literal notranslate"><span class="pre">heart_rate_mean__weekly_mean</span></code>. Its weekly coverage is
+the fraction of expected daily children that qualified.</p>
+</section>
+<section id="available-operations">
+<h2>Available operations<a class="headerlink" href="#available-operations" title="Link to this heading"></a></h2>
+<p>Parent levels support <code class="docutils literal notranslate"><span class="pre">mean</span></code>, <code class="docutils literal notranslate"><span class="pre">std</span></code>, <code class="docutils literal notranslate"><span class="pre">median</span></code>, <code class="docutils literal notranslate"><span class="pre">min</span></code>, <code class="docutils literal notranslate"><span class="pre">max</span></code>, and
+percentiles from <code class="docutils literal notranslate"><span class="pre">p0</span></code> through <code class="docutils literal notranslate"><span class="pre">p100</span></code>. Activity totals additionally support
+<code class="docutils literal notranslate"><span class="pre">sum</span></code>. A list requests several branches at the same level:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">sleep</span>
+
+<span class="n">monthly</span> <span class="o">=</span> <span class="n">sleep</span><span class="o">.</span><span class="n">get_sleep_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="n">sleep</span><span class="o">.</span><span class="n">SLEEP_STATISTIC_TST</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;nightly&quot;</span><span class="p">,</span> <span class="s2">&quot;monthly&quot;</span><span class="p">),</span>
+    <span class="n">aggregation</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="s2">&quot;median&quot;</span><span class="p">,</span> <span class="s2">&quot;p10&quot;</span><span class="p">,</span> <span class="s2">&quot;p90&quot;</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For a hierarchy with more than one parent level, provide one aggregation
+specification per level. Nest lists when a level branches into several
+operations:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;daily&quot;</span><span class="p">,</span> <span class="s2">&quot;weekly&quot;</span><span class="p">,</span> <span class="s2">&quot;monthly&quot;</span><span class="p">)</span>
+<span class="n">aggregation</span><span class="o">=</span><span class="p">([</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span> <span class="s2">&quot;std&quot;</span><span class="p">],</span> <span class="s2">&quot;mean&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This produces weekly mean and standard-deviation branches, followed by monthly means of each
+branch.</p>
+</section>
+<section id="custom-aggregations">
+<h2>Custom aggregations<a class="headerlink" href="#custom-aggregations" title="Link to this heading"></a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">aggregation</span></code> also accepts named Python functions, alone or mixed with
+built-in names. Each function receives a chronologically sorted copy of one
+feature’s <a class="reference external" href="https://pandas.pydata.org/docs/reference/api/pandas.Series.html#pandas.Series" title="(in pandas v3.1)"><code class="xref py py-class docutils literal notranslate"><span class="pre">pandas.Series</span></code></a>, including missing rows, its feature name,
+and the <code class="docutils literal notranslate"><span class="pre">(user_id,</span> <span class="pre">window_start)</span></code> index. It must return one numeric scalar
+or a missing value. For clock-valued features such as bedtime, custom
+functions must instead return a time/datetime scalar or a missing value.</p>
+<p>For example, a custom aggregation can combine quantiles into a robust
+coefficient of variation, <code class="docutils literal notranslate"><span class="pre">(p90</span> <span class="pre">-</span> <span class="pre">p10)</span> <span class="pre">/</span> <span class="pre">median</span></code>. Compared with classical
+mean/standard-deviation-based summaries, this may be useful for describing
+within-night RMSSD variability in noisy wearable data with less sensitivity
+to extreme values. The following example then computes its monthly IQR:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">hrv</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">robust_coefficient_of_variation</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+    <span class="n">observed</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">dropna</span><span class="p">()</span>
+    <span class="n">median</span> <span class="o">=</span> <span class="n">observed</span><span class="o">.</span><span class="n">median</span><span class="p">()</span>
+    <span class="k">if</span> <span class="n">pd</span><span class="o">.</span><span class="n">isna</span><span class="p">(</span><span class="n">median</span><span class="p">)</span> <span class="ow">or</span> <span class="n">median</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">observed</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.90</span><span class="p">)</span> <span class="o">-</span> <span class="n">observed</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.10</span><span class="p">))</span> <span class="o">/</span> <span class="n">median</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">interquartile_range</span><span class="p">(</span><span class="n">values</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">values</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.75</span><span class="p">)</span> <span class="o">-</span> <span class="n">values</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="mf">0.25</span><span class="p">)</span>
+
+<span class="n">monthly</span> <span class="o">=</span> <span class="n">hrv</span><span class="o">.</span><span class="n">get_hrv_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="s2">&quot;hrv_rmssd&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;5min&quot;</span><span class="p">,</span> <span class="s2">&quot;nightly&quot;</span><span class="p">,</span> <span class="s2">&quot;monthly&quot;</span><span class="p">],</span>
+    <span class="n">aggregation</span><span class="o">=</span><span class="p">[[</span><span class="n">robust_coefficient_of_variation</span><span class="p">],</span> <span class="p">[</span><span class="n">interquartile_range</span><span class="p">]],</span>
+    <span class="n">sleep_stages_to_remove</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;awake&quot;</span><span class="p">,</span> <span class="s2">&quot;unmeasurable&quot;</span><span class="p">],</span>
+    <span class="n">min_coverage</span><span class="o">=</span><span class="p">[</span><span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">,</span> <span class="mf">0.7</span><span class="p">],</span>
+    <span class="n">min_valid_children</span><span class="o">=</span><span class="p">[</span><span class="kc">None</span><span class="p">,</span> <span class="mi">12</span><span class="p">,</span> <span class="mi">10</span><span class="p">],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>This raw-BBI example uses available non-wake sleep stages and requires at
+least 12 qualified five-minute estimates per night and 10 qualified nights
+per month, as well as the coverage thresholds. The monthly result describes
+between-night variation in robust CV, not the IQR of all five-minute RMSSD
+estimates pooled across the month.</p>
+</section>
+<section id="coverage-and-support">
+<h2>Coverage and support<a class="headerlink" href="#coverage-and-support" title="Link to this heading"></a></h2>
+<p>Every feature has a matching <code class="docutils literal notranslate"><span class="pre">__coverage</span></code> column. At the primary level,
+coverage reflects the evidence available for that domain and window. At a
+parent level, it reports the fraction of expected child windows that met the
+child requirement.</p>
+<p><code class="docutils literal notranslate"><span class="pre">min_coverage</span></code> is the minimum acceptable ratio between observed and expected
+evidence. At the primary level, the numerator and denominator are defined by
+the domain: for regularly sampled heart rate, for example, they are the number
+of observed and expected samples in the window. At a parent level, the ratio
+is the number of valid child windows divided by the number expected in that
+parent. A scalar applies the same threshold at every level. A sequence must
+contain one entry per requested resolution; use <code class="docutils literal notranslate"><span class="pre">None</span></code> where no threshold
+should be applied.</p>
+<p><code class="docutils literal notranslate"><span class="pre">min_valid_children</span></code> is a separate count requirement for parent levels. Its
+sequence form also has one entry per requested resolution, but the primary
+entry must be <code class="docutils literal notranslate"><span class="pre">None</span></code> because primary rows have no children. A scalar integer
+is shorthand for applying that count to every parent level.</p>
+<p>For example, this two-level request keeps a daily heart-rate value only when
+at least 70% of its expected samples are observed, then keeps a weekly value
+only when at least five valid daily rows are present:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">weekly</span> <span class="o">=</span> <span class="n">heart_rate</span><span class="o">.</span><span class="n">get_heart_rate_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="n">heart_rate</span><span class="o">.</span><span class="n">HEART_RATE_STATISTIC_MEAN</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-04-01&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;daily&quot;</span><span class="p">,</span> <span class="s2">&quot;weekly&quot;</span><span class="p">),</span>
+    <span class="n">aggregation</span><span class="o">=</span><span class="s2">&quot;mean&quot;</span><span class="p">,</span>
+    <span class="n">min_coverage</span><span class="o">=</span><span class="p">(</span><span class="mf">0.70</span><span class="p">,</span> <span class="kc">None</span><span class="p">),</span>
+    <span class="n">min_valid_children</span><span class="o">=</span><span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="mi">5</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="direct-and-hierarchical-summaries-answer-different-questions">
+<h2>Direct and hierarchical summaries answer different questions<a class="headerlink" href="#direct-and-hierarchical-summaries-answer-different-questions" title="Link to this heading"></a></h2>
+<p>A direct monthly maximum finds the largest sample in the month. A monthly
+maximum built from nightly medians finds the largest <em>nightly median</em>. Both
+are valid, but they summarize different quantities. The hierarchy is visible
+in the resulting column name so that downstream code can distinguish them.</p>
+</section>
+<section id="date-bounds">
+<h2>Date bounds<a class="headerlink" href="#date-bounds" title="Link to this heading"></a></h2>
+<p>Analysis bounds are half-open: <code class="docutils literal notranslate"><span class="pre">start_date</span></code> is included and <code class="docutils literal notranslate"><span class="pre">end_date</span></code> is
+excluded. Calendar dates select calendar labels. Cycle dates select cycle
+labels while retaining each selected cycle’s complete physical interval. See
+<a class="reference internal" href="cycles.html"><span class="doc">Sleep-anchored cycles</span></a> for the sleep-anchored definitions.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="cycles.html" class="btn btn-neutral float-left" title="Sleep-anchored cycles" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="trajectories.html" class="btn btn-neutral float-right" title="Working with feature trajectories" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
