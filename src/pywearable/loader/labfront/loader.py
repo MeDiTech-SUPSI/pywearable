@@ -1839,10 +1839,11 @@ class LabfrontLoader(BaseLoader):
         start_date: Union[str, datetime.date, datetime.date] = None,
         end_date: Union[str, datetime.date, datetime.date] = None,
     ) -> pd.DataFrame:
-        """
-        Load Garmin Connect steps data.
+        """Load reconciled Garmin Connect step intervals in Labfront format.
 
-        This function loads Garmin Connect steps data from a given participant and within a specified date and time range.
+        Overlapping exports are reconciled as in :meth:`load_activity_samples`.
+        A conflicting epoch has a missing step count; the cumulative total
+        remains missing from that epoch until the next local calendar day.
 
         Parameters
         ----------
@@ -1859,30 +1860,26 @@ class LabfrontLoader(BaseLoader):
             Dataframe containing Garmin Connect steps data.
         """
 
-        df = self.load_garmin_connect_epoch(user_id, start_date, end_date)
-        steps_df = (
-            df.groupby(lf_constants.ISODATE_COL)[lf_constants.ACTIVITY_STEPS_COL]
-            .sum()
-            .reset_index()
+        samples = self.load_activity_samples(user_id, start_date, end_date)
+        millisecond = pd.Timedelta(milliseconds=1)
+        steps_df = pd.DataFrame(
+            {
+                lf_constants.ISODATE_COL: samples[schema.LOCAL_TIME_COL],
+                lf_constants.ACTIVITY_STEPS_COL: samples[schema.ACTIVITY_STEPS_COL],
+                lf_constants.TIMEZONEOFFSET_IN_MS_COL: (
+                    samples[schema.TIMEZONE_COL] / millisecond
+                ),
+                lf_constants.UNIXTIMESTAMP_IN_MS_COL: (
+                    (samples[schema.UTC_TIME_COL] - pd.Timestamp("1970-01-01"))
+                    // millisecond
+                ),
+                lf_constants.DURATION_IN_MS_COL: samples[schema.DURATION_IN_MS_COL],
+                lf_constants.CALENDAR_DATE_COL: samples[schema.LOCAL_TIME_COL].dt.date,
+            }
         )
-        # add back the most frequent timezone offset
-        steps_df[lf_constants.TIMEZONEOFFSET_IN_MS_COL] = (
-            df.groupby(lf_constants.ISODATE_COL)[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
-            .mean()
-            .reset_index()[lf_constants.TIMEZONEOFFSET_IN_MS_COL]
-        )
-        # add the unix timestamp column
-        steps_df[lf_constants.UNIXTIMESTAMP_IN_MS_COL] = steps_df[
-            lf_constants.ISODATE_COL
-        ].apply(lambda x: int(x.timestamp() * 1000))
-        # add sampling frequency column durationInMs
-        steps_df[lf_constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
-        # add a column for calendar date
-        steps_df[lf_constants.CALENDAR_DATE_COL] = steps_df[lf_constants.ISODATE_COL].dt.date
-        # add a column for cumulative steps at a daily level
         steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(
             lf_constants.CALENDAR_DATE_COL
-        )[lf_constants.ACTIVITY_STEPS_COL].cumsum()
+        )[lf_constants.ACTIVITY_STEPS_COL].cumsum(skipna=False)
 
         return steps_df
 

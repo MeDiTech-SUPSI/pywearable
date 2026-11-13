@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from pywearable import activity, cycle, schema
+from pywearable.loader import LabfrontLoader
 from pywearable.loader.garmin import prepare_epoch_activity_samples
 from tests.helpers import LoaderBase
 
@@ -407,3 +408,86 @@ def test_garmin_epoch_category_conflict_marks_collapsed_steps_missing():
     )
     assert extracted.iloc[0]["activity_steps__coverage"] == 1
     assert pd.isna(extracted.iloc[0]["activity_steps"])
+
+
+def test_labfront_steps_reconcile_overlapping_epochs(monkeypatch):
+    loader = LabfrontLoader.__new__(LabfrontLoader)
+    first = pd.Timestamp("2024-01-01 12:00")
+    epochs = pd.DataFrame(
+        [
+            (first, 75, "walking", "active"),
+            (first, 75, "walking", "active"),
+            (first, 25, "walking", "highly_active"),
+            (first + pd.Timedelta(minutes=15), 20, "walking", "active"),
+            (first + pd.Timedelta(minutes=15), 30, "walking", "active"),
+            (first + pd.Timedelta(minutes=30), 40, "walking", "active"),
+            (first + pd.Timedelta(days=1), 50, "walking", "active"),
+        ],
+        columns=["isoDate", "steps", "activityType", "intensity"],
+    )
+    epochs["unixTimestampInMs"] = (
+        epochs["isoDate"] - pd.Timedelta(hours=1)
+    ).astype("datetime64[ms]").astype("int64")
+    epochs["timezoneOffsetInMs"] = 3_600_000
+    epochs["durationInMs"] = 15 * 60_000
+    monkeypatch.setattr(
+        loader, "load_garmin_connect_epoch", lambda *args, **kwargs: epochs
+    )
+
+    result = loader.load_steps("p1")
+
+    assert list(result.columns) == [
+        "isoDate",
+        "steps",
+        "timezoneOffsetInMs",
+        "unixTimestampInMs",
+        "durationInMs",
+        "calendarDate",
+        "totalSteps",
+    ]
+    assert result["steps"].iloc[[0, 2, 3]].tolist() == [100, 40, 50]
+    assert pd.isna(result["steps"].iloc[1])
+    assert result["totalSteps"].iloc[[0, 3]].tolist() == [100, 50]
+    assert result["totalSteps"].iloc[1:3].isna().all()
+    assert result["timezoneOffsetInMs"].eq(3_600_000).all()
+    assert result["unixTimestampInMs"].iloc[0] == epochs["unixTimestampInMs"].iloc[0]
+    assert result["durationInMs"].eq(15 * 60_000).all()
+    assert result["calendarDate"].iloc[0] == first.date()
+    pd.testing.assert_frame_equal(result, loader.load_garmin_connect_step("p1"))
+
+
+def test_labfront_steps_keep_distinct_epochs_at_the_same_local_time(monkeypatch):
+    loader = LabfrontLoader.__new__(LabfrontLoader)
+    local_time = pd.Timestamp("2024-10-27 02:00")
+    utc_times = pd.to_datetime(["2024-10-27 00:00", "2024-10-27 01:00"])
+    epochs = pd.DataFrame(
+        {
+            "isoDate": local_time,
+            "unixTimestampInMs": utc_times.astype("datetime64[ms]").astype("int64"),
+            "timezoneOffsetInMs": [7_200_000, 3_600_000],
+            "durationInMs": 15 * 60_000,
+            "steps": [100, 200],
+        }
+    )
+    monkeypatch.setattr(
+        loader, "load_garmin_connect_epoch", lambda *args, **kwargs: epochs
+    )
+
+    result = loader.load_steps("p1")
+
+    assert result["isoDate"].tolist() == [local_time, local_time]
+    assert result["unixTimestampInMs"].tolist() == epochs["unixTimestampInMs"].tolist()
+    assert result["steps"].tolist() == [100, 200]
+    assert result["totalSteps"].tolist() == [100, 300]
+
+
+def test_labfront_steps_returns_empty_table_when_no_epochs(monkeypatch):
+    loader = LabfrontLoader.__new__(LabfrontLoader)
+    monkeypatch.setattr(
+        loader, "load_garmin_connect_epoch", lambda *args, **kwargs: pd.DataFrame()
+    )
+
+    result = loader.load_steps("p1")
+
+    assert result.empty
+    assert {"isoDate", "steps", "totalSteps"}.issubset(result.columns)
