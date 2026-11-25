@@ -1,0 +1,342 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualization guide &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../_static/pywearable-logo.png"/>
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Analyze wearable data with pywearable" href="../_notebooks/analysis_examples.html" />
+    <link rel="prev" title="Data model and missingness" href="metrics.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            pywearable
+              <img src="../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="getting_started.html">Getting started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data_sources.html">Data sources</a></li>
+<li class="toctree-l1"><a class="reference internal" href="features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualization guide</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#choose-a-plot">Choose a plot</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#trajectory-and-trend">Trajectory and trend</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#calendar-views">Calendar views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#coverage-heatmaps">Coverage heatmaps</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#typical-within-day-profiles">Typical within-day profiles</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sleep-views">Sleep views</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adherence-monitoring">Adherence monitoring</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#save-and-customize">Save and customize</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Visualization guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_pages/visualization.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="visualization-guide">
+<h1>Visualization guide<a class="headerlink" href="#visualization-guide" title="Link to this heading"></a></h1>
+<p>The visualization module contains two kinds of plots. Trajectory plots accept
+an analysis-ready DataFrame, while composite plots accept a loader because
+they coordinate several streams in one figure. Every function returns its
+Matplotlib axes, so labels, annotations, and layout can be customized after
+the plot is created.</p>
+<section id="choose-a-plot">
+<h2>Choose a plot<a class="headerlink" href="#choose-a-plot" title="Link to this heading"></a></h2>
+<table class="docutils align-default" id="id1">
+<caption><span class="caption-text">Plot chooser</span><a class="headerlink" href="#id1" title="Link to this table"></a></caption>
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 42.0%" />
+<col style="width: 28.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>Function</p></th>
+<th class="head"><p>Best used for</p></th>
+<th class="head"><p>Input</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_trajectory" title="pywearable.visualization.plot_trajectory"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_trajectory()</span></code></a></p></td>
+<td><p>One or more features over time, optionally with coverage</p></td>
+<td><p>Trajectory</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_trajectory_trend" title="pywearable.visualization.plot_trajectory_trend"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_trajectory_trend()</span></code></a></p></td>
+<td><p>Values, imputation, historical baseline, and normal range</p></td>
+<td><p>Trend-enriched trajectory</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_hierarchical_trajectory" title="pywearable.visualization.plot_hierarchical_trajectory"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_hierarchical_trajectory()</span></code></a></p></td>
+<td><p>Child observations against each parent mean and its
+<code class="docutils literal notranslate"><span class="pre">mean</span> <span class="pre">±</span> <span class="pre">std_multiplier</span> <span class="pre">×</span> <span class="pre">SD</span></code> band</p></td>
+<td><p>Loader and feature request</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_calendar_heatmap" title="pywearable.visualization.plot_calendar_heatmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_calendar_heatmap()</span></code></a></p></td>
+<td><p>One daily value in a familiar calendar layout</p></td>
+<td><p>Daily trajectory</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_coverage_heatmap" title="pywearable.visualization.plot_coverage_heatmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_coverage_heatmap()</span></code></a></p></td>
+<td><p>Subdaily data availability by date and local time</p></td>
+<td><p>Subdaily trajectory</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_weekly_profile" title="pywearable.visualization.plot_weekly_profile"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_weekly_profile()</span></code></a></p></td>
+<td><p>Typical within-day pattern for each weekday</p></td>
+<td><p>Subdaily trajectory</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_period_comparison" title="pywearable.visualization.plot_period_comparison"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_period_comparison()</span></code></a></p></td>
+<td><p>Consecutive period summaries and percentage changes</p></td>
+<td><p>Aggregated trajectory</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_sleep_summary" title="pywearable.visualization.plot_sleep_summary"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_sleep_summary()</span></code></a></p></td>
+<td><p>Sleep stages, timing, score, and optional CPD panels across nights</p></td>
+<td><p>Loader</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_sleep_heart_rate" title="pywearable.visualization.plot_sleep_heart_rate"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_sleep_heart_rate()</span></code></a></p></td>
+<td><p>Raw and aggregated heart rate through one sleep session</p></td>
+<td><p>Loader</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_weekly_overview" title="pywearable.visualization.plot_weekly_overview"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_weekly_overview()</span></code></a></p></td>
+<td><p>Sleep, activity, heart rate, and missingness in aligned 24-hour rows</p></td>
+<td><p>Loader</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_adherence_summary" title="pywearable.visualization.plot_adherence_summary"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_adherence_summary()</span></code></a></p></td>
+<td><p>Cohort adherence by participant, week, weekday, and local hour</p></td>
+<td><p>Loader</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+<section id="trajectory-and-trend">
+<h2>Trajectory and trend<a class="headerlink" href="#trajectory-and-trend" title="Link to this heading"></a></h2>
+<p>Use <a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_trajectory" title="pywearable.visualization.plot_trajectory"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_trajectory()</span></code></a> for a direct view of a
+feature. Add a coverage panel when the support behind each row matters:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">activity</span><span class="p">,</span> <span class="n">visualization</span>
+
+<span class="n">steps</span> <span class="o">=</span> <span class="n">activity</span><span class="o">.</span><span class="n">get_activity_statistics</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">statistic</span><span class="o">=</span><span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-02-01&quot;</span><span class="p">,</span>
+    <span class="n">resolution</span><span class="o">=</span><span class="s2">&quot;daily&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">axes</span> <span class="o">=</span> <span class="n">visualization</span><span class="o">.</span><span class="n">plot_trajectory</span><span class="p">(</span>
+    <span class="n">steps</span><span class="p">,</span>
+    <span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+    <span class="n">kind</span><span class="o">=</span><span class="s2">&quot;bar&quot;</span><span class="p">,</span>
+    <span class="n">show_coverage</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Steps&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/trajectory.svg"><img alt="Daily step trajectory with a source-coverage panel." class="align-center" src="../_images/trajectory.svg" style="width: 96%;" />
+</a>
+<p>For historical context, enrich the trajectory first and pass the result to
+<a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_trajectory_trend" title="pywearable.visualization.plot_trajectory_trend"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_trajectory_trend()</span></code></a>:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable</span><span class="w"> </span><span class="kn">import</span> <span class="n">trajectory</span>
+
+<span class="n">enriched</span> <span class="o">=</span> <span class="n">trajectory</span><span class="o">.</span><span class="n">compute_trajectory_trend</span><span class="p">(</span>
+    <span class="n">steps</span><span class="p">,</span>
+    <span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">visualization</span><span class="o">.</span><span class="n">plot_trajectory_trend</span><span class="p">(</span>
+    <span class="n">enriched</span><span class="p">,</span>
+    <span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+    <span class="n">show_deviation</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">ylabel</span><span class="o">=</span><span class="s2">&quot;Steps&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/trajectory-trend.svg"><img alt="Daily step trajectory with observed and imputed values, historical baseline, normal range, and source coverage." class="align-center" src="../_images/trajectory-trend.svg" style="width: 96%;" />
+</a>
+<p>Imputed values have a distinct marker or hatch. Clock features such as bedtime
+are displayed on a continuous clock axis across midnight.</p>
+</section>
+<section id="calendar-views">
+<h2>Calendar views<a class="headerlink" href="#calendar-views" title="Link to this heading"></a></h2>
+<p>A calendar heatmap is useful for daily features such as steps, total sleep
+time, resting heart rate, or a provider score:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">visualization</span><span class="o">.</span><span class="n">plot_calendar_heatmap</span><span class="p">(</span>
+    <span class="n">steps</span><span class="p">,</span>
+    <span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+    <span class="n">title</span><span class="o">=</span><span class="s2">&quot;Daily steps&quot;</span><span class="p">,</span>
+    <span class="n">colorbar_label</span><span class="o">=</span><span class="s2">&quot;Steps&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<a class="reference internal image-reference" href="../_images/calendar-heatmap.svg"><img alt="Calendar heatmap of daily steps with missing dates shown in grey." class="align-center" src="../_images/calendar-heatmap.svg" style="width: 96%;" />
+</a>
+</section>
+<section id="coverage-heatmaps">
+<h2>Coverage heatmaps<a class="headerlink" href="#coverage-heatmaps" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_coverage_heatmap" title="pywearable.visualization.plot_coverage_heatmap"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_coverage_heatmap()</span></code></a> uses rows for dates
+and columns for local time. It is designed for questions such as “when during
+the day is heart-rate coverage usually available?”</p>
+<a class="reference internal image-reference" href="../_images/coverage-heatmap.svg"><img alt="Heart-rate coverage by calendar date and local time of day." class="align-center" src="../_images/coverage-heatmap.svg" style="width: 96%;" />
+</a>
+</section>
+<section id="typical-within-day-profiles">
+<h2>Typical within-day profiles<a class="headerlink" href="#typical-within-day-profiles" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_weekly_profile" title="pywearable.visualization.plot_weekly_profile"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_weekly_profile()</span></code></a> groups a subdaily
+trajectory by weekday and local-time slot. The default line view creates seven
+aligned panels; <code class="docutils literal notranslate"><span class="pre">kind=&quot;heatmap&quot;</span></code> provides a compact matrix.</p>
+<a class="reference internal image-reference" href="../_images/weekly-profile.svg"><img alt="Seven aligned weekday panels showing the median hourly heart-rate profile, with observed sleep windows shaded." class="align-center" src="../_images/weekly-profile.svg" style="width: 82%;" />
+</a>
+<p>The profile describes repeated weekdays across the supplied interval. It does
+not replace chronological weekly aggregation, which is covered in
+<a class="reference internal" href="resolutions.html"><span class="doc">Resolutions and hierarchies</span></a>.</p>
+</section>
+<section id="sleep-views">
+<h2>Sleep views<a class="headerlink" href="#sleep-views" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_sleep_summary" title="pywearable.visualization.plot_sleep_summary"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_sleep_summary()</span></code></a> shows native stage
+intervals across consecutive sleep calendar dates. It can add provider sleep
+scores, average bedtime and wake-up boundaries, and narrow CPD panels.</p>
+<a class="reference internal image-reference" href="../_images/sleep-summary.svg"><img alt="Multi-night sleep summary with stage intervals, average bedtime and wake-up, sleep scores, and composite phase deviation." class="align-center" src="../_images/sleep-summary.svg" style="width: 90%;" />
+</a>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">visualization</span><span class="o">.</span><span class="n">plot_sleep_summary</span><span class="p">(</span>
+    <span class="n">loader</span><span class="p">,</span>
+    <span class="n">user_id</span><span class="o">=</span><span class="s2">&quot;participant-01&quot;</span><span class="p">,</span>
+    <span class="n">start_date</span><span class="o">=</span><span class="s2">&quot;2026-01-01&quot;</span><span class="p">,</span>
+    <span class="n">end_date</span><span class="o">=</span><span class="s2">&quot;2026-01-14&quot;</span><span class="p">,</span>
+    <span class="n">cpd</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;midpoint&quot;</span><span class="p">,</span> <span class="s2">&quot;duration&quot;</span><span class="p">),</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>For this figure, <code class="docutils literal notranslate"><span class="pre">start_date</span></code> and <code class="docutils literal notranslate"><span class="pre">end_date</span></code> are inclusive sleep-calendar
+labels. A selected night retains its complete stage intervals, including the
+portion before midnight.</p>
+<p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_sleep_heart_rate" title="pywearable.visualization.plot_sleep_heart_rate"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_sleep_heart_rate()</span></code></a> focuses on one night
+and overlays raw heart-rate samples, a fixed-window mean, sleep-stage
+backgrounds, and optional coverage.</p>
+<a class="reference internal image-reference" href="../_images/sleep-heart-rate.svg"><img alt="Raw and aggregated heart rate over one observed sleep session, with sleep-stage backgrounds and coverage." class="align-center" src="../_images/sleep-heart-rate.svg" style="width: 96%;" />
+</a>
+<p>Use
+<a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_weekly_overview" title="pywearable.visualization.plot_weekly_overview"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_weekly_overview()</span></code></a> when the goal is an
+aligned multi-day view of sleep stages, steps, heart rate, and missingness.</p>
+</section>
+<section id="adherence-monitoring">
+<h2>Adherence monitoring<a class="headerlink" href="#adherence-monitoring" title="Link to this heading"></a></h2>
+<p><a class="reference internal" href="_api/visualization.html#pywearable.visualization.plot_adherence_summary" title="pywearable.visualization.plot_adherence_summary"><code class="xref py py-func docutils literal notranslate"><span class="pre">plot_adherence_summary()</span></code></a> is a cohort view. It
+shows worn days, available nights, cohort summaries, weekday patterns, and
+local-hour patterns. Participants are aligned at their first date with
+wearable or sleep evidence; <code class="docutils literal notranslate"><span class="pre">follow_up_days</span></code> can set a shared study window.</p>
+<a class="reference internal image-reference" href="../_images/adherence-summary.svg"><img alt="Cohort adherence across participants, study weeks, weekdays, and local hours." class="align-center" src="../_images/adherence-summary.svg" style="width: 100%;" />
+</a>
+</section>
+<section id="save-and-customize">
+<h2>Save and customize<a class="headerlink" href="#save-and-customize" title="Link to this heading"></a></h2>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">show=False</span></code> when building figures in a script and <code class="docutils literal notranslate"><span class="pre">save_to</span></code> to write
+the output. Every plotting function returns its Matplotlib axis or axes; assign
+that return value to update labels, annotations, limits, or layout with normal
+Matplotlib methods:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">axis</span> <span class="o">=</span> <span class="n">visualization</span><span class="o">.</span><span class="n">plot_calendar_heatmap</span><span class="p">(</span>
+    <span class="n">steps</span><span class="p">,</span>
+    <span class="n">activity</span><span class="o">.</span><span class="n">ACTIVITY_STATISTIC_STEPS</span><span class="p">,</span>
+    <span class="n">show</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">save_to</span><span class="o">=</span><span class="s2">&quot;daily-steps.svg&quot;</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">axis</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Participant 01 — daily steps&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="metrics.html" class="btn btn-neutral float-left" title="Data model and missingness" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="../_notebooks/analysis_examples.html" class="btn btn-neutral float-right" title="Analyze wearable data with pywearable" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

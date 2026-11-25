@@ -1,0 +1,198 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LifeSnaps &mdash; pywearable  documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../../_static/branding.css?v=430857da" />
+
+  
+    <link rel="shortcut icon" href="../../_static/pywearable-logo.png"/>
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=5929fcd5"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="next" title="Oura" href="oura.html" />
+    <link rel="prev" title="Labfront" href="labfront.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            pywearable
+              <img src="../../_static/pywearable-logo.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">User guide</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../getting_started.html">Getting started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../data_sources.html">Data sources</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="labfront.html">Labfront</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">LifeSnaps</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="oura.html">Oura</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tesserae.html">Tesserae</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../data_sources.html#references">References</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../features.html">What can I extract?</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cycles.html">Sleep-anchored cycles</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../resolutions.html">Resolutions and hierarchies</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../trajectories.html">Working with feature trajectories</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../metrics.html">Data model and missingness</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../visualization.html">Visualization guide</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Tutorials</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/analysis_examples.html">Analyze wearable data with pywearable</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../_notebooks/custom_loader.html">Implement a custom pywearable loader</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API reference</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">pywearable</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../data_sources.html">Data sources</a></li>
+      <li class="breadcrumb-item active">LifeSnaps</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../../_sources/_pages/_data_sources/lifesnaps.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="lifesnaps">
+<h1>LifeSnaps<a class="headerlink" href="#lifesnaps" title="Link to this heading"></a></h1>
+<p>The LifeSnaps dataset <a class="footnote-reference brackets" href="#id2" id="id1" role="doc-noteref"><span class="fn-bracket">[</span>1<span class="fn-bracket">]</span></a> can be loaded in two different ways.
+One way is to use the <code class="docutils literal notranslate"><span class="pre">LifeSnapsMongoDBLoader</span></code> to load data
+directly from the LifeSnaps MongoDB database. To do so, you need to:</p>
+<ol class="arabic">
+<li><p>Install <a class="reference external" href="https://www.mongodb.com/try/download/community">MongoDB Community Edition</a></p></li>
+<li><p>Install <a class="reference external" href="https://www.mongodb.com/try/download/database-tools">MongoDB Command Line Database Tools</a></p></li>
+<li><p><em>(Optional)</em> Install <a class="reference external" href="https://www.mongodb.com/products/tools/compass">MongoDB Compass</a></p></li>
+<li><p>Download the zip file from <a class="reference external" href="https://zenodo.org/record/7229547">Zenodo</a></p></li>
+<li><p>Extract the zip file in a convenient location (you will need the path of the contained bson files in the next step)</p></li>
+<li><p>On a terminal window, run the following commands, by replacing <code class="docutils literal notranslate"><span class="pre">&lt;mongodb</span> <span class="pre">host&gt;</span></code> with the host name of your MongoDB (by default <code class="docutils literal notranslate"><span class="pre">localhost</span></code>), <code class="docutils literal notranslate"><span class="pre">mongodb</span> <span class="pre">port</span></code> with the port of your MongoDB on your host (by default: <code class="docutils literal notranslate"><span class="pre">27017</span></code>) and the bson files that you have previously extractd (<code class="docutils literal notranslate"><span class="pre">&lt;path</span> <span class="pre">to</span> <span class="pre">file</span> <span class="pre">*.bson&gt;</span></code>) :</p>
+<blockquote>
+<div><ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">mongorestore</span> <span class="pre">--host</span> <span class="pre">&lt;mongodb</span> <span class="pre">host&gt;:&lt;mongo</span> <span class="pre">db</span> <span class="pre">port&gt;</span> <span class="pre">-d</span> <span class="pre">rais_anonymized</span> <span class="pre">-c</span> <span class="pre">fitbit</span> <span class="pre">&lt;path</span> <span class="pre">to</span> <span class="pre">file</span> <span class="pre">fitbit.bson&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mongorestore</span> <span class="pre">--host</span> <span class="pre">&lt;mongodb</span> <span class="pre">host&gt;:&lt;mongo</span> <span class="pre">db</span> <span class="pre">port&gt;</span> <span class="pre">-d</span> <span class="pre">rais_anonymized</span> <span class="pre">-c</span> <span class="pre">sema</span> <span class="pre">&lt;path</span> <span class="pre">to</span> <span class="pre">file</span> <span class="pre">sema.bson&gt;</span></code></p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">mongorestore</span> <span class="pre">--host</span> <span class="pre">&lt;mongodb</span> <span class="pre">host&gt;:&lt;mongo</span> <span class="pre">db</span> <span class="pre">port&gt;</span> <span class="pre">-d</span> <span class="pre">rais_anonymized</span> <span class="pre">-c</span> <span class="pre">surveys</span> <span class="pre">&lt;path</span> <span class="pre">to</span> <span class="pre">file</span> <span class="pre">surveys.bson&gt;</span></code></p></li>
+</ul>
+</div></blockquote>
+</li>
+<li><p>Running the previous commands load the backup <code class="docutils literal notranslate"><span class="pre">bson</span></code> files into your MongoDB. You can then use MongoDB Compass to query the database. This is what you should see in your MongoDB Compass window if everything was set up properly</p></li>
+</ol>
+<p>With the MongoDB properly setup:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable.loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifeSnapsMongoDBLoader</span>
+
+<span class="n">loader</span> <span class="o">=</span> <span class="n">LifeSnapsMongoDBLoader</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Once you have the LifeSnaps dataset loaded in your MongoDB, you can convert it in Parquet format using
+pywearable. To do so, run the following command on your terminal:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pywearable</span> <span class="n">convert</span> <span class="n">lifesnaps</span><span class="o">-</span><span class="n">to</span><span class="o">-</span><span class="n">parquet</span> <span class="n">OUTPUT_FOLDER</span>
+</pre></div>
+</div>
+<p>After converting it into pywearable’s local Parquet layout, you can use <code class="docutils literal notranslate"><span class="pre">LifeSnapsParquetLoader</span></code> to load the data
+in Parquet format:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pywearable.loader</span><span class="w"> </span><span class="kn">import</span> <span class="n">LifeSnapsParquetLoader</span>
+
+<span class="n">loader</span> <span class="o">=</span> <span class="n">LifeSnapsParquetLoader</span><span class="p">(</span><span class="s2">&quot;path/to/lifesnaps-parquet&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Install the <code class="docutils literal notranslate"><span class="pre">parquet</span></code> optional dependency before using this loader:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">pip</span> <span class="n">install</span> <span class="s2">&quot;.[parquet]&quot;</span>
+</pre></div>
+</div>
+<p>The loader exposes timestamped Fitbit activity and heart-rate samples together
+with provider-computed sleep, HRV, SpO2, and stress features where present in
+the converted dataset. Missing source tables return empty canonical frames,
+preserving the distinction between unavailable data and measured zeros.</p>
+<p>See <a class="reference internal" href="../_api/loader.html#pywearable.loader.LifeSnapsParquetLoader" title="pywearable.loader.LifeSnapsParquetLoader"><code class="xref py py-class docutils literal notranslate"><span class="pre">pywearable.loader.LifeSnapsParquetLoader</span></code></a> and <a class="reference internal" href="../_api/loader.html#pywearable.loader.LifeSnapsMongoDBLoader" title="pywearable.loader.LifeSnapsMongoDBLoader"><code class="xref py py-class docutils literal notranslate"><span class="pre">pywearable.loader.LifeSnapsMongoDBLoader</span></code></a> for the loaders’ API.</p>
+<section id="references">
+<h2>References<a class="headerlink" href="#references" title="Link to this heading"></a></h2>
+<aside class="footnote-list brackets">
+<aside class="footnote brackets" id="id2" role="doc-footnote">
+<span class="label"><span class="fn-bracket">[</span><a role="doc-backlink" href="#id1">1</a><span class="fn-bracket">]</span></span>
+<p>Yfantidou, Sofia, et al. “LifeSnaps, a 4-month multi-modal dataset
+capturing unobtrusive snapshots of our lives in the wild.” <em>Scientific
+Data</em> 9.1 (2022): 663.</p>
+</aside>
+</aside>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="labfront.html" class="btn btn-neutral float-left" title="Labfront" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="oura.html" class="btn btn-neutral float-right" title="Oura" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023-2026, Davide Marzorati.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
