@@ -353,6 +353,31 @@ def test_builtin_frequency_uses_observed_times_across_a_gap(monkeypatch):
     assert observed_times[150] - observed_times[149] == 4
 
 
+@pytest.mark.parametrize("resolution", ["5min", "cycle_night"])
+def test_hrv_parallel_participants_match_serial(resolution, monkeypatch):
+    arguments = {
+        "loader": RawBBILoader(),
+        "statistic": "hrv_rmssd",
+        "user_id": ["second", "first"],
+        "resolution": resolution,
+    }
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            hrv,
+            "ProcessPoolExecutor",
+            lambda **kwargs: pytest.fail("Serial HRV must run in the calling process"),
+        )
+        serial = hrv.get_hrv_statistics(**arguments, n_cores=1)
+
+    parallel = hrv.get_hrv_statistics(**arguments, n_cores=2)
+
+    assert list(serial.index.get_level_values(schema.USER_COL).unique()) == [
+        "first",
+        "second",
+    ]
+    pd.testing.assert_frame_equal(parallel, serial)
+
+
 def test_raw_bbi_primary_coverage_filters_five_minute_feature():
     loader = RawBBILoader(sample_count=150)
     result = hrv.get_hrv_statistics(

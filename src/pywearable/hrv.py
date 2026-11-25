@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import datetime
 import warnings
+from concurrent.futures import ProcessPoolExecutor
+from functools import partial
 from typing import Literal, Union
 
 import numpy as np
@@ -1107,6 +1109,16 @@ def _hierarchical_hrv_statistics(
     return trajectory
 
 
+def _run_participant_trajectories(trajectory, users, n_cores):
+    if n_cores == 1 or not users:
+        return trajectory(users)
+
+    with ProcessPoolExecutor(max_workers=n_cores) as pool:
+        frames = list(pool.map(trajectory, ([user] for user in users)))
+    nonempty_frames = [frame for frame in frames if not frame.empty]
+    return pd.concat(nonempty_frames).sort_index() if nonempty_frames else frames[0]
+
+
 def get_hrv_statistics(
     loader: BaseLoader,
     statistic: Union[str, list, tuple, None] = None,
@@ -1125,6 +1137,7 @@ def get_hrv_statistics(
     sleep_stages_to_remove: Union[str, list, tuple, None] = (
         DEFAULT_SLEEP_STAGES_TO_REMOVE
     ),
+    n_cores: int = 1,
 ) -> pd.DataFrame:
     """Return HRV features at five minutes or along a resolution hierarchy.
 
@@ -1187,6 +1200,10 @@ def get_hrv_statistics(
         Sleep stages excluded from sleep-cycle extraction. By default,
         ``awake`` and ``unmeasurable`` are removed. ``None`` or an empty
         sequence disables stage filtering.
+    n_cores
+        Number of worker processes for extraction across participants.
+        The default, ``1``, runs in the calling process. Parallel extraction
+        requires a picklable loader and worker arguments.
 
     Returns
     -------
@@ -1236,23 +1253,24 @@ def get_hrv_statistics(
         and getattr(loader, "hrv_source", "bbi") == "bbi"
     ):
         min_coverage = [0.7, *([None] * (len(chain) - 1))]
-
     if not hierarchical:
         threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
         time_col = _resolve_time_col(loader, time_reference, chain)
-        result = _primary_trajectory(
+        process_participant = partial(
+            _primary_trajectory,
             loader,
-            users,
-            statistics,
-            start_date,
-            end_date,
-            time_col,
-            loader_kwargs,
-            backend,
-            threshold,
-            True,
-            step,
+            statistics=statistics,
+            start_date=start_date,
+            end_date=end_date,
+            time_col=time_col,
+            loader_kwargs=loader_kwargs,
+            backend=backend,
+            min_coverage=threshold,
+            return_coverage=True,
+            window_step=step,
         )
+
+        result = _run_participant_trajectories(process_participant, users, n_cores)
         columns = [
             column for name in statistics for column in (name, f"{name}__coverage")
         ]
@@ -1262,23 +1280,24 @@ def get_hrv_statistics(
         ].rename_axis(index={"window_start": time_col})
         return hierarchy.format_fixed_time_output(result, time_col)
 
-    return _hierarchical_hrv_statistics(
+    process_participant = partial(
+        _hierarchical_hrv_statistics,
         loader,
         statistics,
-        users,
-        start_date,
-        end_date,
-        chain,
-        aggregation,
-        min_coverage,
-        min_valid_children,
-        loader_kwargs,
-        time_reference,
-        cycle_kwargs,
-        backend,
-        step,
-        sleep_stages_to_remove,
+        start_date=start_date,
+        end_date=end_date,
+        chain=chain,
+        aggregation=aggregation,
+        min_coverage=min_coverage,
+        min_valid_children=min_valid_children,
+        loader_kwargs=loader_kwargs,
+        time_reference=time_reference,
+        cycle_kwargs=cycle_kwargs,
+        backend=backend,
+        window_step=step,
+        sleep_stages_to_remove=sleep_stages_to_remove,
     )
+    return _run_participant_trajectories(process_participant, users, n_cores)
 
 
 def get_hrv_statistic(
