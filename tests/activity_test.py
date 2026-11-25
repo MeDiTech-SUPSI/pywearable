@@ -15,9 +15,7 @@ class SampleActivityLoader(LoaderBase):
     def __init__(self, samples, heart_rate=None):
         self.samples = samples
         self.heart_rate = (
-            schema.empty_heart_rate_frame()
-            if heart_rate is None
-            else heart_rate
+            schema.empty_heart_rate_frame() if heart_rate is None else heart_rate
         )
 
     def get_user_ids(self):
@@ -43,7 +41,7 @@ class DailyActivityLoader(LoaderBase):
     def get_user_ids(self):
         return ["u1"]
 
-    def load_activity_summary(self, user_id, start_date=None, end_date=None):
+    def load_activity_summaries(self, user_id, start_date=None, end_date=None):
         return self.summary.copy()
 
 
@@ -150,19 +148,27 @@ def test_hr_presence_covers_sparse_zero_step_rows():
 @pytest.mark.parametrize("unknown_count", [1, 60])
 def test_explicit_unknown_steps_remain_missing_despite_full_wear(unknown_count):
     samples = _minute_samples("2024-01-01", np.ones(60))
-    samples.loc[:unknown_count - 1, schema.ACTIVITY_STEPS_COL] = np.nan
+    samples.loc[: unknown_count - 1, schema.ACTIVITY_STEPS_COL] = np.nan
     times = samples[schema.LOCAL_TIME_COL]
-    heart_rate = pd.DataFrame({
-        schema.LOCAL_TIME_COL: times, schema.UTC_TIME_COL: times,
-        schema.TIMEZONE_COL: pd.Timedelta(0), schema.HEART_RATE_COL: 60,
-    })
+    heart_rate = pd.DataFrame(
+        {
+            schema.LOCAL_TIME_COL: times,
+            schema.UTC_TIME_COL: times,
+            schema.TIMEZONE_COL: pd.Timedelta(0),
+            schema.HEART_RATE_COL: 60,
+        }
+    )
     result = activity.get_activity_statistics(
         SampleActivityLoader(samples, heart_rate),
-        statistic=[activity.ACTIVITY_STATISTIC_STEPS,
-                   activity.ACTIVITY_STATISTIC_PEAK_60MIN_STEPS,
-                   activity.ACTIVITY_STATISTIC_PEAK_60MIN_START],
-        start_date="2024-01-01", end_date="2024-01-01 01:00",
-        resolution="1h", min_coverage=0.7,
+        statistic=[
+            activity.ACTIVITY_STATISTIC_STEPS,
+            activity.ACTIVITY_STATISTIC_PEAK_60MIN_STEPS,
+            activity.ACTIVITY_STATISTIC_PEAK_60MIN_START,
+        ],
+        start_date="2024-01-01",
+        end_date="2024-01-01 01:00",
+        resolution="1h",
+        min_coverage=0.7,
     )
     row = result.iloc[0]
     assert row["activity_steps__coverage"] == 1
@@ -175,16 +181,24 @@ def test_peak_can_use_a_complete_hour_after_an_unknown_interval():
     samples = _minute_samples("2024-01-01", np.ones(120))
     samples.loc[0, schema.ACTIVITY_STEPS_COL] = np.nan
     times = samples[schema.LOCAL_TIME_COL]
-    heart_rate = pd.DataFrame({
-        schema.LOCAL_TIME_COL: times, schema.UTC_TIME_COL: times,
-        schema.TIMEZONE_COL: pd.Timedelta(0), schema.HEART_RATE_COL: 60,
-    })
+    heart_rate = pd.DataFrame(
+        {
+            schema.LOCAL_TIME_COL: times,
+            schema.UTC_TIME_COL: times,
+            schema.TIMEZONE_COL: pd.Timedelta(0),
+            schema.HEART_RATE_COL: 60,
+        }
+    )
     result = activity.get_activity_statistics(
         SampleActivityLoader(samples, heart_rate),
-        statistic=[activity.ACTIVITY_STATISTIC_STEPS,
-                   activity.ACTIVITY_STATISTIC_PEAK_60MIN_STEPS,
-                   activity.ACTIVITY_STATISTIC_PEAK_60MIN_START],
-        start_date="2024-01-01", end_date="2024-01-01 02:00", resolution="2h",
+        statistic=[
+            activity.ACTIVITY_STATISTIC_STEPS,
+            activity.ACTIVITY_STATISTIC_PEAK_60MIN_STEPS,
+            activity.ACTIVITY_STATISTIC_PEAK_60MIN_START,
+        ],
+        start_date="2024-01-01",
+        end_date="2024-01-01 02:00",
+        resolution="2h",
     )
     row = result.iloc[0]
     assert pd.isna(row["activity_steps"])
@@ -268,12 +282,8 @@ def test_native_daily_zero_is_valid_and_weekly_defaults_to_sum():
 
 
 def test_sample_weekly_defaults_sum_steps_and_average_peak_descriptors():
-    first = _minute_samples(
-        "2024-01-01", np.r_[np.ones(60), np.zeros(60)]
-    )
-    second = _minute_samples(
-        "2024-01-02", np.r_[np.full(60, 2), np.zeros(60)]
-    )
+    first = _minute_samples("2024-01-01", np.r_[np.ones(60), np.zeros(60)])
+    second = _minute_samples("2024-01-02", np.r_[np.full(60, 2), np.zeros(60)])
     result = activity.get_activity_statistics(
         SampleActivityLoader(pd.concat([first, second], ignore_index=True)),
         start_date="2024-01-01",
@@ -284,9 +294,10 @@ def test_sample_weekly_defaults_sum_steps_and_average_peak_descriptors():
     row = result.iloc[0]
     assert row["activity_steps__daily__weekly_sum"] == 180
     assert row["activity_peak_60min_steps__daily__weekly_mean"] == 90
-    assert row["activity_peak_60min_start__daily__weekly_mean"] == pd.Timestamp(
-        "2024-01-01"
-    ).time()
+    assert (
+        row["activity_peak_60min_start__daily__weekly_mean"]
+        == pd.Timestamp("2024-01-01").time()
+    )
 
 
 def test_daily_summaries_reject_subdaily_and_peak_requests():
@@ -396,14 +407,21 @@ def test_garmin_epoch_category_conflict_marks_collapsed_steps_missing():
     assert len(result) == 1
     assert pd.isna(result.iloc[0][schema.ACTIVITY_STEPS_COL])
     times = pd.date_range("2024-01-01 12:00", periods=15, freq="min")
-    heart_rate = pd.DataFrame({
-        schema.LOCAL_TIME_COL: times, schema.UTC_TIME_COL: times - pd.Timedelta(hours=1),
-        schema.TIMEZONE_COL: pd.Timedelta(hours=1), schema.HEART_RATE_COL: 60,
-    })
+    heart_rate = pd.DataFrame(
+        {
+            schema.LOCAL_TIME_COL: times,
+            schema.UTC_TIME_COL: times - pd.Timedelta(hours=1),
+            schema.TIMEZONE_COL: pd.Timedelta(hours=1),
+            schema.HEART_RATE_COL: 60,
+        }
+    )
     extracted = activity.get_activity_statistics(
-        SampleActivityLoader(result, heart_rate), statistic=activity.ACTIVITY_STATISTIC_STEPS,
-        start_date="2024-01-01 12:00", end_date="2024-01-01 12:15",
-        resolution="1h", time_reference="local",
+        SampleActivityLoader(result, heart_rate),
+        statistic=activity.ACTIVITY_STATISTIC_STEPS,
+        start_date="2024-01-01 12:00",
+        end_date="2024-01-01 12:15",
+        resolution="1h",
+        time_reference="local",
     )
     assert extracted.iloc[0]["activity_steps__coverage"] == 1
     assert pd.isna(extracted.iloc[0]["activity_steps"])

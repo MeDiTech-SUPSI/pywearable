@@ -36,7 +36,7 @@ def _trajectory(values, *, feature="feature", frequency="D"):
 
 
 def _sleep_loader():
-    call_counts = {"sleep_summary": 0, "sleep_stage": 0, "heart_rate": 0}
+    call_counts = {"sleep_summaries": 0, "sleep_stages": 0, "heart_rate": 0}
     summary_rows = []
     stage_rows = []
     for offset in range(4):
@@ -62,9 +62,11 @@ def _sleep_loader():
         stage_sequence = (
             (schema.SLEEP_STAGE_AWAKE_STAGE_VALUE, 15),
             (
-                schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE
-                if offset == 1
-                else schema.SLEEP_STAGE_LIGHT_STAGE_VALUE,
+                (
+                    schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE
+                    if offset == 1
+                    else schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
+                ),
                 180,
             ),
             (schema.SLEEP_STAGE_DEEP_STAGE_VALUE, 90),
@@ -114,8 +116,8 @@ def _sleep_loader():
         }
     )
 
-    def load_sleep_summary(user_id, start_date=None, end_date=None, **kwargs):
-        call_counts["sleep_summary"] += 1
+    def load_sleep_summaries(user_id, start_date=None, end_date=None, **kwargs):
+        call_counts["sleep_summaries"] += 1
         frame = summaries.copy()
         if start_date is not None:
             frame = frame[
@@ -127,8 +129,8 @@ def _sleep_loader():
             ]
         return frame.reset_index(drop=True)
 
-    def load_sleep_stage(user_id, start_date=None, end_date=None, **kwargs):
-        call_counts["sleep_stage"] += 1
+    def load_sleep_stages(user_id, start_date=None, end_date=None, **kwargs):
+        call_counts["sleep_stages"] += 1
         frame = stages.copy()
         stage_ends = frame[schema.LOCAL_TIME_COL] + pd.to_timedelta(
             frame[schema.DURATION_IN_MS_COL], unit="ms"
@@ -169,8 +171,8 @@ def _sleep_loader():
             ["person-1"], requested
         ),
         call_counts=call_counts,
-        load_sleep_summary=load_sleep_summary,
-        load_sleep_stage=load_sleep_stage,
+        load_sleep_summaries=load_sleep_summaries,
+        load_sleep_stages=load_sleep_stages,
         load_heart_rate=load_heart_rate,
         load_activity_samples=load_activity_samples,
     )
@@ -355,19 +357,31 @@ def test_subdaily_coverage_and_weekly_profile_keep_expected_shape():
 @pytest.mark.parametrize("supply_local", [True, False])
 def test_clock_plots_convert_utc_observations_across_local_midnight(supply_local):
     utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
-    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
-    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
-                          "timezone": pd.Timedelta(hours=2)}, index=index)
+    index = pd.MultiIndex.from_arrays(
+        [["person-1"] * 2, utc], names=["user_id", "utc_time"]
+    )
+    frame = pd.DataFrame(
+        {
+            "feature": [80, 85],
+            "feature__coverage": [1, 0.5],
+            "timezone": pd.Timedelta(hours=2),
+        },
+        index=index,
+    )
     if supply_local:
         frame["local_time"] = utc + pd.Timedelta(hours=2)
     original = frame.copy(deep=True)
-    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    coverage = visualization.plot_coverage_heatmap(
+        frame, "feature", interval="1h", show=False
+    )
     matrix = coverage.images[0].get_array()
     assert matrix.shape == (1, 24)
-    np.testing.assert_allclose(matrix[0, :2], [1, .5])
+    np.testing.assert_allclose(matrix[0, :2], [1, 0.5])
     assert matrix.mask[0, 22]
     assert coverage.get_yticklabels()[0].get_text() == "Jan 02"
-    profile = visualization.plot_weekly_profile(frame, "feature", kind="heatmap", interval="1h", show=False)
+    profile = visualization.plot_weekly_profile(
+        frame, "feature", kind="heatmap", interval="1h", show=False
+    )
     matrix = profile.images[0].get_array()
     np.testing.assert_allclose(matrix[1, :2], [80, 85])
     assert matrix.mask[0].all()
@@ -378,30 +392,53 @@ def test_clock_plots_convert_utc_observations_across_local_midnight(supply_local
 
 def test_clock_plots_use_each_rows_offset_at_a_dst_transition():
     utc = pd.to_datetime(["2024-03-30 23:00", "2024-03-31 01:00"])
-    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
-    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
-                          "timezone": pd.to_timedelta([1, 2], unit="h")}, index=index)
-    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    index = pd.MultiIndex.from_arrays(
+        [["person-1"] * 2, utc], names=["user_id", "utc_time"]
+    )
+    frame = pd.DataFrame(
+        {
+            "feature": [80, 85],
+            "feature__coverage": [1, 0.5],
+            "timezone": pd.to_timedelta([1, 2], unit="h"),
+        },
+        index=index,
+    )
+    coverage = visualization.plot_coverage_heatmap(
+        frame, "feature", interval="1h", show=False
+    )
     matrix = coverage.images[0].get_array()
     assert matrix.shape == (1, 24)
     assert matrix[0, 0] == 1
-    assert matrix[0, 3] == .5
+    assert matrix[0, 3] == 0.5
     assert matrix.mask[0, 2]
     plt.close("all")
 
 
 def test_utc_only_profiles_label_clock_and_skip_local_sleep_shading(monkeypatch):
     utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
-    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
-    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5]}, index=index)
-    coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+    index = pd.MultiIndex.from_arrays(
+        [["person-1"] * 2, utc], names=["user_id", "utc_time"]
+    )
+    frame = pd.DataFrame(
+        {"feature": [80, 85], "feature__coverage": [1, 0.5]}, index=index
+    )
+    coverage = visualization.plot_coverage_heatmap(
+        frame, "feature", interval="1h", show=False
+    )
     assert coverage.get_xlabel() == "UTC time of day"
+
     def unexpected_shading(*args, **kwargs):
         raise AssertionError("A UTC-only trajectory cannot use local sleep shading")
+
     monkeypatch.setattr(visualization, "_weekday_sleep_windows", unexpected_shading)
     with pytest.warns(UserWarning, match="Sleep shading requires local times"):
         profile = visualization.plot_weekly_profile(
-            frame, "feature", loader=object(), kind="heatmap", interval="1h", show=False,
+            frame,
+            "feature",
+            loader=object(),
+            kind="heatmap",
+            interval="1h",
+            show=False,
         )
     assert profile.get_xlabel() == "UTC time of day"
     np.testing.assert_allclose(profile.images[0].get_array()[0, 22:24], [80, 85])
@@ -410,20 +447,28 @@ def test_utc_only_profiles_label_clock_and_skip_local_sleep_shading(monkeypatch)
 
 def test_local_clock_plots_warn_when_some_rows_cannot_be_mapped():
     utc = pd.date_range("2024-01-01 22:00", periods=2, freq="h")
-    index = pd.MultiIndex.from_arrays([["person-1"] * 2, utc], names=["user_id", "utc_time"])
-    frame = pd.DataFrame({"feature": [80, 85], "feature__coverage": [1, .5],
-                          "local_time": pd.to_datetime(["2024-01-02", None])}, index=index)
+    index = pd.MultiIndex.from_arrays(
+        [["person-1"] * 2, utc], names=["user_id", "utc_time"]
+    )
+    frame = pd.DataFrame(
+        {
+            "feature": [80, 85],
+            "feature__coverage": [1, 0.5],
+            "local_time": pd.to_datetime(["2024-01-02", None]),
+        },
+        index=index,
+    )
     with pytest.warns(UserWarning, match="Rows without local-time metadata"):
-        coverage = visualization.plot_coverage_heatmap(frame, "feature", interval="1h", show=False)
+        coverage = visualization.plot_coverage_heatmap(
+            frame, "feature", interval="1h", show=False
+        )
     assert coverage.get_xlabel() == "Local time of day"
     assert coverage.images[0].get_array()[0, 0] == 1
     plt.close("all")
 
 
 def test_weekday_sleep_windows_use_actual_local_days(monkeypatch):
-    dates = pd.to_datetime(
-        ["2024-01-08", "2024-01-09", "2024-01-10", "2024-01-17"]
-    )
+    dates = pd.to_datetime(["2024-01-08", "2024-01-09", "2024-01-10", "2024-01-17"])
     index = pd.MultiIndex.from_arrays(
         [["person-1"] * len(dates), dates],
         names=[schema.USER_COL, schema.CALENDAR_DATE_COL],
@@ -533,9 +578,7 @@ def test_sleep_views_combine_loader_tables_without_expanding_stages(monkeypatch)
         0.34,
     }
     assert (
-        visualization.SLEEP_HEART_RATE_STAGE_ALPHA[
-            schema.SLEEP_STAGE_AWAKE_STAGE_VALUE
-        ]
+        visualization.SLEEP_HEART_RATE_STAGE_ALPHA[schema.SLEEP_STAGE_AWAKE_STAGE_VALUE]
         < visualization.SLEEP_HEART_RATE_STAGE_ALPHA[
             schema.SLEEP_STAGE_LIGHT_STAGE_VALUE
         ]
@@ -617,7 +660,7 @@ def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch)
             }
         )
 
-    def load_sleep_summary(user_id, start_date=None, end_date=None, **kwargs):
+    def load_sleep_summaries(user_id, start_date=None, end_date=None, **kwargs):
         return pd.DataFrame({schema.CALENDAR_DATE_COL: sleep_dates[user_id]})
 
     loader = SimpleNamespace(
@@ -626,7 +669,7 @@ def test_adherence_summary_aligns_inferred_starts_and_keeps_dropout(monkeypatch)
             ["person-1", "person-2", "outside-study"], requested
         ),
         load_heart_rate=load_heart_rate,
-        load_sleep_summary=load_sleep_summary,
+        load_sleep_summaries=load_sleep_summaries,
     )
 
     def fake_adherence(
@@ -735,7 +778,7 @@ def test_adherence_summary_reuses_each_raw_stream_load():
     )
 
     assert loader.call_counts["heart_rate"] == 1
-    assert loader.call_counts["sleep_summary"] == 1
+    assert loader.call_counts["sleep_summaries"] == 1
 
 
 def test_empty_trajectory_reports_a_clear_error():

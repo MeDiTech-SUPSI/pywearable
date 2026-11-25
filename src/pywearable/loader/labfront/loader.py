@@ -16,10 +16,7 @@ import pandas as pd
 
 from ... import schema
 from ..base import BaseLoader
-from ..garmin import (
-    _normalize_garmin_sleep_columns,
-    prepare_epoch_activity_samples,
-)
+from ..garmin import _normalize_garmin_sleep_columns, prepare_epoch_activity_samples
 from . import constants as lf_constants
 
 _LABFRONT_METRICS_DICT = {
@@ -274,9 +271,7 @@ class LabfrontLoader(BaseLoader):
         else:
             raise ValueError(f"Could not get full_id from {id}")
 
-    def get_available_questionnaires(
-        self, user_id: Union[str, list] = "all"
-    ) -> list:
+    def get_available_questionnaires(self, user_id: Union[str, list] = "all") -> list:
         """Get the list of available questionnaires.
 
         Parameters
@@ -1195,7 +1190,10 @@ class LabfrontLoader(BaseLoader):
                 "type": row["questionType"],
                 "description": row["questionDescription"],
             }
-            if row["questionType"] == lf_constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE:
+            if (
+                row["questionType"]
+                == lf_constants.QUESTIONNAIRE_QUESTION_TYPE_TEXT_VALUE
+            ):
                 continue
             question_options = {}
             for col in option_cols:
@@ -1204,7 +1202,7 @@ class LabfrontLoader(BaseLoader):
             questions_dict[question_id]["options"] = question_options
         return questions_dict
 
-    def load_garmin_connect_activity_details_lap(
+    def load_garmin_connect_activity_details_laps(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1218,7 +1216,7 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def load_garmin_connect_activity_details_sample(
+    def load_garmin_connect_activity_details_samples(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1232,7 +1230,7 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def load_garmin_connect_activity_details_summary(
+    def load_garmin_connect_activity_details_summaries(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1246,7 +1244,7 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def load_garmin_connect_activity_moveiq_summary(
+    def load_garmin_connect_activity_moveiq_summaries(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1260,7 +1258,7 @@ class LabfrontLoader(BaseLoader):
         )
         return data
 
-    def load_garmin_connect_activity_summary(
+    def load_garmin_connect_activity_summaries(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1422,7 +1420,7 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self._load_sleep_summary_raw(
+            sleep_summary = self._load_sleep_summaries_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
@@ -1462,7 +1460,7 @@ class LabfrontLoader(BaseLoader):
         ).reset_index(drop=True)
         if len(sleep_data) > 0:
             # We need to add calendarDate from sleep summaries
-            sleep_summary = self._load_sleep_summary_raw(
+            sleep_summary = self._load_sleep_summaries_raw(
                 user_id=user_id,
                 start_date=start_date,
                 end_date=end_date,
@@ -1765,7 +1763,7 @@ class LabfrontLoader(BaseLoader):
         data["source"] = "garmin_device_bbi"
         return schema.prepare_bbi(data)
 
-    def load_daily_summary(
+    def load_daily_summaries(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -1878,7 +1876,9 @@ class LabfrontLoader(BaseLoader):
         # add sampling frequency column durationInMs
         steps_df[lf_constants.DURATION_IN_MS_COL] = 15 * 60 * 1000
         # add a column for calendar date
-        steps_df[lf_constants.CALENDAR_DATE_COL] = steps_df[lf_constants.ISODATE_COL].dt.date
+        steps_df[lf_constants.CALENDAR_DATE_COL] = steps_df[
+            lf_constants.ISODATE_COL
+        ].dt.date
         # add a column for cumulative steps at a daily level
         steps_df[lf_constants.ACTIVITY_TOTAL_STEPS_COL] = steps_df.groupby(
             lf_constants.CALENDAR_DATE_COL
@@ -1949,17 +1949,13 @@ class LabfrontLoader(BaseLoader):
         if "timezone" in data.columns:
             data = data.rename(columns={"timezone": "timezone_name"})
         data["timezone"] = data["local_time"] - data["utc_time"]
-        data["heart_rate"] = pd.to_numeric(
-            data["beatsPerMinute"], errors="coerce"
-        )
+        data["heart_rate"] = pd.to_numeric(data["beatsPerMinute"], errors="coerce")
         data = data[data["heart_rate"] > 0]
         data["source"] = source
         data[schema.TIMESTAMP_CONFLICT_COL] = (
             data.groupby("utc_time")["heart_rate"].transform("nunique") > 1
         )
-        data = data.drop_duplicates(
-            subset=["utc_time", "heart_rate"], keep="last"
-        )
+        data = data.drop_duplicates(subset=["utc_time", "heart_rate"], keep="last")
         data = schema.prepare_heart_rate_samples(data)
         return (
             schema.filter_heart_rate_by_time(
@@ -1992,8 +1988,9 @@ class LabfrontLoader(BaseLoader):
                 errors="coerce",
                 utc=True,
             ).dt.tz_localize(None)
-        if schema.TIMEZONE_COL in data.columns and not pd.api.types.is_timedelta64_dtype(
-            data[schema.TIMEZONE_COL]
+        if (
+            schema.TIMEZONE_COL in data.columns
+            and not pd.api.types.is_timedelta64_dtype(data[schema.TIMEZONE_COL])
         ):
             data = data.rename(columns={schema.TIMEZONE_COL: "timezone_name"})
         if (
@@ -2121,7 +2118,7 @@ class LabfrontLoader(BaseLoader):
         )
         return schema.prepare_respiration_samples(data)
 
-    def _load_sleep_stage_raw(
+    def _load_sleep_stages_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date, None] = None,
@@ -2165,9 +2162,17 @@ class LabfrontLoader(BaseLoader):
         )
 
         if len(data) > 0:
-            summary_start = requested_start - pd.Timedelta(days=2) if requested_start is not None else None
-            summary_end = requested_end + pd.Timedelta(days=2) if requested_end is not None else None
-            summaries = self._load_sleep_summary_raw(
+            summary_start = (
+                requested_start - pd.Timedelta(days=2)
+                if requested_start is not None
+                else None
+            )
+            summary_end = (
+                requested_end + pd.Timedelta(days=2)
+                if requested_end is not None
+                else None
+            )
+            summaries = self._load_sleep_summaries_raw(
                 user_id, summary_start, summary_end, drop_duplicates=False
             )
             data = self._reconcile_sleep_stage_snapshots(
@@ -2195,7 +2200,7 @@ class LabfrontLoader(BaseLoader):
 
         return data.reset_index(drop=True)
 
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date=None,
@@ -2212,7 +2217,7 @@ class LabfrontLoader(BaseLoader):
         Labfront file-index order (first timestamp, then last-edit timestamp).
         """
         return _normalize_garmin_sleep_columns(
-            self._load_sleep_stage_raw(
+            self._load_sleep_stages_raw(
                 user_id, start_date, end_date, on_conflict=on_conflict
             )
         )
@@ -2234,9 +2239,7 @@ class LabfrontLoader(BaseLoader):
         raise an error, or retain the last loaded source snapshot. The
         temporary source-file column is removed from the result.
         """
-        on_conflict = LabfrontLoader._validate_sleep_stage_conflict_policy(
-            on_conflict
-        )
+        on_conflict = LabfrontLoader._validate_sleep_stage_conflict_policy(on_conflict)
         source_col = _LABFRONT_SOURCE_FILE_COL
         id_col = lf_constants.SLEEP_SUMMARY_ID_COL
         record_cols = [col for col in sleep_stages if col != source_col]
@@ -2317,7 +2320,8 @@ class LabfrontLoader(BaseLoader):
                 lf_constants.SLEEP_STAGE_DURATION_IN_MS_COL
             ].sum()
             return all(
-                pd.notna(summary[column]) and int(actual.get(stage, 0)) == int(summary[column])
+                pd.notna(summary[column])
+                and int(actual.get(stage, 0)) == int(summary[column])
                 for stage, column in stage_summary_cols.items()
             )
 
@@ -2374,7 +2378,9 @@ class LabfrontLoader(BaseLoader):
             )
 
         if not chosen:
-            return sleep_stages.iloc[0:0].drop(columns=source_col).reset_index(drop=True)
+            return (
+                sleep_stages.iloc[0:0].drop(columns=source_col).reset_index(drop=True)
+            )
         return (
             pd.concat(chosen, ignore_index=True)
             .drop(columns=source_col)
@@ -2382,7 +2388,7 @@ class LabfrontLoader(BaseLoader):
             .reset_index(drop=True)
         )
 
-    def _load_sleep_summary_raw(
+    def _load_sleep_summaries_raw(
         self,
         user_id: str,
         start_date: Union[str, datetime.date, datetime.date] = None,
@@ -2466,7 +2472,7 @@ class LabfrontLoader(BaseLoader):
         else:
             return pd.DataFrame()
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date=None,
@@ -2475,7 +2481,7 @@ class LabfrontLoader(BaseLoader):
     ) -> pd.DataFrame:
         """Return Garmin sleep summaries in the shared snake_case schema."""
         return _normalize_garmin_sleep_columns(
-            self._load_sleep_summary_raw(
+            self._load_sleep_summaries_raw(
                 user_id, start_date, end_date, drop_duplicates=drop_duplicates
             )
         )
@@ -2506,15 +2512,22 @@ class LabfrontLoader(BaseLoader):
             start_col = next(
                 (
                     column
-                    for column in (lf_constants.UNIXTIMESTAMP_IN_MS_COL, lf_constants.ISODATE_COL)
+                    for column in (
+                        lf_constants.UNIXTIMESTAMP_IN_MS_COL,
+                        lf_constants.ISODATE_COL,
+                    )
                     if column in versions and versions[column].notna().all()
                 ),
                 None,
             )
-            different_periods = start_col is not None and versions[start_col].nunique() > 1
+            different_periods = (
+                start_col is not None and versions[start_col].nunique() > 1
+            )
             same_period = start_col is not None and not different_periods
             if same_period and lf_constants.DURATION_IN_MS_COL in versions:
-                duration = pd.to_numeric(versions[lf_constants.DURATION_IN_MS_COL], errors="coerce")
+                duration = pd.to_numeric(
+                    versions[lf_constants.DURATION_IN_MS_COL], errors="coerce"
+                )
                 duration = duration.where(np.isfinite(duration) & duration.gt(0))
                 if duration.notna().any():
                     versions = versions.loc[duration.eq(duration.max())]
@@ -2522,7 +2535,11 @@ class LabfrontLoader(BaseLoader):
             conflicts = (
                 value_columns
                 if different_periods
-                else [column for column in value_columns if versions[column].nunique(dropna=False) > 1]
+                else [
+                    column
+                    for column in value_columns
+                    if versions[column].nunique(dropna=False) > 1
+                ]
             )
             if conflicts:
                 selected[conflicts] = np.nan
@@ -2623,10 +2640,8 @@ class LabfrontLoader(BaseLoader):
                 data.loc[data[feature].lt(0), feature] = np.nan
             return schema.prepare_provider_feature_samples(data, feature)
         if feature not in daily_columns:
-            return super().load_provider_feature(
-                feature, user_id, start_date, end_date
-            )
-        data = self.load_daily_summary(user_id, start_date, end_date).copy()
+            return super().load_provider_feature(feature, user_id, start_date, end_date)
+        data = self.load_daily_summaries(user_id, start_date, end_date).copy()
         if data.empty:
             return schema.prepare_provider_feature_summary(
                 pd.DataFrame(columns=[schema.CALENDAR_DATE_COL, feature]),
@@ -2647,9 +2662,7 @@ class LabfrontLoader(BaseLoader):
                 result[feature] = result[feature] / 1000
             else:
                 result.loc[result[feature].lt(0), feature] = np.nan
-        return schema.prepare_provider_feature_summary(
-            result, feature, numeric=numeric
-        )
+        return schema.prepare_provider_feature_summary(result, feature, numeric=numeric)
 
     def load_steps(
         self,
@@ -2720,7 +2733,9 @@ class LabfrontLoader(BaseLoader):
             utc=True,
         ).dt.tz_localize(None)
         epochs[schema.TIMEZONE_COL] = pd.to_timedelta(
-            pd.to_numeric(epochs[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"),
+            pd.to_numeric(
+                epochs[lf_constants.TIMEZONEOFFSET_IN_MS_COL], errors="coerce"
+            ),
             unit="ms",
         )
         epochs[schema.DURATION_IN_MS_COL] = epochs[lf_constants.DURATION_IN_MS_COL]

@@ -41,7 +41,7 @@ def test_tesserae_csv_sleep_uses_optional_bounds_and_true_utc_milliseconds(
     raw.to_csv(sleep_file, index=False)
 
     loader = TesseraeCSVLoader(tmp_path)
-    result = loader.load_sleep_summary("person-1")
+    result = loader.load_sleep_summaries("person-1")
 
     assert result.loc[0, "utc_time"] == pd.Timestamp("2024-01-01 22:00")
     assert loader._convert_timezone_offset("2024-01-01T23:00:00+0100") == 3_600_000
@@ -50,7 +50,7 @@ def test_tesserae_csv_sleep_uses_optional_bounds_and_true_utc_milliseconds(
 def test_tesserae_csv_empty_stage_supports_omitted_bounds(tmp_path):
     (tmp_path / "person-1").mkdir()
 
-    result = TesseraeCSVLoader(tmp_path).load_sleep_stage("person-1")
+    result = TesseraeCSVLoader(tmp_path).load_sleep_stages("person-1")
 
     assert {"sleep_summary_id", "local_time", "duration_in_ms", "type"} <= set(result)
 
@@ -79,7 +79,7 @@ def test_tesserae_sleep_summary_coerces_null_numeric_values(
     raw["Timestamp"] = raw["Timestamp"].dt.as_unit(unit)
     monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
 
-    result = TesseraeParquetLoader(tmp_path).load_sleep_summary("person-1")
+    result = TesseraeParquetLoader(tmp_path).load_sleep_summaries("person-1")
 
     assert result.loc[0, "duration_in_ms"] == 3_600_000
     assert result.loc[0, "rem_sleep_duration_in_ms"] == 0
@@ -109,7 +109,7 @@ def test_tesserae_normalizes_legacy_duration_that_includes_awake_time(
     )
     monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
 
-    result = TesseraeParquetLoader(tmp_path).load_sleep_summary("person-1")
+    result = TesseraeParquetLoader(tmp_path).load_sleep_summaries("person-1")
 
     assert result.loc[0, "duration_in_ms"] == 3_000_000
     assert result.loc[0, "awake_duration_in_ms"] == 600_000
@@ -140,7 +140,7 @@ def test_tesserae_sleep_uses_calendar_day_and_drops_empty_records(
     )
     monkeypatch.setattr(pd, "read_parquet", lambda _: raw.copy())
 
-    result = TesseraeParquetLoader(tmp_path).load_sleep_summary(
+    result = TesseraeParquetLoader(tmp_path).load_sleep_summaries(
         "person-1", start_date="2024-01-02", end_date="2024-01-03"
     )
 
@@ -152,7 +152,7 @@ def test_tesserae_sleep_uses_calendar_day_and_drops_empty_records(
 def test_tesserae_empty_sleep_stage_uses_shared_contract(tmp_path):
     (tmp_path / "person-1").mkdir()
 
-    result = TesseraeParquetLoader(tmp_path).load_sleep_stage("person-1")
+    result = TesseraeParquetLoader(tmp_path).load_sleep_stages("person-1")
 
     assert {
         "sleep_summary_id",
@@ -282,7 +282,7 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
         "classic-night": True,
     }
 
-    loaded_summaries = loader.load_sleep_summary("person-1")
+    loaded_summaries = loader.load_sleep_summaries("person-1")
     assert loaded_summaries["sleep_summary_id"].tolist() == [
         "staged-night",
         "classic-night",
@@ -302,7 +302,7 @@ def test_lifesnaps_sleep_uses_main_sessions_and_normalizes_fitbit_stages(
     assert loaded_summaries["utc_time"].isna().all()
     assert loaded_summaries["timezone_offset_in_ms"].isna().all()
 
-    loaded_stages = loader.load_sleep_stage("person-1")
+    loaded_stages = loader.load_sleep_stages("person-1")
     assert "nap" not in set(loaded_stages["sleep_summary_id"])
     all_session_stages = loader.load_sleep_session_stages("person-1")
     assert "nap" in set(all_session_stages["sleep_summary_id"])
@@ -386,8 +386,8 @@ def test_lifesnaps_marks_unknown_intervals_unmeasurable(tmp_path, monkeypatch):
     )
     loader = LifeSnapsParquetLoader(tmp_path)
 
-    summary = loader.load_sleep_summary("person-1")
-    loaded_stages = loader.load_sleep_stage("person-1")
+    summary = loader.load_sleep_summaries("person-1")
+    loaded_stages = loader.load_sleep_stages("person-1")
     features = sleep.get_sleep_statistics(loader, user_id="person-1")
 
     assert summary.loc[0, "duration_in_ms"] == 70 * 60_000
@@ -438,7 +438,7 @@ def test_lifesnaps_drops_only_incoherent_stages(tmp_path, monkeypatch):
     loader = LifeSnapsParquetLoader(tmp_path)
 
     with pytest.warns(UserWarning, match="stage durations conflict"):
-        loaded_stages = loader.load_sleep_stage("person-1")
+        loaded_stages = loader.load_sleep_stages("person-1")
     with pytest.warns(UserWarning, match="stage durations conflict"):
         features = sleep.get_sleep_statistics(loader, user_id="person-1")
 

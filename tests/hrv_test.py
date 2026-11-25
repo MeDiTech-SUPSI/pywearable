@@ -45,7 +45,7 @@ class RawBBILoader(LoaderBase):
             }
         )
 
-    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+    def load_sleep_stages(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame(
             {
                 "sleep_summary_id": ["night"],
@@ -72,9 +72,7 @@ class ProviderHRVLoader(RawBBILoader):
         frame = pd.DataFrame(
             {
                 "utc_time": [pd.NaT, pd.NaT],
-                "local_time": pd.to_datetime(
-                    ["2024-01-01 23:00", "2024-01-01 23:05"]
-                ),
+                "local_time": pd.to_datetime(["2024-01-01 23:00", "2024-01-01 23:05"]),
                 "timezone": [pd.NaT, pd.NaT],
                 "hrv_rmssd": [40.0, 44.0],
             }
@@ -112,9 +110,7 @@ class SubperiodProviderHRVLoader(ProviderHRVLoader):
                 "calendar_date": pd.to_datetime(["2024-01-02", "2024-01-03"]),
                 "type": ["main_sleep", "main_sleep"],
                 "main_sleep": [True, True],
-                "local_time": pd.to_datetime(
-                    ["2024-01-01 23:00", "2024-01-02 23:00"]
-                ),
+                "local_time": pd.to_datetime(["2024-01-01 23:00", "2024-01-02 23:00"]),
                 "local_end_time": pd.to_datetime(
                     ["2024-01-01 23:15", "2024-01-02 23:15"]
                 ),
@@ -147,7 +143,7 @@ class InternalWakeGapLoader(RawBBILoader):
             }
         )
 
-    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+    def load_sleep_stages(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame(
             {
                 "sleep_summary_id": ["night", "night", "night"],
@@ -288,9 +284,7 @@ def test_neurokit_returns_requested_time_and_frequency_features_only(monkeypatch
     monkeypatch.setitem(sys.modules, "neurokit2", fake_neurokit)
 
     requested = ["hrv_sdsd", "hrv_mad_nn", "hrv_total_power"]
-    result = hrv._neurokit_window_statistics(
-        np.resize([900.0, 1100.0], 300), requested
-    )
+    result = hrv._neurokit_window_statistics(np.resize([900.0, 1100.0], 300), requested)
 
     assert result == {
         "hrv_sdsd": 12.0,
@@ -351,9 +345,7 @@ def test_builtin_frequency_uses_observed_times_across_a_gap(monkeypatch):
         values,
         ["hrv_lf_power"],
         "pywearable",
-        segment_ids=np.concatenate(
-            [np.zeros(150, dtype=int), np.ones(150, dtype=int)]
-        ),
+        segment_ids=np.concatenate([np.zeros(150, dtype=int), np.ones(150, dtype=int)]),
         timestamps=timestamps,
     )
 
@@ -386,9 +378,14 @@ def test_invalid_or_repeated_bbi_cannot_inflate_coverage(injection):
         extra["bbi"] = np.inf
     loader.bbi = pd.concat([loader.bbi, extra], ignore_index=True)
     result = hrv.get_hrv_statistics(
-        loader, statistic="hrv_rmssd", user_id="user", resolution="5min",
-        start_date="2024-01-01 23:00", end_date="2024-01-01 23:05",
-        time_reference="local", min_coverage=0.7,
+        loader,
+        statistic="hrv_rmssd",
+        user_id="user",
+        resolution="5min",
+        start_date="2024-01-01 23:00",
+        end_date="2024-01-01 23:05",
+        time_reference="local",
+        min_coverage=0.7,
     )
     assert result.iloc[0]["hrv_rmssd__coverage"] == pytest.approx(0.5)
     assert pd.isna(result.iloc[0]["hrv_rmssd"])
@@ -430,9 +427,7 @@ def test_overlapping_primary_windows_aggregate_to_night():
     assert result.loc[("user", pd.Timestamp("2024-01-02")), feature] == pytest.approx(
         200
     )
-    assert result.loc[
-        ("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"
-    ] == 1
+    assert result.loc[("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"] == 1
 
 
 def test_provider_hrv_rejects_non_native_window_step():
@@ -507,10 +502,10 @@ def test_raw_bbi_night_hierarchy_uses_equal_five_minute_windows():
         min_coverage=[0.7, None],
     )
     feature = "hrv_rmssd__5min__cycle_night_mean"
-    assert result.loc[("user", pd.Timestamp("2024-01-02")), feature] == pytest.approx(200)
-    assert result.loc[
-        ("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"
-    ] == 1
+    assert result.loc[("user", pd.Timestamp("2024-01-02")), feature] == pytest.approx(
+        200
+    )
+    assert result.loc[("user", pd.Timestamp("2024-01-02")), f"{feature}__coverage"] == 1
 
 
 def test_nightly_and_cycle_night_are_complete_hrv_aliases():
@@ -524,9 +519,7 @@ def test_nightly_and_cycle_night_are_complete_hrv_aliases():
     }
     nightly = hrv.get_hrv_statistics(resolution="nightly", **common)
     cycle_night = hrv.get_hrv_statistics(resolution="cycle_night", **common)
-    explicit_nightly = hrv.get_hrv_statistics(
-        resolution=["5min", "nightly"], **common
-    )
+    explicit_nightly = hrv.get_hrv_statistics(resolution=["5min", "nightly"], **common)
     explicit_cycle = hrv.get_hrv_statistics(
         resolution=["5min", "cycle_night"], **common
     )
@@ -558,17 +551,16 @@ def test_direct_max_differs_from_maximum_nightly_median():
     direct, by_night = _subperiod_hrv_results()
 
     assert direct["hrv_rmssd__5min__monthly_max"] == 100
-    assert by_night[
-        "hrv_rmssd__5min__cycle_night_median__monthly_max"
-    ] == 2
+    assert by_night["hrv_rmssd__5min__cycle_night_median__monthly_max"] == 2
 
 
 def test_maximum_nightly_maximum_equals_direct_maximum():
     direct, by_night = _subperiod_hrv_results()
 
-    assert by_night[
-        "hrv_rmssd__5min__cycle_night_max__monthly_max"
-    ] == direct["hrv_rmssd__5min__monthly_max"]
+    assert (
+        by_night["hrv_rmssd__5min__cycle_night_max__monthly_max"]
+        == direct["hrv_rmssd__5min__monthly_max"]
+    )
 
 
 def test_raw_bbi_wake_filtering_is_limited_to_night_cycles():
@@ -696,7 +688,9 @@ def test_unknown_provider_coverage_warns_and_rejects_only_when_requested():
     )
     assert baseline["hrv_rmssd"].notna().all()
     assert baseline["hrv_rmssd__coverage"].isna().all()
-    with pytest.warns(UserWarning, match="Primary HRV coverage could not be determined"):
+    with pytest.warns(
+        UserWarning, match="Primary HRV coverage could not be determined"
+    ):
         strict = hrv.get_hrv_statistics(
             loader,
             statistic="hrv_rmssd",

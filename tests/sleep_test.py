@@ -9,9 +9,8 @@ import pandas.testing
 import pytest
 
 import pywearable.loader
-import pywearable.sleep
 import pywearable.schema
-
+import pywearable.sleep
 
 _SLEEP_COLUMN_MAP = {
     "sleepSummaryId": "sleep_summary_id",
@@ -47,8 +46,7 @@ x4c64722-645d63f8-5c94,2023-05-12,7200000,1683842040000,2023-05-11T23:54:00.000+
         parse_dates=["calendarDate"],
     )
     sleep_summary["isoDate"] = pd.to_datetime(
-        sleep_summary["unixTimestampInMs"]
-        + sleep_summary["timezoneOffsetInMs"],
+        sleep_summary["unixTimestampInMs"] + sleep_summary["timezoneOffsetInMs"],
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
@@ -93,8 +91,7 @@ x4c64722-645d63f8-5c94,7200000,1683842640000,2023-05-12T00:04:00.000+02:00,23700
         )
     )
     sleep_stages["isoDate"] = pd.to_datetime(
-        sleep_stages["unixTimestampInMs"]
-        + sleep_stages["timezoneOffsetInMs"],
+        sleep_stages["unixTimestampInMs"] + sleep_stages["timezoneOffsetInMs"],
         unit="ms",
         utc=True,
     ).dt.tz_localize(None)
@@ -124,15 +121,21 @@ def sleep_score():
 def base_loader(monkeypatch, sleep_summary, sleep_stages):
     """
     Fixture that returns a BaseLoader with mock values
-    for the load_sleep_summary and load_sleep_stage
+    for the load_sleep_summaries and load_sleep_stages
     functions. The value returned by these functions
     are specified by the sleep_summary and
     sleep_stages fixtures.
     """
-    monkeypatch.setattr(pywearable.loader.BaseLoader, "__abstractmethods__", frozenset())
+    monkeypatch.setattr(
+        pywearable.loader.BaseLoader, "__abstractmethods__", frozenset()
+    )
     loader = pywearable.loader.BaseLoader()
-    monkeypatch.setattr(loader, "load_sleep_summary", lambda **kwargs: sleep_summary.copy())
-    monkeypatch.setattr(loader, "load_sleep_stage", lambda **kwargs: sleep_stages.copy())
+    monkeypatch.setattr(
+        loader, "load_sleep_summaries", lambda **kwargs: sleep_summary.copy()
+    )
+    monkeypatch.setattr(
+        loader, "load_sleep_stages", lambda **kwargs: sleep_stages.copy()
+    )
     monkeypatch.setattr(loader, "get_user_ids", lambda: ["test-user"])
     return loader
 
@@ -223,9 +226,7 @@ def test_get_sleep_period_time(base_loader):
         ),
         name=pywearable.sleep.SLEEP_STATISTIC_SPT,
     )
-    pd.testing.assert_series_equal(
-        spt[pywearable.sleep.SLEEP_STATISTIC_SPT], spt_true
-    )
+    pd.testing.assert_series_equal(spt[pywearable.sleep.SLEEP_STATISTIC_SPT], spt_true)
 
 
 def test_get_sleep_efficiency(base_loader):
@@ -274,6 +275,7 @@ def test_get_sleep_maintenance_efficiency(base_loader):
     # Sleep maintenance efficiency is computed as
     # the ratio between TST (light+deep+rem) and SPT (overall sleep)
     assert sleep_me[pywearable.sleep.SLEEP_STATISTIC_SME].notna().any()
+
 
 ######################################################
 #              Compute Functions Tests               #
@@ -480,9 +482,7 @@ def test_compute_sleep_onset_latency(
     assert np.isnan(sol.loc[pd.Timestamp("2023-05-10")])
 
 
-def test_compute_wakeup_time(
-    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
-):
+def test_compute_wakeup_time(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
     sleep_summary = sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL)
     wakeup_time = pywearable.sleep._compute_wakeup_time(sleep_summary, sleep_stages)
     pandas.testing.assert_series_equal(
@@ -536,9 +536,7 @@ def test_compute_unmeasurable_duration(sleep_summary_id_as_idx: pd.DataFrame):
     assert unmeasurable_duration.loc["x4c64722-645bf6d0-6888"] == 0.0
 
 
-def test_compute_stage_count(
-    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
-):
+def test_compute_stage_count(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
     counts = pywearable.sleep._compute_stage_count(
         sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )
@@ -603,9 +601,7 @@ def test_compute_stage_count_distinguishes_zero_from_unavailable(sleep_summary):
     assert pd.Timestamp("2023-05-10") not in counts.index
 
 
-def test_compute_rem_count(
-    sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame
-):
+def test_compute_rem_count(sleep_summary: pd.DataFrame, sleep_stages: pd.DataFrame):
     counts = pywearable.sleep._compute_rem_count(
         sleep_summary.set_index(pywearable.schema.CALENDAR_DATE_COL), sleep_stages
     )

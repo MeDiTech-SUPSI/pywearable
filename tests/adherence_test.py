@@ -36,9 +36,7 @@ class AdherenceLoader(LoaderBase):
 
     @staticmethod
     def _empty_sleep_summary():
-        return pd.DataFrame(
-            columns=["sleep_summary_id", "calendar_date", "local_time"]
-        )
+        return pd.DataFrame(columns=["sleep_summary_id", "calendar_date", "local_time"])
 
     def get_user_ids(self):
         return ["user"]
@@ -51,7 +49,7 @@ class AdherenceLoader(LoaderBase):
     def load_bbi(self, user_id, start_date=None, end_date=None):
         return self.bbi.copy()
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self, user_id, start_date=None, end_date=None, drop_duplicates=True
     ):
         return self.sleep_summary.copy()
@@ -90,8 +88,7 @@ def _sleep_summary(dates, validations=None):
     frame = pd.DataFrame(
         {
             "sleep_summary_id": [
-                f"night-{index}-{day:%Y%m%d}"
-                for index, day in enumerate(dates)
+                f"night-{index}-{day:%Y%m%d}" for index, day in enumerate(dates)
             ],
             "calendar_date": dates,
             "local_time": dates - pd.Timedelta(hours=1),
@@ -164,9 +161,7 @@ def test_vectorized_summary_adherence_matches_canonical_adherence():
 
 def _scanned_heart_rate_adherence(frame, segments, time_col):
     segments = adherence._merged_segments(segments)
-    expected_seconds = sum(
-        (end - start).total_seconds() for start, end in segments
-    )
+    expected_seconds = sum((end - start).total_seconds() for start, end in segments)
     if expected_seconds <= 0:
         return np.nan
     observed_seconds = 0.0
@@ -184,9 +179,7 @@ def _scanned_heart_rate_adherence(frame, segments, time_col):
 
 def _scanned_bbi_adherence(frame, segments, time_col):
     segments = adherence._merged_segments(segments)
-    expected_ms = sum(
-        (end - start).total_seconds() * 1000 for start, end in segments
-    )
+    expected_ms = sum((end - start).total_seconds() * 1000 for start, end in segments)
     if expected_ms <= 0:
         return np.nan
     observed_ms = 0.0
@@ -235,18 +228,14 @@ def test_binary_search_calculators_match_full_frame_scans():
 def test_binary_search_cycle_filter_matches_boolean_interval_mask():
     frame = pd.DataFrame(
         {
-            "local_time": pd.date_range(
-                "2024-01-01", periods=21, freq="30s"
-            ),
+            "local_time": pd.date_range("2024-01-01", periods=21, freq="30s"),
             "heart_rate": 60,
         }
     )
     intervals = pd.DataFrame(
         {
             "user_id": ["user", "user", "user"],
-            "window_start": pd.to_datetime(
-                ["2024-01-01", "2024-01-02", "2024-01-03"]
-            ),
+            "window_start": pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
             "start_time": pd.to_datetime(
                 [
                     "2024-01-01 00:01:30",
@@ -274,9 +263,7 @@ def test_binary_search_cycle_filter_matches_boolean_interval_mask():
         ).to_numpy()
     expected = frame[mask].copy()
 
-    result = adherence._filter_to_intervals(
-        frame, "user", intervals, "local_time"
-    )
+    result = adherence._filter_to_intervals(frame, "user", intervals, "local_time")
 
     pd.testing.assert_frame_equal(result, expected)
 
@@ -338,9 +325,7 @@ def test_sleep_adherence_at_an_upper_calendar_level_is_available_nights_over_dat
 
 def test_sleep_skips_fixed_levels_and_enters_at_its_native_daily_grain():
     result = adherence.get_adherence(
-        AdherenceLoader(
-            sleep_summary=_sleep_summary(["2024-01-01", "2024-01-03"])
-        ),
+        AdherenceLoader(sleep_summary=_sleep_summary(["2024-01-01", "2024-01-03"])),
         metric="sleep",
         start_date="2024-01-01",
         end_date="2024-01-08",
@@ -415,12 +400,11 @@ def test_sleep_validation_filter_does_not_change_heart_rate_or_bbi():
 
     assert filtered.iloc[0]["sleep_adherence"] == 0
     assert unfiltered.iloc[0]["sleep_adherence"] == 1
-    assert filtered.iloc[0]["heart_rate_adherence"] == unfiltered.iloc[0][
-        "heart_rate_adherence"
-    ]
-    assert filtered.iloc[0]["bbi_adherence"] == unfiltered.iloc[0][
-        "bbi_adherence"
-    ]
+    assert (
+        filtered.iloc[0]["heart_rate_adherence"]
+        == unfiltered.iloc[0]["heart_rate_adherence"]
+    )
+    assert filtered.iloc[0]["bbi_adherence"] == unfiltered.iloc[0]["bbi_adherence"]
 
 
 @pytest.mark.parametrize(
@@ -431,9 +415,7 @@ def test_sleep_calendar_adherence_is_independent_of_non_awake_domain(
     sleep_resolution,
 ):
     result = adherence.get_adherence(
-        AdherenceLoader(
-            sleep_summary=_sleep_summary(["2024-01-01", "2024-01-03"])
-        ),
+        AdherenceLoader(sleep_summary=_sleep_summary(["2024-01-01", "2024-01-03"])),
         metric="sleep",
         start_date="2024-01-01",
         end_date="2024-01-08",
@@ -492,12 +474,8 @@ def test_cycle_hierarchy_applies_each_intermediate_coverage_threshold():
             "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
             "type": "main_sleep",
             "main_sleep": True,
-            "local_time": pd.to_datetime(
-                ["2024-01-01 00:00", "2024-01-02 00:00"]
-            ),
-            "local_end_time": pd.to_datetime(
-                ["2024-01-01 01:00", "2024-01-02 03:00"]
-            ),
+            "local_time": pd.to_datetime(["2024-01-01 00:00", "2024-01-02 00:00"]),
+            "local_end_time": pd.to_datetime(["2024-01-01 01:00", "2024-01-02 03:00"]),
             "time_in_bed_seconds": [3600, 10800],
         }
     )
@@ -626,9 +604,7 @@ def test_daily_wearing_time_uses_actual_duration_for_partial_days():
     result = adherence.get_daily_wearing_time(
         AdherenceLoader(
             heart_rate=_heart_rate(
-                pd.date_range(
-                    "2024-01-01 12:00", periods=60, freq="min"
-                )
+                pd.date_range("2024-01-01 12:00", periods=60, freq="min")
             )
         ),
         user_id="user",

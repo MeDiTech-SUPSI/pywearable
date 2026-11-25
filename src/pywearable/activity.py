@@ -181,9 +181,7 @@ def _peak_sixty_minutes(rows, observations, time_col, end_col, window_end):
     candidates = (
         pd.DatetimeIndex(rows[time_col].drop_duplicates())
         if not rows.empty
-        else pd.DatetimeIndex(
-            observations["__activity_observation_start"].head(1)
-        )
+        else pd.DatetimeIndex(observations["__activity_observation_start"].head(1))
     )
     for candidate in candidates:
         candidate_end = candidate + hour
@@ -386,9 +384,9 @@ def _sample_primary_trajectory(
             values = {name: np.nan for name in statistics}
             if accepted and (not rows.empty or coverage > 0):
                 if ACTIVITY_STATISTIC_STEPS in statistics:
-                    steps = rows[
-                        schema.ACTIVITY_STEPS_COL
-                    ].sum(min_count=1, skipna=False)
+                    steps = rows[schema.ACTIVITY_STEPS_COL].sum(
+                        min_count=1, skipna=False
+                    )
                     values[ACTIVITY_STATISTIC_STEPS] = (
                         0.0 if rows.empty and coverage > 0 else steps
                     )
@@ -443,7 +441,7 @@ def _summary_primary_trajectory(
     frames = []
     for user in users:
         summary = schema.prepare_activity_summary(
-            loader.load_activity_summary(
+            loader.load_activity_summaries(
                 user,
                 start_date=start_date,
                 end_date=end_date,
@@ -561,13 +559,9 @@ def _aggregate_default_level(
         )
         frames.append(frame)
         next_temporal.update(group_temporal)
-        output_features.extend(
-            f"{feature}__{target}_{operation}" for feature in group
-        )
+        output_features.extend(f"{feature}__{target}_{operation}" for feature in group)
     return (
-        hierarchy.combine_trajectories(
-            frames, output_features, include_coverage=True
-        ),
+        hierarchy.combine_trajectories(frames, output_features, include_coverage=True),
         next_temporal,
     )
 
@@ -792,18 +786,10 @@ def get_activity_statistics(
             return hierarchy.format_fixed_time_output(trajectory, index_name)
         return trajectory
 
-    columns = [
-        column
-        for name in statistics
-        for column in (name, f"{name}__coverage")
-    ]
+    columns = [column for name in statistics for column in (name, f"{name}__coverage")]
     result = trajectory[
         columns
-        + [
-            column
-            for column in hierarchy.TIME_METADATA_COLUMNS
-            if column in trajectory
-        ]
+        + [column for column in hierarchy.TIME_METADATA_COLUMNS if column in trajectory]
     ].copy()
     index_name = (
         schema.CALENDAR_DATE_COL

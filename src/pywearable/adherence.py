@@ -28,7 +28,6 @@ from pandas.api.types import is_datetime64_any_dtype
 from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 
-
 ADHERENCE_HEART_RATE = "heart_rate"
 ADHERENCE_SLEEP = "sleep"
 ADHERENCE_BBI = "bbi"
@@ -52,9 +51,11 @@ def _naive_local_datetimes(values):
     if is_datetime64_any_dtype(parsed.dtype):
         return parsed
     return parsed.map(
-        lambda value: value.tz_localize(None)
-        if pd.notna(value) and value.tzinfo is not None
-        else value
+        lambda value: (
+            value.tz_localize(None)
+            if pd.notna(value) and value.tzinfo is not None
+            else value
+        )
     )
 
 
@@ -111,9 +112,7 @@ class _CachedAdherenceLoader:
                 time_col=time_col,
                 **kwargs,
             )
-        return self._slice(
-            self._heart_rate[key], time_col, start_date, end_date
-        )
+        return self._slice(self._heart_rate[key], time_col, start_date, end_date)
 
     def load_bbi(self, user_id, start_date=None, end_date=None, **kwargs):
         if user_id not in self._bbi:
@@ -130,7 +129,7 @@ class _CachedAdherenceLoader:
             end_date,
         )
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id,
         start_date=None,
@@ -140,7 +139,7 @@ class _CachedAdherenceLoader:
     ):
         key = (user_id, bool(drop_duplicates))
         if key not in self._sleep_summary:
-            self._sleep_summary[key] = self._loader.load_sleep_summary(
+            self._sleep_summary[key] = self._loader.load_sleep_summaries(
                 user_id=user_id,
                 start_date=None,
                 end_date=None,
@@ -181,12 +180,10 @@ def _adherence_evidence_bounds(loader, user, metric):
                         "heart-rate data is missing required columns: "
                         + ", ".join(sorted(missing))
                     )
-                valid = pd.to_numeric(
-                    frame[schema.HEART_RATE_COL], errors="coerce"
-                ).gt(0)
-                bounds = _local_date_bounds(
-                    frame.loc[valid, schema.LOCAL_TIME_COL]
+                valid = pd.to_numeric(frame[schema.HEART_RATE_COL], errors="coerce").gt(
+                    0
                 )
+                bounds = _local_date_bounds(frame.loc[valid, schema.LOCAL_TIME_COL])
                 if bounds is not None:
                     evidence.append(bounds)
     elif getattr(loader, "hrv_source", "bbi") == "bbi":
@@ -204,7 +201,7 @@ def _adherence_evidence_bounds(loader, user, metric):
                     evidence.append(bounds)
 
     try:
-        summaries = loader.load_sleep_summary(
+        summaries = loader.load_sleep_summaries(
             user_id=user,
             start_date=None,
             end_date=None,
@@ -221,9 +218,7 @@ def _adherence_evidence_bounds(loader, user, metric):
                 raise ValueError("sleep summary data is missing calendar_date")
             if "validation" in summaries:
                 validation = summaries["validation"].astype("string").str.upper()
-                summaries = summaries[
-                    ~validation.isin({"MANUAL", "AUTO_MANUAL"})
-                ]
+                summaries = summaries[~validation.isin({"MANUAL", "AUTO_MANUAL"})]
             bounds = _local_date_bounds(summaries[schema.CALENDAR_DATE_COL])
             if bounds is not None:
                 evidence.append(bounds)
@@ -251,8 +246,7 @@ def _adherence_study_periods(
         raise ValueError("no requested participant has adherence evidence")
     if follow_up_days is None:
         follow_up_days = max(
-            int((bounds[1] - bounds[0]).days) + 1
-            for bounds in observed.values()
+            int((bounds[1] - bounds[0]).days) + 1 for bounds in observed.values()
         )
     elif (
         not isinstance(follow_up_days, (int, np.integer))
@@ -369,7 +363,7 @@ def _daily_sleep_adherence(loader, users, start, end):
     values = np.full((len(users), len(dates)), np.nan)
     for user_position, user in enumerate(users):
         try:
-            frame = loader.load_sleep_summary(
+            frame = loader.load_sleep_summaries(
                 user_id=user,
                 start_date=start,
                 end_date=end,
@@ -476,11 +470,7 @@ def _resolve_time_col(loader, metrics, chain, time_reference: str) -> str:
     calendar_based = (
         chain[-1] in hierarchy.CALENDAR_RESOLUTIONS or chain[-1] == "nightly"
     )
-    if (
-        ADHERENCE_SLEEP in metrics
-        and calendar_based
-        and time_reference == "utc"
-    ):
+    if ADHERENCE_SLEEP in metrics and calendar_based and time_reference == "utc":
         raise ValueError("sleep adherence uses local calendar dates")
 
     available = []
@@ -494,10 +484,7 @@ def _resolve_time_col(loader, metrics, chain, time_reference: str) -> str:
                 )
             )
         )
-    if (
-        ADHERENCE_BBI in metrics
-        and getattr(loader, "hrv_source", "bbi") == "bbi"
-    ):
+    if ADHERENCE_BBI in metrics and getattr(loader, "hrv_source", "bbi") == "bbi":
         available.append(
             set(getattr(loader, "hrv_time_columns", schema.BBI_TIME_COLUMNS))
         )
@@ -516,14 +503,10 @@ def _resolve_time_col(loader, metrics, chain, time_reference: str) -> str:
 
 def _physiological_chain(chain):
     """Translate the public ``nightly`` alias into a physical night cycle."""
-    return [
-        cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain
-    ]
+    return [cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain]
 
 
-def _windows_for_resolution(
-    loader, users, start, end, resolution, cycle_kwargs
-):
+def _windows_for_resolution(loader, users, start, end, resolution, cycle_kwargs):
     """Construct cycle, calendar, or fixed windows for one resolution."""
     if resolution in cycle.CYCLE_TYPES:
         return cycle.get_intervals(
@@ -584,9 +567,7 @@ def _fixed_cycle_windows(users, intervals, resolution):
     )
 
 
-def _primary_windows(
-    loader, users, start, end, chain, cycle_kwargs
-):
+def _primary_windows(loader, users, start, end, chain, cycle_kwargs):
     """Build primary windows and identify cycle intervals restricting data.
 
     When a later hierarchy level is a cycle, fixed primary windows are created
@@ -606,9 +587,7 @@ def _primary_windows(
         *cycle.CYCLE_TYPES,
         *hierarchy.CALENDAR_RESOLUTIONS,
     ):
-        windows = _fixed_cycle_windows(
-            users, restricting_intervals, primary
-        )
+        windows = _fixed_cycle_windows(users, restricting_intervals, primary)
     else:
         windows = _windows_for_resolution(
             loader, users, start, end, primary, cycle_kwargs
@@ -619,9 +598,7 @@ def _primary_windows(
         columns={"start_time": "period_start", "end_time": "period_end"}
     )
     windows["segments"] = [
-        ((row.period_start, row.period_end),)
-        if row.interval_valid
-        else tuple()
+        ((row.period_start, row.period_end),) if row.interval_valid else tuple()
         for row in windows.itertuples()
     ]
     return windows, restricting_intervals
@@ -658,9 +635,7 @@ def _time_slice_bounds(timestamps, start, end):
 def _physical_bounds(windows, start, end):
     """Return the smallest load interval covering all window segments."""
     segments = [
-        segment
-        for row_segments in windows["segments"]
-        for segment in row_segments
+        segment for row_segments in windows["segments"] for segment in row_segments
     ]
     if not segments:
         return start, end
@@ -678,8 +653,7 @@ def _filter_to_intervals(frame, user, intervals, time_col):
     if valid.empty:
         return frame.iloc[0:0]
     segments = _merged_segments(
-        (interval.start_time, interval.end_time)
-        for interval in valid.itertuples()
+        (interval.start_time, interval.end_time) for interval in valid.itertuples()
     )
     timestamps = frame[time_col].to_numpy(copy=False)
     pieces = []
@@ -752,9 +726,7 @@ def _aggregate_adherence(
         if parent is None:
             return pd.Series(dtype=float, name=f"{feature}__coverage")
         threshold = (
-            coverage_thresholds[level_index]
-            if level_index < len(chain) - 1
-            else None
+            coverage_thresholds[level_index] if level_index < len(chain) - 1 else None
         )
         current, _ = hierarchy.aggregate_level(
             current,
@@ -797,8 +769,7 @@ def _load_heart_rate(loader, user, start, end, time_col, loader_kwargs):
     missing = {time_col, schema.HEART_RATE_COL}.difference(frame.columns)
     if missing:
         raise ValueError(
-            "heart-rate data is missing required columns: "
-            + ", ".join(sorted(missing))
+            "heart-rate data is missing required columns: " + ", ".join(sorted(missing))
         )
     frame = frame.copy()
     if time_col == schema.UTC_TIME_COL:
@@ -809,9 +780,11 @@ def _load_heart_rate(loader, user, start, end, time_col, loader_kwargs):
         frame[time_col] = pd.to_datetime(
             frame[time_col], errors="coerce", format="mixed"
         ).map(
-            lambda value: value.tz_localize(None)
-            if pd.notna(value) and value.tzinfo is not None
-            else value
+            lambda value: (
+                value.tz_localize(None)
+                if pd.notna(value) and value.tzinfo is not None
+                else value
+            )
         )
     frame[schema.HEART_RATE_COL] = pd.to_numeric(
         frame[schema.HEART_RATE_COL], errors="coerce"
@@ -890,8 +863,8 @@ def _heart_rate_adherence(frame, segments, time_col):
         overlap_ends = np.minimum(
             minute_starts + np.timedelta64(1, "m"), end.to_datetime64()
         )
-        observed_seconds += (
-            (overlap_ends - overlap_starts).sum() / np.timedelta64(1, "s")
+        observed_seconds += (overlap_ends - overlap_starts).sum() / np.timedelta64(
+            1, "s"
         )
     return min(1.0, observed_seconds / expected_seconds)
 
@@ -906,9 +879,7 @@ def _bbi_adherence(frame, segments, time_col):
     if frame is None:
         return np.nan
     segments = _merged_segments(segments)
-    expected_ms = sum(
-        (end - start).total_seconds() * 1000 for start, end in segments
-    )
+    expected_ms = sum((end - start).total_seconds() * 1000 for start, end in segments)
     if expected_ms <= 0:
         return np.nan
     if frame.empty:
@@ -941,7 +912,7 @@ def _load_sleep_dates(
             "sleep adherence always requests one main-sleep summary per date"
         )
     try:
-        frame = loader.load_sleep_summary(
+        frame = loader.load_sleep_summaries(
             user_id=user,
             start_date=start,
             end_date=end,
@@ -997,18 +968,14 @@ def _stream_adherence(
     trajectory[feature] = np.nan
     trajectory[f"{feature}__coverage"] = np.nan
     unsupported_users = set()
-    primary_threshold = (
-        coverage_thresholds[0] if len(chain) > 1 else None
-    )
+    primary_threshold = coverage_thresholds[0] if len(chain) > 1 else None
 
     for user in users:
         if user in windows.index.get_level_values(0):
             user_windows = windows.xs(user)
         else:
             user_windows = windows.iloc[0:0]
-        load_start, load_end = _physical_bounds(
-            user_windows, start, end
-        )
+        load_start, load_end = _physical_bounds(user_windows, start, end)
         if metric == ADHERENCE_HEART_RATE:
             frame = _load_heart_rate(
                 loader,
@@ -1031,9 +998,7 @@ def _stream_adherence(
             calculator = _bbi_adherence
         if frame is None:
             unsupported_users.add(user)
-        frame = _filter_to_intervals(
-            frame, user, restricting_intervals, time_col
-        )
+        frame = _filter_to_intervals(frame, user, restricting_intervals, time_col)
         for label, window in user_windows.iterrows():
             raw = (
                 calculator(frame, window["segments"], time_col)
@@ -1042,9 +1007,7 @@ def _stream_adherence(
             )
             index = (user, label)
             trajectory.at[index, f"{feature}__coverage"] = raw
-            trajectory.at[index, feature] = _thresholded(
-                raw, primary_threshold
-            )
+            trajectory.at[index, feature] = _thresholded(raw, primary_threshold)
 
     result = _aggregate_adherence(
         trajectory,
@@ -1079,9 +1042,7 @@ def _sleep_daily_trajectory(
     valid children for an upper level.
     """
     feature = _ADHERENCE_COLUMNS[ADHERENCE_SLEEP]
-    dates = pd.date_range(
-        start.normalize(), end, freq="D", inclusive="left"
-    )
+    dates = pd.date_range(start.normalize(), end, freq="D", inclusive="left")
     records = []
     unsupported_users = set()
     for user in users:
@@ -1096,22 +1057,14 @@ def _sleep_daily_trajectory(
         if observed is None:
             unsupported_users.add(user)
         for date in dates:
-            raw = (
-                np.nan
-                if observed is None
-                else float(date in observed)
-            )
+            raw = np.nan if observed is None else float(date in observed)
             records.append(
                 {
                     schema.USER_COL: user,
                     "window_start": date,
                     "period_start": date,
                     "period_end": date + pd.Timedelta(days=1),
-                    feature: (
-                        _thresholded(raw, threshold)
-                        if raw == 1
-                        else np.nan
-                    ),
+                    feature: (_thresholded(raw, threshold) if raw == 1 else np.nan),
                     f"{feature}__coverage": raw,
                 }
             )
@@ -1156,9 +1109,7 @@ def _sleep_levels(chain, coverage_thresholds):
     )
     levels = ["daily"]
     thresholds = [
-        coverage_thresholds[native_index]
-        if native_index is not None
-        else None
+        coverage_thresholds[native_index] if native_index is not None else None
     ]
     for index, value in enumerate(chain):
         if value in hierarchy.CALENDAR_RESOLUTIONS and value != "daily":
@@ -1180,9 +1131,7 @@ def _constant_final_series(
     target = chain[-1]
     if target == "nightly":
         target = cycle.CYCLE_NIGHT
-    windows = _windows_for_resolution(
-        loader, users, start, end, target, cycle_kwargs
-    )
+    windows = _windows_for_resolution(loader, users, start, end, target, cycle_kwargs)
     return pd.Series(value, index=windows.index, dtype=float)
 
 
@@ -1232,9 +1181,7 @@ def _sleep_adherence_series(
             np.nan,
         ).rename(feature)
 
-    sleep_chain, sleep_thresholds = _sleep_levels(
-        chain, coverage_thresholds
-    )
+    sleep_chain, sleep_thresholds = _sleep_levels(chain, coverage_thresholds)
     trajectory, unsupported_users = _sleep_daily_trajectory(
         loader,
         users,
@@ -1406,9 +1353,7 @@ def get_adherence(
             or chain[-1] == "nightly"
             else time_col
         )
-        index = pd.MultiIndex.from_arrays(
-            [[], []], names=[schema.USER_COL, index_name]
-        )
+        index = pd.MultiIndex.from_arrays([[], []], names=[schema.USER_COL, index_name])
         return pd.DataFrame(columns=columns, index=index, dtype=float)
     series = []
     for value in metrics:
@@ -1439,10 +1384,7 @@ def get_adherence(
             )
         series.append(metric_result)
     result = pd.concat(series, axis=1).reindex(columns=columns)
-    has_cycle = any(
-        value in cycle.CYCLE_TYPES or value == "nightly"
-        for value in chain
-    )
+    has_cycle = any(value in cycle.CYCLE_TYPES or value == "nightly" for value in chain)
     index_name = (
         schema.CALENDAR_DATE_COL
         if has_cycle or chain[-1] in hierarchy.CALENDAR_RESOLUTIONS
@@ -1497,9 +1439,7 @@ def get_daily_wearing_time(
     windows = hierarchy.calendar_windows(
         [user_id], "daily", {user_id: (start, end)}
     ).xs(user_id)
-    durations = (
-        windows["end_time"] - windows["start_time"]
-    ).dt.total_seconds() / 3600
+    durations = (windows["end_time"] - windows["start_time"]).dt.total_seconds() / 3600
     hours = adherence * durations.reindex(adherence.index)
     if ceil_to_24:
         hours = hours.clip(upper=24)

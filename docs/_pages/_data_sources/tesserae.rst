@@ -13,7 +13,7 @@ Detailed description of the Tesserae dataset is available on OSF: `Tesserae <htt
 The CSV version of the dataset is quite memory consuming, so pywearable offers a 
 useful command that you can use to convert the full dataset in Parquet format::
 
-    pywearable convert tesserae-parquet SOURCE_DIR OUTPUT_DIR
+    pywearable convert tesserae-to-parquet SOURCE_DIR OUTPUT_DIR
 
 Afterwards, you can use the Tesserae loader for Parquet files::
 

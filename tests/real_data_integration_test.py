@@ -29,7 +29,6 @@ from pywearable import (
 )
 from pywearable.loader import LabfrontLoader, OuraLoader
 
-
 FIXTURES = Path(__file__).parent / "data"
 USER = "participant-01_00000001"
 START, END = pd.Timestamp("2024-04-01"), pd.Timestamp("2024-05-01")
@@ -54,7 +53,8 @@ def loaders(tmp_path_factory):
     for source, loader_type in [("labfront", LabfrontLoader), ("oura", OuraLoader)]:
         root = tmp_path_factory.mktemp(f"real-data-{source}") / source
         shutil.copytree(
-            FIXTURES / source, root,
+            FIXTURES / source,
+            root,
             ignore=shutil.ignore_patterns(".pywearable_file_index.csv"),
         )
         result[source] = loader_type(root)
@@ -103,7 +103,12 @@ def _raw_nights(source):
         return rows.set_index(pd.to_datetime(rows["day"]))
     rows = _april(_csv("garmin-connect-sleep-summary"), "calendarDate")
     rows["rank"] = rows["validation"].map(
-        {"AUTO_TENTATIVE": 1, "AUTO_FINAL": 2, "ENHANCED_TENTATIVE": 3, "ENHANCED_FINAL": 4}
+        {
+            "AUTO_TENTATIVE": 1,
+            "AUTO_FINAL": 2,
+            "ENHANCED_TENTATIVE": 3,
+            "ENHANCED_FINAL": 4,
+        }
     )
     rows = rows.sort_values(["calendarDate", "rank", "durationInMs"])
     rows = rows.drop_duplicates("calendarDate", keep="last")
@@ -126,8 +131,16 @@ def _assert_json_identity_fields(value):
     elif isinstance(value, dict):
         for key, item in value.items():
             assert key.lower() not in {
-                "name", "email", "first_name", "last_name", "user_id", "serial_number",
-                "latitude", "longitude", "access_token", "refresh_token",
+                "name",
+                "email",
+                "first_name",
+                "last_name",
+                "user_id",
+                "serial_number",
+                "latitude",
+                "longitude",
+                "access_token",
+                "refresh_token",
             }
             if key == "id":
                 assert re.fullmatch(r"oura-record-\d{5}", str(item))
@@ -144,12 +157,15 @@ def test_fixture_identity_and_period_are_bounded(wearable):
         assert not re.search(
             r"[\w.+%-]+@[\w.-]+\.[a-z]{2,}|(?<![a-z0-9])[a-z]:[\\/]|/(?:home|Users)/|"
             r"(?:access|refresh)[_-]?token|client[_-]?secret|password|api[_-]?key",
-            text, flags=re.IGNORECASE,
+            text,
+            flags=re.IGNORECASE,
         )
         uuids = {
             value.lower()
             for value in re.findall(
-                r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b", text, flags=re.IGNORECASE
+                r"\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b",
+                text,
+                flags=re.IGNORECASE,
             )
         }
         assert uuids.issubset(IDENTITY_METADATA.values())
@@ -159,11 +175,20 @@ def test_fixture_identity_and_period_are_bounded(wearable):
                 header = [next(reader) for _ in range(5)]
                 next(reader)
                 fields = next(reader)
-                id_positions = [i for i, field in enumerate(fields) if field.endswith("Id")]
+                id_positions = [
+                    i for i, field in enumerate(fields) if field.endswith("Id")
+                ]
                 for row in reader:
-                    assert all(re.fullmatch(r"record-\d{5}", row[i]) for i in id_positions)
+                    assert all(
+                        re.fullmatch(r"record-\d{5}", row[i]) for i in id_positions
+                    )
             identity = dict(zip(header[3], header[4]))
-            assert {"projectId", "projectTitle", "participantId", "participantInsignia"}.issubset(identity)
+            assert {
+                "projectId",
+                "projectTitle",
+                "participantId",
+                "participantInsignia",
+            }.issubset(identity)
             assert identity == {key: IDENTITY_METADATA[key] for key in identity}
             assert USER in path.name
         elif path.suffix == ".json":
@@ -198,20 +223,28 @@ def test_sleep_features_match_native_summaries_and_missing_nights(wearable):
         tib = (native["durationInMs"] + native["awakeDurationInMs"]) / 60_000
         scores = native["overallSleepScore"]
     np.testing.assert_allclose(result["sleep_TST"], tst.reindex(DATES), equal_nan=True)
-    np.testing.assert_allclose(result["sleep_SE"], (100 * tst / tib).reindex(DATES), equal_nan=True)
-    np.testing.assert_allclose(result["sleep_score"], scores.reindex(DATES), equal_nan=True)
-    assert result.loc[~result.index.isin(native.index), "sleep_TST__coverage"].eq(0).all()
+    np.testing.assert_allclose(
+        result["sleep_SE"], (100 * tst / tib).reindex(DATES), equal_nan=True
+    )
+    np.testing.assert_allclose(
+        result["sleep_score"], scores.reindex(DATES), equal_nan=True
+    )
+    assert (
+        result.loc[~result.index.isin(native.index), "sleep_TST__coverage"].eq(0).all()
+    )
     assert result["sleep_bedtime"].notna().sum() == len(native)
     assert result["sleep_stage_coverage"].notna().sum() == len(native)
-    stages = loader.load_sleep_stage(USER, START, END)
+    stages = loader.load_sleep_stages(USER, START, END)
     assert len(stages) == (473 if source == "labfront" else 633)
     assert set(stages["sleep_summary_id"]).issubset(
-        loader.load_sleep_summary(USER, START, END)["sleep_summary_id"]
+        loader.load_sleep_summaries(USER, START, END)["sleep_summary_id"]
     )
 
 
 @pytest.mark.parametrize("qualified", [False, True])
-def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable, qualified):
+def test_custom_sleep_hierarchy_matches_independent_native_calculations(
+    wearable, qualified
+):
     source, loader = wearable
 
     def slope_per_day(values):
@@ -227,7 +260,8 @@ def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable
 
     native = _raw_nights(source)
     duration = (
-        native["total_sleep_duration"] / 60 if source == "oura"
+        native["total_sleep_duration"] / 60
+        if source == "oura"
         else (native["durationInMs"] - native["unmeasurableSleepInMs"]) / 60_000
     ).reindex(DATES)
     labels = DATES - pd.to_timedelta(DATES.weekday, unit="D")
@@ -240,7 +274,7 @@ def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable
                 (observed.index - observed.index[0]) / pd.Timedelta(days=1), dtype=float
             )
             times -= times.mean()
-            value = np.sum(times * (observed - observed.mean())) / np.sum(times ** 2)
+            value = np.sum(times * (observed - observed.mean())) / np.sum(times**2)
         if qualified and (observed.size / group.size < 0.9 or observed.size < 4):
             value = np.nan
         expected_slopes.append(value)
@@ -251,7 +285,9 @@ def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable
         expected = np.nan
 
     result = sleep.get_sleep_statistics(
-        loader, **BOUNDS, statistic="sleep_TST",
+        loader,
+        **BOUNDS,
+        statistic="sleep_TST",
         resolution=["nightly", "weekly", "monthly"],
         aggregation=[[slope_per_day], [median_observed]],
         min_coverage=[0.8, 0.9, 0.8] if qualified else None,
@@ -262,9 +298,13 @@ def test_custom_sleep_hierarchy_matches_independent_native_calculations(wearable
     assert result[feature + "__coverage"].iloc[0] == pytest.approx(coverage)
 
 
-@pytest.mark.parametrize("domain", ["heart_rate", "activity", "respiration", "provider", "hrv"])
+@pytest.mark.parametrize(
+    "domain", ["heart_rate", "activity", "respiration", "provider", "hrv"]
+)
 @pytest.mark.parametrize("qualified", [False, True])
-def test_custom_reducers_follow_builtin_hierarchies_across_domains(wearable, domain, qualified):
+def test_custom_reducers_follow_builtin_hierarchies_across_domains(
+    wearable, domain, qualified
+):
     source, loader = wearable
 
     def mean_observed(values):
@@ -289,7 +329,8 @@ def test_custom_reducers_follow_builtin_hierarchies_across_domains(wearable, dom
     elif domain == "provider":
         extract = provider_features.get_provider_features
         options["feature"] = (
-            "oura_readiness_score" if source == "oura"
+            "oura_readiness_score"
+            if source == "oura"
             else "garmin_daily_stress_duration_seconds"
         )
     else:
@@ -298,17 +339,22 @@ def test_custom_reducers_follow_builtin_hierarchies_across_domains(wearable, dom
         chain = ["5min", "1h", "daily"]
         bounds.update(start_date="2024-04-11", end_date="2024-04-12")
     options.update(
-        **bounds, resolution=chain,
+        **bounds,
+        resolution=chain,
         min_coverage=[None, 0.9, 0.9] if qualified else None,
         min_valid_children=[None, 2, 2] if qualified else None,
     )
     custom = extract(
-        loader, **options, aggregation=[[mean_observed], [median_observed]],
+        loader,
+        **options,
+        aggregation=[[mean_observed], [median_observed]],
     )
     reference = extract(loader, **options, aggregation=[["mean"], ["median"]])
-    custom = custom.rename(columns=lambda name: name.replace(
-        "_mean_observed", "_mean"
-    ).replace("_median_observed", "_median"))
+    custom = custom.rename(
+        columns=lambda name: name.replace("_mean_observed", "_mean").replace(
+            "_median_observed", "_median"
+        )
+    )
     pd.testing.assert_frame_equal(custom, reference)
 
 
@@ -319,12 +365,15 @@ def test_direct_callable_repeats_at_successive_real_data_levels(wearable):
         return values.median()
 
     options = dict(
-        **BOUNDS, statistic="sleep_TST",
+        **BOUNDS,
+        statistic="sleep_TST",
         resolution=["nightly", "weekly", "monthly"],
     )
     custom = sleep.get_sleep_statistics(loader, **options, aggregation=median_observed)
     reference = sleep.get_sleep_statistics(loader, **options, aggregation="median")
-    custom = custom.rename(columns=lambda name: name.replace("_median_observed", "_median"))
+    custom = custom.rename(
+        columns=lambda name: name.replace("_median_observed", "_median")
+    )
     pd.testing.assert_frame_equal(custom, reference)
 
 
@@ -358,7 +407,9 @@ def test_24h_sleep_totals_match_native_oura_stage_grid(loaders):
         asleep, classified, duration = expected.get(day, (0.0, 0.0, 0.0))
         if classified:
             assert row["sleep_TST_24h"] == pytest.approx(asleep / 60)
-            assert row["sleep_TST_24h__coverage"] == pytest.approx(classified / duration)
+            assert row["sleep_TST_24h__coverage"] == pytest.approx(
+                classified / duration
+            )
         else:
             assert pd.isna(row["sleep_TST_24h"])
             assert row["sleep_TST_24h__coverage"] == 0
@@ -400,19 +451,31 @@ def test_sleep_regularity_has_real_comparable_epochs(wearable):
 
 def test_weekly_sleep_uses_equal_night_weights_and_calendar_coverage(wearable):
     _, loader = wearable
-    nightly = sleep.get_sleep_statistics(loader, statistic="sleep_TST", **BOUNDS).xs(USER)
+    nightly = sleep.get_sleep_statistics(loader, statistic="sleep_TST", **BOUNDS).xs(
+        USER
+    )
     weekly = sleep.get_sleep_statistics(
-        loader, statistic="sleep_TST", resolution=("nightly", "weekly"),
-        aggregation="mean", min_valid_children=(None, 2), **BOUNDS,
+        loader,
+        statistic="sleep_TST",
+        resolution=("nightly", "weekly"),
+        aggregation="mean",
+        min_valid_children=(None, 2),
+        **BOUNDS,
     ).xs(USER)
     first_week = nightly.loc["2024-04-01":"2024-04-07", "sleep_TST"]
     feature = "sleep_TST__nightly__weekly_mean"
     assert weekly.loc[START, feature] == pytest.approx(first_week.mean())
-    assert weekly.loc[START, f"{feature}__coverage"] == pytest.approx(first_week.notna().sum() / 7)
+    assert weekly.loc[START, f"{feature}__coverage"] == pytest.approx(
+        first_week.notna().sum() / 7
+    )
 
 
-@pytest.mark.parametrize("resolution", ["seasonal", "seasonal_meteorological", "quarterly"])
-def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(wearable, resolution):
+@pytest.mark.parametrize(
+    "resolution", ["seasonal", "seasonal_meteorological", "quarterly"]
+)
+def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(
+    wearable, resolution
+):
     source, loader = wearable
     native = _raw_nights(source)
     expected = (
@@ -421,7 +484,11 @@ def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(weara
         else (native["durationInMs"] - native["unmeasurableSleepInMs"]) / 60_000
     )
     result = sleep.get_sleep_statistics(
-        loader, statistic="sleep_TST", resolution=resolution, aggregation="mean", **BOUNDS
+        loader,
+        statistic="sleep_TST",
+        resolution=resolution,
+        aggregation="mean",
+        **BOUNDS,
     )
     column = f"sleep_TST__nightly__{resolution}_mean"
     assert len(result) == 1
@@ -430,7 +497,12 @@ def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(weara
     assert result.iloc[0]["period_start"] == START
     assert result.iloc[0]["period_end"] == END
     filtered = sleep.get_sleep_statistics(
-        loader, statistic="sleep_TST", resolution=resolution, aggregation="mean", min_coverage=.9, **BOUNDS
+        loader,
+        statistic="sleep_TST",
+        resolution=resolution,
+        aggregation="mean",
+        min_coverage=0.9,
+        **BOUNDS,
     )
     assert filtered[column].isna().all()
     assert filtered.iloc[0][f"{column}__coverage"] == pytest.approx(len(native) / 30)
@@ -438,7 +510,7 @@ def test_three_month_sleep_resolutions_keep_real_april_values_and_coverage(weara
 
 def test_sleep_cycles_match_night_boundaries_and_retain_context(wearable):
     source, loader = wearable
-    summaries = loader.load_sleep_summary(USER, START, END)
+    summaries = loader.load_sleep_summaries(USER, START, END)
     nights = cycle.get_intervals(loader, cycle.CYCLE_NIGHT, **BOUNDS).xs(USER)
     assert nights["interval_valid"].sum() == len(summaries)
     for row in summaries.itertuples():
@@ -451,7 +523,7 @@ def test_sleep_cycles_match_night_boundaries_and_retain_context(wearable):
         valid = intervals[intervals["interval_valid"]]
         assert not valid.empty
         assert valid["end_time"].gt(valid["start_time"]).all()
-    assert loader.load_sleep_summary(USER, "2024-03-31", START).shape[0] == (
+    assert loader.load_sleep_summaries(USER, "2024-03-31", START).shape[0] == (
         0 if source == "labfront" else 1
     )
 
@@ -466,27 +538,40 @@ def test_heart_rate_hourly_reductions_match_physical_samples(wearable):
         raw = pd.DataFrame(_json("heartrate"))
         raw["utc"] = pd.to_datetime(raw["timestamp"], utc=True).dt.tz_localize(None)
         raw["value"] = raw["bpm"]
-    raw = raw[raw["utc"].ge("2024-04-11") & raw["utc"].lt("2024-04-12") & raw["value"].gt(0)]
+    raw = raw[
+        raw["utc"].ge("2024-04-11") & raw["utc"].lt("2024-04-12") & raw["value"].gt(0)
+    ]
     conflicts = raw.groupby("utc")["value"].transform("nunique").gt(1)
     raw = raw[~conflicts].drop_duplicates("utc")
     grouped = raw.groupby(raw["utc"].dt.floor("1h"))["value"]
     result = heart_rate.get_heart_rate_statistics(
-        loader, statistic=list(heart_rate.HEART_RATE_REDUCTIONS) + ["heart_rate_p10", "heart_rate_p90"],
-        user_id=USER, start_date="2024-04-11", end_date="2024-04-12",
-        resolution="1h", time_reference="utc",
+        loader,
+        statistic=list(heart_rate.HEART_RATE_REDUCTIONS)
+        + ["heart_rate_p10", "heart_rate_p90"],
+        user_id=USER,
+        start_date="2024-04-11",
+        end_date="2024-04-12",
+        resolution="1h",
+        time_reference="utc",
     ).xs(USER)
     for feature, operation in heart_rate.HEART_RATE_REDUCTIONS.items():
         expected = getattr(grouped, operation)()
-        np.testing.assert_allclose(result.loc[expected.index, feature], expected, equal_nan=True)
+        np.testing.assert_allclose(
+            result.loc[expected.index, feature], expected, equal_nan=True
+        )
     for quantile in (10, 90):
         expected = grouped.quantile(quantile / 100)
-        np.testing.assert_allclose(result.loc[expected.index, f"heart_rate_p{quantile}"], expected)
+        np.testing.assert_allclose(
+            result.loc[expected.index, f"heart_rate_p{quantile}"], expected
+        )
     _assert_clock(result.reset_index())
 
 
 def test_activity_totals_match_native_steps(wearable):
     source, loader = wearable
-    result = activity.get_activity_statistics(loader, statistic="activity_steps", **BOUNDS).xs(USER)
+    result = activity.get_activity_statistics(
+        loader, statistic="activity_steps", **BOUNDS
+    ).xs(USER)
     if source == "oura":
         raw = _april(pd.DataFrame(_json("daily_activity")), "day")
         expected = raw.set_index(pd.to_datetime(raw["day"]))["steps"].reindex(DATES)
@@ -501,9 +586,13 @@ def test_activity_totals_match_native_steps(wearable):
         raw = raw.drop_duplicates(identity + ["steps", "durationInMs"])
         versions = raw.groupby(identity)[["steps", "durationInMs"]].nunique()
         conflicts = versions.index[versions.gt(1).any(axis=1)].get_level_values(0)
-        epochs = raw.groupby("unixTimestampInMs").agg(local=("local", "first"), steps=("steps", "sum"))
+        epochs = raw.groupby("unixTimestampInMs").agg(
+            local=("local", "first"), steps=("steps", "sum")
+        )
         epochs.loc[epochs.index.isin(conflicts), "steps"] = np.nan
-        expected = epochs.groupby(epochs["local"].dt.normalize())["steps"].agg(lambda v: v.sum(skipna=False))
+        expected = epochs.groupby(epochs["local"].dt.normalize())["steps"].agg(
+            lambda v: v.sum(skipna=False)
+        )
         expected = expected.reindex(DATES)
         assert len(loader.load_activity_samples(USER, START, END)) == 2751
         peaks = activity.get_activity_statistics(loader, **BOUNDS).xs(USER)
@@ -522,7 +611,9 @@ def test_respiration_matches_native_rates(wearable):
             loader, statistic="respiratory_rate_mean", resolution="nightly", **BOUNDS
         ).xs(USER)
         assert expected.notna().sum() == 25
-        np.testing.assert_allclose(result["respiratory_rate_mean"], expected, equal_nan=True)
+        np.testing.assert_allclose(
+            result["respiratory_rate_mean"], expected, equal_nan=True
+        )
     else:
         raw = _csv("garmin-connect-respiration").copy()
         raw["local"] = pd.to_datetime(raw["isoDate"].str[:19])
@@ -530,18 +621,28 @@ def test_respiration_matches_native_rates(wearable):
         raw = raw[raw["breathsPerMinute"].gt(0)]
         grouped = raw.groupby(raw["local"].dt.normalize())["breathsPerMinute"]
         result = respiration.get_respiration_statistics(
-            loader, statistic=list(respiration.RESPIRATORY_RATE_STATISTICS), resolution="daily", **BOUNDS
+            loader,
+            statistic=list(respiration.RESPIRATORY_RATE_STATISTICS),
+            resolution="daily",
+            **BOUNDS,
         ).xs(USER)
-        for suffix, expected in [("mean", grouped.mean()), ("median", grouped.median()),
-                                 ("std", grouped.std()), ("count", grouped.count()),
-                                 ("p10", grouped.quantile(.1)), ("p90", grouped.quantile(.9))]:
-            np.testing.assert_allclose(result.loc[expected.index, f"respiratory_rate_{suffix}"], expected)
+        for suffix, expected in [
+            ("mean", grouped.mean()),
+            ("median", grouped.median()),
+            ("std", grouped.std()),
+            ("count", grouped.count()),
+            ("p10", grouped.quantile(0.1)),
+            ("p90", grouped.quantile(0.9)),
+        ]:
+            np.testing.assert_allclose(
+                result.loc[expected.index, f"respiratory_rate_{suffix}"], expected
+            )
 
 
 def test_absent_spo2_is_not_invented(wearable):
     _, loader = wearable
     assert loader.load_pulse_ox(USER, START, END).empty
-    assert loader.load_spo2_summary(USER, START, END).empty
+    assert loader.load_spo2_summaries(USER, START, END).empty
     result = respiration.get_respiration_statistics(
         loader, statistic="spo2_mean", resolution="nightly", **BOUNDS
     )
@@ -553,35 +654,54 @@ def test_provider_features_match_native_scores_and_clean_sentinels(wearable):
     source, loader = wearable
     available = provider_features.get_available_provider_features(loader)
     if source == "oura":
-        result = provider_features.get_provider_features(loader, feature=list(loader.provider_features), **BOUNDS).xs(USER)
+        result = provider_features.get_provider_features(
+            loader, feature=list(loader.provider_features), **BOUNDS
+        ).xs(USER)
         raw = _april(pd.json_normalize(_json("daily_readiness")), "day")
         raw = raw.set_index(pd.to_datetime(raw["day"]))
         for feature in loader.provider_features:
             suffix = feature.removeprefix("oura_readiness_")
-            field = suffix if suffix.startswith("temperature") or suffix == "score" else f"contributors.{suffix}"
-            np.testing.assert_allclose(result[feature], raw[field].reindex(DATES), equal_nan=True)
+            field = (
+                suffix
+                if suffix.startswith("temperature") or suffix == "score"
+                else f"contributors.{suffix}"
+            )
+            np.testing.assert_allclose(
+                result[feature], raw[field].reindex(DATES), equal_nan=True
+            )
         assert set(loader.provider_features).issubset(available)
         assert len(loader.load_resilience(USER, START, END)) == 22
     else:
         raw = _csv("garmin-connect-stress").copy()
         raw["local"] = pd.to_datetime(raw["isoDate"].str[:19])
         raw = _april(raw, "local").drop_duplicates("unixTimestampInMs")
-        for feature, field in [("garmin_stress_level", "stressLevel"), ("garmin_body_battery", "bodyBattery")]:
+        for feature, field in [
+            ("garmin_stress_level", "stressLevel"),
+            ("garmin_body_battery", "bodyBattery"),
+        ]:
             assert feature in available
             expected_rows = raw.loc[raw[field].between(0, 100)]
-            expected = expected_rows.groupby(expected_rows["local"].dt.normalize())[field].mean()
+            expected = expected_rows.groupby(expected_rows["local"].dt.normalize())[
+                field
+            ].mean()
             result = provider_features.get_provider_features(
                 loader, feature=feature, statistic="mean", resolution="daily", **BOUNDS
             ).xs(USER)
-            np.testing.assert_allclose(result[f"{feature}_mean"], expected.reindex(DATES), equal_nan=True)
+            np.testing.assert_allclose(
+                result[f"{feature}_mean"], expected.reindex(DATES), equal_nan=True
+            )
         raw = _april(_csv("garmin-connect-daily-summary"), "calendarDate")
         result = provider_features.get_provider_features(
             loader, feature="garmin_daily_stress_duration_seconds", **BOUNDS
         ).xs(USER)
         for day, versions in raw.groupby("calendarDate"):
-            seconds = result.loc[pd.Timestamp(day), "garmin_daily_stress_duration_seconds"]
+            seconds = result.loc[
+                pd.Timestamp(day), "garmin_daily_stress_duration_seconds"
+            ]
             assert versions["unixTimestampInMs"].nunique() == 1
-            complete = versions[versions["durationInMs"].eq(versions["durationInMs"].max())]
+            complete = versions[
+                versions["durationInMs"].eq(versions["durationInMs"].max())
+            ]
             candidates = complete["stressDurationInMs"].drop_duplicates()
             assert len(candidates) == 1
             expected = candidates.iloc[0] / 1000
@@ -589,9 +709,15 @@ def test_provider_features_match_native_scores_and_clean_sentinels(wearable):
 
 
 def test_body_battery_sleep_recovery_matches_observed_boundaries(labfront):
-    features = ["garmin_body_battery_bedtime", "garmin_body_battery_getup",
-                "garmin_body_battery_sleep_gain", "garmin_body_battery_sleep_recovery_fraction"]
-    result = provider_features.get_provider_features(labfront, feature=features, **BOUNDS).xs(USER)
+    features = [
+        "garmin_body_battery_bedtime",
+        "garmin_body_battery_getup",
+        "garmin_body_battery_sleep_gain",
+        "garmin_body_battery_sleep_recovery_fraction",
+    ]
+    result = provider_features.get_provider_features(
+        labfront, feature=features, **BOUNDS
+    ).xs(USER)
     raw = _csv("garmin-connect-stress").copy()
     raw["local"] = pd.to_datetime(raw["isoDate"].str[:19])
     raw = raw[raw["bodyBattery"].between(0, 100)].sort_values("local")
@@ -599,7 +725,9 @@ def test_body_battery_sleep_recovery_matches_observed_boundaries(labfront):
     compared = 0
     for day, night in nights.iterrows():
         start = pd.Timestamp(night["isoDate"]).tz_localize(None)
-        end = start + pd.Timedelta(milliseconds=night["durationInMs"] + night["awakeDurationInMs"])
+        end = start + pd.Timedelta(
+            milliseconds=night["durationInMs"] + night["awakeDurationInMs"]
+        )
         before = raw[raw["local"].between(start - pd.Timedelta(minutes=5), start)]
         after = raw[raw["local"].between(end, end + pd.Timedelta(minutes=5))]
         if before.empty or after.empty:
@@ -610,9 +738,9 @@ def test_body_battery_sleep_recovery_matches_observed_boundaries(labfront):
         assert result.loc[day, "garmin_body_battery_getup"] == getup
         assert result.loc[day, "garmin_body_battery_sleep_gain"] == getup - bedtime
         if bedtime < 100:
-            assert result.loc[day, "garmin_body_battery_sleep_recovery_fraction"] == pytest.approx(
-                max((getup - bedtime) / (100 - bedtime), 0)
-            )
+            assert result.loc[
+                day, "garmin_body_battery_sleep_recovery_fraction"
+            ] == pytest.approx(max((getup - bedtime) / (100 - bedtime), 0))
         compared += 1
     assert compared > 10
 
@@ -621,13 +749,20 @@ def test_daily_stress_revision_retains_full_export_reference(labfront):
     # The original full export resolves this day to its complete daily summary.
     # Removing unrelated months must not change the selected measurement.
     raw = _csv("garmin-connect-daily-summary")
-    complete = raw[raw["calendarDate"].eq("2024-04-12") & raw["durationInMs"].eq(86_400_000)]
+    complete = raw[
+        raw["calendarDate"].eq("2024-04-12") & raw["durationInMs"].eq(86_400_000)
+    ]
     expected = complete["stressDurationInMs"].drop_duplicates().to_numpy() / 1000
     np.testing.assert_array_equal(expected, [21_120])
     result = provider_features.get_provider_features(
         labfront, feature="garmin_daily_stress_duration_seconds", **BOUNDS
     )
-    assert result.loc[(USER, pd.Timestamp("2024-04-12")), "garmin_daily_stress_duration_seconds"] == expected[0]
+    assert (
+        result.loc[
+            (USER, pd.Timestamp("2024-04-12")), "garmin_daily_stress_duration_seconds"
+        ]
+        == expected[0]
+    )
 
 
 def test_adherence_matches_observed_nights_and_heart_rate_minutes(wearable):
@@ -638,7 +773,9 @@ def test_adherence_matches_observed_nights_and_heart_rate_minutes(wearable):
     samples = loader.load_heart_rate(USER, START, END)
     minutes = samples["local_time"].dropna().dt.floor("1min").drop_duplicates()
     counts = minutes.groupby(minutes.dt.normalize()).size().reindex(DATES, fill_value=0)
-    wearing = adherence.get_adherence(loader, metric="heart_rate", time_reference="local", **BOUNDS).xs(USER)
+    wearing = adherence.get_adherence(
+        loader, metric="heart_rate", time_reference="local", **BOUNDS
+    ).xs(USER)
     np.testing.assert_allclose(wearing["heart_rate_adherence"], counts / 1440)
 
 
@@ -650,28 +787,46 @@ def test_hrv_uses_native_source_and_keeps_missing_features_missing(wearable):
             if night["type"] != "long_sleep" or not night.get("hrv"):
                 continue
             series = night["hrv"]
-            start = pd.Timestamp(series["timestamp"]).tz_convert("UTC").tz_localize(None)
-            raw.extend((start + pd.Timedelta(seconds=i * series["interval"]), value)
-                       for i, value in enumerate(series["items"]) if value is not None)
+            start = (
+                pd.Timestamp(series["timestamp"]).tz_convert("UTC").tz_localize(None)
+            )
+            raw.extend(
+                (start + pd.Timedelta(seconds=i * series["interval"]), value)
+                for i, value in enumerate(series["items"])
+                if value is not None
+            )
         raw = pd.DataFrame(raw, columns=["utc", "rmssd"])
         raw = _april(raw, "utc")
         expected = raw.groupby(raw["utc"].dt.floor("5min"))["rmssd"].mean()
         result = hrv.get_hrv_statistics(
-            loader, statistic=["hrv_rmssd", "hrv_sdnn"], resolution="5min", time_reference="utc", **BOUNDS
+            loader,
+            statistic=["hrv_rmssd", "hrv_sdnn"],
+            resolution="5min",
+            time_reference="utc",
+            **BOUNDS,
         ).xs(USER)
         np.testing.assert_allclose(result.loc[expected.index, "hrv_rmssd"], expected)
         assert result["hrv_sdnn"].isna().all()
         with pytest.raises(ValueError, match="provider-computed"):
-            hrv.get_hrv_statistics(loader, statistic="hrv_rmssd", window_step="1min", **BOUNDS)
+            hrv.get_hrv_statistics(
+                loader, statistic="hrv_rmssd", window_step="1min", **BOUNDS
+            )
     else:
         samples = loader.load_bbi(USER)
         assert len(samples) == 76_077
-        assert samples["local_time"].dt.normalize().unique().tolist() == [pd.Timestamp("2024-04-11")]
+        assert samples["local_time"].dt.normalize().unique().tolist() == [
+            pd.Timestamp("2024-04-11")
+        ]
         assert loader.load_bbi(USER, "2024-04-10", "2024-04-11").empty
         assert loader.load_bbi(USER, "2024-04-12", "2024-04-13").empty
         result = hrv.get_hrv_statistics(
-            loader, resolution="5min", user_id=USER, start_date="2024-04-11",
-            end_date="2024-04-12", min_coverage=.7, time_reference="local",
+            loader,
+            resolution="5min",
+            user_id=USER,
+            start_date="2024-04-11",
+            end_date="2024-04-12",
+            min_coverage=0.7,
+            time_reference="local",
         ).xs(USER)
         assert len(result) == 288
         assert result["hrv_rmssd"].notna().sum() == 209
@@ -688,7 +843,11 @@ def test_raw_bbi_metrics_and_loader_side_gap_do_not_bridge_differences(labfront)
     candidates = raw.groupby(raw["local_time"].dt.floor("5min"))
     reference = None
     for label, rows in candidates:
-        rows = rows.sort_values("utc_time").drop_duplicates(["utc_time", "bbi"]).reset_index(drop=True)
+        rows = (
+            rows.sort_values("utc_time")
+            .drop_duplicates(["utc_time", "bbi"])
+            .reset_index(drop=True)
+        )
         values = rows["bbi"].to_numpy(dtype=float)
         elapsed = rows["utc_time"].diff().dt.total_seconds().to_numpy() * 1000
         previous = np.r_[np.nan, values[:-1]]
@@ -706,48 +865,85 @@ def test_raw_bbi_metrics_and_loader_side_gap_do_not_bridge_differences(labfront)
         rows, statistics=list(hrv.HRV_STATISTICS), coverage=None, time_col="local_time"
     ).loc[label]
     differences = np.diff(values)
-    rmssd, sdnn, mean = np.sqrt(np.mean(differences ** 2)), np.std(values, ddof=1), values.mean()
+    rmssd, sdnn, mean = (
+        np.sqrt(np.mean(differences**2)),
+        np.std(values, ddof=1),
+        values.mean(),
+    )
     expected = {
-        "hrv_rmssd": rmssd, "hrv_sdnn": sdnn,
+        "hrv_rmssd": rmssd,
+        "hrv_sdnn": sdnn,
         "hrv_pnn20": 100 * np.mean(np.abs(differences) > 20),
         "hrv_pnn50": 100 * np.mean(np.abs(differences) > 50),
-        "hrv_min_nn": values.min(), "hrv_mean_nn": mean, "hrv_max_nn": values.max(),
-        "hrv_bbi_median": np.median(values), "hrv_iqr_nn": np.quantile(values, .75) - np.quantile(values, .25),
-        "hrv_sdnn_rmssd_ratio": sdnn / rmssd, "hrv_cv_nn": sdnn / mean, "hrv_cv_sd": rmssd / mean,
+        "hrv_min_nn": values.min(),
+        "hrv_mean_nn": mean,
+        "hrv_max_nn": values.max(),
+        "hrv_median_nn": np.median(values),
+        "hrv_iqr_nn": np.quantile(values, 0.75) - np.quantile(values, 0.25),
+        "hrv_sdnn_rmssd_ratio": sdnn / rmssd,
+        "hrv_cv_nn": sdnn / mean,
+        "hrv_cv_sd": rmssd / mean,
     }
     for name, value in expected.items():
         assert result[name] == pytest.approx(value)
-    assert result["hrv_lfhf_ratio"] == pytest.approx(result["hrv_lf_power"] / result["hrv_hf_power"])
+    assert result["hrv_lfhf_ratio"] == pytest.approx(
+        result["hrv_lf_power"] / result["hrv_hf_power"]
+    )
     position = len(rows) // 2
     filtered = rows.drop(index=position)
     result = hrv.compute_hrv_statistics(
-        filtered, statistics=["hrv_rmssd", "hrv_pnn50"], coverage=None, time_col="local_time"
+        filtered,
+        statistics=["hrv_rmssd", "hrv_pnn50"],
+        coverage=None,
+        time_col="local_time",
     ).loc[label]
     original_positions = filtered.index.to_numpy()
     valid_differences = np.diff(filtered["bbi"])[np.diff(original_positions) == 1]
-    assert result["hrv_rmssd"] == pytest.approx(np.sqrt(np.mean(valid_differences ** 2)))
-    assert result["hrv_pnn50"] == pytest.approx(100 * np.mean(np.abs(valid_differences) > 50))
+    assert result["hrv_rmssd"] == pytest.approx(np.sqrt(np.mean(valid_differences**2)))
+    assert result["hrv_pnn50"] == pytest.approx(
+        100 * np.mean(np.abs(valid_differences) > 50)
+    )
 
 
 def test_raw_hrv_overlap_and_sleep_filtering(labfront):
     loader = labfront
-    kwargs = dict(user_id=USER, start_date="2024-04-11", end_date="2024-04-12",
-                  statistic="hrv_rmssd", time_reference="local", min_coverage=.7)
+    kwargs = dict(
+        user_id=USER,
+        start_date="2024-04-11",
+        end_date="2024-04-12",
+        statistic="hrv_rmssd",
+        time_reference="local",
+        min_coverage=0.7,
+    )
     ordinary = hrv.get_hrv_statistics(loader, resolution="5min", **kwargs)
-    rolling = hrv.get_hrv_statistics(loader, resolution="5min", window_step="1min", **kwargs)
+    rolling = hrv.get_hrv_statistics(
+        loader, resolution="5min", window_step="1min", **kwargs
+    )
     assert len(rolling) > len(ordinary)
     assert rolling["hrv_rmssd"].notna().sum() > ordinary["hrv_rmssd"].notna().sum()
     filtered = hrv.get_hrv_statistics(
-        loader, resolution=("5min", "nightly"), window_step="1min", aggregation="mean", **kwargs
+        loader,
+        resolution=("5min", "nightly"),
+        window_step="1min",
+        aggregation="mean",
+        **kwargs,
     )
     explicit = hrv.get_hrv_statistics(
-        loader, resolution=("5min", "cycle_night"), window_step="1min", aggregation="mean",
-        sleep_stages_to_remove=["awake", "unmeasurable"], **kwargs,
+        loader,
+        resolution=("5min", "cycle_night"),
+        window_step="1min",
+        aggregation="mean",
+        sleep_stages_to_remove=["awake", "unmeasurable"],
+        **kwargs,
     )
     pd.testing.assert_frame_equal(filtered, explicit)
     unfiltered = hrv.get_hrv_statistics(
-        loader, resolution=("5min", "nightly"), window_step="1min", aggregation="mean",
-        sleep_stages_to_remove=None, **kwargs,
+        loader,
+        resolution=("5min", "nightly"),
+        window_step="1min",
+        aggregation="mean",
+        sleep_stages_to_remove=None,
+        **kwargs,
     )
     feature = "hrv_rmssd__5min__cycle_night_mean"
     assert filtered[feature].notna().any()
@@ -758,8 +954,14 @@ def test_raw_hrv_overlap_and_sleep_filtering(labfront):
 def test_optional_neurokit_matches_direct_backend_on_real_timestamps(labfront):
     loader = labfront
     nk = pytest.importorskip("neurokit2")
-    kwargs = dict(user_id=USER, start_date="2024-04-11", end_date="2024-04-12",
-                  statistic=["hrv_rmssd", "hrv_sdnn", "hrv_mean_nn"], resolution="5min", min_coverage=.7)
+    kwargs = dict(
+        user_id=USER,
+        start_date="2024-04-11",
+        end_date="2024-04-12",
+        statistic=["hrv_rmssd", "hrv_sdnn", "hrv_mean_nn"],
+        resolution="5min",
+        min_coverage=0.7,
+    )
     builtin = hrv.get_hrv_statistics(loader, backend="pywearable", **kwargs)
     neurokit = hrv.get_hrv_statistics(loader, backend="neurokit", **kwargs)
     for feature in ["hrv_sdnn", "hrv_mean_nn"]:
@@ -773,10 +975,15 @@ def test_optional_neurokit_matches_direct_backend_on_real_timestamps(labfront):
     valid = neurokit["hrv_rmssd"].dropna()
     assert len(valid) > 100
     for _, label in valid.index[:3]:
-        rows = samples[samples["utc_time"].ge(label) & samples["utc_time"].lt(label + pd.Timedelta(minutes=5))]
+        rows = samples[
+            samples["utc_time"].ge(label)
+            & samples["utc_time"].lt(label + pd.Timedelta(minutes=5))
+        ]
         intervals = {
             "RRI": rows["bbi"].to_numpy(),
-            "RRI_Time": (rows["utc_time"] - rows["utc_time"].iloc[0]).dt.total_seconds().to_numpy(),
+            "RRI_Time": (rows["utc_time"] - rows["utc_time"].iloc[0])
+            .dt.total_seconds()
+            .to_numpy(),
         }
         expected = nk.hrv_time(intervals, show=False).iloc[0]["HRV_RMSSD"]
         assert neurokit.loc[(USER, label), "hrv_rmssd"] == pytest.approx(expected)
@@ -786,23 +993,41 @@ def test_trajectory_history_and_visualizations_on_real_outputs(wearable):
     _, loader = wearable
     nightly = sleep.get_sleep_statistics(loader, statistic="sleep_TST", **BOUNDS)
     original = nightly.copy(deep=True)
-    filled = trajectory.impute_trajectory(nightly, "sleep_TST", method="ma", window=7, min_periods=3)
+    filled = trajectory.impute_trajectory(
+        nightly, "sleep_TST", method="ma", window=7, min_periods=3
+    )
     observed = nightly["sleep_TST"].notna()
-    pd.testing.assert_series_equal(filled.loc[observed, "sleep_TST"], nightly.loc[observed, "sleep_TST"])
-    pd.testing.assert_series_equal(filled["sleep_TST__coverage"], nightly["sleep_TST__coverage"])
+    pd.testing.assert_series_equal(
+        filled.loc[observed, "sleep_TST"], nightly.loc[observed, "sleep_TST"]
+    )
+    pd.testing.assert_series_equal(
+        filled["sleep_TST__coverage"], nightly["sleep_TST__coverage"]
+    )
     assert filled["sleep_TST__is_imputed"].any()
     enriched = trajectory.compute_trajectory_trend(
-        filled, "sleep_TST", baseline_window=7, min_periods_baseline=3,
-        normal_range_window=30, min_periods_normal_range=10,
+        filled,
+        "sleep_TST",
+        baseline_window=7,
+        min_periods_baseline=3,
+        normal_range_window=30,
+        min_periods_normal_range=10,
     )
     expected_baseline = nightly["sleep_TST"].shift().rolling(7, min_periods=3).mean()
-    np.testing.assert_allclose(enriched["sleep_TST__trend_baseline"], expected_baseline, equal_nan=True)
+    np.testing.assert_allclose(
+        enriched["sleep_TST__trend_baseline"], expected_baseline, equal_nan=True
+    )
     try:
-        trend = visualization.plot_trajectory_trend(enriched, "sleep_TST", show_coverage=True, show=False)
+        trend = visualization.plot_trajectory_trend(
+            enriched, "sleep_TST", show_coverage=True, show=False
+        )
         assert set(trend) == {"trajectory", "coverage"}
-        hypnogram = visualization.plot_sleep_summary(loader, USER, "2024-04-10", "2024-04-17", show=False)
+        hypnogram = visualization.plot_sleep_summary(
+            loader, USER, "2024-04-10", "2024-04-17", show=False
+        )
         assert len(hypnogram["sleep"].collections) > 0
-        night_hr = visualization.plot_sleep_heart_rate(loader, USER, "2024-04-11", show=False)
+        night_hr = visualization.plot_sleep_heart_rate(
+            loader, USER, "2024-04-11", show=False
+        )
         assert len(night_hr.lines) > 0
         for number in plt.get_fignums():
             plt.figure(number).canvas.draw()

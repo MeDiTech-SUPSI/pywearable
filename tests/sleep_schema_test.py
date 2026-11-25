@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from pywearable import hierarchy, sleep, schema
+from pywearable import hierarchy, schema, sleep
 from tests.helpers import LoaderBase
 
 
@@ -51,11 +51,13 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
             "overall_sleep_score": [80, None],
         }
     )
-    stages = pd.DataFrame(columns=["sleep_summary_id", "local_time", "duration_in_ms", "type"])
+    stages = pd.DataFrame(
+        columns=["sleep_summary_id", "local_time", "duration_in_ms", "type"]
+    )
     loader = _SleepLoader(
         ["person-1"],
-        load_sleep_summary=lambda **kwargs: summaries.copy(),
-        load_sleep_stage=lambda **kwargs: stages.copy(),
+        load_sleep_summaries=lambda **kwargs: summaries.copy(),
+        load_sleep_stages=lambda **kwargs: stages.copy(),
     )
     result = sleep.get_sleep_statistics(
         loader,
@@ -85,10 +87,7 @@ def test_sleep_trajectory_preserves_feature_names_and_keeps_missing_score():
     )
     assert isinstance(score, pd.DataFrame)
     assert score.index.names == ["user_id", "calendar_date"]
-    assert (
-        score.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_score"]
-        == 80
-    )
+    assert score.loc[("person-1", pd.Timestamp("2024-01-02")), "sleep_score"] == 80
 
     timestamps = sleep.get_sleep_timestamps(loader, "person-1")
     assert isinstance(timestamps, pd.DataFrame)
@@ -131,8 +130,8 @@ def test_sleep_trajectory_is_sorted_and_accepts_omitted_bounds():
     )
     loader = _SleepLoader(
         ["person-1"],
-        load_sleep_summary=lambda **kwargs: summaries.copy(),
-        load_sleep_stage=lambda **kwargs: pd.DataFrame(),
+        load_sleep_summaries=lambda **kwargs: summaries.copy(),
+        load_sleep_stages=lambda **kwargs: pd.DataFrame(),
     )
 
     result = sleep.get_sleep_statistics(
@@ -163,8 +162,8 @@ def test_sleep_trajectory_rejects_more_than_one_summary_per_night():
     )
     loader = _SleepLoader(
         ["person-1"],
-        load_sleep_summary=lambda **kwargs: summaries.copy(),
-        load_sleep_stage=lambda **kwargs: pd.DataFrame(),
+        load_sleep_summaries=lambda **kwargs: summaries.copy(),
+        load_sleep_stages=lambda **kwargs: pd.DataFrame(),
     )
 
     with pytest.raises(ValueError, match="one row per calendar_date"):
@@ -296,9 +295,7 @@ def test_wakeup_is_missing_after_an_unexplained_terminal_stage_gap():
     stages = pd.DataFrame(
         {
             "sleep_summary_id": ["night-1", "night-1"],
-            "local_time": pd.to_datetime(
-                ["2024-01-01 23:00", "2024-01-02 06:00"]
-            ),
+            "local_time": pd.to_datetime(["2024-01-01 23:00", "2024-01-02 06:00"]),
             "duration_in_ms": [7 * 60 * 60_000, 10 * 60_000],
             "type": ["light", "awake"],
         }

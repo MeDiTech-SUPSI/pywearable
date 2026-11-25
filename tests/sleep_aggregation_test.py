@@ -43,7 +43,7 @@ def _sleep_loader(empty=False):
     if empty:
         summaries = summaries.iloc[0:0]
 
-    def load_sleep_summary(user_id, start_date=None, end_date=None, **kwargs):
+    def load_sleep_summaries(user_id, start_date=None, end_date=None, **kwargs):
         result = summaries.copy()
         if start_date is not None:
             result = result[
@@ -57,8 +57,8 @@ def _sleep_loader(empty=False):
 
     return _SleepLoader(
         ["person-1"],
-        load_sleep_summary=load_sleep_summary,
-        load_sleep_stage=lambda **kwargs: pd.DataFrame(
+        load_sleep_summaries=load_sleep_summaries,
+        load_sleep_stages=lambda **kwargs: pd.DataFrame(
             columns=["sleep_summary_id", "local_time", "duration_in_ms", "type"]
         ),
     )
@@ -75,12 +75,14 @@ def test_weekly_sleep_statistics_keep_partial_periods_and_coverage():
         end_date="2024-01-25",
     )
 
-    assert result.index.get_level_values("calendar_date").tolist() == pd.to_datetime(
-        ["2024-01-16", "2024-01-22"]
-    ).tolist()
-    assert result["period_end"].tolist() == pd.to_datetime(
-        ["2024-01-22", "2024-01-25"]
-    ).tolist()
+    assert (
+        result.index.get_level_values("calendar_date").tolist()
+        == pd.to_datetime(["2024-01-16", "2024-01-22"]).tolist()
+    )
+    assert (
+        result["period_end"].tolist()
+        == pd.to_datetime(["2024-01-22", "2024-01-25"]).tolist()
+    )
     assert result.iloc[0]["sleep_TST__nightly__weekly_mean"] == 430
     assert result.iloc[0]["sleep_TST__nightly__weekly_mean__coverage"] == pytest.approx(
         2 / 6
@@ -241,9 +243,10 @@ def test_nightly_sleep_coverage_is_binary_feature_availability():
         end_date="2024-01-21",
     ).xs("person-1")
 
-    assert result.index.tolist() == pd.date_range(
-        "2024-01-16", "2024-01-21", inclusive="left"
-    ).tolist()
+    assert (
+        result.index.tolist()
+        == pd.date_range("2024-01-16", "2024-01-21", inclusive="left").tolist()
+    )
     assert result["sleep_TST__coverage"].tolist() == [1, 1, 0, 0, 0]
     assert result["sleep_bedtime__coverage"].tolist() == [1, 1, 0, 0, 1]
 
@@ -260,9 +263,9 @@ def test_sleep_hierarchy_accepts_primary_availability_threshold():
         end_date="2024-01-22",
     )
 
-    assert result.iloc[0][
-        "sleep_TST__nightly__weekly_mean__coverage"
-    ] == pytest.approx(2 / 6)
+    assert result.iloc[0]["sleep_TST__nightly__weekly_mean__coverage"] == pytest.approx(
+        2 / 6
+    )
 
 
 def test_unbounded_empty_sleep_hierarchy_preserves_index_contract():
@@ -281,15 +284,15 @@ def test_unbounded_empty_sleep_hierarchy_preserves_index_contract():
 def test_unbounded_sleep_hierarchy_skips_users_without_observed_nights():
     source = _sleep_loader()
 
-    def load_sleep_summary(user_id, **kwargs):
+    def load_sleep_summaries(user_id, **kwargs):
         if user_id == "person-2":
-            return source.load_sleep_summary(user_id, **kwargs).iloc[0:0]
-        return source.load_sleep_summary(user_id, **kwargs)
+            return source.load_sleep_summaries(user_id, **kwargs).iloc[0:0]
+        return source.load_sleep_summaries(user_id, **kwargs)
 
     loader = _SleepLoader(
         ["person-1", "person-2"],
-        load_sleep_summary=load_sleep_summary,
-        load_sleep_stage=source.load_sleep_stage,
+        load_sleep_summaries=load_sleep_summaries,
+        load_sleep_stages=source.load_sleep_stages,
     )
     result = sleep.get_sleep_statistics(
         loader,
@@ -299,9 +302,7 @@ def test_unbounded_sleep_hierarchy_skips_users_without_observed_nights():
         aggregation="mean",
     )
 
-    assert result.index.get_level_values("user_id").unique().tolist() == [
-        "person-1"
-    ]
+    assert result.index.get_level_values("user_id").unique().tolist() == ["person-1"]
 
 
 @pytest.mark.parametrize(
@@ -423,12 +424,14 @@ def test_monthly_sleep_statistics_return_both_requested_partial_months():
         end_date="2024-02-15",
     )
 
-    assert result.index.get_level_values("calendar_date").tolist() == pd.to_datetime(
-        ["2024-01-15", "2024-02-01"]
-    ).tolist()
-    assert result["period_end"].tolist() == pd.to_datetime(
-        ["2024-02-01", "2024-02-15"]
-    ).tolist()
+    assert (
+        result.index.get_level_values("calendar_date").tolist()
+        == pd.to_datetime(["2024-01-15", "2024-02-01"]).tolist()
+    )
+    assert (
+        result["period_end"].tolist()
+        == pd.to_datetime(["2024-02-01", "2024-02-15"]).tolist()
+    )
     column = "sleep_TST__nightly__monthly_mean"
     assert pd.isna(result.iloc[1][column])
     assert result.iloc[1][f"{column}__coverage"] == 0

@@ -15,21 +15,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 
-
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "src"))
 
-from pywearable import (  # noqa: E402
-    activity,
-    cycle,
-    heart_rate,
-    schema,
-    sleep,
-    trajectory,
-    visualization,
-)
+from pywearable import schema  # noqa: E402
+from pywearable import activity, cycle, heart_rate, sleep, trajectory, visualization
 from pywearable.loader import LabfrontLoader, OuraLoader  # noqa: E402
-
 
 OUTPUT = ROOT / "docs" / "_static" / "figures"
 DATA_ROOT = Path(
@@ -92,7 +83,7 @@ def _load_labfront_example():
 
 def _analysis_data(loader, user, days=70):
     """Select the best-supported fixed-length activity interval."""
-    source = loader.load_activity_summary(user)
+    source = loader.load_activity_summaries(user)
     start = pd.to_datetime(source[schema.CALENDAR_DATE_COL]).min().normalize()
     end = pd.to_datetime(source[schema.CALENDAR_DATE_COL]).max().normalize()
     steps = activity.get_activity_statistics(
@@ -107,7 +98,9 @@ def _analysis_data(loader, user, days=70):
     support = user_steps[activity.ACTIVITY_STATISTIC_STEPS].notna().astype(int)
     rolling = support.rolling(days, min_periods=days).sum()
     if rolling.notna().sum() == 0:
-        raise ValueError(f"The example participant has fewer than {days} activity days.")
+        raise ValueError(
+            f"The example participant has fewer than {days} activity days."
+        )
     final_day = rolling.idxmax()
     interval_start = final_day - pd.Timedelta(days=days - 1)
     interval_end = final_day + pd.Timedelta(days=1)
@@ -151,7 +144,7 @@ def _relative_week_axis(ax, origin):
 
 def _densest_sleep_window(loader, user, start, end, days=14):
     """Return the inclusive bounds of the densest requested sleep span."""
-    summaries = loader.load_sleep_summary(user, start, end)
+    summaries = loader.load_sleep_summaries(user, start, end)
     observed = pd.Series(
         1,
         index=pd.DatetimeIndex(summaries[schema.CALENDAR_DATE_COL]).normalize(),
@@ -188,12 +181,12 @@ def make_cycle_figure(loader, user, start, end):
     runs = [
         pd.DatetimeIndex([date + pd.Timedelta(days=offset) for offset in range(3)])
         for date in common_dates
-        if all(
-            date + pd.Timedelta(days=offset) in common_set for offset in range(3)
-        )
+        if all(date + pd.Timedelta(days=offset) in common_set for offset in range(3))
     ]
     if not runs:
-        raise ValueError("No three consecutive complete sleep-wake cycles are available.")
+        raise ValueError(
+            "No three consecutive complete sleep-wake cycles are available."
+        )
 
     heart_rate_all = heart_rate.get_heart_rate_statistics(
         loader,
@@ -218,12 +211,13 @@ def make_cycle_figure(loader, user, start, end):
             (heart_rate_all.index >= bounds(run)[0])
             & (heart_rate_all.index < bounds(run)[1]),
             feature,
-        ].notna().sum(),
+        ]
+        .notna()
+        .sum(),
     )
     plot_start, plot_end = bounds(selected)
     heart_rate_window = heart_rate_all.loc[
-        (heart_rate_all.index >= plot_start)
-        & (heart_rate_all.index < plot_end)
+        (heart_rate_all.index >= plot_start) & (heart_rate_all.index < plot_end)
     ]
 
     def elapsed_days(values):
@@ -444,7 +438,7 @@ def make_sleep_summary_figure(loader, user, start, end):
 
 def make_sleep_heart_rate_figure(loader, user, start, end):
     """Render heart rate and stage context for one observed sleep session."""
-    summaries = loader.load_sleep_summary(user, start, end)
+    summaries = loader.load_sleep_summaries(user, start, end)
     selected = None
     for summary in summaries.itertuples(index=False):
         session_hr = loader.load_heart_rate(

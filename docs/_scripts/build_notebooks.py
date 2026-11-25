@@ -7,7 +7,6 @@ from textwrap import dedent
 
 import nbformat as nbf
 
-
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT = ROOT / "docs" / "_notebooks"
 
@@ -41,8 +40,7 @@ def write_notebook(path, cells):
 def build_analysis_examples():
     """Build the real-data analysis tutorial."""
     cells = [
-        markdown(
-            """
+        markdown("""
             # Analyze wearable data with pywearable
 
             This tutorial follows one de-identified Oura participant from raw
@@ -61,19 +59,15 @@ def build_analysis_examples():
             The saved outputs use measured values, while participant IDs and
             calendar dates are replaced in tables and figures. To rerun the
             notebook, set `PYWEARABLE_OURA_ROOT` to an Oura API v2 export root.
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Setup
 
             The root directory contains one subdirectory per participant. This
             local example selects the first directory beginning with `A_`; the
             complete identifier is never displayed or stored in a title.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             import os
             import sys
             import warnings
@@ -129,10 +123,8 @@ def build_analysis_examples():
             source_user = next(user for user in loader.get_user_ids() if user.startswith("A_"))
             public_user = "example-participant"
             print("Loaded one Oura participant")
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Start with loader capabilities
 
             “What can I extract?” always depends on the selected loader. Oura
@@ -141,10 +133,8 @@ def build_analysis_examples():
             sleep summaries and stages, and readiness features. It does not
             provide timestamped step intervals, so peak-hour activity and the
             multi-stream weekly overview are not available from this loader.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             capability_table = pd.DataFrame(
                 {
                     "loader setting": [
@@ -166,20 +156,16 @@ def build_analysis_examples():
                 }
             )
             display(capability_table)
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Choose one well-supported example interval
 
             The code below finds the 70-day activity interval with the most
             observed days. This keeps the tutorial reproducible without
             publishing the source calendar dates.
-            """
-        ),
-        code(
-            """
-            raw_activity = loader.load_activity_summary(source_user)
+            """),
+        code("""
+            raw_activity = loader.load_activity_summaries(source_user)
             source_start = raw_activity[schema.CALENDAR_DATE_COL].min().normalize()
             source_end = raw_activity[schema.CALENDAR_DATE_COL].max().normalize() + pd.Timedelta(days=1)
 
@@ -221,20 +207,16 @@ def build_analysis_examples():
 
             print(f"Selected {len(steps)} study days; {step_series.loc[analysis_start:final_day].notna().sum()} contain steps")
             display(public_trajectory(steps).head())
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Extract features from every supported domain
 
             Each domain returns the same trajectory shape: a `(user_id, time)`
             index, feature columns, and matching coverage columns. The feature
             names describe the measurement; the loader determines whether the
             required stream exists.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 hourly_hr = heart_rate.get_heart_rate_statistics(
@@ -336,20 +318,16 @@ def build_analysis_examples():
                 }
             )
             display(summary)
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Sleep-anchored cycles
 
             A night runs from one main-sleep bedtime to its end, an awake cycle
             runs from that end to the following bedtime, and a physiological
             cycle runs from one bedtime to the next. The table reports elapsed
             duration only, keeping the source dates private.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             cycle_rows = []
             for cycle_type in (
                 cycle.CYCLE_NIGHT,
@@ -376,20 +354,16 @@ def build_analysis_examples():
                     )
                 )
             display(pd.concat(cycle_rows, ignore_index=True))
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Hierarchies preserve the aggregation path
 
             Here nightly total sleep time is the child level. Weekly means and
             standard deviations are calculated from valid nights, so each
             night receives equal weight. The lower-level observations and
             parent estimates remain visible together.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             hierarchy_ax = visualization.plot_hierarchical_trajectory(
                 loader,
                 sleep.SLEEP_STATISTIC_TST,
@@ -414,20 +388,16 @@ def build_analysis_examples():
             hierarchy_ax.tick_params(axis="x", rotation=0)
             hierarchy_ax.set_xlabel("Study week")
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Imputation and trends are explicit trajectory operations
 
             Imputation fills eligible gaps and adds `__is_imputed`. Trend
             estimation then adds participant-specific baseline, normal-range,
             deviation, and support columns. Coverage continues to describe the
             source evidence.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             public_steps = public_trajectory(steps).set_index(steps.index.names)[steps.columns]
             filled_steps = trajectory.impute_trajectory(
                 public_steps,
@@ -453,20 +423,16 @@ def build_analysis_examples():
                 show=False,
             )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Calendar and within-day views
 
             Calendar heatmaps suit daily outcomes. Coverage heatmaps and weekly
             profiles require a subdaily trajectory; here they use hourly heart
             rate. The profile summarizes repeated weekdays and is not a weekly
             chronological aggregation.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             visualization.plot_calendar_heatmap(
                 public_steps,
                 activity.ACTIVITY_STATISTIC_STEPS,
@@ -495,21 +461,17 @@ def build_analysis_examples():
                 show=False,
             )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Loader-aware sleep views
 
             Composite plots accept a loader because they coordinate sleep
             summaries, stages, and heart-rate samples. `plot_sleep_summary`
             takes inclusive sleep-calendar bounds, so the first selected night
             retains stages from the preceding civil date.
-            """
-        ),
-        code(
-            """
-            sleep_dates = loader.load_sleep_summary(
+            """),
+        code("""
+            sleep_dates = loader.load_sleep_summaries(
                 source_user, analysis_start, analysis_end
             )[schema.CALENDAR_DATE_COL]
             summary_start = sleep_dates.iloc[0]
@@ -530,12 +492,10 @@ def build_analysis_examples():
             )
             sleep_axis.set_ylabel("Observed night")
             plt.show()
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             heart_rate_night = None
-            for row in loader.load_sleep_summary(source_user, analysis_start, analysis_end).itertuples(index=False):
+            for row in loader.load_sleep_summaries(source_user, analysis_start, analysis_end).itertuples(index=False):
                 samples = loader.load_heart_rate(
                     source_user,
                     start_date=row.local_time,
@@ -555,10 +515,8 @@ def build_analysis_examples():
                 show=False,
             )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Period comparison and adherence monitoring
 
             Period comparison expects an already aggregated trajectory. The
@@ -566,10 +524,8 @@ def build_analysis_examples():
             can use a fixed follow-up length. The Oura loader cannot produce
             `plot_weekly_overview` because that plot requires timestamped step
             intervals, whereas Oura supplies daily step totals.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             weekly_steps = activity.get_activity_statistics(
                 loader,
                 statistic=activity.ACTIVITY_STATISTIC_STEPS,
@@ -606,10 +562,8 @@ def build_analysis_examples():
             for panel in ("wearing_days", "available_nights"):
                 adherence_axes[panel].set_yticklabels([public_user])
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Exercise
 
             Choose one feature above and answer the same question at two
@@ -620,19 +574,15 @@ def build_analysis_examples():
             2. Set a coverage threshold appropriate for the primary rows.
             3. Plot child observations against the parent estimate.
             4. Explain what would change if raw samples were pooled directly.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             # Your analysis here.
             # daily = heart_rate.get_heart_rate_statistics(...)
             # weekly = heart_rate.get_heart_rate_statistics(
             #     ..., resolution=("daily", "weekly"), aggregation="mean"
             # )
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Practical checks
 
             - Confirm that the loader exposes the stream required by a feature.
@@ -643,8 +593,7 @@ def build_analysis_examples():
             - Keep imputation and trend settings in the analysis record.
             - Retain provider names for provider-defined outcomes such as Oura
               readiness.
-            """
-        ),
+            """),
     ]
     write_notebook(OUTPUT / "analysis_examples.ipynb", cells)
 
@@ -652,8 +601,7 @@ def build_analysis_examples():
 def build_custom_loader():
     """Build the guided custom-loader tutorial."""
     cells = [
-        markdown(
-            """
+        markdown("""
             # Implement a custom pywearable loader
 
             A loader adapts one project or provider to pywearable's canonical
@@ -668,10 +616,8 @@ def build_custom_loader():
             We will inspect the provider files, translate deliberately
             inconsistent fields into canonical schemas, validate the loader
             boundary, and then use the normal feature and visualization APIs.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             import json
             import sys
             from pathlib import Path
@@ -706,19 +652,15 @@ def build_custom_loader():
 
             WYVERN_SLEEP_HEALTH_SCORE = "wyvern_sleep_health_score"
             WYVERN_DAILY_STRAIN_SCORE = "wyvern_daily_strain_score"
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Inspect the fictional provider export
 
             The export uses one directory per participant and mixes TSV, CSV,
             and JSON files. Source names mix camel case and snake case, and
             none is assumed to be canonical.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             participant_dirs = sorted(
                 path for path in DATA_ROOT.glob("demo-*") if path.is_dir()
             )
@@ -784,10 +726,8 @@ def build_custom_loader():
                 ].head(3),
                 score_source.head(3),
             )
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Plan the translation
 
             | Source field | Canonical field | Conversion |
@@ -805,10 +745,8 @@ def build_custom_loader():
             heart-rate methods. Optional methods are added only for streams
             present in the export. Capability attributes tell pywearable which
             clocks and source grains are available.
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Implement the adapter
 
             Each method returns canonical columns and applies `[start_date,
@@ -816,10 +754,8 @@ def build_custom_loader():
             normalize types, add optional columns, and validate required fields.
             Returning a typed empty canonical frame is preferable to inventing
             observations when a supported interval has no rows.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             class WyvernLoader(BaseLoader):
                 '''Adapt participant-folder exports from the fictional Wyvern Band.'''
 
@@ -992,7 +928,7 @@ def build_custom_loader():
                         canonical, schema.LOCAL_TIME_COL, start_date, end_date
                     )
 
-                def load_sleep_summary(self, user_id, start_date=None, end_date=None, drop_duplicates=True):
+                def load_sleep_summaries(self, user_id, start_date=None, end_date=None, drop_duplicates=True):
                     '''Convert nightly JSON records to canonical sleep summaries.
 
                     Provider session identifiers, calendar labels, and local
@@ -1045,7 +981,7 @@ def build_custom_loader():
                         canonical = canonical.drop_duplicates(schema.CALENDAR_DATE_COL)
                     return canonical.reset_index(drop=True)
 
-                def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+                def load_sleep_stages(self, user_id, start_date=None, end_date=None):
                     '''Convert flattened stage segments to canonical intervals.
 
                     ``startedAt`` becomes ``local_time``, seconds become
@@ -1077,7 +1013,7 @@ def build_custom_loader():
                         mask &= canonical[schema.LOCAL_TIME_COL] < pd.Timestamp(end_date)
                     return canonical.loc[mask].reset_index(drop=True)
 
-                def load_respiration_summary(
+                def load_respiration_summaries(
                     self, user_id, start_date=None, end_date=None
                 ):
                     '''Expose the nightly respiration summary stored in ``sleep.json``.
@@ -1136,19 +1072,15 @@ def build_custom_loader():
 
             loader = WyvernLoader(DATA_ROOT)
             print("Participants:", loader.get_user_ids())
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Validate the canonical boundary
 
             Before using domain functions, inspect each loader method directly.
             Required columns, dtypes, sorting, duplicate handling, and empty
             intervals are part of the loader contract.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             participant = loader.get_user_ids()[0]
             hr = loader.load_heart_rate(
                 participant, START, START + pd.Timedelta(hours=1)
@@ -1156,9 +1088,9 @@ def build_custom_loader():
             activity_samples = loader.load_activity_samples(
                 participant, START, START + pd.Timedelta(hours=1)
             )
-            summaries = loader.load_sleep_summary(participant, START, END)
-            stage_intervals = loader.load_sleep_stage(participant, START, END)
-            respiration_summary = loader.load_respiration_summary(
+            summaries = loader.load_sleep_summaries(participant, START, END)
+            stage_intervals = loader.load_sleep_stages(participant, START, END)
+            respiration_summary = loader.load_respiration_summaries(
                 participant, START, END
             )
 
@@ -1181,18 +1113,14 @@ def build_custom_loader():
 
             display(hr.head(3), activity_samples.head(3), summaries.head(3))
             print("Canonical loader checks passed")
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Use the normal pywearable APIs
 
             Once the adapter returns canonical streams, no project-specific
             code is needed for feature extraction.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             daily_steps = activity.get_activity_statistics(
                 loader,
                 statistic=activity.ACTIVITY_STATISTIC_STEPS,
@@ -1251,19 +1179,15 @@ def build_custom_loader():
                 nightly_respiration.head(3),
                 daily_scores.head(6),
             )
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Visualize one integrated week
 
             The weekly overview needs timestamped activity samples, heart rate,
             and sleep stages. Implementing those three streams makes the
             loader-aware visualization available automatically.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             visualization.plot_weekly_overview(
                 loader,
                 participant,
@@ -1273,10 +1197,8 @@ def build_custom_loader():
                 show=False,
             )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Compare the provider-native scores
 
             These scores remain provider-specific: pywearable can align and
@@ -1284,10 +1206,8 @@ def build_custom_loader():
             scores from another device. A sleep-health score is absent when
             no nightly sleep result is available; daytime strain can still be
             present when activity data exists.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             score_participant = "demo-02"
             score_axes = visualization.plot_trajectory(
                 daily_scores,
@@ -1301,20 +1221,16 @@ def build_custom_loader():
             )
             score_axes["trajectory"].set_ylim(0, 100)
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Inspect nightly sleep
 
             The compact sleep view uses the canonical summaries and native
             stage intervals. Because the loader maps `sleepHealthScore` to
             canonical `overall_sleep_score`, it can also be displayed beside
             each night; unavailable nights and scores remain blank.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             sleep_participant = "demo-02"
             visualization.plot_sleep_summary(
                 loader,
@@ -1326,19 +1242,15 @@ def build_custom_loader():
                 show=False,
             )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## Inspect adherence across participants
 
             To inspect adherence during the study, aggregate heart-rate
             coverage into 10-minute windows and compare its local-time pattern
             for each participant.
-            """
-        ),
-        code(
-            """
+            """),
+        code("""
             ten_minute_heart_rate = heart_rate.get_heart_rate_statistics(
                 loader,
                 statistic=heart_rate.HEART_RATE_STATISTIC_MEAN,
@@ -1363,10 +1275,8 @@ def build_custom_loader():
                     show=False,
                 )
             plt.show()
-            """
-        ),
-        markdown(
-            """
+            """),
+        markdown("""
             ## What the adapter is responsible for
 
             - Preserve the provider's native resolution and units.
@@ -1381,8 +1291,7 @@ def build_custom_loader():
 
             Once those responsibilities are met, downstream analysis remains
             independent of the original source structure.
-            """
-        ),
+            """),
     ]
     write_notebook(OUTPUT / "custom_loader.ipynb", cells)
 

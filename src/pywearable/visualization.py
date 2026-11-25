@@ -36,8 +36,8 @@ from . import (
     respiration,
     schema,
     sleep,
-    trajectory as trajectory_analysis,
 )
+from . import trajectory as trajectory_analysis
 from .utils import time as time_utils
 
 # Okabe-Ito colors, with neutral greys for missing and contextual layers.
@@ -175,7 +175,9 @@ def _profile_clock(frame: pd.DataFrame) -> tuple[pd.DataFrame, str]:
     if not available.any():
         return frame, "UTC"
     if not available.all():
-        warnings.warn("Rows without local-time metadata are omitted from local-clock plots.")
+        warnings.warn(
+            "Rows without local-time metadata are omitted from local-clock plots."
+        )
     result = frame.loc[available].copy()
     result.index = pd.DatetimeIndex(local[available], name=schema.LOCAL_TIME_COL)
     return result.sort_index(kind="stable"), "Local"
@@ -828,13 +830,10 @@ def plot_hierarchical_trajectory(
     duplicated = reserved.intersection(extra)
     if duplicated:
         raise ValueError(
-            "statistics_kwargs duplicates explicit arguments: "
-            f"{sorted(duplicated)}"
+            "statistics_kwargs duplicates explicit arguments: " f"{sorted(duplicated)}"
         )
     child_coverage = (
-        min_coverage[0]
-        if isinstance(min_coverage, (list, tuple))
-        else min_coverage
+        min_coverage[0] if isinstance(min_coverage, (list, tuple)) else min_coverage
     )
     common = {
         "user_id": user_id,
@@ -861,12 +860,8 @@ def plot_hierarchical_trajectory(
     children, _, time_level = _select_user(child_trajectory, user_id)
     parents, _, _ = _select_user(parent_trajectory, user_id)
     child_feature = _single_value_column(children)
-    center_feature = _single_value_column(
-        parents, suffix=f"__{chain[1]}_mean"
-    )
-    spread_feature = _single_value_column(
-        parents, suffix=f"__{chain[1]}_std"
-    )
+    center_feature = _single_value_column(parents, suffix=f"__{chain[1]}_mean")
+    spread_feature = _single_value_column(parents, suffix=f"__{chain[1]}_std")
 
     is_clock = _is_clock_series(children[child_feature], child_feature, temporal)
     anchor = (
@@ -913,10 +908,10 @@ def plot_hierarchical_trajectory(
                 color=LIGHT_BLUE,
                 alpha=0.22,
                 label=(
-                    range_label or f"{chain[1]} mean ± {std_multiplier:g} SD"
-                )
-                if not range_labeled
-                else None,
+                    (range_label or f"{chain[1]} mean ± {std_multiplier:g} SD")
+                    if not range_labeled
+                    else None
+                ),
                 zorder=0,
             )
             range_labeled = True
@@ -926,9 +921,7 @@ def plot_hierarchical_trajectory(
             end,
             color=BLUE,
             linewidth=2.4,
-            label=(center_label or f"{chain[1]} mean")
-            if not center_labeled
-            else None,
+            label=(center_label or f"{chain[1]} mean") if not center_labeled else None,
             zorder=2,
         )
         center_labeled = True
@@ -1242,9 +1235,7 @@ def _shade_clock_windows(ax, windows, *, color="#C9D7EC", alpha=0.65):
     if windows is None:
         return
     intervals = (
-        windows
-        if len(windows) and isinstance(windows[0], (list, tuple))
-        else [windows]
+        windows if len(windows) and isinstance(windows[0], (list, tuple)) else [windows]
     )
     for window in intervals:
         _shade_clock_window(ax, window, color=color, alpha=alpha)
@@ -1274,9 +1265,7 @@ def _weekday_sleep_windows(loader, user_id, start_date, end_date):
     nightly = nightly.xs(user_id, level=schema.USER_COL)
     if isinstance(nightly.index, pd.MultiIndex):
         time_levels = [
-            name
-            for name in nightly.index.names
-            if name != schema.TIMEZONE_COL
+            name for name in nightly.index.names if name != schema.TIMEZONE_COL
         ]
         if len(time_levels) != 1:
             raise ValueError("nightly sleep must contain one calendar-date level")
@@ -1576,7 +1565,9 @@ def plot_weekly_profile(
     if clock == "UTC":
         night_windows = {}
         if night_window is not None and (night_window != "auto" or loader is not None):
-            warnings.warn("Sleep shading requires local times; skipped for UTC-only trajectories.")
+            warnings.warn(
+                "Sleep shading requires local times; skipped for UTC-only trajectories."
+            )
     if kind == "heatmap":
         if ax is None:
             fig, profile_ax = plt.subplots(figsize=figsize)
@@ -1636,9 +1627,7 @@ def plot_weekly_profile(
             )
             profile_ax.plot(x, matrix[weekday], color=BLUE, linewidth=1.5)
             profile_ax.set_xlim(0, 24)
-            profile_ax.set_ylabel(
-                _WEEKDAY_NAMES[weekday][:3], rotation=0, labelpad=22
-            )
+            profile_ax.set_ylabel(_WEEKDAY_NAMES[weekday][:3], rotation=0, labelpad=22)
             profile_ax.grid(axis="y", alpha=0.16)
             profile_ax.spines[["top", "right"]].set_visible(False)
         profile_axes[0].set_title(title or f"Typical week: {feature} ({aggregation})")
@@ -1670,9 +1659,10 @@ def _normalize_cpd(cpd) -> list[str]:
 def _sleep_clock_hour(value):
     if pd.isna(value):
         return np.nan
-    return time_utils.unwrap_clock_seconds(
-        time_utils.clock_seconds(value), 12 * 3600
-    ) / 3600
+    return (
+        time_utils.unwrap_clock_seconds(time_utils.clock_seconds(value), 12 * 3600)
+        / 3600
+    )
 
 
 def plot_sleep_summary(
@@ -1758,7 +1748,7 @@ def plot_sleep_summary(
         if summary_end <= summary_start:
             raise ValueError("end_date must not precede start_date")
     summaries = schema.prepare_sleep_summary(
-        loader.load_sleep_summary(user_id, summary_start, summary_end)
+        loader.load_sleep_summaries(user_id, summary_start, summary_end)
     )
     if summaries.empty:
         raise ValueError("no sleep summaries are available for the requested period")
@@ -1787,7 +1777,7 @@ def plot_sleep_summary(
     if pd.isna(stage_end) or stage_end <= stage_start:
         raise ValueError("the selected sleep summaries have invalid session bounds")
     stages = schema.prepare_sleep_stages(
-        loader.load_sleep_stage(user_id, stage_start, stage_end)
+        loader.load_sleep_stages(user_id, stage_start, stage_end)
     )
     summary_ids = set(summaries[schema.SLEEP_SUMMARY_ID_COL])
     stages = stages[stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids)]
@@ -2100,7 +2090,7 @@ def plot_sleep_heart_rate(
         raise ValueError("stage_alpha must lie between zero and one")
     date = pd.Timestamp(calendar_date).normalize()
     summaries = schema.prepare_sleep_summary(
-        loader.load_sleep_summary(user_id, date, date + pd.Timedelta(days=1))
+        loader.load_sleep_summaries(user_id, date, date + pd.Timedelta(days=1))
     )
     row = summaries[summaries[schema.CALENDAR_DATE_COL].dt.normalize().eq(date)]
     if row.empty:
@@ -2162,7 +2152,7 @@ def plot_sleep_heart_rate(
     present_stages = []
     if show_stages:
         stages = schema.prepare_sleep_stages(
-            loader.load_sleep_stage(user_id, start_date=start, end_date=end)
+            loader.load_sleep_stages(user_id, start_date=start, end_date=end)
         )
         stages = stages[
             stages[schema.SLEEP_SUMMARY_ID_COL].eq(summary[schema.SLEEP_SUMMARY_ID_COL])
@@ -2416,9 +2406,7 @@ def plot_period_comparison(
             if favorable_direction is None:
                 positive = delta >= 0
             else:
-                positive = (
-                    delta >= 0 if favorable_direction == "higher" else delta <= 0
-                )
+                positive = delta >= 0 if favorable_direction == "higher" else delta <= 0
             color = GREEN if positive else VERMILLION
             arrow = "↑" if delta >= 0 else "↓"
             ax.annotate(
@@ -2589,7 +2577,7 @@ def plot_weekly_overview(
         time_reference="local",
     ).xs(user_id, level=schema.USER_COL)
     stages = schema.prepare_sleep_stages(
-        loader.load_sleep_stage(
+        loader.load_sleep_stages(
             user_id,
             start_date=start - pd.Timedelta(days=1),
             end_date=end + pd.Timedelta(days=1),
@@ -2961,14 +2949,12 @@ def plot_adherence_summary(
         raise ValueError("worn_day_threshold must lie between zero and one")
     if not isinstance(include_without_evidence, (bool, np.bool_)):
         raise ValueError("include_without_evidence must be a boolean")
-    periods, follow_up_days, hourly, nights = (
-        adherence._prepare_adherence_summary_data(
-            loader,
-            user_id,
-            metric,
-            follow_up_days,
-            include_without_evidence,
-        )
+    periods, follow_up_days, hourly, nights = adherence._prepare_adherence_summary_data(
+        loader,
+        user_id,
+        metric,
+        follow_up_days,
+        include_without_evidence,
     )
     users = pd.Index(periods)
     column = f"{metric}_adherence"

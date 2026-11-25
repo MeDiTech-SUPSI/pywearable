@@ -264,7 +264,7 @@ class TesseraeCSVLoader(BaseLoader):
             columns=["utc_time", "local_time", "timezone", "breaths_per_minute"]
         )
 
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -375,7 +375,7 @@ class TesseraeCSVLoader(BaseLoader):
             ]
 
         if drop_duplicates:
-            sleep_summary = self.load_sleep_summary(
+            sleep_summary = self.load_sleep_summaries(
                 user_id=user_id, start_date=None, end_date=None, drop_duplicates=True
             )
             sleep_stage = sleep_stage[
@@ -387,7 +387,7 @@ class TesseraeCSVLoader(BaseLoader):
             ["unixTimestampInMs"], axis=1
         )
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -907,7 +907,7 @@ class TesseraeCSVLoader(BaseLoader):
     ###################################################
     #                 Summaries
     ###################################################
-    def load_daily_summary(
+    def load_daily_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -960,7 +960,7 @@ class TesseraeCSVLoader(BaseLoader):
     #####################################################
     #               Additional summaries
     ####################################################
-    def load_activity_summary(
+    def load_activity_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1020,7 +1020,7 @@ class TesseraeCSVLoader(BaseLoader):
                 ]
             )
 
-    def load_adjusted_imputed_sleep_summary(
+    def load_adjusted_imputed_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1075,7 +1075,7 @@ class TesseraeCSVLoader(BaseLoader):
 
         return adj_imp_sleep_summary
 
-    def load_heart_rate_summary(
+    def load_heart_rate_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1134,7 +1134,7 @@ class TesseraeCSVLoader(BaseLoader):
 
         return hr_summary
 
-    def load_hrv_summary(
+    def load_hrv_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1225,7 +1225,7 @@ class TesseraeCSVLoader(BaseLoader):
                 ]
             )
 
-    def load_stress_summary(
+    def load_stress_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1390,7 +1390,7 @@ class TesseraeCSVLoader(BaseLoader):
     #############################################################
     #                   Weather
     #############################################################
-    def load_weather_summary(
+    def load_weather_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         return self._load_metric(
@@ -1461,7 +1461,7 @@ class TesseraeCSVLoader(BaseLoader):
         )
         return gimbal_beacon_sighting
 
-    def load_beacon_summary(
+    def load_beacon_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         gimbal_beacon_summary = self._load_metric(
@@ -1492,7 +1492,7 @@ class TesseraeCSVLoader(BaseLoader):
                 )
         return home_office_hours
 
-    def load_interaction_summary(
+    def load_interaction_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         interaction_summary = self._load_metric(
@@ -1562,7 +1562,7 @@ class TesseraeCSVLoader(BaseLoader):
                 )
         return home_office_hours
 
-    def load_mixed_hrv_summary_baseline(
+    def load_mixed_hrv_summaries_baseline(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -1622,7 +1622,7 @@ class TesseraeCSVLoader(BaseLoader):
             )
         return hrv_summary_baseline
 
-    def load_mixed_hrv_work_desk_home_summary(
+    def load_mixed_hrv_work_desk_home_summaries(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -1651,7 +1651,7 @@ class TesseraeCSVLoader(BaseLoader):
             hrv[columns] = hrv[columns].replace("NULL", None).astype(float)
         return hrv
 
-    def load_mixed_pa_summary(
+    def load_mixed_pa_summaries(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,

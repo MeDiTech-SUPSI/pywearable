@@ -69,7 +69,7 @@ class LifeSnapsParquetLoader(BaseLoader):
 
             LifeSnaps dataset doesn't have raw respiration data. Therefore
             this function will always return an empty :class:`pd.DataFrame`.
-            You can use the function :func:`load_respiration_summary` that
+            You can use the function :func:`load_respiration_summaries` that
             returns a summary of night respiration data.
 
 
@@ -202,7 +202,7 @@ class LifeSnapsParquetLoader(BaseLoader):
         else:
             return schema.empty_heart_rate_frame()
 
-    def load_respiration_summary(
+    def load_respiration_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -229,7 +229,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             respiration["timestamp"], errors="coerce"
         )
         respiration["calendar_date"] = respiration["timestamp"].dt.normalize()
-        sleep_summary = self.load_sleep_summary(user_id=user_id)
+        sleep_summary = self.load_sleep_summaries(user_id=user_id)
         if sleep_summary.empty:
             return schema.prepare_respiration_summary(pd.DataFrame())
         sleep_summary = schema.prepare_sleep_summary(sleep_summary)
@@ -271,7 +271,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             ]
         return respiration.reset_index(drop=True)
 
-    def load_spo2_summary(
+    def load_spo2_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -313,14 +313,14 @@ class LifeSnapsParquetLoader(BaseLoader):
             ]
         return spo2.reset_index(drop=True)
 
-    def load_pulse_ox_summary(
+    def load_pulse_ox_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
         end_date: Union[pd.Timestamp, None] = None,
     ) -> pd.DataFrame:
-        """Compatibility alias for :meth:`load_spo2_summary`."""
-        return self.load_spo2_summary(user_id, start_date, end_date)
+        """Compatibility alias for :meth:`load_spo2_summaries`."""
+        return self.load_spo2_summaries(user_id, start_date, end_date)
 
     def load_calories(
         self,
@@ -511,7 +511,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 columns=["sleep_summary_id", "local_time", "type", "duration_in_ms"]
             )
 
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -705,7 +705,7 @@ class LifeSnapsParquetLoader(BaseLoader):
                 ]
             )
 
-    def load_hrv_summary(self, user_id, start_date=None, end_date=None):
+    def load_hrv_summaries(self, user_id, start_date=None, end_date=None):
         """Return Fitbit-provided daily HRV summaries without using them as fallback."""
         file_path = (
             self.root_folder / user_id / "daily_heart_rate_variability_summary.parquet"
@@ -784,7 +784,7 @@ class LifeSnapsParquetLoader(BaseLoader):
             .reset_index(drop=True)
         )
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,

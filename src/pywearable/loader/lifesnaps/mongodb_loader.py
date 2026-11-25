@@ -247,7 +247,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         """
         return [str(x) for x in self.fitbit_collection.distinct("id")]
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -445,7 +445,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             "local_end_time",
             "time_in_bed_seconds",
         ]
-        sessions = self.load_sleep_summary(
+        sessions = self.load_sleep_summaries(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -618,7 +618,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
         )
         return sleep_data_df
 
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -1340,7 +1340,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             return df
         return df
 
-    def load_spo2_summary(
+    def load_spo2_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -1374,7 +1374,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
         return spo2_summary
 
-    def load_hrv_summary(
+    def load_hrv_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -1412,7 +1412,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
 
         return calories
 
-    def load_respiration_summary(
+    def load_respiration_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -1440,7 +1440,7 @@ class LifeSnapsMongoDBLoader(BaseLoader):
             respiration["timestamp"], errors="coerce"
         )
         respiration["calendar_date"] = respiration["timestamp"].dt.normalize()
-        sleep_summary = self.load_sleep_summary(user_id=user_id)
+        sleep_summary = self.load_sleep_summaries(user_id=user_id)
         if sleep_summary.empty:
             return schema.prepare_respiration_summary(pd.DataFrame())
         sleep_summary = schema.prepare_sleep_summary(sleep_summary)

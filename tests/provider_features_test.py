@@ -53,9 +53,7 @@ class ProviderFeatureLoader(BaseLoader):
         }
         self.daily = pd.DataFrame(
             {
-                schema.CALENDAR_DATE_COL: pd.to_datetime(
-                    ["2024-01-01", "2024-01-03"]
-                ),
+                schema.CALENDAR_DATE_COL: pd.to_datetime(["2024-01-01", "2024-01-03"]),
                 provider_features.FITBIT_STRESS_MANAGEMENT_SCORE: [70.0, 80.0],
             }
         )
@@ -66,10 +64,10 @@ class ProviderFeatureLoader(BaseLoader):
     def load_heart_rate(self, *args, **kwargs):
         return pd.DataFrame()
 
-    def load_sleep_summary(self, *args, **kwargs):
+    def load_sleep_summaries(self, *args, **kwargs):
         return pd.DataFrame()
 
-    def load_sleep_stage(self, *args, **kwargs):
+    def load_sleep_stages(self, *args, **kwargs):
         return pd.DataFrame()
 
     def load_provider_feature(
@@ -93,9 +91,7 @@ class CustomProviderFeatureLoader(ProviderFeatureLoader):
         super().__init__()
         self.daily = pd.DataFrame(
             {
-                schema.CALENDAR_DATE_COL: pd.to_datetime(
-                    ["2024-01-01", "2024-01-02"]
-                ),
+                schema.CALENDAR_DATE_COL: pd.to_datetime(["2024-01-01", "2024-01-02"]),
                 "example_sleep_health_score": [82.0, 76.0],
                 "example_daily_strain_score": [61.0, 73.0],
             }
@@ -151,7 +147,9 @@ def test_loader_declared_provider_feature_definitions_are_validated():
     ],
 )
 def test_labfront_stress_routes_to_the_selected_stress_folder(
-    monkeypatch, source, folder,
+    monkeypatch,
+    source,
+    folder,
 ):
     loader = LabfrontLoader.__new__(LabfrontLoader)
     requested = {}
@@ -223,45 +221,72 @@ def test_single_sample_feature_returns_coverage_without_a_threshold():
     )
 
     feature = f"{provider_features.GARMIN_STRESS_LEVEL}_mean"
-    assert list(result) == [schema.LOCAL_TIME_COL, schema.TIMEZONE_COL,
-                            feature, f"{feature}__coverage"]
+    assert list(result) == [
+        schema.LOCAL_TIME_COL,
+        schema.TIMEZONE_COL,
+        feature,
+        f"{feature}__coverage",
+    ]
     assert result.iloc[0][f"{feature}__coverage"] == 0.8
 
 
 @pytest.mark.parametrize("time_reference", ["utc", "local"])
 @pytest.mark.parametrize("resolution", ["5min", ["5min", "10min"]])
-def test_fixed_provider_features_keep_both_clocks_and_offsets(time_reference, resolution):
+def test_fixed_provider_features_keep_both_clocks_and_offsets(
+    time_reference, resolution
+):
     loader = ProviderFeatureLoader()
     for samples in loader.samples.values():
         samples[schema.TIMEZONE_COL] = pd.to_timedelta([1] * 5 + [2] * 5, unit="h")
-        samples[schema.LOCAL_TIME_COL] = samples[schema.UTC_TIME_COL] + samples[schema.TIMEZONE_COL]
+        samples[schema.LOCAL_TIME_COL] = (
+            samples[schema.UTC_TIME_COL] + samples[schema.TIMEZONE_COL]
+        )
     result = provider_features.get_provider_features(
-        loader, feature=[provider_features.GARMIN_STRESS_LEVEL, provider_features.GARMIN_BODY_BATTERY],
-        statistic="mean", resolution=resolution, time_reference=time_reference,
+        loader,
+        feature=[
+            provider_features.GARMIN_STRESS_LEVEL,
+            provider_features.GARMIN_BODY_BATTERY,
+        ],
+        statistic="mean",
+        resolution=resolution,
+        time_reference=time_reference,
         **({"aggregation": "mean"} if isinstance(resolution, list) else {}),
     )
     assert not result.empty
     selected = schema.UTC_TIME_COL if time_reference == "utc" else schema.LOCAL_TIME_COL
-    alternative = schema.LOCAL_TIME_COL if time_reference == "utc" else schema.UTC_TIME_COL
+    alternative = (
+        schema.LOCAL_TIME_COL if time_reference == "utc" else schema.UTC_TIME_COL
+    )
     assert result.index.names == [schema.USER_COL, selected]
     observed = result[result[schema.TIMEZONE_COL].notna()]
     times = pd.Series(observed.index.get_level_values(selected), index=observed.index)
-    expected = (times + observed[schema.TIMEZONE_COL] if selected == schema.UTC_TIME_COL
-                else times - observed[schema.TIMEZONE_COL])
+    expected = (
+        times + observed[schema.TIMEZONE_COL]
+        if selected == schema.UTC_TIME_COL
+        else times - observed[schema.TIMEZONE_COL]
+    )
     pd.testing.assert_series_equal(observed[alternative], expected, check_names=False)
     if time_reference == "local":
         assert result[schema.TIMEZONE_COL].isna().any()
     if resolution == "5min":
-        assert set(observed[schema.TIMEZONE_COL]) == {pd.Timedelta(hours=1), pd.Timedelta(hours=2)}
+        assert set(observed[schema.TIMEZONE_COL]) == {
+            pd.Timedelta(hours=1),
+            pd.Timedelta(hours=2),
+        }
 
 
 @pytest.mark.parametrize("resolution", ["5min", ["5min", "10min"]])
 def test_empty_fixed_provider_features_keep_time_metadata(resolution):
     loader = ProviderFeatureLoader()
-    loader.samples[provider_features.GARMIN_STRESS_LEVEL] = loader.samples[provider_features.GARMIN_STRESS_LEVEL].iloc[0:0]
+    loader.samples[provider_features.GARMIN_STRESS_LEVEL] = loader.samples[
+        provider_features.GARMIN_STRESS_LEVEL
+    ].iloc[0:0]
     result = provider_features.get_provider_features(
-        loader, feature=provider_features.GARMIN_STRESS_LEVEL, statistic="mean",
-        resolution=resolution, **({"aggregation": "mean"} if isinstance(resolution, list) else {}),
+        loader,
+        feature=provider_features.GARMIN_STRESS_LEVEL,
+        statistic="mean",
+        resolution=resolution,
+        **({"aggregation": "mean"} if isinstance(resolution, list) else {}),
     )
     assert result.empty
     assert result.index.names == [schema.USER_COL, schema.UTC_TIME_COL]
@@ -273,9 +298,14 @@ def test_provider_features_do_not_invent_missing_source_offsets():
     loader = ProviderFeatureLoader()
     samples = loader.samples[provider_features.GARMIN_STRESS_LEVEL]
     samples[schema.LOCAL_TIME_COL] = pd.NaT
-    samples[schema.TIMEZONE_COL] = pd.Series(pd.NaT, index=samples.index, dtype="timedelta64[ns]")
+    samples[schema.TIMEZONE_COL] = pd.Series(
+        pd.NaT, index=samples.index, dtype="timedelta64[ns]"
+    )
     result = provider_features.get_provider_features(
-        loader, feature=provider_features.GARMIN_STRESS_LEVEL, statistic="mean", resolution="5min",
+        loader,
+        feature=provider_features.GARMIN_STRESS_LEVEL,
+        statistic="mean",
+        resolution="5min",
     )
     assert result.garmin_stress_level_mean.notna().all()
     assert result[schema.LOCAL_TIME_COL].isna().all()
@@ -346,9 +376,7 @@ def test_body_battery_sleep_features_use_cycle_boundaries(monkeypatch):
         provider_features.GARMIN_BODY_BATTERY_SLEEP_GAIN,
         provider_features.GARMIN_BODY_BATTERY_SLEEP_RECOVERY_FRACTION,
     }
-    times = pd.to_datetime(
-        ["2024-01-01 21:58", "2024-01-01 22:00", "2024-01-02 06:00"]
-    )
+    times = pd.to_datetime(["2024-01-01 21:58", "2024-01-01 22:00", "2024-01-02 06:00"])
     loader.samples[provider_features.GARMIN_BODY_BATTERY] = pd.DataFrame(
         {
             schema.UTC_TIME_COL: times,
@@ -395,7 +423,8 @@ def test_body_battery_sleep_features_use_cycle_boundaries(monkeypatch):
 
 @pytest.mark.parametrize("include_offset", [True, False])
 def test_labfront_translates_stress_sentinels_without_losing_body_battery(
-    monkeypatch, include_offset,
+    monkeypatch,
+    include_offset,
 ):
     loader = LabfrontLoader.__new__(LabfrontLoader)
     raw = pd.DataFrame(
@@ -463,10 +492,7 @@ def test_lifesnaps_drops_duplicates_and_requires_completed_fitbit_scores(tmp_pat
     assert len(result) == 4
     assert result[provider_features.FITBIT_STRESS_MANAGEMENT_SCORE].iloc[0] == 80
     assert (
-        result[provider_features.FITBIT_STRESS_MANAGEMENT_SCORE]
-        .iloc[1:]
-        .isna()
-        .all()
+        result[provider_features.FITBIT_STRESS_MANAGEMENT_SCORE].iloc[1:].isna().all()
     )
 
 
@@ -476,21 +502,15 @@ def test_tesserae_provider_feature_supports_unbounded_loading(tmp_path):
     folder.mkdir(parents=True)
     pd.DataFrame(
         {
-            "Timestamp": pd.to_datetime(
-                ["2024-01-01 00:00Z", "2024-01-01 00:03Z"]
-            ),
+            "Timestamp": pd.to_datetime(["2024-01-01 00:00Z", "2024-01-01 00:03Z"]),
             "tz_source": ["export", "export"],
-            "local_time": pd.to_datetime(
-                ["2024-01-01 01:00", "2024-01-01 01:03"]
-            ),
+            "local_time": pd.to_datetime(["2024-01-01 01:00", "2024-01-01 01:03"]),
             "hr": [-2, 35],
         }
     ).to_parquet(folder / "Stress.parquet")
     loader = TesseraeParquetLoader(tmp_path)
 
-    result = loader.load_provider_feature(
-        provider_features.GARMIN_STRESS_LEVEL, user
-    )
+    result = loader.load_provider_feature(provider_features.GARMIN_STRESS_LEVEL, user)
 
     assert result[provider_features.GARMIN_STRESS_LEVEL].isna().iloc[0]
     assert result[provider_features.GARMIN_STRESS_LEVEL].iloc[1] == 35

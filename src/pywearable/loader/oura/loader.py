@@ -67,7 +67,9 @@ class OuraLoader(BaseLoader):
         self.data_dir = Path(data_dir)
         if not self.data_dir.is_dir():
             raise FileNotFoundError(self.data_dir)
-        self.ids = sorted(path.name for path in self.data_dir.iterdir() if path.is_dir())
+        self.ids = sorted(
+            path.name for path in self.data_dir.iterdir() if path.is_dir()
+        )
 
     def get_user_ids(self) -> list:
         return self.ids.copy()
@@ -84,9 +86,15 @@ class OuraLoader(BaseLoader):
             with file.open(encoding="utf-8") as stream:
                 payload = json.load(stream)
             # Some copied exports contain numbered placeholder pages such as "0".
-            if isinstance(payload, str) and payload.isdigit() and file.stem.startswith("data_"):
+            if (
+                isinstance(payload, str)
+                and payload.isdigit()
+                and file.stem.startswith("data_")
+            ):
                 continue
-            if not isinstance(payload, dict) or not isinstance(payload.get("data"), list):
+            if not isinstance(payload, dict) or not isinstance(
+                payload.get("data"), list
+            ):
                 raise ValueError(f"Invalid Oura export structure: {file}")
             for record in payload["data"]:
                 if not isinstance(record, dict):
@@ -94,12 +102,18 @@ class OuraLoader(BaseLoader):
                 if "id" in record:
                     key = ("id", record["id"])
                 elif metric == "heartrate" and "timestamp" in record:
-                    key = ("timestamp_source", record["timestamp"], record.get("source"))
+                    key = (
+                        "timestamp_source",
+                        record["timestamp"],
+                        record.get("source"),
+                    )
                 else:
                     key = ("record", json.dumps(record, sort_keys=True))
                 previous = records.get(key)
                 if previous is not None and previous != record:
-                    raise ValueError(f"Conflicting Oura {metric} export records for {key}")
+                    raise ValueError(
+                        f"Conflicting Oura {metric} export records for {key}"
+                    )
                 records[key] = record
         return list(records.values())
 
@@ -225,19 +239,28 @@ class OuraLoader(BaseLoader):
         assign_days(self._day_offsets(sleep_records, "bedtime_end"), "sleep_day")
         return offsets, offset_source
 
-    def load_sleep_sessions(self, user_id, start_date=None, end_date=None, sleep_type=None):
+    def load_sleep_sessions(
+        self, user_id, start_date=None, end_date=None, sleep_type=None
+    ):
         """Return Oura sessions, including naps, without making them nightly features."""
-        records = self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
+        records = self._day_filter(
+            self._read_records(user_id, "sleep"), start_date, end_date
+        )
         if sleep_type is not None:
             records = [record for record in records if record.get("type") == sleep_type]
         columns = [
-            "id", "calendar_date", "type", "main_sleep", "local_time",
-            "local_end_time", "time_in_bed_seconds",
+            "id",
+            "calendar_date",
+            "type",
+            "main_sleep",
+            "local_time",
+            "local_end_time",
+            "time_in_bed_seconds",
         ]
         rows = [
             {
                 "id": record["id"],
-                    "calendar_date": pd.Timestamp(record["day"]).normalize(),
+                "calendar_date": pd.Timestamp(record["day"]).normalize(),
                 "type": record.get("type"),
                 "main_sleep": record.get("type") == "long_sleep",
                 "local_time": self._local_time(record["bedtime_start"]),
@@ -246,24 +269,46 @@ class OuraLoader(BaseLoader):
             }
             for record in records
         ]
-        return pd.DataFrame(rows, columns=columns).sort_values("local_time").reset_index(drop=True) if rows else pd.DataFrame(columns=columns)
+        return (
+            pd.DataFrame(rows, columns=columns)
+            .sort_values("local_time")
+            .reset_index(drop=True)
+            if rows
+            else pd.DataFrame(columns=columns)
+        )
 
-    def load_sleep_summary(self, user_id, start_date=None, end_date=None, drop_duplicates=True):
+    def load_sleep_summaries(
+        self, user_id, start_date=None, end_date=None, drop_duplicates=True
+    ):
         """Return long_sleep nights in the shared sleep-summary schema."""
-        records = self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
+        records = self._day_filter(
+            self._read_records(user_id, "sleep"), start_date, end_date
+        )
         records = [record for record in records if record.get("type") == "long_sleep"]
         columns = [
-            "sleep_summary_id", "calendar_date", "local_time", "local_end_time",
-            "utc_time", "utc_end_time", "unix_timestamp_in_ms", "timezone_offset_in_ms",
-            "duration_in_ms", "awake_duration_in_ms", "deep_sleep_duration_in_ms",
-            "light_sleep_duration_in_ms", "rem_sleep_duration_in_ms",
-            "unmeasurable_sleep_duration_in_ms", "overall_sleep_score",
+            "sleep_summary_id",
+            "calendar_date",
+            "local_time",
+            "local_end_time",
+            "utc_time",
+            "utc_end_time",
+            "unix_timestamp_in_ms",
+            "timezone_offset_in_ms",
+            "duration_in_ms",
+            "awake_duration_in_ms",
+            "deep_sleep_duration_in_ms",
+            "light_sleep_duration_in_ms",
+            "rem_sleep_duration_in_ms",
+            "unmeasurable_sleep_duration_in_ms",
+            "overall_sleep_score",
         ]
         if not records:
             return pd.DataFrame(columns=columns)
 
         scores = {}
-        for record in self._day_filter(self._read_records(user_id, "daily_sleep"), start_date, end_date):
+        for record in self._day_filter(
+            self._read_records(user_id, "daily_sleep"), start_date, end_date
+        ):
             day = record["day"]
             if day in scores and scores[day] != record.get("score"):
                 raise ValueError(f"Conflicting Oura daily sleep scores for {day}")
@@ -281,7 +326,9 @@ class OuraLoader(BaseLoader):
             start = pd.Timestamp(record["bedtime_start"])
             end = pd.Timestamp(record["bedtime_end"])
             if start.tzinfo is None or end.tzinfo is None:
-                raise ValueError(f"Oura sleep session {record['id']} lacks a time offset")
+                raise ValueError(
+                    f"Oura sleep session {record['id']} lacks a time offset"
+                )
             row = {
                 "sleep_summary_id": record["id"],
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
@@ -301,7 +348,9 @@ class OuraLoader(BaseLoader):
         frame = pd.DataFrame(rows, columns=columns).sort_values("calendar_date")
         if drop_duplicates:
             frame = (
-                frame.sort_values(["calendar_date", "duration_in_ms", "sleep_summary_id"])
+                frame.sort_values(
+                    ["calendar_date", "duration_in_ms", "sleep_summary_id"]
+                )
                 .drop_duplicates(subset="calendar_date", keep="last")
                 .sort_values("calendar_date")
             )
@@ -317,8 +366,14 @@ class OuraLoader(BaseLoader):
         """
         stage_map = {"1": "deep", "2": "light", "3": "rem", "4": "awake"}
         columns = [
-            "sleep_summary_id", "utc_time", "local_time", "timezone_offset_in_ms",
-            "unix_timestamp_in_ms", "duration_in_ms", "type", "local_time_uncertain",
+            "sleep_summary_id",
+            "utc_time",
+            "local_time",
+            "timezone_offset_in_ms",
+            "unix_timestamp_in_ms",
+            "duration_in_ms",
+            "type",
+            "local_time_uncertain",
         ]
         rows = []
         uncertain_sessions_in_window = set()
@@ -333,14 +388,18 @@ class OuraLoader(BaseLoader):
             start = pd.Timestamp(record["bedtime_start"])
             end = pd.Timestamp(record["bedtime_end"])
             if start.tzinfo is None:
-                raise ValueError(f"Oura sleep session {record['id']} lacks a time offset")
+                raise ValueError(
+                    f"Oura sleep session {record['id']} lacks a time offset"
+                )
             if end.tzinfo is None:
-                raise ValueError(f"Oura sleep session {record['id']} lacks an end time offset")
+                raise ValueError(
+                    f"Oura sleep session {record['id']} lacks an end time offset"
+                )
             uncertain_local_clock = start.utcoffset() != end.utcoffset()
-            if uncertain_local_clock and (
-                requested_start is None or end.tz_localize(None) > requested_start
-            ) and (
-                requested_end is None or start.tz_localize(None) < requested_end
+            if (
+                uncertain_local_clock
+                and (requested_start is None or end.tz_localize(None) > requested_start)
+                and (requested_end is None or start.tz_localize(None) < requested_end)
             ):
                 uncertain_sessions_in_window.add(record["id"])
             run_start = 0
@@ -353,7 +412,9 @@ class OuraLoader(BaseLoader):
                         "sleep_summary_id": record["id"],
                         "utc_time": instant.tz_convert("UTC").tz_localize(None),
                         "local_time": instant.tz_localize(None),
-                        "timezone_offset_in_ms": int(start.utcoffset().total_seconds() * 1000),
+                        "timezone_offset_in_ms": int(
+                            start.utcoffset().total_seconds() * 1000
+                        ),
                         "unix_timestamp_in_ms": instant.value // 1_000_000,
                         "duration_in_ms": (index - run_start) * 5 * 60_000,
                         "type": stage_map.get(phases[run_start], "unmeasurable"),
@@ -373,7 +434,7 @@ class OuraLoader(BaseLoader):
         ]
         return frame.sort_values("local_time").reset_index(drop=True)
 
-    def load_sleep_stage(self, user_id, start_date=None, end_date=None):
+    def load_sleep_stages(self, user_id, start_date=None, end_date=None):
         """Return the stage trajectory for nightly ``long_sleep`` sessions."""
         return self._load_sleep_stages(
             user_id, start_date, end_date, main_sleep_only=True
@@ -385,7 +446,9 @@ class OuraLoader(BaseLoader):
             user_id, start_date, end_date, main_sleep_only=False
         )
 
-    def load_heart_rate(self, user_id, start_date=None, end_date=None, time_col="local_time"):
+    def load_heart_rate(
+        self, user_id, start_date=None, end_date=None, time_col="local_time"
+    ):
         """Return Oura HR with UTC instants and conservatively inferred local time.
 
         ``daily_activity.timestamp`` supplies the primary local-day offset.
@@ -395,8 +458,14 @@ class OuraLoader(BaseLoader):
         """
         schema.validate_heart_rate_time_col(time_col)
         columns = [
-            "utc_time", "local_time", "timezone", "heart_rate", "source",
-            "timestamp_conflict", "local_time_source", "local_time_uncertain",
+            "utc_time",
+            "local_time",
+            "timezone",
+            "heart_rate",
+            "source",
+            "timestamp_conflict",
+            "local_time_source",
+            "local_time_uncertain",
         ]
         rows = [
             {
@@ -417,21 +486,17 @@ class OuraLoader(BaseLoader):
                 frame, start_date, end_date, time_col
             )
         else:
-            broad_start = schema.normalize_time_bound(
-                start_date, time_col
-            )
+            broad_start = schema.normalize_time_bound(start_date, time_col)
             broad_end = schema.normalize_time_bound(end_date, time_col)
             if broad_start is not None:
-                frame = frame[
-                    frame["utc_time"] >= broad_start - pd.Timedelta(days=1)
-                ]
+                frame = frame[frame["utc_time"] >= broad_start - pd.Timedelta(days=1)]
             if broad_end is not None:
                 frame = frame[frame["utc_time"] < broad_end + pd.Timedelta(days=1)]
         if frame.empty:
             return pd.DataFrame(columns=columns)
 
-        frame["timezone"], frame["local_time_source"] = (
-            self._heart_rate_local_context(user_id, frame["utc_time"])
+        frame["timezone"], frame["local_time_source"] = self._heart_rate_local_context(
+            user_id, frame["utc_time"]
         )
         frame["local_time"] = frame["utc_time"] + frame["timezone"]
         frame["local_time_uncertain"] = frame["local_time"].isna()
@@ -444,14 +509,12 @@ class OuraLoader(BaseLoader):
             )
         frame = schema.prepare_heart_rate_samples(frame)
         return (
-            schema.filter_heart_rate_by_time(
-                frame, start_date, end_date, time_col
-            )
+            schema.filter_heart_rate_by_time(frame, start_date, end_date, time_col)
             .sort_values(["utc_time", "source"])
             .reset_index(drop=True)
         )[columns]
 
-    def load_hrv_summary(self, user_id, start_date=None, end_date=None):
+    def load_hrv_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura-provided average nightly rMSSD (milliseconds)."""
         rows = [
             {
@@ -460,7 +523,9 @@ class OuraLoader(BaseLoader):
                 "oura_average_rmssd_ms": record.get("average_hrv"),
                 schema.HRV_RMSSD_COL: record.get("average_hrv"),
             }
-            for record in self._day_filter(self._read_records(user_id, "sleep"), start_date, end_date)
+            for record in self._day_filter(
+                self._read_records(user_id, "sleep"), start_date, end_date
+            )
             if record.get("type") == "long_sleep"
         ]
         return pd.DataFrame(
@@ -494,7 +559,9 @@ class OuraLoader(BaseLoader):
                 continue
             anchor = pd.Timestamp(series["timestamp"])
             if anchor.tzinfo is None:
-                raise ValueError(f"Oura HRV series for {record['id']} lacks a time offset")
+                raise ValueError(
+                    f"Oura HRV series for {record['id']} lacks a time offset"
+                )
             interval = pd.Timedelta(seconds=float(series["interval"]))
             for index, value in enumerate(items):
                 if value is None:
@@ -524,7 +591,7 @@ class OuraLoader(BaseLoader):
             frame = frame[frame["utc_time"] < end]
         return frame.sort_values("utc_time").reset_index(drop=True)
 
-    def load_sleep_respiration_summary(self, user_id, start_date=None, end_date=None):
+    def load_sleep_respiration_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura's nightly respiratory-rate estimate, not a continuous signal."""
         rows = []
         for record in self._day_filter(
@@ -537,12 +604,10 @@ class OuraLoader(BaseLoader):
             rows.append(
                 {
                     "sleep_summary_id": record["id"],
-                "calendar_date": pd.Timestamp(record["day"]).normalize(),
+                    "calendar_date": pd.Timestamp(record["day"]).normalize(),
                     "local_time": start.tz_localize(None),
                     "local_end_time": end.tz_localize(None),
-                    "oura_average_breaths_per_minute": record.get(
-                        "average_breath"
-                    ),
+                    "oura_average_breaths_per_minute": record.get("average_breath"),
                     schema.RESPIRATORY_RATE_MEAN_COL: record.get("average_breath"),
                     "source": "oura_sleep",
                 }
@@ -558,11 +623,11 @@ class OuraLoader(BaseLoader):
         ]
         return schema.prepare_respiration_summary(pd.DataFrame(rows, columns=columns))
 
-    def load_respiration_summary(self, user_id, start_date=None, end_date=None):
+    def load_respiration_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura's provider-native nightly respiratory-rate summary."""
-        return self.load_sleep_respiration_summary(user_id, start_date, end_date)
+        return self.load_sleep_respiration_summaries(user_id, start_date, end_date)
 
-    def load_steps_summary(self, user_id, start_date=None, end_date=None):
+    def load_steps_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura daily steps keyed by its local calendar day."""
         rows = [
             {
@@ -578,22 +643,22 @@ class OuraLoader(BaseLoader):
         )
         return schema.prepare_activity_summary(frame)
 
-    def load_pulse_ox_summary(self, user_id, start_date=None, end_date=None):
+    def load_pulse_ox_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura's provider daily SpO2 percentage, not raw pulse-ox samples."""
         rows = [
             {
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
-                    "oura_daily_spo2_percentage": (
-                        pd.NA
-                        if (record.get("spo2_percentage") or {}).get("average") == 0
-                        else (record.get("spo2_percentage") or {}).get("average")
-                    ),
-                    schema.SPO2_MEAN_COL: (
-                        pd.NA
-                        if (record.get("spo2_percentage") or {}).get("average") == 0
-                        else (record.get("spo2_percentage") or {}).get("average")
-                    ),
-                }
+                "oura_daily_spo2_percentage": (
+                    pd.NA
+                    if (record.get("spo2_percentage") or {}).get("average") == 0
+                    else (record.get("spo2_percentage") or {}).get("average")
+                ),
+                schema.SPO2_MEAN_COL: (
+                    pd.NA
+                    if (record.get("spo2_percentage") or {}).get("average") == 0
+                    else (record.get("spo2_percentage") or {}).get("average")
+                ),
+            }
             for record in self._day_filter(
                 self._read_records(user_id, "daily_spo2"), start_date, end_date
             )
@@ -612,18 +677,24 @@ class OuraLoader(BaseLoader):
         frame["source"] = "oura_daily_spo2"
         return schema.prepare_spo2_summary(frame)
 
-    def load_spo2_summary(self, user_id, start_date=None, end_date=None):
+    def load_spo2_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura's sleep-derived daily oxygen-saturation summary."""
-        return self.load_pulse_ox_summary(user_id, start_date, end_date)
+        return self.load_pulse_ox_summaries(user_id, start_date, end_date)
 
     def load_readiness(self, user_id, start_date=None, end_date=None):
         """Return Oura's daily readiness score and vendor contributor scores."""
         columns = [
-            "calendar_date", "oura_readiness_score", "temperature_deviation",
-            "temperature_trend_deviation", "readiness_activity_balance",
-            "readiness_body_temperature", "readiness_hrv_balance",
-            "readiness_previous_day_activity", "readiness_previous_night",
-            "readiness_recovery_index", "readiness_resting_heart_rate",
+            "calendar_date",
+            "oura_readiness_score",
+            "temperature_deviation",
+            "temperature_trend_deviation",
+            "readiness_activity_balance",
+            "readiness_body_temperature",
+            "readiness_hrv_balance",
+            "readiness_previous_day_activity",
+            "readiness_previous_night",
+            "readiness_recovery_index",
+            "readiness_resting_heart_rate",
             "readiness_sleep_balance",
         ]
         rows = []
@@ -634,10 +705,15 @@ class OuraLoader(BaseLoader):
                 "calendar_date": pd.Timestamp(record["day"]).normalize(),
                 "oura_readiness_score": record.get("score"),
                 "temperature_deviation": record.get("temperature_deviation"),
-                "temperature_trend_deviation": record.get("temperature_trend_deviation"),
+                "temperature_trend_deviation": record.get(
+                    "temperature_trend_deviation"
+                ),
             }
             row.update(
-                {f"readiness_{key}": value for key, value in (record.get("contributors") or {}).items()}
+                {
+                    f"readiness_{key}": value
+                    for key, value in (record.get("contributors") or {}).items()
+                }
             )
             rows.append(row)
         return pd.DataFrame(rows, columns=columns)
@@ -655,14 +731,10 @@ class OuraLoader(BaseLoader):
             "oura_readiness_activity_balance": "readiness_activity_balance",
             "oura_readiness_body_temperature": "readiness_body_temperature",
             "oura_readiness_hrv_balance": "readiness_hrv_balance",
-            "oura_readiness_previous_day_activity": (
-                "readiness_previous_day_activity"
-            ),
+            "oura_readiness_previous_day_activity": ("readiness_previous_day_activity"),
             "oura_readiness_previous_night": "readiness_previous_night",
             "oura_readiness_recovery_index": "readiness_recovery_index",
-            "oura_readiness_resting_heart_rate": (
-                "readiness_resting_heart_rate"
-            ),
+            "oura_readiness_resting_heart_rate": ("readiness_resting_heart_rate"),
             "oura_readiness_sleep_balance": "readiness_sleep_balance",
         }
         if feature not in columns:
@@ -678,8 +750,11 @@ class OuraLoader(BaseLoader):
     def load_resilience(self, user_id, start_date=None, end_date=None):
         """Return Oura's categorical daily resilience and vendor contributors."""
         columns = [
-            "calendar_date", "oura_resilience_level", "resilience_daytime_recovery",
-            "resilience_sleep_recovery", "resilience_stress",
+            "calendar_date",
+            "oura_resilience_level",
+            "resilience_daytime_recovery",
+            "resilience_sleep_recovery",
+            "resilience_stress",
         ]
         rows = []
         for record in self._day_filter(
@@ -690,17 +765,22 @@ class OuraLoader(BaseLoader):
                 "oura_resilience_level": record.get("level"),
             }
             row.update(
-                {f"resilience_{key}": value for key, value in (record.get("contributors") or {}).items()}
+                {
+                    f"resilience_{key}": value
+                    for key, value in (record.get("contributors") or {}).items()
+                }
             )
             rows.append(row)
         return pd.DataFrame(rows, columns=columns)
 
     def load_recovery(self, user_id, start_date=None, end_date=None):
-        raise NotImplementedError("Oura readiness is vendor-specific; use load_readiness")
+        raise NotImplementedError(
+            "Oura readiness is vendor-specific; use load_readiness"
+        )
 
-    def load_activity_summary(self, user_id, start_date=None, end_date=None):
+    def load_activity_summaries(self, user_id, start_date=None, end_date=None):
         """Return Oura's calendar-day step totals."""
-        return self.load_steps_summary(user_id, start_date, end_date)
+        return self.load_steps_summaries(user_id, start_date, end_date)
 
     def load_intensity(self, user_id, start_date=None, end_date=None):
         # TODO: decode Oura's five-minute activity class series.
@@ -711,5 +791,6 @@ class OuraLoader(BaseLoader):
 
     def load_respiration(self, user_id, start_date=None, end_date=None):
         return schema.empty_respiration_frame()
+
 
 __all__ = ["OuraLoader"]

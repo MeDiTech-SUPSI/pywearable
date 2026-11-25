@@ -12,7 +12,6 @@ from . import cycle, hierarchy, schema
 from .loader.base import BaseLoader
 from .utils import time as time_utils
 
-
 RESPIRATORY_RATE_STATISTIC_MEAN = "respiratory_rate_mean"
 RESPIRATORY_RATE_STATISTIC_MEDIAN = "respiratory_rate_median"
 RESPIRATORY_RATE_STATISTIC_STD = "respiratory_rate_std"
@@ -55,14 +54,14 @@ _FAMILY_CONFIG = {
         "source_attr": "respiratory_rate_source",
         "time_columns_attr": "respiratory_rate_time_columns",
         "sample_loader": "load_respiration",
-        "summary_loader": "load_respiration_summary",
+        "summary_loader": "load_respiration_summaries",
     },
     "spo2": {
         "value_col": schema.SPO2_COL,
         "source_attr": "spo2_source",
         "time_columns_attr": "spo2_time_columns",
         "sample_loader": "load_pulse_ox",
-        "summary_loader": "load_spo2_summary",
+        "summary_loader": "load_spo2_summaries",
     },
 }
 
@@ -135,9 +134,7 @@ def _summarize_samples(
             result[name] = int(values.size)
         elif name == SPO2_STATISTIC_BELOW_THRESHOLD_FRACTION:
             result[name] = (
-                float(values.lt(spo2_threshold).mean())
-                if not values.empty
-                else np.nan
+                float(values.lt(spo2_threshold).mean()) if not values.empty else np.nan
             )
         elif name == SPO2_STATISTIC_BELOW_THRESHOLD_DURATION:
             result[name] = _below_threshold_duration(
@@ -388,15 +385,16 @@ def _summary_family_trajectory(
             ]
         if end_date is not None:
             summary = summary[
-                summary[schema.CALENDAR_DATE_COL]
-                < pd.Timestamp(end_date).normalize()
+                summary[schema.CALENDAR_DATE_COL] < pd.Timestamp(end_date).normalize()
             ]
         lower = (
-            start_date if start_date is not None
+            start_date
+            if start_date is not None
             else summary[schema.CALENDAR_DATE_COL].min()
         )
         upper = (
-            end_date if end_date is not None
+            end_date
+            if end_date is not None
             else summary[schema.CALENDAR_DATE_COL].max() + pd.Timedelta(days=1)
         )
         if pd.isna(lower) or pd.isna(upper):
@@ -529,7 +527,9 @@ def get_respiration_statistics(
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
     chain = [cycle.CYCLE_NIGHT if value == "nightly" else value for value in chain]
     families = [
-        family for family in _FAMILY_CONFIG if hierarchy.family_statistics(statistics, family)
+        family
+        for family in _FAMILY_CONFIG
+        if hierarchy.family_statistics(statistics, family)
     ]
     sources = {
         getattr(loader, _FAMILY_CONFIG[family]["source_attr"], "samples")
@@ -553,7 +553,11 @@ def get_respiration_statistics(
         primary = chain[0]
         if primary == cycle.CYCLE_NIGHT:
             direct_summary = not hierarchical
-        elif not hierarchical and primary in hierarchy.CALENDAR_RESOLUTIONS and primary != "daily":
+        elif (
+            not hierarchical
+            and primary in hierarchy.CALENDAR_RESOLUTIONS
+            and primary != "daily"
+        ):
             chain = [cycle.CYCLE_NIGHT, primary]
             hierarchical = True
         else:
@@ -686,18 +690,10 @@ def get_respiration_statistics(
             return hierarchy.format_fixed_time_output(trajectory, index_name)
         return trajectory
 
-    columns = [
-        column
-        for name in statistics
-        for column in (name, f"{name}__coverage")
-    ]
+    columns = [column for name in statistics for column in (name, f"{name}__coverage")]
     result = trajectory[
         columns
-        + [
-            column
-            for column in hierarchy.TIME_METADATA_COLUMNS
-            if column in trajectory
-        ]
+        + [column for column in hierarchy.TIME_METADATA_COLUMNS if column in trajectory]
     ].copy()
     index_name = (
         schema.CALENDAR_DATE_COL

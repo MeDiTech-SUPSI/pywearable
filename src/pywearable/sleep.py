@@ -830,13 +830,9 @@ def _get_user_sleep_wake_trajectory(
         raise ValueError("end_date must be after start_date")
 
     load_start = (
-        None
-        if requested_start is None
-        else requested_start - pd.Timedelta(days=1)
+        None if requested_start is None else requested_start - pd.Timedelta(days=1)
     )
-    load_end = (
-        None if requested_end is None else requested_end + pd.Timedelta(days=1)
-    )
+    load_end = None if requested_end is None else requested_end + pd.Timedelta(days=1)
     sessions = schema.prepare_sleep_sessions(
         loader.load_sleep_sessions(user_id, load_start, load_end)
     )
@@ -847,9 +843,9 @@ def _get_user_sleep_wake_trajectory(
     if not include_naps and not sessions.empty:
         main_ids = set(sessions.loc[sessions["main_sleep"], "id"])
         sessions = sessions[sessions["id"].isin(main_ids)].reset_index(drop=True)
-        stages = stages[
-            stages[schema.SLEEP_SUMMARY_ID_COL].isin(main_ids)
-        ].reset_index(drop=True)
+        stages = stages[stages[schema.SLEEP_SUMMARY_ID_COL].isin(main_ids)].reset_index(
+            drop=True
+        )
 
     available_starts = []
     available_ends = []
@@ -861,9 +857,7 @@ def _get_user_sleep_wake_trajectory(
         available_ends.append(
             (
                 stages[schema.LOCAL_TIME_COL]
-                + pd.to_timedelta(
-                    stages[schema.DURATION_IN_MS_COL], unit="ms"
-                )
+                + pd.to_timedelta(stages[schema.DURATION_IN_MS_COL], unit="ms")
             ).max()
         )
     if requested_start is None:
@@ -939,9 +933,7 @@ def _get_user_sleep_wake_trajectory(
             if overlap <= pd.Timedelta(0):
                 continue
             session_for_bin[index] = session.id
-            awake_ms[index] = max(
-                0, awake_ms[index] - overlap.total_seconds() * 1000
-            )
+            awake_ms[index] = max(0, awake_ms[index] - overlap.total_seconds() * 1000)
             inferred_awake[index] = awake_ms[index] > 0
 
     session_lookup = sessions.set_index("id") if not sessions.empty else sessions
@@ -963,9 +955,7 @@ def _get_user_sleep_wake_trajectory(
         if stage_type == schema.SLEEP_STAGE_UNMEASURABLE_STAGE_VALUE:
             continue
         state = (
-            "awake"
-            if stage_type == schema.SLEEP_STAGE_AWAKE_STAGE_VALUE
-            else "sleep"
+            "awake" if stage_type == schema.SLEEP_STAGE_AWAKE_STAGE_VALUE else "sleep"
         )
         if stage_type not in stage_overlap:
             stage_overlap[stage_type] = np.zeros(size, dtype=float)
@@ -1034,9 +1024,7 @@ def _get_user_sleep_wake_trajectory(
         index=grid,
     )
     result.index.name = schema.LOCAL_TIME_COL
-    return pd.concat(
-        {user_id: result}, names=[schema.USER_COL, schema.LOCAL_TIME_COL]
-    )
+    return pd.concat({user_id: result}, names=[schema.USER_COL, schema.LOCAL_TIME_COL])
 
 
 def get_sleep_regularity_index(
@@ -1131,14 +1119,17 @@ def get_total_sleep_time_24h(
             sessions = sessions[sessions["sleep_day"] < last]
         day_start = first if first is not None else sessions["sleep_day"].min()
         day_end = (
-            last if last is not None
+            last
+            if last is not None
             else sessions["sleep_day"].max() + pd.Timedelta(days=1)
         )
         if pd.isna(day_start) or pd.isna(day_end):
             continue
-        if sessions[schema.LOCAL_TIME_COL].lt(
-            sessions[schema.LOCAL_END_TIME_COL].cummax().shift()
-        ).any():
+        if (
+            sessions[schema.LOCAL_TIME_COL]
+            .lt(sessions[schema.LOCAL_END_TIME_COL].cummax().shift())
+            .any()
+        ):
             raise ValueError("Sleep sessions must not overlap for 24-hour totals")
         totals = {}
         if not sessions.empty:
@@ -1177,9 +1168,11 @@ def get_total_sleep_time_24h(
             index=index,
             dtype=float,
         )
-    return pd.DataFrame(records).set_index(
-        [schema.USER_COL, schema.CALENDAR_DATE_COL]
-    ).sort_index()
+    return (
+        pd.DataFrame(records)
+        .set_index([schema.USER_COL, schema.CALENDAR_DATE_COL])
+        .sort_index()
+    )
 
 
 def get_sleep_wake_trajectory(
@@ -1236,9 +1229,7 @@ def get_sleep_regularity(
         if start_date is None
         else pd.Timestamp(start_date).normalize() - pd.Timedelta(days=1)
     )
-    trajectory_end = (
-        None if end_date is None else pd.Timestamp(end_date).normalize()
-    )
+    trajectory_end = None if end_date is None else pd.Timestamp(end_date).normalize()
     trajectory = get_sleep_wake_trajectory(
         loader,
         user_id=user_id,
@@ -1592,21 +1583,15 @@ def _compute_total_sleep_time(sleep_summary: pd.DataFrame, **kwargs) -> pd.Serie
     ):
         summary_tst = (
             sleep_summary[schema.DURATION_IN_MS_COL]
-            - sleep_summary[
-                schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL
-            ]
+            - sleep_summary[schema.SLEEP_SUMMARY_UNMEASURABLE_SLEEP_DURATION_IN_MS_COL]
         )
 
     stage_tst = pd.Series(np.nan, index=sleep_summary.index, dtype=float)
     if (
         (schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns)
+        and (schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns)
         and (
-            schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL
-            in sleep_summary.columns
-        )
-        and (
-            schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL
-            in sleep_summary.columns
+            schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns
         )
     ):
         stage_tst = sleep_summary[
@@ -1753,13 +1738,9 @@ def _compute_sleep_stage_percentage(
         )
     if (
         (schema.SLEEP_SUMMARY_DEEP_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns)
+        and (schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns)
         and (
-            schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL
-            in sleep_summary.columns
-        )
-        and (
-            schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL
-            in sleep_summary.columns
+            schema.SLEEP_SUMMARY_LIGHT_SLEEP_DURATION_IN_MS_COL in sleep_summary.columns
         )
     ):
         tot_duration = sleep_summary[
@@ -1773,9 +1754,7 @@ def _compute_sleep_stage_percentage(
             perc = (
                 (
                     tot_duration
-                    - sleep_summary[
-                        schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL
-                    ]
+                    - sleep_summary[schema.SLEEP_SUMMARY_REM_SLEEP_DURATION_IN_MS_COL]
                 )
                 / tot_duration
                 * 100
@@ -2039,7 +2018,7 @@ def _compute_sleep_period_time(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2086,9 +2065,7 @@ def _compute_sleep_period_time(
         ):
             time_col = schema.UTC_TIME_COL
         start = group[time_col]
-        end = start + pd.to_timedelta(
-            group[schema.DURATION_IN_MS_COL], unit="ms"
-        )
+        end = start + pd.to_timedelta(group[schema.DURATION_IN_MS_COL], unit="ms")
         durations[summary_id] = (end.max() - start.min()).total_seconds() / 60
 
     spt = sleep_summary[schema.SLEEP_SUMMARY_ID_COL].map(durations).dropna()
@@ -2107,7 +2084,7 @@ def _compute_sleep_onset_latency(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2147,7 +2124,7 @@ def _compute_wake_after_sleep_onset(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2194,9 +2171,7 @@ def _compute_wake_after_sleep_onset(
         sleep_onset = known_sleep[time_col].min()
         sleep_offset = (
             known_sleep[time_col]
-            + pd.to_timedelta(
-                known_sleep[schema.DURATION_IN_MS_COL], unit="ms"
-            )
+            + pd.to_timedelta(known_sleep[schema.DURATION_IN_MS_COL], unit="ms")
         ).max()
         awake = group[
             group[schema.SLEEP_STAGE_SLEEP_TYPE_COL]
@@ -2205,13 +2180,11 @@ def _compute_wake_after_sleep_onset(
         awake_start = awake[time_col].clip(lower=sleep_onset)
         awake_end = (
             awake[time_col]
-            + pd.to_timedelta(
-                awake[schema.DURATION_IN_MS_COL], unit="ms"
-            )
+            + pd.to_timedelta(awake[schema.DURATION_IN_MS_COL], unit="ms")
         ).clip(upper=sleep_offset)
-        waso_by_id[summary_id] = (
-            (awake_end - awake_start).dt.total_seconds().clip(lower=0).sum() / 60
-        )
+        waso_by_id[summary_id] = (awake_end - awake_start).dt.total_seconds().clip(
+            lower=0
+        ).sum() / 60
 
     waso = sleep_summary[schema.SLEEP_SUMMARY_ID_COL].map(waso_by_id)
     waso.name = SLEEP_STATISTIC_WASO
@@ -2226,7 +2199,7 @@ def _compute_light_latency(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2248,7 +2221,7 @@ def _compute_deep_latency(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2270,7 +2243,7 @@ def _compute_rem_latency(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2295,7 +2268,7 @@ def _compute_latencies(
     Parameters
     ----------
     sleep_summary : :class:`pd.DataFrame`
-        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summary`.
+        Sleep summaries, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_summaries`.
         The index of ``sleep_summary`` must be the unique ``sleep_summary_id``.
     sleep_stages : :class:`pd.DataFrame`
         Sleep stages, that can be extracted using :method:`pywearable.loader.base.BaseLoader.load_sleep_stage`.
@@ -2357,9 +2330,7 @@ def _compute_latencies(
             and pd.notna(summary[schema.UTC_TIME_COL])
         ):
             time_col = schema.UTC_TIME_COL
-        first_stages = group.groupby(schema.SLEEP_STAGE_SLEEP_TYPE_COL)[
-            time_col
-        ].min()
+        first_stages = group.groupby(schema.SLEEP_STAGE_SLEEP_TYPE_COL)[time_col].min()
         latency_rows[summary_id] = (
             first_stages - summary[time_col]
         ).dt.total_seconds() / 60
@@ -2546,9 +2517,7 @@ def _get_sleep_summary_ids(sleep_summary: pd.DataFrame) -> pd.Series:
     raise ValueError("sleep summary data requires sleep_summary_id")
 
 
-def _compute_summary_end_time(
-    sleep_summary: pd.DataFrame, time_col: str
-) -> pd.Series:
+def _compute_summary_end_time(sleep_summary: pd.DataFrame, time_col: str) -> pd.Series:
     """Return the provider sleep-session end in the requested clock."""
     end_col = (
         schema.LOCAL_END_TIME_COL
@@ -2562,10 +2531,9 @@ def _compute_summary_end_time(
 
     if time_col not in sleep_summary.columns:
         return end_time
-    duration = (
-        sleep_summary[schema.DURATION_IN_MS_COL]
-        + sleep_summary[schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(0)
-    )
+    duration = sleep_summary[schema.DURATION_IN_MS_COL] + sleep_summary[
+        schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
+    ].fillna(0)
     reconstructed = pd.to_datetime(
         sleep_summary[time_col], errors="coerce"
     ) + pd.to_timedelta(duration, unit="ms")
@@ -2594,16 +2562,12 @@ def _compute_sleep_boundaries(
     summary_ids = _get_sleep_summary_ids(sleep_summary)
     stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
-            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
-                summary_ids.unique()
-            )
+            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids.unique())
         ].reset_index(drop=True)
     )
     groups = {
         summary_id: group.reset_index(drop=True)
-        for summary_id, group in stages.groupby(
-            schema.SLEEP_SUMMARY_ID_COL, sort=False
-        )
+        for summary_id, group in stages.groupby(schema.SLEEP_SUMMARY_ID_COL, sort=False)
     }
     local_getup = _compute_summary_end_time(sleep_summary, schema.LOCAL_TIME_COL)
     utc_getup = _compute_summary_end_time(sleep_summary, schema.UTC_TIME_COL)
@@ -2626,9 +2590,7 @@ def _compute_sleep_boundaries(
         )
         time_col = schema.UTC_TIME_COL if use_utc else schema.LOCAL_TIME_COL
         group = group.sort_values(time_col, kind="stable").reset_index(drop=True)
-        durations = pd.to_timedelta(
-            group[schema.DURATION_IN_MS_COL], unit="ms"
-        )
+        durations = pd.to_timedelta(group[schema.DURATION_IN_MS_COL], unit="ms")
         ends = group[time_col] + durations
         is_sleep = group[schema.SLEEP_STAGE_SLEEP_TYPE_COL].isin(sleep_labels)
         if not is_sleep.any():
@@ -2686,9 +2648,9 @@ def _compute_sleep_boundaries(
                 wakeup_elapsed = last_sleep_end
                 local_uncertain = (
                     "local_time_uncertain" in group.columns
-                    and group.loc[
-                        last_sleep_position:, "local_time_uncertain"
-                    ].fillna(False).any()
+                    and group.loc[last_sleep_position:, "local_time_uncertain"]
+                    .fillna(False)
+                    .any()
                 )
                 if not local_uncertain:
                     wakeup_local = (
@@ -2789,7 +2751,9 @@ def _get_sleep_calendar_dates(sleep_summary: pd.DataFrame) -> pd.Series:
         if schema.CALENDAR_DATE_COL in sleep_summary.columns
         else sleep_summary.index
     )
-    dates = pd.Series(pd.to_datetime(values, errors="coerce"), index=sleep_summary.index).dt.normalize()
+    dates = pd.Series(
+        pd.to_datetime(values, errors="coerce"), index=sleep_summary.index
+    ).dt.normalize()
     if dates.isna().any():
         raise ValueError("CPD requires a valid calendar date for every sleep summary.")
     return dates
@@ -2920,9 +2884,9 @@ def _compute_cpd_duration(
 
     calendar_dates = _get_sleep_calendar_dates(sleep_summary)
     chronological_index = calendar_dates.sort_values(kind="stable").index
-    durations = (
-        _compute_total_sleep_time(sleep_summary=sleep_summary) / 60
-    ).reindex(chronological_index)
+    durations = (_compute_total_sleep_time(sleep_summary=sleep_summary) / 60).reindex(
+        chronological_index
+    )
 
     if chronotype is None:  # from data
         chronotype_sleep_duration = durations.mean()
@@ -3004,9 +2968,7 @@ def _compute_awakening_metrics(
     summary_ids = _get_sleep_summary_ids(sleep_summary)
     stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
-            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
-                summary_ids.unique()
-            )
+            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids.unique())
         ].reset_index(drop=True)
     )
     summary_index_by_id = dict(zip(summary_ids, sleep_summary.index))
@@ -3018,9 +2980,7 @@ def _compute_awakening_metrics(
         ):
             time_col = schema.UTC_TIME_COL
         group = group.sort_values(time_col, kind="stable")
-        durations = pd.to_timedelta(
-            group[schema.DURATION_IN_MS_COL], unit="ms"
-        )
+        durations = pd.to_timedelta(group[schema.DURATION_IN_MS_COL], unit="ms")
         ends = group[time_col] + durations
         is_sleep = ~group[schema.SLEEP_STAGE_SLEEP_TYPE_COL].isin(
             [
@@ -3039,21 +2999,19 @@ def _compute_awakening_metrics(
         awake_start = awake[time_col].clip(lower=onset)
         awake_end = (
             awake[time_col]
-            + pd.to_timedelta(
-                awake[schema.DURATION_IN_MS_COL], unit="ms"
-            )
+            + pd.to_timedelta(awake[schema.DURATION_IN_MS_COL], unit="ms")
         ).clip(upper=offset)
-        bout_durations = (
-            (awake_end - awake_start).dt.total_seconds() / 60
-        ).loc[lambda values: values > 0]
+        bout_durations = ((awake_end - awake_start).dt.total_seconds() / 60).loc[
+            lambda values: values > 0
+        ]
         calendar_date = summary_index_by_id[summary_id]
         metrics.loc[calendar_date, SLEEP_STATISTIC_AWAKENING_COUNT] = len(
             bout_durations
         )
         if len(bout_durations):
-            metrics.loc[
-                calendar_date, SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION
-            ] = bout_durations.median()
+            metrics.loc[calendar_date, SLEEP_STATISTIC_MEDIAN_AWAKENING_DURATION] = (
+                bout_durations.median()
+            )
     return metrics
 
 
@@ -3097,9 +3055,7 @@ def _compute_stage_transition_count(
     summary_ids = _get_sleep_summary_ids(sleep_summary)
     stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
-            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
-                summary_ids.unique()
-            )
+            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids.unique())
         ].reset_index(drop=True)
     )
     summary_index_by_id = dict(zip(summary_ids, sleep_summary.index))
@@ -3156,9 +3112,7 @@ def _compute_stage_coverage(
     summary_ids = _get_sleep_summary_ids(sleep_summary)
     stages = schema._coalesce_sleep_stage_runs(
         sleep_stages[
-            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(
-                summary_ids.unique()
-            )
+            sleep_stages[schema.SLEEP_SUMMARY_ID_COL].isin(summary_ids.unique())
         ].reset_index(drop=True)
     )
     measurable = stages[
@@ -3169,10 +3123,9 @@ def _compute_stage_coverage(
         schema.DURATION_IN_MS_COL
     ].sum()
     has_stages = summary_ids.isin(stages[schema.SLEEP_SUMMARY_ID_COL].unique())
-    tib_ms = (
-        sleep_summary[schema.DURATION_IN_MS_COL]
-        + sleep_summary[schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL].fillna(0)
-    )
+    tib_ms = sleep_summary[schema.DURATION_IN_MS_COL] + sleep_summary[
+        schema.SLEEP_SUMMARY_AWAKE_DURATION_IN_MS_COL
+    ].fillna(0)
     coverage_by_id = (
         summary_ids.map(measurable_ms).fillna(0).where(has_stages)
         / tib_ms.where(tib_ms > 0)
@@ -3230,9 +3183,7 @@ SLEEP_STATISTICS_DICT = {
 def _sleep_statistics_list(statistic):
     if statistic is None:
         statistics = [
-            name
-            for name in SLEEP_STATISTICS_DICT
-            if name != SLEEP_STATISTIC_VALIDATION
+            name for name in SLEEP_STATISTICS_DICT if name != SLEEP_STATISTIC_VALIDATION
         ]
     else:
         statistics = [statistic] if isinstance(statistic, str) else list(statistic)
@@ -3416,9 +3367,7 @@ def _nightly_sleep_statistics(
     end_date = None if end_date is None else pd.Timestamp(end_date)
 
     statistics = _sleep_statistics_list(statistic)
-    coverage_threshold = hierarchy.normalize_coverage_thresholds(
-        min_coverage, 1
-    )[0]
+    coverage_threshold = hierarchy.normalize_coverage_thresholds(min_coverage, 1)[0]
 
     if loader_kwargs is None:
         loader_kwargs = {}
@@ -3429,7 +3378,7 @@ def _nightly_sleep_statistics(
     user_frames = {}
     for user in users:
         # Load sleep summary data
-        sleep_summary: pd.DataFrame = loader.load_sleep_summary(
+        sleep_summary: pd.DataFrame = loader.load_sleep_summaries(
             user_id=user,
             start_date=start_date,
             end_date=end_date,
@@ -3461,7 +3410,7 @@ def _nightly_sleep_statistics(
                     )
                 ).max()
             # Load sleep stages
-            sleep_stages = loader.load_sleep_stage(
+            sleep_stages = loader.load_sleep_stages(
                 user_id=user,
                 start_date=sleep_summary_start_date,
                 end_date=sleep_summary_end_date,
@@ -3493,21 +3442,19 @@ def _nightly_sleep_statistics(
         user_start = (
             pd.Timestamp(start_date).normalize()
             if start_date is not None
-            else user_frame.index.min().normalize()
-            if not user_frame.empty
-            else None
+            else user_frame.index.min().normalize() if not user_frame.empty else None
         )
         user_end = (
             pd.Timestamp(end_date).normalize()
             if end_date is not None
-            else user_frame.index.max().normalize() + pd.Timedelta(days=1)
-            if not user_frame.empty
-            else None
+            else (
+                user_frame.index.max().normalize() + pd.Timedelta(days=1)
+                if not user_frame.empty
+                else None
+            )
         )
         if user_start is not None and user_end is not None:
-            expected = pd.date_range(
-                user_start, user_end, freq="D", inclusive="left"
-            )
+            expected = pd.date_range(user_start, user_end, freq="D", inclusive="left")
             user_frame = user_frame.reindex(expected)
             user_frame.index.name = schema.CALENDAR_DATE_COL
         if user_frame.empty:
@@ -3516,29 +3463,23 @@ def _nightly_sleep_statistics(
             coverage_col = f"{name}__coverage"
             user_frame[coverage_col] = user_frame[name].notna().astype(float)
             if coverage_threshold is not None:
-                user_frame.loc[
-                    user_frame[coverage_col] < coverage_threshold, name
-                ] = np.nan
+                user_frame.loc[user_frame[coverage_col] < coverage_threshold, name] = (
+                    np.nan
+                )
         user_frames[user] = user_frame
     if not user_frames:
         empty_index = pd.MultiIndex.from_arrays(
             [[], []], names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
         )
         columns = [
-            column
-            for name in statistics
-            for column in (name, f"{name}__coverage")
+            column for name in statistics for column in (name, f"{name}__coverage")
         ]
         return pd.DataFrame(columns=columns, index=empty_index)
     sleep_stats_df = pd.concat(
         user_frames, names=[schema.USER_COL, schema.CALENDAR_DATE_COL]
     ).sort_index()
 
-    columns = [
-        column
-        for name in statistics
-        for column in (name, f"{name}__coverage")
-    ]
+    columns = [column for name in statistics for column in (name, f"{name}__coverage")]
     return sleep_stats_df[columns]
 
 
@@ -3557,7 +3498,10 @@ def _hierarchical_sleep_statistics(
 ):
     if chain[0] != "nightly":
         raise ValueError("sleep hierarchies must start with nightly resolution")
-    if any(target not in hierarchy.CALENDAR_RESOLUTIONS or target == "daily" for target in chain[1:]):
+    if any(
+        target not in hierarchy.CALENDAR_RESOLUTIONS or target == "daily"
+        for target in chain[1:]
+    ):
         raise ValueError(
             "nightly sleep features require calendar parents larger than daily"
         )
@@ -3618,9 +3562,7 @@ def _hierarchical_sleep_statistics(
     rename = {feature: f"{feature}__nightly" for feature in statistics}
     trajectory = trajectory.rename(columns=rename)
     temporal = {
-        rename[feature]
-        for feature in SLEEP_TEMPORAL_STATISTICS
-        if feature in rename
+        rename[feature] for feature in SLEEP_TEMPORAL_STATISTICS if feature in rename
     }
 
     for level_index, target in enumerate(chain[1:]):
@@ -3636,9 +3578,7 @@ def _hierarchical_sleep_statistics(
             min_coverage=coverage_thresholds[level_index + 1],
             min_valid_children=valid_child_thresholds[level_index + 1],
         )
-    return trajectory.rename_axis(
-        index={"window_start": schema.CALENDAR_DATE_COL}
-    )
+    return trajectory.rename_axis(index={"window_start": schema.CALENDAR_DATE_COL})
 
 
 def get_sleep_statistics(
@@ -3720,10 +3660,7 @@ def get_sleep_statistics(
     """
     chain, hierarchical = hierarchy.normalize_resolution_chain(resolution)
     if start_date is not None and end_date is not None:
-        if (
-            pd.Timestamp(end_date).normalize()
-            <= pd.Timestamp(start_date).normalize()
-        ):
+        if pd.Timestamp(end_date).normalize() <= pd.Timestamp(start_date).normalize():
             raise ValueError("end_date must be after start_date")
     if not hierarchical:
         target = chain[0]

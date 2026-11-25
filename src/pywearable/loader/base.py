@@ -40,7 +40,7 @@ class BaseLoader(ABC):
         pass
 
     @abstractmethod
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -57,7 +57,7 @@ class BaseLoader(ABC):
         pass
 
     @abstractmethod
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -84,7 +84,7 @@ class BaseLoader(ABC):
         override this method to include naps and other non-main sessions,
         advertising this with ``sleep_sessions_include_naps = True``.
         """
-        summaries = self.load_sleep_summary(
+        summaries = self.load_sleep_summaries(
             user_id=user_id,
             start_date=start_date,
             end_date=end_date,
@@ -117,9 +117,9 @@ class BaseLoader(ABC):
             unit="ms",
         )
         if schema.LOCAL_END_TIME_COL in summaries:
-            local_end = pd.to_datetime(
-                summaries[schema.LOCAL_END_TIME_COL]
-            ).fillna(reconstructed_end)
+            local_end = pd.to_datetime(summaries[schema.LOCAL_END_TIME_COL]).fillna(
+                reconstructed_end
+            )
         else:
             local_end = reconstructed_end
         result = pd.DataFrame(
@@ -133,8 +133,7 @@ class BaseLoader(ABC):
                 "local_time": pd.to_datetime(summaries[schema.LOCAL_TIME_COL]),
                 "local_end_time": local_end,
                 "time_in_bed_seconds": (
-                    local_end
-                    - pd.to_datetime(summaries[schema.LOCAL_TIME_COL])
+                    local_end - pd.to_datetime(summaries[schema.LOCAL_TIME_COL])
                 ).dt.total_seconds(),
             }
         )
@@ -151,7 +150,7 @@ class BaseLoader(ABC):
         The default is the loader's main-sleep stage trajectory. Loaders with
         staged naps or other non-main sessions override this method.
         """
-        return self.load_sleep_stage(user_id, start_date, end_date)
+        return self.load_sleep_stages(user_id, start_date, end_date)
 
     @abstractmethod
     def load_heart_rate(
@@ -193,7 +192,7 @@ class BaseLoader(ABC):
         """Load incremental step intervals in the shared activity schema."""
         return schema.empty_activity_frame()
 
-    def load_activity_summary(
+    def load_activity_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -232,7 +231,7 @@ class BaseLoader(ABC):
         """
         return schema.empty_respiration_frame()
 
-    def load_respiration_summary(
+    def load_respiration_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -247,7 +246,7 @@ class BaseLoader(ABC):
             ]
         )
 
-    def load_spo2_summary(
+    def load_spo2_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -295,9 +294,7 @@ class BaseLoader(ABC):
         additional features with ``provider_feature_definitions``, mapping
         each name to ``{"grain": "samples" | "daily", "numeric": bool}``.
         """
-        raise ValueError(
-            f"{type(self).__name__} does not provide feature {feature!r}"
-        )
+        raise ValueError(f"{type(self).__name__} does not provide feature {feature!r}")
 
     def load_hrv_samples(
         self,
@@ -308,7 +305,7 @@ class BaseLoader(ABC):
         """Load provider-computed HRV samples when the source supplies them."""
         return pd.DataFrame()
 
-    def load_hrv_summary(
+    def load_hrv_summaries(
         self,
         user_id: str,
         start_date: Union[datetime.datetime, datetime.date, str, None] = None,
@@ -331,14 +328,13 @@ class BaseLoader(ABC):
         """
         pass
 
-    def resolve_user_ids(
-        self, user_id: Union[str, list, tuple, None] = "all"
-    ) -> list:
+    def resolve_user_ids(self, user_id: Union[str, list, tuple, None] = "all") -> list:
         """Return the requested participant IDs as a list."""
         if user_id == "all" or user_id is None:
             return list(self.get_user_ids())
-        if isinstance(user_id, str):
+        if isinstance(user_id, str) or isinstance(user_id, int):
             return [user_id]
+
         return list(user_id)
 
 

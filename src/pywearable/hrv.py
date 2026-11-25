@@ -21,7 +21,7 @@ HRV_STATISTIC_VERY_LOW_FREQUENCY_POWER = "hrv_vlf_power"
 HRV_STATISTIC_LOW_FREQUENCY_POWER = "hrv_lf_power"
 HRV_STATISTIC_HIGH_FREQUENCY_POWER = "hrv_hf_power"
 HRV_STATISTIC_LOW_HIGH_FREQUENCY_RATIO = "hrv_lfhf_ratio"
-HRV_STATISTIC_BBI_MEDIAN = "hrv_bbi_median"
+HRV_STATISTIC_BBI_MEDIAN = "hrv_median_nn"
 HRV_STATISTIC_MIN_NN = "hrv_min_nn"
 HRV_STATISTIC_MEAN_NN = "hrv_mean_nn"
 HRV_STATISTIC_MAX_NN = "hrv_max_nn"
@@ -534,7 +534,7 @@ def _asleep_stage_membership(
             "sleep_stages_to_remove contains unsupported values: " f"{sorted(unknown)}"
         )
     stages = schema.prepare_sleep_stages(
-        loader.load_sleep_stage(user_id, start_date, end_date)
+        loader.load_sleep_stages(user_id, start_date, end_date)
     )
     if stages.empty:
         return np.ones(len(timestamps), dtype=bool), np.zeros(

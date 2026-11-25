@@ -5,10 +5,10 @@ from pywearable.loader.base import BaseLoader
 
 
 class MinimalLoader(BaseLoader):
-    def load_sleep_summary(self, *args, **kwargs):
+    def load_sleep_summaries(self, *args, **kwargs):
         return pd.DataFrame()
 
-    def load_sleep_stage(self, *args, **kwargs):
+    def load_sleep_stages(self, *args, **kwargs):
         return pd.DataFrame()
 
     def load_heart_rate(self, *args, **kwargs):

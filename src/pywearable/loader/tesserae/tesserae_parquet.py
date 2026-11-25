@@ -283,13 +283,13 @@ class TesseraeParquetLoader(BaseLoader):
         stress = stress.drop_duplicates(subset="utc_time", keep="last")
         return stress
 
-    def load_sleep_stage(
+    def load_sleep_stages(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
         end_date: pd.Timestamp = None,
     ) -> pd.DataFrame:
-        sleep_summary = self.load_sleep_summary(user_id=user_id)
+        sleep_summary = self.load_sleep_summaries(user_id=user_id)
         if len(sleep_summary) == 0:
             return pd.DataFrame(
                 columns=[
@@ -396,7 +396,7 @@ class TesseraeParquetLoader(BaseLoader):
             ]
         return sleep_stage
 
-    def load_sleep_summary(
+    def load_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -883,7 +883,7 @@ class TesseraeParquetLoader(BaseLoader):
             df = df[df[date_col] < pd.Timestamp(end_date).dt.normalize()]
         return df
 
-    def load_daily_summary(
+    def load_daily_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -916,7 +916,7 @@ class TesseraeParquetLoader(BaseLoader):
             ).drop_duplicates(subset="calendar_date", keep="last", ignore_index=True)
         return daily_summary
 
-    def load_activity_summary(
+    def load_activity_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -944,7 +944,7 @@ class TesseraeParquetLoader(BaseLoader):
 
         return activity_summary
 
-    def load_adjusted_imputed_sleep_summary(
+    def load_adjusted_imputed_sleep_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -988,7 +988,7 @@ class TesseraeParquetLoader(BaseLoader):
 
         return adj_sleep_summary
 
-    def load_heart_rate_summary(
+    def load_heart_rate_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1035,7 +1035,7 @@ class TesseraeParquetLoader(BaseLoader):
 
         return hr_summary
 
-    def load_hrv_summary(
+    def load_hrv_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1105,7 +1105,7 @@ class TesseraeParquetLoader(BaseLoader):
 
         return hrv_summary
 
-    def load_stress_summary(
+    def load_stress_summaries(
         self,
         user_id: str,
         start_date: Union[pd.Timestamp, None] = None,
@@ -1246,7 +1246,7 @@ class TesseraeParquetLoader(BaseLoader):
     #############################################################
     #                   Weather
     #############################################################
-    def load_weather_summary(
+    def load_weather_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         return self._load_global_metric(
@@ -1313,7 +1313,7 @@ class TesseraeParquetLoader(BaseLoader):
         )
         return gimbal_beacon_sighting
 
-    def load_beacon_summary(
+    def load_beacon_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         gimbal_beacon_summary = self._load_global_metric(
@@ -1340,7 +1340,7 @@ class TesseraeParquetLoader(BaseLoader):
                 )
         return home_office_hours
 
-    def load_interaction_summary(
+    def load_interaction_summaries(
         self, user_id, start_date: pd.Timestamp = None, end_date: pd.Timestamp = None
     ) -> pd.DataFrame:
         interaction_summary = self._load_global_metric(
@@ -1404,7 +1404,7 @@ class TesseraeParquetLoader(BaseLoader):
                 )
         return home_office_hours
 
-    def load_mixed_hrv_summary_baseline(
+    def load_mixed_hrv_summaries_baseline(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -1462,7 +1462,7 @@ class TesseraeParquetLoader(BaseLoader):
             )
         return hrv_summary_baseline
 
-    def load_mixed_hrv_work_desk_home_summary(
+    def load_mixed_hrv_work_desk_home_summaries(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,
@@ -1489,7 +1489,7 @@ class TesseraeParquetLoader(BaseLoader):
             hrv[columns] = hrv[columns].replace("NULL", None).astype(float)
         return hrv
 
-    def load_mixed_pa_summary(
+    def load_mixed_pa_summaries(
         self,
         user_id: str,
         start_date: pd.Timestamp = None,

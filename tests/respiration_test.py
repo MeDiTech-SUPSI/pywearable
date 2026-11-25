@@ -11,6 +11,7 @@ from pywearable.loader.labfront import constants as labfront_constants
 from pywearable.loader.labfront.loader import LabfrontLoader
 from pywearable.loader.lifesnaps import LifeSnapsParquetLoader
 
+
 class SampleRespirationLoader(pywearable.loader.BaseLoader):
     def __init__(self):
         times = pd.date_range("2024-01-01", periods=10, freq="1min")
@@ -19,9 +20,7 @@ class SampleRespirationLoader(pywearable.loader.BaseLoader):
             "local_time": times,
             "timezone": pd.Timedelta(0),
         }
-        self.respiration = pd.DataFrame(
-            {**common, "respiratory_rate": range(10, 20)}
-        )
+        self.respiration = pd.DataFrame({**common, "respiratory_rate": range(10, 20)})
         self.spo2 = pd.DataFrame(
             {**common, "spo2": [89, 89, 95, 96, 97, 98, 97, 96, 95, 94]}
         )
@@ -42,9 +41,7 @@ class SampleRespirationLoader(pywearable.loader.BaseLoader):
                 "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
                 "type": ["main_sleep", "main_sleep"],
                 "main_sleep": [True, True],
-                "local_time": pd.to_datetime(
-                    ["2024-01-01 00:00", "2024-01-02 00:00"]
-                ),
+                "local_time": pd.to_datetime(["2024-01-01 00:00", "2024-01-02 00:00"]),
                 "local_end_time": pd.to_datetime(
                     ["2024-01-01 00:05", "2024-01-02 00:10"]
                 ),
@@ -52,10 +49,10 @@ class SampleRespirationLoader(pywearable.loader.BaseLoader):
             }
         )
 
-    def load_sleep_summary(self, *args, **kwargs):
+    def load_sleep_summaries(self, *args, **kwargs):
         return pd.DataFrame()
 
-    def load_sleep_stage(self, *args, **kwargs):
+    def load_sleep_stages(self, *args, **kwargs):
         return pd.DataFrame()
 
     def load_heart_rate(self, *args, **kwargs):
@@ -66,7 +63,7 @@ class SummaryRespirationLoader(SampleRespirationLoader):
     respiratory_rate_source = "provider_summary"
     spo2_source = "provider_summary"
 
-    def load_respiration_summary(self, user_id, start_date=None, end_date=None):
+    def load_respiration_summaries(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame(
             {
                 "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
@@ -75,7 +72,7 @@ class SummaryRespirationLoader(SampleRespirationLoader):
             }
         )
 
-    def load_spo2_summary(self, user_id, start_date=None, end_date=None):
+    def load_spo2_summaries(self, user_id, start_date=None, end_date=None):
         return pd.DataFrame(
             {
                 "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-02"]),
@@ -207,12 +204,10 @@ def test_raw_night_and_awake_shortcuts_use_the_intended_cycles():
         start_date="2024-01-01",
         end_date="2024-01-02",
     )
-    assert nightly.loc[
-        ("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"
-    ] == 12
-    assert awake.loc[
-        ("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"
-    ] == 17
+    assert (
+        nightly.loc[("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"] == 12
+    )
+    assert awake.loc[("u1", pd.Timestamp("2024-01-01")), "respiratory_rate_mean"] == 17
 
 
 def test_combined_raw_night_features_share_cycle_lookup(monkeypatch):
@@ -243,9 +238,7 @@ def test_provider_summaries_remain_at_native_or_larger_grain():
         user_id="u1",
     )
     assert nightly.loc[("u1", pd.Timestamp("2024-01-01")), "spo2_mean"] == 97
-    assert nightly.loc[
-        ("u1", pd.Timestamp("2024-01-02")), "respiratory_rate_std"
-    ] == 2
+    assert nightly.loc[("u1", pd.Timestamp("2024-01-02")), "respiratory_rate_std"] == 2
 
     with pytest.raises(ValueError, match="native nightly grain"):
         pywearable.respiration.get_five_minute_respiration_statistics(
@@ -282,7 +275,7 @@ def test_provider_month_uses_night_label_not_previous_evening(monkeypatch):
     loader = SummaryRespirationLoader()
     monkeypatch.setattr(
         loader,
-        "load_respiration_summary",
+        "load_respiration_summaries",
         lambda **kwargs: pd.DataFrame(
             {
                 "calendar_date": [pd.Timestamp("2024-02-01")],
@@ -320,22 +313,35 @@ def test_provider_primary_coverage_is_not_invented():
 def test_provider_summary_hierarchy_counts_missing_nights(monkeypatch, family):
     loader = SummaryRespirationLoader()
     statistic = f"{family}_mean"
-    method = "load_respiration_summary" if family == "respiratory_rate" else "load_spo2_summary"
-    summary = pd.DataFrame({
-        "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-07"]),
-        statistic: [15.0, 16.0] if family == "respiratory_rate" else [96.0, 97.0],
-        f"{family}_coverage": [1.0, 1.0],
-    })
+    method = (
+        "load_respiration_summaries"
+        if family == "respiratory_rate"
+        else "load_spo2_summaries"
+    )
+    summary = pd.DataFrame(
+        {
+            "calendar_date": pd.to_datetime(["2024-01-01", "2024-01-07"]),
+            statistic: [15.0, 16.0] if family == "respiratory_rate" else [96.0, 97.0],
+            f"{family}_coverage": [1.0, 1.0],
+        }
+    )
     monkeypatch.setattr(loader, method, lambda **kwargs: summary.copy())
-    options = dict(loader=loader, statistic=statistic, user_id="u1",
-                   start_date="2024-01-01", end_date="2024-01-15")
+    options = dict(
+        loader=loader,
+        statistic=statistic,
+        user_id="u1",
+        start_date="2024-01-01",
+        end_date="2024-01-15",
+    )
     nightly = pywearable.respiration.get_respiration_statistics(**options)
     assert len(nightly) == 14
     missing = nightly[statistic].isna()
     assert missing.sum() == 12
     assert nightly.loc[missing, f"{statistic}__coverage"].eq(0).all()
     weekly = pywearable.respiration.get_respiration_statistics(
-        **options, resolution=["nightly", "weekly"], aggregation="mean",
+        **options,
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
         min_coverage=[None, 0.7],
     )
     feature = f"{statistic}__cycle_night__weekly_mean"
@@ -346,10 +352,16 @@ def test_provider_summary_hierarchy_counts_missing_nights(monkeypatch, family):
 
 def test_empty_provider_summary_preserves_requested_nights(monkeypatch):
     loader = SummaryRespirationLoader()
-    monkeypatch.setattr(loader, "load_respiration_summary", lambda **kwargs: pd.DataFrame())
+    monkeypatch.setattr(
+        loader, "load_respiration_summaries", lambda **kwargs: pd.DataFrame()
+    )
     result = pywearable.respiration.get_respiration_statistics(
-        loader, statistic="respiratory_rate_mean", start_date="2024-01-01",
-        end_date="2024-01-08", resolution=["nightly", "weekly"], aggregation="mean",
+        loader,
+        statistic="respiratory_rate_mean",
+        start_date="2024-01-01",
+        end_date="2024-01-08",
+        resolution=["nightly", "weekly"],
+        aggregation="mean",
     )
     feature = "respiratory_rate_mean__cycle_night__weekly_mean"
     assert len(result) == 1
@@ -409,9 +421,7 @@ def test_summary_schema_preserves_grain_and_rejects_invalid_values():
     assert spo2.loc[0, "spo2_upper_bound"] == 99
 
 
-def test_lifesnaps_summaries_use_local_sleep_end_and_expose_spo2(
-    tmp_path, monkeypatch
-):
+def test_lifesnaps_summaries_use_local_sleep_end_and_expose_spo2(tmp_path, monkeypatch):
     user_dir = tmp_path / "u1"
     user_dir.mkdir()
     pd.DataFrame(
@@ -438,7 +448,7 @@ def test_lifesnaps_summaries_use_local_sleep_end_and_expose_spo2(
     loader = LifeSnapsParquetLoader(tmp_path)
     monkeypatch.setattr(
         loader,
-        "load_sleep_summary",
+        "load_sleep_summaries",
         lambda **kwargs: pd.DataFrame(
             {
                 "sleep_summary_id": ["night-1"],
@@ -449,8 +459,8 @@ def test_lifesnaps_summaries_use_local_sleep_end_and_expose_spo2(
         ),
     )
 
-    respiration = loader.load_respiration_summary("u1")
-    spo2 = loader.load_spo2_summary("u1")
+    respiration = loader.load_respiration_summaries("u1")
+    spo2 = loader.load_spo2_summaries("u1")
     assert respiration.loc[0, "calendar_date"] == pd.Timestamp("2024-01-01")
     assert respiration.loc[0, "respiratory_rate_mean"] == 14.2
     assert respiration.loc[0, "respiratory_rate_std"] == 1.1
@@ -471,7 +481,7 @@ def test_lifesnaps_respiration_without_matched_sleep_is_not_a_night(tmp_path):
         }
     ).to_parquet(user_dir / "respiratory_rate_summary.parquet")
     loader = LifeSnapsParquetLoader(tmp_path)
-    assert loader.load_respiration_summary("u1").empty
+    assert loader.load_respiration_summaries("u1").empty
 
 
 def test_labfront_connect_samples_do_not_load_sleep_streams(monkeypatch):

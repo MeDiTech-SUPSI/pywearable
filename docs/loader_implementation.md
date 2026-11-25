@@ -149,8 +149,8 @@ Every concrete `BaseLoader` subclass implements:
 
 - `get_user_ids()`;
 - `load_heart_rate()`;
-- `load_sleep_summary()`;
-- `load_sleep_stage()`.
+- `load_sleep_summaries()`;
+- `load_sleep_stages()`.
 
 When the source does not support one of the required streams, return the
 corresponding typed canonical empty frame rather than inventing data.
@@ -186,14 +186,14 @@ Construct canonical columns explicitly, then call the relevant preparer:
 |---|---|---|
 | Heart rate | `load_heart_rate` | `schema.prepare_heart_rate_samples` |
 | Activity intervals | `load_activity_samples` | `schema.prepare_activity_samples` |
-| Daily activity | `load_activity_summary` | `schema.prepare_activity_summary` |
+| Daily activity | `load_activity_summaries` | `schema.prepare_activity_summary` |
 | Respiration samples | `load_respiration` | `schema.prepare_respiration_samples` |
-| Nightly respiration | `load_respiration_summary` | `schema.prepare_respiration_summary` |
+| Nightly respiration | `load_respiration_summaries` | `schema.prepare_respiration_summary` |
 | SpO2 samples | `load_pulse_ox` | `schema.prepare_spo2_samples` |
-| Nightly SpO2 | `load_spo2_summary` | `schema.prepare_spo2_summary` |
+| Nightly SpO2 | `load_spo2_summaries` | `schema.prepare_spo2_summary` |
 | Beat-to-beat intervals | `load_bbi` | `schema.prepare_bbi` |
-| Sleep summaries | `load_sleep_summary` | `schema.prepare_sleep_summary` |
-| Sleep stages | `load_sleep_stage` | `schema.prepare_sleep_stages` |
+| Sleep summaries | `load_sleep_summaries` | `schema.prepare_sleep_summary` |
+| Sleep stages | `load_sleep_stages` | `schema.prepare_sleep_stages` |
 | Provider samples | `load_provider_feature` | `schema.prepare_provider_feature_samples` |
 | Provider daily summaries | `load_provider_feature` | `schema.prepare_provider_feature_summary` |
 
